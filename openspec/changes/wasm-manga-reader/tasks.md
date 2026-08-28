@@ -35,10 +35,10 @@
 
 ## 6. Wails Frontend Bridge & Asset Proxy (`internal/bridge`)
 
-- [ ] 6.1 Implement `SearchManga`, `GetMangaDetails`, `GetPageList` service bindings that delegate to plugins
-- [ ] 6.2 Implement `ToggleLibraryItem` and `InstallPlugin` service bindings backed by `internal/database` and `internal/pluginmanager`
-- [ ] 6.3 Register the `manga-img://` protocol handler that fetches image bytes with the page's headers (including `Referer`) and serves them to the frontend
-- [ ] 6.4 Add image caching so repeat requests satisfy the sub-second cached-image latency requirement
+- [x] 6.1 Implement `SearchManga`, `GetMangaDetails`, `GetPageList` service bindings that delegate to plugins
+- [x] 6.2 Implement `ToggleLibraryItem` and `InstallPlugin` service bindings backed by `internal/database` and `internal/pluginmanager`
+- [x] 6.3 Register the `manga-img://` protocol handler that fetches image bytes with the page's headers (including `Referer`) and serves them to the frontend
+- [x] 6.4 Add image caching so repeat requests satisfy the sub-second cached-image latency requirement
 
 ## 7. Acceptance Verification
 
