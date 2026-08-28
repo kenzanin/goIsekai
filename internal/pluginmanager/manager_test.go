@@ -10,14 +10,15 @@ import (
 	"goisekai/pkg/types"
 )
 
-// buildFixture compiles the testdata plugin to wasip1/wasm and returns its path.
-func buildFixture(t *testing.T) string {
+// buildFixture compiles the named testdata plugin (without the .go suffix) to
+// wasip1/wasm and returns its path.
+func buildFixture(t *testing.T, name string) string {
 	t.Helper()
 	if _, err := exec.LookPath("go"); err != nil {
 		t.Skip("go toolchain not available")
 	}
-	wasmPath := filepath.Join(t.TempDir(), "testplugin.wasm")
-	cmd := exec.Command("go", "build", "-buildmode=c-shared", "-o", wasmPath, "./testdata/plugin.go")
+	wasmPath := filepath.Join(t.TempDir(), name+".wasm")
+	cmd := exec.Command("go", "build", "-buildmode=c-shared", "-o", wasmPath, "./testdata/"+name+".go")
 	cmd.Env = append(os.Environ(), "GOOS=wasip1", "GOARCH=wasm")
 	if out, err := cmd.CombinedOutput(); err != nil {
 		t.Fatalf("build fixture: %v\n%s", err, out)
@@ -26,7 +27,7 @@ func buildFixture(t *testing.T) string {
 }
 
 func TestManagerRoundTrip(t *testing.T) {
-	wasmPath := buildFixture(t)
+	wasmPath := buildFixture(t, "plugin")
 	pluginsDir := filepath.Dir(wasmPath)
 
 	mgr := NewManager(hostnet.NewProxy(), pluginsDir)
@@ -35,7 +36,7 @@ func TestManagerRoundTrip(t *testing.T) {
 	}
 	defer mgr.Close()
 
-	mangas, err := mgr.Search("testplugin", types.SearchFilter{Query: "test"})
+	mangas, err := mgr.Search("plugin", types.SearchFilter{Query: "test"})
 	if err != nil {
 		t.Fatalf("Search: %v", err)
 	}
@@ -43,7 +44,7 @@ func TestManagerRoundTrip(t *testing.T) {
 		t.Fatalf("unexpected Search result: %+v", mangas)
 	}
 
-	detail, err := mgr.GetMangaDetail("testplugin", "m1")
+	detail, err := mgr.GetMangaDetail("plugin", "m1")
 	if err != nil {
 		t.Fatalf("GetMangaDetail: %v", err)
 	}
@@ -51,7 +52,7 @@ func TestManagerRoundTrip(t *testing.T) {
 		t.Fatalf("unexpected detail: %+v", detail)
 	}
 
-	chapters, err := mgr.GetChapterList("testplugin", "m1")
+	chapters, err := mgr.GetChapterList("plugin", "m1")
 	if err != nil {
 		t.Fatalf("GetChapterList: %v", err)
 	}
@@ -59,7 +60,7 @@ func TestManagerRoundTrip(t *testing.T) {
 		t.Fatalf("unexpected chapters: %+v", chapters)
 	}
 
-	pages, err := mgr.GetPageList("testplugin", "c1")
+	pages, err := mgr.GetPageList("plugin", "c1")
 	if err != nil {
 		t.Fatalf("GetPageList: %v", err)
 	}
@@ -69,7 +70,7 @@ func TestManagerRoundTrip(t *testing.T) {
 }
 
 func TestUnknownPlugin(t *testing.T) {
-	wasmPath := buildFixture(t)
+	wasmPath := buildFixture(t, "plugin")
 	mgr := NewManager(hostnet.NewProxy(), filepath.Dir(wasmPath))
 	if err := mgr.Discover(); err != nil {
 		t.Fatalf("Discover: %v", err)
@@ -78,5 +79,23 @@ func TestUnknownPlugin(t *testing.T) {
 
 	if _, err := mgr.Search("nope", types.SearchFilter{}); err == nil {
 		t.Fatal("expected error for unknown plugin")
+	}
+}
+
+// TestPanickingPlugin verifies that a plugin whose Search panics returns a Go
+// error to the host, and that the manager (and a healthy plugin) keep working
+// afterward — the panic is isolated, not fatal to the reader (criterion 7.2).
+func TestPanickingPlugin(t *testing.T) {
+	panicPath := buildFixture(t, "panicplugin")
+	// Put the healthy plugin in a separate dir so Discover only sees the
+	// panicking one here.
+	mgr := NewManager(hostnet.NewProxy(), filepath.Dir(panicPath))
+	if err := mgr.Discover(); err != nil {
+		t.Fatalf("Discover: %v", err)
+	}
+	defer mgr.Close()
+
+	if _, err := mgr.Search("panicplugin", types.SearchFilter{}); err == nil {
+		t.Fatal("expected error from panicking plugin Search")
 	}
 }

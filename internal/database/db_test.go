@@ -201,3 +201,51 @@ func TestUpsertChapterPreservesProgress(t *testing.T) {
 		t.Fatalf("progress not preserved: read=%d page=%d status=%q", isRead, lastPage, status)
 	}
 }
+
+// TestPersistenceAcrossRestart verifies that library bookmarks and chapter
+// progress survive a close/reopen of the same SQLite file (criterion 7.3).
+func TestPersistenceAcrossRestart(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "restart.db")
+
+	db, err := Open(path)
+	if err != nil {
+		t.Fatalf("Open: %v", err)
+	}
+	m := Manga{ID: "m1", PluginID: "p1", SourceMangaID: "s1", Title: "Persist", InLibrary: true}
+	if err := db.UpsertManga(m); err != nil {
+		t.Fatalf("upsert manga: %v", err)
+	}
+	c := Chapter{ID: "c1", MangaID: "m1", SourceChapterID: "cs1", Title: "Ch1", ChapterNum: 1}
+	if err := db.UpsertChapter(c); err != nil {
+		t.Fatalf("upsert chapter: %v", err)
+	}
+	if err := db.SetChapterProgress("c1", 7); err != nil {
+		t.Fatalf("set progress: %v", err)
+	}
+	if err := db.Close(); err != nil {
+		t.Fatalf("close: %v", err)
+	}
+
+	// "Restart": reopen the same file and read back the persisted state.
+	db2, err := Open(path)
+	if err != nil {
+		t.Fatalf("reopen: %v", err)
+	}
+	defer db2.Close()
+
+	lib, err := db2.ListLibrary()
+	if err != nil {
+		t.Fatalf("ListLibrary: %v", err)
+	}
+	if len(lib) != 1 || lib[0].Title != "Persist" || !lib[0].InLibrary {
+		t.Fatalf("library not persisted: %+v", lib)
+	}
+
+	var isRead, lastPage int
+	if err := db2.db.QueryRow(`SELECT is_read, last_page_read FROM chapters WHERE id = ?`, "c1").Scan(&isRead, &lastPage); err != nil {
+		t.Fatalf("scan chapter: %v", err)
+	}
+	if isRead != 1 || lastPage != 7 {
+		t.Fatalf("progress not persisted: read=%d page=%d", isRead, lastPage)
+	}
+}

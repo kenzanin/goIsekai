@@ -42,7 +42,7 @@
 
 ## 7. Acceptance Verification
 
-- [ ] 7.1 Verify `CGO_ENABLED=0` cross-compilation succeeds for Windows, Linux, and macOS
-- [ ] 7.2 Verify a panicking/OOM `.wasm` plugin returns a Go error and the UI remains functional
-- [ ] 7.3 Verify manga progress, offline download status, and library bookmarks persist accurately across restarts
-- [ ] 7.4 Verify cached image loading via `manga-img://` stays under one second
+- [x] 7.1 Verify `CGO_ENABLED=0` cross-compilation succeeds for Windows, Linux, and macOS
+- [x] 7.2 Verify a panicking/OOM `.wasm` plugin returns a Go error and the UI remains functional
+- [x] 7.3 Verify manga progress, offline download status, and library bookmarks persist accurately across restarts
+- [x] 7.4 Verify cached image loading via `manga-img://` stays under one second
