@@ -1,0 +1,1 @@
+herdr --session goIsekai "$@"
