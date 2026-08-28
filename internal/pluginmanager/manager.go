@@ -168,6 +168,24 @@ func (m *Manager) load(rt wazero.Runtime, id, wasmPath string) (*loadedPlugin, e
 	return p, nil
 }
 
+// Install hot-loads a single plugin wasm file into the already-discovered
+// runtime and registers it under its base filename. It must be called after
+// Discover. The caller is responsible for placing the file in pluginsDir.
+func (m *Manager) Install(wasmPath string) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if m.runtime == nil {
+		return fmt.Errorf("Discover must be called before Install")
+	}
+	id := strings.TrimSuffix(filepath.Base(wasmPath), ".wasm")
+	p, err := m.load(m.runtime, id, wasmPath)
+	if err != nil {
+		return fmt.Errorf("install plugin %s: %w", id, err)
+	}
+	m.plugins[id] = p
+	return nil
+}
+
 // get returns the loaded plugin for pluginID under a read lock.
 func (m *Manager) get(pluginID string) (*loadedPlugin, error) {
 	m.mu.RLock()
