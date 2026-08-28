@@ -1,21 +1,21 @@
 ## 1. Project Setup
 
-- [ ] 1.1 Initialize the Go module (`go mod init`) with Go 1.21+ and add `wazero` and `modernc.org/sqlite` dependencies
-- [ ] 1.2 Add Wails scaffolding (v2/v3) and confirm a CGO-free host build config (`CGO_ENABLED=0`) for all target platforms
-- [ ] 1.3 Establish the standard Go project layout: `cmd/goisekai` (entrypoint), `pkg/types` (shared ABI contract), `internal/{hostnet,database,pluginmanager,bridge}` (host-private packages)
+- [x] 1.1 Initialize the Go module (`go mod init`) with Go 1.21+ and add `wazero` and `modernc.org/sqlite` dependencies
+- [x] 1.2 Add Wails scaffolding (v2/v3) and confirm a CGO-free host build config (`CGO_ENABLED=0`) for all target platforms
+- [x] 1.3 Establish the standard Go project layout: `cmd/goisekai` (entrypoint), `pkg/types` (shared ABI contract), `internal/{hostnet,database,pluginmanager,bridge}` (host-private packages)
 
 ## 2. Shared ABI & Core Domain Types (`pkg/types`)
 
-- [ ] 2.1 Define the `Manga`, `Chapter`, `Page`, and `SearchFilter` DTOs with JSON tags matching the proposal contract
-- [ ] 2.2 Define the plugin interface spec: the four exported host functions (`Search`, `GetMangaDetail`, `GetChapterList`, `GetPageList`) and the `host_http_request` import signature
-- [ ] 2.3 Add the `contractVersion` constant and the version-declaration/rejection mechanism
+- [x] 2.1 Define the `Manga`, `Chapter`, `Page`, and `SearchFilter` DTOs with JSON tags matching the proposal contract
+- [x] 2.2 Define the plugin interface spec: the four exported host functions (`Search`, `GetMangaDetail`, `GetChapterList`, `GetPageList`) and the `host_http_request` import signature
+- [x] 2.3 Add the `contractVersion` constant and the version-declaration/rejection mechanism
 
 ## 3. Host Network Proxy (`internal/hostnet`)
 
-- [ ] 3.1 Implement the `host_http_request` handler that decodes the request payload, performs the HTTP call, and returns the response as JSON
-- [ ] 3.2 Implement automatic standard-header injection (`User-Agent`, `Accept-Language`, configured `Referer`)
-- [ ] 3.3 Implement per-page header override (page `headers` map wins over defaults)
-- [ ] 3.4 Implement per-plugin cookie jars (one `cookiejar.Jar` keyed by plugin id) with persistence across calls
+- [x] 3.1 Implement the `host_http_request` handler that decodes the request payload, performs the HTTP call, and returns the response as JSON
+- [x] 3.2 Implement automatic standard-header injection (`User-Agent`, `Accept-Language`, configured `Referer`)
+- [x] 3.3 Implement per-page header override (page `headers` map wins over defaults)
+- [x] 3.4 Implement per-plugin cookie jars (one `cookiejar.Jar` keyed by plugin id) with persistence across calls
 
 ## 4. SQLite Schema & Persistence (`internal/database`)
 
