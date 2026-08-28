@@ -19,19 +19,19 @@
 
 ## 4. SQLite Schema & Persistence (`internal/database`)
 
-- [ ] 4.1 Set up the pure-Go SQLite connection and a versioned migration runner
-- [ ] 4.2 Create the `mangas` table with the `UNIQUE(plugin_id, source_manga_id)` constraint
-- [ ] 4.3 Create the `chapters` table with `is_read`, `last_page_read`, `download_status`, and FK cascade to `mangas`
-- [ ] 4.4 Create the `read_history` and `plugins` tables with cascade and registry fields per the DDL
-- [ ] 4.5 Implement repository methods for library bookmarks, chapter read progress, download status transitions, read history, and plugin registration
+- [x] 4.1 Set up the pure-Go SQLite connection and a versioned migration runner
+- [x] 4.2 Create the `mangas` table with the `UNIQUE(plugin_id, source_manga_id)` constraint
+- [x] 4.3 Create the `chapters` table with `is_read`, `last_page_read`, `download_status`, and FK cascade to `mangas`
+- [x] 4.4 Create the `read_history` and `plugins` tables with cascade and registry fields per the DDL
+- [x] 4.5 Implement repository methods for library bookmarks, chapter read progress, download status transitions, read history, and plugin registration
 
 ## 5. WASM Engine & Isolation (`internal/pluginmanager`)
 
-- [ ] 5.1 Implement plugin discovery by scanning `app_data/plugins/*.wasm`
-- [ ] 5.2 Implement module loading into the `wazero` runtime with the four JSON host functions bound to each plugin
-- [ ] 5.3 Wire `host_http_request` as the host-imported function available to plugin modules
-- [ ] 5.4 Enforce the 64 MB per-instance memory cap and 15s per-invocation timeout (context cancellation)
-- [ ] 5.5 Implement panic/OOM interception so plugin failures return a Go `error` and leave the host/UI functional
+- [x] 5.1 Implement plugin discovery by scanning `app_data/plugins/*.wasm`
+- [x] 5.2 Implement module loading into the `wazero` runtime with the four JSON host functions bound to each plugin
+- [x] 5.3 Wire `host_http_request` as the host-imported function available to plugin modules
+- [x] 5.4 Enforce the 64 MB per-instance memory cap and 15s per-invocation timeout (context cancellation)
+- [x] 5.5 Implement panic/OOM interception so plugin failures return a Go `error` and leave the host/UI functional
 
 ## 6. Wails Frontend Bridge & Asset Proxy (`internal/bridge`)
 
