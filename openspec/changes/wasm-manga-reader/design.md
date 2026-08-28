@@ -46,7 +46,7 @@ Register a custom scheme (`manga-img://`) handled in-process. The handler parses
 - **Pure-Go SQLite is slower than cgo SQLite** → Acceptable for a reader's small writes; mitigations if needed: batched transactions and prepared statements.
 - **WASM call overhead per request** → JSON-over-memory serialization is cheap relative to network I/O; keep payloads bounded and reuse module instances where possible.
 - **TLS fingerprinting for bypass sources is hard to make robust** → Scope it as best-effort header/transport tuning first; full uTLS-style fingerprinting is deferred (see Open Questions). Broken bypass degrades to "source unavailable", never crashes the host.
-- **Custom image scheme may differ between Wails v2 and v3** → Isolate the proxy behind an interface in `pkg/bridge` so the scheme registration is the only platform-specific piece.
+- **Custom image scheme may differ between Wails v2 and v3** → Isolate the proxy behind an interface in `internal/bridge` so the scheme registration is the only platform-specific piece.
 - **Memory cap too low for image-heavy plugins** → 64 MB is a starting point; expose the cap as a per-plugin configurable value, keep 64 MB as the default.
 
 ## Migration Plan

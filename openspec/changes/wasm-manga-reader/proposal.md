@@ -25,7 +25,7 @@ We need a cross-platform desktop manga reader whose content sources are hot-swap
 
 ## Impact
 
-- **New Go module** (`go.mod`, Go 1.21+) with packages: `pkg/types`, `pkg/hostnet`, `pkg/database`, `pkg/pluginmanager`, `pkg/bridge`.
+- **New Go module** (`go.mod`, Go 1.21+) using the standard Go project layout: `cmd/goisekai` (Wails entrypoint), `pkg/types` (shared ABI contract), and `internal/{hostnet,database,pluginmanager,bridge}` (host-private packages).
 - **New dependencies**: Wails (v2/v3), `wazero` and/or `extism` (pure-Go WASM runtime), `glebarez/go-sqlite` or `modernc.org/sqlite` (pure-Go SQLite).
 - **Build constraint**: `CGO_ENABLED=0` across all host builds (Windows, Linux, macOS).
 - **Deployment artifact**: a self-contained desktop app plus an `app_data/plugins/*.wasm` discovery directory.
