@@ -20,7 +20,7 @@ export const bindings = {
   getImage: (pluginID, url, headers) => call('GetImage', pluginID, url, headers),
   log: (level, msg) => call('Log', level, msg),
   reloadConfig: () => call('ReloadConfig'),
-  getConfigPath: () => call('GetConfigPath'),
+  evictImageCache: (url) => call('EvictImageCache', url),
 };
 
 export function call(method, ...args) {

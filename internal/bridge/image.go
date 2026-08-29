@@ -12,6 +12,17 @@ import (
 	"goisekai/pkg/types"
 )
 
+// EvictImageCache removes a URL from both L1 (memory) and L2 (disk) cache.
+// Called when the user wants to force re-fetch a corrupt/stale image.
+func (s *AppService) EvictImageCache(url string) {
+	s.imageMu.Lock()
+	delete(s.imageCache, url)
+	s.imageMu.Unlock()
+	if diskPath := s.diskCachePath(url); diskPath != "" {
+		_ = os.Remove(diskPath)
+	}
+}
+
 // GetImage fetches image bytes for pluginID from url (with optional per-request
 // headers) through the hostnet proxy. Results are cached in memory (L1) and on
 // disk (L2) so repeat lookups skip the network entirely.

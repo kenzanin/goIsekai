@@ -26,6 +26,7 @@ export const readerView = () => ({
   viewMode: 'fitWidth',
   direction: 'ltr',
   showShortcuts: false,
+  deleteCacheOnRetry: false,
 
   init() {
     const s = settings;
@@ -166,6 +167,21 @@ export const readerView = () => ({
   // these (ArrowLeft vs ArrowRight) is decided in bindKeys() by the direction.
   goNext() { this.goToPage(this.currentPage + 1); },
   goPrev() { this.goToPage(this.currentPage - 1); },
+
+  // Retry current page, optionally evicting cache first.
+  async retryPage() {
+    if (this.deleteCacheOnRetry) {
+      const page = this.pages[this.currentPage];
+      if (page) await bindings.evictImageCache(page.url);
+    }
+    await this.goToPage(this.currentPage, true);
+  },
+
+  // Skip to next page without retrying.
+  skipPage() {
+    this.deleteCacheOnRetry = false;
+    this.goNext();
+  },
 
   setViewMode(v) {
     this.viewMode = v;
