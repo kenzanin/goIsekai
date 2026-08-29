@@ -43,7 +43,7 @@ func main() {
 	if err := logger.Init(level); err != nil {
 		log.Fatalf("init logger: %v", err)
 	}
-	logger.Info("starting goIsekai", "level", level, "data_dir", cfg.DataDir)
+	logger.Info("starting goIsekai", "log_level", level, "data_dir", cfg.DataDir)
 
 	// Data directory holds the SQLite file and the plugins/ wasm directory.
 	dataDir := cfg.DataDir
