@@ -29,7 +29,7 @@ export const RBTN_ACTIVE = 'px-3 py-1.5 rounded-card border border-accent text-a
  * 3. Image loading — GetImage bytes → Blob URL (cache per-URL).
  *    `blobCache` stays centralized here so it is never spread out.
  * ------------------------------------------------------------------ */
-export const blobCache = new Map();
+const blobCache = new Map();
 const blobUrls = [];
 const MAX_BLOBS = 50;
 
