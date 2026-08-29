@@ -340,7 +340,7 @@
               'img-sharp': renderMode === 'sharp',
               'gpu-compositing': gpu
             }">
-         <img x-show="pageSrc && !error" :src="pageSrc" alt="" class="block">
+         <img x-show="pageSrc && !error" :src="pageSrc" alt="" class="block" @error="error = true; loading = false">
          <!-- Retry button for failed images -->
          <div x-show="error && !loading" class="flex flex-col items-center justify-center gap-4 text-center">
            <span class="text-zinc-400 text-sm">Failed to load page</span>
