@@ -256,6 +256,12 @@ export const settingsView = () => {
     readAhead: s.readAhead,
     direction: s.direction,
     viewMode: s.viewMode,
+    configPath: '',
+    configStatus: '',
+
+    init() {
+      bindings.getConfigPath().then(p => { this.configPath = p; }).catch(() => {});
+    },
 
     persist() {
       settings.renderMode = this.renderMode;
@@ -268,6 +274,13 @@ export const settingsView = () => {
       saveSetting('readAhead', String(this.readAhead));
       saveSetting('direction', this.direction);
       saveSetting('viewMode', this.viewMode);
+    },
+
+    reloadConfig() {
+      this.configStatus = 'Reloading...';
+      bindings.reloadConfig()
+        .then(() => { this.configStatus = 'Config reloaded ✓'; setTimeout(() => { this.configStatus = ''; }, 3000); })
+        .catch(e => { this.configStatus = 'Error: ' + (e?.message || e); });
     },
 
     setReadAhead(v) {

@@ -23,7 +23,7 @@ func newTestService(t *testing.T) *AppService {
 		t.Fatalf("open db: %v", err)
 	}
 	t.Cleanup(func() { _ = db.Close() })
-	return NewAppService(db, nil, hostnet.NewProxy())
+	return NewAppService(db, nil, hostnet.NewProxy(), "", "")
 }
 
 func TestGetMangaDetailsPersists(t *testing.T) {

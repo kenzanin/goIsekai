@@ -5,11 +5,13 @@
 package bridge
 
 import (
+	"encoding/json"
 	"fmt"
 	"path/filepath"
 	"strings"
 	"sync"
 
+	"goisekai/internal/config"
 	"goisekai/internal/database"
 	"goisekai/internal/hostnet"
 	"goisekai/internal/logger"
@@ -23,17 +25,21 @@ type AppService struct {
 	db         *database.DB
 	mgr        *pluginmanager.Manager
 	proxy      *hostnet.Proxy
+	cfgPath    string
+	cacheDir   string
 	imageMu    sync.RWMutex
 	imageCache map[string][]byte
 }
 
 // NewAppService returns an AppService backed by the supplied database, plugin
 // manager, and hostnet proxy.
-func NewAppService(db *database.DB, mgr *pluginmanager.Manager, proxy *hostnet.Proxy) *AppService {
+func NewAppService(db *database.DB, mgr *pluginmanager.Manager, proxy *hostnet.Proxy, cfgPath, cacheDir string) *AppService {
 	return &AppService{
 		db:         db,
 		mgr:        mgr,
 		proxy:      proxy,
+		cfgPath:    cfgPath,
+		cacheDir:   cacheDir,
 		imageCache: make(map[string][]byte),
 	}
 }
@@ -173,6 +179,24 @@ func (s *AppService) SyncLibrary() error {
 		}
 	}
 	return nil
+}
+
+// ReloadConfig re-reads goisekai.ini and returns the new config as JSON.
+func (s *AppService) ReloadConfig() (string, error) {
+	if s.cfgPath == "" {
+		return "", fmt.Errorf("bridge: no config path set")
+	}
+	cfg, err := config.Load(s.cfgPath)
+	if err != nil {
+		return "", fmt.Errorf("bridge: reload config: %w", err)
+	}
+	b, _ := json.Marshal(cfg)
+	return string(b), nil
+}
+
+// GetConfigPath returns the path to goisekai.ini.
+func (s *AppService) GetConfigPath() string {
+	return s.cfgPath
 }
 
 // ListPlugins returns all registered plugins.

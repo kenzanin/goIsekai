@@ -69,6 +69,14 @@ func main() {
 		logger.Fatal("mkdir plugins dir", "error", err)
 	}
 
+	cacheDir := cfg.CacheDir
+	if cacheDir == "" {
+		cacheDir = filepath.Join(dataDir, "cache")
+	}
+	if err := os.MkdirAll(filepath.Join(cacheDir, "images"), 0o755); err != nil {
+		logger.Fatal("mkdir cache dir", "error", err)
+	}
+
 	db, err := database.Open(filepath.Join(dataDir, "goisekai.db"))
 	if err != nil {
 		logger.Fatal("open database", "error", err)
@@ -104,7 +112,7 @@ func main() {
 		}
 	}
 
-	svc := bridge.NewAppService(db, mgr, proxy)
+	svc := bridge.NewAppService(db, mgr, proxy, cfgPath, cacheDir)
 
 	app := application.New(application.Options{
 		Name: "goIsekai",

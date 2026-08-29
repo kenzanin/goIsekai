@@ -19,6 +19,8 @@ export const bindings = {
   syncLibrary: () => call('SyncLibrary'),
   getImage: (pluginID, url, headers) => call('GetImage', pluginID, url, headers),
   log: (level, msg) => call('Log', level, msg),
+  reloadConfig: () => call('ReloadConfig'),
+  getConfigPath: () => call('GetConfigPath'),
 };
 
 export function call(method, ...args) {

@@ -52,7 +52,7 @@ async function loadImage(pluginID, url, headers) {
     while (blobUrls.length > MAX_BLOBS) URL.revokeObjectURL(blobUrls.shift());
     return blobUrl;
   } catch (err) {
-    console.error('Failed to load image:', url, err);
+    console.error('Failed to load image:', url, err?.message || err?.toString() || JSON.stringify(err));
     return null;
   }
 }

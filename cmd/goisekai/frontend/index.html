@@ -513,6 +513,14 @@
         </div>
         <p class="text-xs text-zinc-500">Read-ahead chapters: how many upcoming chapters' pages are prefetched in the background.</p>
       </section>
+
+      <!-- App config -->
+      <section class="space-y-3">
+        <h2 class="text-lg font-semibold text-zinc-100">App Config</h2>
+        <p class="text-sm text-zinc-400">Config file: <code x-text="configPath" class="text-accent"></code></p>
+        <button @click="reloadConfig()" class="px-4 py-2 bg-surface-alt border border-border rounded-card text-zinc-100 hover:bg-white/10 transition-all text-sm">Reload Config</button>
+        <span x-show="configStatus" x-text="configStatus" class="text-sm text-accent ml-2"></span>
+      </section>
     </div>
   </section>
 

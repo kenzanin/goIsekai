@@ -7,6 +7,7 @@ import (
 	"bufio"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 
@@ -21,6 +22,9 @@ type Config struct {
 	LogLevel string
 	Width    int
 	Height   int
+	// CacheDir holds the on-disk image cache (L2), defaulting to
+	// <DataDir>/cache. Overridable in the [app] section of goisekai.ini.
+	CacheDir string
 
 	// [network] — default headers injected into plugin HTTP requests.
 	UserAgent      string
@@ -30,7 +34,7 @@ type Config struct {
 
 // Default returns the built-in defaults.
 func Default() *Config {
-	return &Config{
+	c := &Config{
 		DataDir:        "app_data",
 		Title:          "goIsekai",
 		LogLevel:       "info",
@@ -40,6 +44,8 @@ func Default() *Config {
 		AcceptLanguage: "en-US,en;q=0.9",
 		Referer:        "",
 	}
+	c.CacheDir = filepath.Join(c.DataDir, "cache")
+	return c
 }
 
 // Load reads the INI file at path, applying defaults for any missing or
@@ -92,6 +98,7 @@ func (c *Config) Save(path string) error {
 	fmt.Fprintf(&b, "log_level = %s\n", c.LogLevel)
 	fmt.Fprintf(&b, "width = %d\n", c.Width)
 	fmt.Fprintf(&b, "height = %d\n", c.Height)
+	fmt.Fprintf(&b, "cache_dir = %s\n", c.CacheDir)
 	fmt.Fprintf(&b, "\n[network]\n")
 	fmt.Fprintf(&b, "user_agent = %s\n", c.UserAgent)
 	fmt.Fprintf(&b, "accept_language = %s\n", c.AcceptLanguage)
@@ -126,6 +133,8 @@ func (c *Config) set(section, key, val string) {
 			if n, err := strconv.Atoi(val); err == nil {
 				c.Height = n
 			}
+		case "cache_dir":
+			c.CacheDir = val
 		}
 	case "network":
 		switch key {
