@@ -2,7 +2,7 @@
 // Image loading + blob cache, format helpers, console→Go logging bridge,
 // and reader toolbar button classes.
 
-import { bindings } from "./bindings.js";
+import { bindings, call } from "./bindings.js";
 
 /* ------------------------------------------------------------------ *
  * 1. Error handling — forward console errors/warns to the Go logger
