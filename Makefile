@@ -6,12 +6,20 @@ BINARY := goisekai
 TAGS   := gtk3,production
 PKGS   := ./internal/... ./pkg/... ./cmd/...
 
-.PHONY: build run check fmt test race modernize lint
+.PHONY: build dev devrun run check fmt test race modernize lint
 
 ## build: compile the desktop binary (requires webkit2gtk-4.1 on Linux via the gtk3 tag).
 ## Wails v3 needs CGO for webkit2gtk-4.1 (no separate webkit2_41 tag).
 build:
 	CGO_ENABLED=1 go build -tags $(TAGS) -o $(BINARY) ./cmd/goisekai
+
+## dev: build with devtools enabled (Ctrl+Shift+F12 to open inspector).
+dev:
+	CGO_ENABLED=1 go build -tags gtk3 -o $(BINARY) ./cmd/goisekai
+
+## devrun: build with devtools and launch.
+devrun: dev
+	./$(BINARY) $(ARGS)
 
 ## run: build and launch the app. Pass flags via ARGS, e.g.: make run ARGS=-logLevel=debug
 run: build
