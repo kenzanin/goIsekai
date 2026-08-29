@@ -7,6 +7,8 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"sort"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -233,6 +235,30 @@ func (m *Manager) get(pluginID string) (*loadedPlugin, error) {
 		return nil, fmt.Errorf("plugin %q not loaded", pluginID)
 	}
 	return p, nil
+}
+
+// LoadedPlugin is metadata about a currently-loaded plugin.
+type LoadedPlugin struct {
+	ID       string
+	Version  string // ABI contract version (e.g. "1")
+	WasmPath string
+}
+
+// LoadedPlugins returns metadata for every plugin currently loaded in memory,
+// sorted by id.
+func (m *Manager) LoadedPlugins() []LoadedPlugin {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	out := make([]LoadedPlugin, 0, len(m.plugins))
+	for _, p := range m.plugins {
+		out = append(out, LoadedPlugin{
+			ID:       p.id,
+			Version:  strconv.Itoa(int(p.contractVersion)),
+			WasmPath: p.wasmPath,
+		})
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i].ID < out[j].ID })
+	return out
 }
 
 // call invokes one JSON-in/JSON-out ABI function on a plugin, enforcing the

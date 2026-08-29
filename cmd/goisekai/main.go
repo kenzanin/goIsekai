@@ -66,12 +66,12 @@ func main() {
 	dataDir := cfg.DataDir
 	pluginsDir := filepath.Join(dataDir, "plugins")
 	if err := os.MkdirAll(pluginsDir, 0o755); err != nil {
-		log.Fatalf("mkdir plugins dir: %v", err)
+		logger.Fatal("mkdir plugins dir", "error", err)
 	}
 
 	db, err := database.Open(filepath.Join(dataDir, "goisekai.db"))
 	if err != nil {
-		log.Fatalf("open database: %v", err)
+		logger.Fatal("open database", "error", err)
 	}
 	defer func() {
 		_ = db.Close()
@@ -84,11 +84,25 @@ func main() {
 
 	mgr := pluginmanager.NewManager(proxy, pluginsDir)
 	if err := mgr.Discover(); err != nil {
-		log.Fatalf("discover plugins: %v", err)
+		logger.Fatal("discover plugins", "error", err)
 	}
 	defer func() {
 		_ = mgr.Close()
 	}()
+
+	// Register plugins loaded from the plugins dir so they appear in
+	// ListPlugins (Discover only loads them into memory).
+	for _, p := range mgr.LoadedPlugins() {
+		if err := db.RegisterPlugin(database.Plugin{
+			ID:       p.ID,
+			Name:     p.ID,
+			Version:  p.Version,
+			WasmPath: p.WasmPath,
+			IsActive: true,
+		}); err != nil {
+			logger.Error("register discovered plugin", "id", p.ID, "error", err)
+		}
+	}
 
 	svc := bridge.NewAppService(db, mgr, proxy)
 
@@ -105,6 +119,6 @@ func main() {
 		Title: cfg.Title, Width: cfg.Width, Height: cfg.Height,
 	})
 	if err := app.Run(); err != nil {
-		log.Fatal(err)
+		logger.Fatal("run app", "error", err)
 	}
 }

@@ -51,3 +51,9 @@ func Warn(msg string, args ...any) { slog.Warn(msg, args...) }
 
 // Error logs at the error level via the process-wide default logger.
 func Error(msg string, args ...any) { slog.Error(msg, args...) }
+
+// Fatal logs at the error level and exits with status 1.
+func Fatal(msg string, args ...any) {
+	slog.Error(msg, args...)
+	os.Exit(1)
+}
