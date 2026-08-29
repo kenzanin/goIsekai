@@ -93,6 +93,9 @@ export const readerView = () => ({
       if (url) {
         this.pageSrc = url;
         this.loading = false;
+        // Reset scroll to top when changing pages.
+        const wrap = document.querySelector('.reader-page')?.parentElement;
+        if (wrap) wrap.scrollTop = 0;
         this.preloadAdjacent();
         this.onProgress();
       } else {
