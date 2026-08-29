@@ -2,6 +2,7 @@ package main
 
 import (
 	"embed"
+	"flag"
 	"log"
 	"os"
 	"path/filepath"
@@ -12,6 +13,7 @@ import (
 	"goisekai/internal/config"
 	"goisekai/internal/database"
 	"goisekai/internal/hostnet"
+	"goisekai/internal/logger"
 	"goisekai/internal/pluginmanager"
 )
 
@@ -19,6 +21,9 @@ import (
 var assets embed.FS
 
 func main() {
+	logLevel := flag.String("logLevel", "", "log level: debug|info|warning (overrides goisekai.ini log_level)")
+	flag.Parse()
+
 	// Config file: goisekai.ini in the working directory, overridable via
 	// GOISEKAI_CONFIG.
 	cfgPath := os.Getenv("GOISEKAI_CONFIG")
@@ -29,6 +34,16 @@ func main() {
 	if err != nil {
 		log.Fatalf("load config: %v", err)
 	}
+
+	// Logger level: flag overrides config, config overrides the "info" default.
+	level := cfg.LogLevel
+	if *logLevel != "" {
+		level = *logLevel
+	}
+	if err := logger.Init(level); err != nil {
+		log.Fatalf("init logger: %v", err)
+	}
+	logger.Info("starting goIsekai", "level", level, "data_dir", cfg.DataDir)
 
 	// Data directory holds the SQLite file and the plugins/ wasm directory.
 	dataDir := cfg.DataDir

@@ -111,7 +111,7 @@ func (c *Config) set(section, key, val string) {
 			c.DataDir = val
 		case "title":
 			c.Title = val
-		case "log_level":
+		case "log_level", "loglevel":
 			// ponytail: reject garbage here rather than storing it; the logger
 			// is the single source of truth for valid levels, so an unknown
 			// value leaves the "info" default in place. (No strconv.Atoi.)
