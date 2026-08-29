@@ -28,3 +28,4 @@ app_data/
 # END oh-my-opencode-slim worktrees
 # Magic Context plugin artifacts
 .cortexkit/
+/goisekai
