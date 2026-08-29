@@ -4,35 +4,18 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>goIsekai</title>
-  <style>body{font-family:Inter,system-ui,sans-serif}</style>
-  <script src="/lib/tailwind.js"></script>
+  <style>body{font-family:Inter,system-ui,sans-serif;background:#0f0f14;color:#e4e4e7}</style>
+  <div id="js-errors" style="position:fixed;top:0;left:0;right:0;z-index:99999;background:#c00;color:white;padding:12px;font-size:13px;font-family:monospace;display:none;white-space:pre-wrap;max-height:40vh;overflow:auto"></div>
   <script>
-    tailwind.config = {
-      theme: {
-        extend: {
-          colors: {
-            bg: '#0f0f14',
-            surface: '#1a1a24',
-            'surface-alt': '#24243a',
-            'surface-elevated': '#2a2a45',
-            accent: '#7c5cfc',
-            'accent-hover': '#9478ff',
-            'accent-subtle': 'rgba(124, 92, 252, 0.12)',
-            muted: '#71717a',
-            success: '#4ade80',
-            error: '#f87171',
-            border: '#2a2a3e',
-          },
-          fontFamily: { sans: ['Inter', 'system-ui', 'sans-serif'] },
-          borderRadius: { card: '0.5rem' },
-          boxShadow: {
-            glow: '0 0 20px rgba(124, 92, 252, 0.3)',
-            'card-hover': '0 4px 24px rgba(0, 0, 0, 0.4)',
-          },
-        },
-      },
-    };
+    (function(){
+      var box=document.getElementById('js-errors');
+      function show(msg){box.style.display='block';box.textContent+=msg+'\n';}
+      window.onerror=function(m,s,l,c,e){show('ERROR: '+m+' ('+s+':'+l+':'+c+')');};
+      window.addEventListener('unhandledrejection',function(e){show('PROMISE: '+(e.reason?.message||e.reason||'unknown'))});
+      window.addEventListener('error',function(e){if(e.target&&e.target.src)show('LOAD FAIL: '+e.target.src);},true);
+    })();
   </script>
+  <link rel="stylesheet" href="/lib/tailwind.css" />
   <script defer src="/lib/alpine.min.js"></script>
   <script type="module" src="app.js"></script>
   <style>
