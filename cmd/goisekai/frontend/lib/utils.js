@@ -121,6 +121,8 @@ window.getInitials = getInitials;
 window.formatChapterNum = formatChapterNum;
 window.formatDate = formatDate;
 window.fallbackInitial = fallbackInitial;
+window.RBTN = RBTN;
+window.RBTN_ACTIVE = RBTN_ACTIVE;
 
 export {
   blobCache,
