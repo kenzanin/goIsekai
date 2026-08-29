@@ -4,8 +4,151 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>goIsekai</title>
+  <!-- Google Fonts: Inter (display/body) + JetBrains Mono (mono).
+       ponytail: offline desktop app; these only enhance the font stack,
+       never required for layout. Falls back to system sans/mono offline. -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
-  <h1>goIsekai</h1>
+  <!-- Top Navigation Bar (hidden in Reader) -->
+  <nav id="top-nav" class="top-nav">
+    <a href="#/library" class="nav-brand" data-view="library">goIsekai</a>
+    <div class="nav-links">
+      <a href="#/library" class="nav-link" data-view="library">Library</a>
+      <a href="#/search" class="nav-link" data-view="search">Search</a>
+      <a href="#/plugins" class="nav-link" data-view="plugins">Plugins</a>
+    </div>
+  </nav>
+
+  <!-- Main Content Area -->
+  <main id="app-content">
+    <!-- Library View -->
+    <section id="library-view" class="view">
+      <div class="view-header">
+        <h1>Library</h1>
+      </div>
+      <div id="library-grid" class="manga-grid"></div>
+      <div id="library-empty" class="empty-state" style="display:none;">
+        <div class="empty-icon">📚</div>
+        <h2>Your library is empty</h2>
+        <p>Search for manga and add them here.</p>
+        <a href="#/search" class="btn btn-primary">Browse Sources</a>
+      </div>
+    </section>
+
+    <!-- Search View -->
+    <section id="search-view" class="view">
+      <div class="search-controls">
+        <select id="plugin-select" class="select" aria-label="Select source">
+          <option value="">Select a source…</option>
+        </select>
+        <div class="search-input-wrap">
+          <input id="search-input" type="text" placeholder="Search manga…" class="input" autocomplete="off" />
+          <button id="search-btn" class="btn btn-primary" disabled>Search</button>
+        </div>
+      </div>
+      <div id="search-results" class="manga-grid"></div>
+      <div id="search-empty" class="empty-state" style="display:none;">
+        <div class="empty-icon">🔍</div>
+        <h2>No results found</h2>
+        <p>Try a different search term or source.</p>
+      </div>
+      <div id="search-loading" class="loading-state" style="display:none;">
+        <div class="spinner"></div>
+        <p>Searching…</p>
+      </div>
+      <div id="search-pagination" class="pagination" style="display:none;">
+        <button id="prev-page" class="btn">← Prev</button>
+        <span id="page-info">Page 1</span>
+        <button id="next-page" class="btn">Next →</button>
+      </div>
+    </section>
+
+    <!-- Manga Detail View -->
+    <section id="manga-view" class="view">
+      <div id="manga-detail" class="manga-detail">
+        <div class="manga-detail-header">
+          <div class="manga-detail-cover">
+            <img id="manga-cover" src="" alt="" />
+          </div>
+          <div class="manga-detail-meta">
+            <h1 id="manga-title"></h1>
+            <div class="manga-detail-badges">
+              <span id="manga-status" class="badge"></span>
+              <span id="manga-author" class="badge"></span>
+            </div>
+            <p id="manga-description"></p>
+            <div class="manga-detail-actions">
+              <button id="library-toggle" class="btn btn-primary">Add Library</button>
+            </div>
+            <div class="manga-detail-chapters">
+              <h2>Chapters</h2>
+              <div id="chapter-list" class="chapter-list"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div id="manga-loading" class="loading-state">
+        <div class="spinner"></div>
+        <p>Loading manga details…</p>
+      </div>
+    </section>
+
+    <!-- Reader View -->
+    <section id="reader-view" class="view reader">
+      <div id="reader-topbar" class="reader-topbar">
+        <button id="reader-back" class="btn btn-ghost">← Back</button>
+        <span id="reader-title" class="reader-title"></span>
+        <span id="reader-page-info" class="reader-page-info">1 / 1</span>
+      </div>
+      <div id="reader-image-wrap" class="reader-image-wrap">
+        <img id="reader-image" src="" alt="" />
+      </div>
+      <div id="reader-zone-prev" class="reader-zone reader-zone-prev" aria-label="Previous page"></div>
+      <div id="reader-zone-next" class="reader-zone reader-zone-next" aria-label="Next page"></div>
+      <div id="reader-bottombar" class="reader-bottombar">
+        <input id="reader-slider" type="range" min="0" max="0" value="0" class="reader-slider" aria-label="Page slider" />
+      </div>
+      <div id="reader-loading" class="reader-loading">
+        <div class="spinner"></div>
+      </div>
+      <div id="reader-error" class="reader-error" style="display:none;">
+        <div class="error-icon">⚠️</div>
+        <p>Failed to load page</p>
+        <button id="reader-retry" class="btn btn-ghost">Retry</button>
+      </div>
+      <div id="reader-complete" class="reader-complete" style="display:none;">
+        <div class="reader-complete-inner">
+          <h2>Chapter Complete</h2>
+          <div class="reader-complete-actions">
+            <button id="next-chapter-btn" class="btn btn-primary">Next Chapter</button>
+            <a id="back-to-manga-btn" class="btn btn-ghost" href="#/manga">Back to Manga</a>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Plugins View -->
+    <section id="plugins-view" class="view">
+      <div class="view-header">
+        <h1>Plugins</h1>
+        <button id="install-plugin-btn" class="btn btn-primary">Install Plugin</button>
+      </div>
+      <div id="plugin-list" class="plugin-list"></div>
+      <div id="plugins-empty" class="empty-state" style="display:none;">
+        <div class="empty-icon">🧩</div>
+        <h2>No plugins installed</h2>
+        <p>Install a .wasm plugin to start reading.</p>
+      </div>
+    </section>
+  </main>
+
+  <!-- Hidden file input for plugin install -->
+  <input type="file" id="plugin-file-input" accept=".wasm" style="display: none;" />
+
+  <script src="app.js"></script>
 </body>
 </html>
