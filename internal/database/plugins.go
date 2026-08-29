@@ -49,3 +49,21 @@ func (d *DB) ListPlugins() ([]Plugin, error) {
 	}
 	return result, nil
 }
+
+// SetPluginActive toggles the is_active flag for a plugin.
+func (d *DB) SetPluginActive(id string, active bool) error {
+	_, err := Plugins.UPDATE().
+		SET(Plugins.IsActive.SET(Int(int64(boolToInt(active))))).
+		WHERE(Plugins.ID.EQ(String(id))).
+		Exec(d.db)
+	return err
+}
+
+// TogglePluginActive flips the is_active flag for a plugin.
+func (d *DB) TogglePluginActive(id string) error {
+	_, err := Plugins.UPDATE().
+		SET(Plugins.IsActive.SET(Int(1).SUB(Plugins.IsActive))).
+		WHERE(Plugins.ID.EQ(String(id))).
+		Exec(d.db)
+	return err
+}

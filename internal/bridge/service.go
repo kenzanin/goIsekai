@@ -12,6 +12,7 @@ import (
 
 	"goisekai/internal/database"
 	"goisekai/internal/hostnet"
+	"goisekai/internal/logger"
 	"goisekai/internal/pluginmanager"
 	"goisekai/pkg/types"
 )
@@ -131,6 +132,35 @@ func (s *AppService) ListLibrary() ([]database.Manga, error) {
 		return nil, fmt.Errorf("bridge: list library: %w", err)
 	}
 	return list, nil
+}
+
+// TogglePlugin flips the is_active flag for a plugin.
+func (s *AppService) TogglePlugin(id string) error {
+	return s.db.TogglePluginActive(id)
+}
+
+// SyncLibrary re-fetches chapter lists from source plugins for every manga in the library.
+func (s *AppService) SyncLibrary() error {
+	library, err := s.db.ListLibrary()
+	if err != nil {
+		return fmt.Errorf("bridge: sync library: %w", err)
+	}
+	for _, manga := range library {
+		m, detailErr := s.mgr.GetMangaDetail(manga.PluginID, manga.SourceMangaID)
+		if detailErr != nil {
+			logger.Error("sync detail failed", "id", manga.ID, "plugin", manga.PluginID, "error", detailErr)
+			continue
+		}
+		chapters, chapErr := s.mgr.GetChapterList(manga.PluginID, manga.SourceMangaID)
+		if chapErr != nil {
+			logger.Error("sync chapters failed", "id", manga.ID, "error", chapErr)
+			continue
+		}
+		if persistErr := s.persistMangaDetails(manga.PluginID, m, chapters); persistErr != nil {
+			logger.Error("sync persist failed", "id", manga.ID, "error", persistErr)
+		}
+	}
+	return nil
 }
 
 // ListPlugins returns all registered plugins.

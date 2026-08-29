@@ -23,6 +23,8 @@ const bindings = {
   setChapterProgress: (pluginID, mangaID, chapterID, lastPage) => call('SetChapterProgress', pluginID, mangaID, chapterID, lastPage),
   listLibrary: () => call('ListLibrary'),
   listPlugins: () => call('ListPlugins'),
+  togglePlugin: (id) => call('TogglePlugin', id),
+  syncLibrary: () => call('SyncLibrary'),
 };
 
 // Thin wrapper: resolves to the Go return value(s), rejects on Go error (§6.4).
@@ -254,6 +256,18 @@ function createPluginCard(plugin) {
   card.appendChild(icon);
   card.appendChild(info);
   card.appendChild(status);
+
+  const toggleBtn = document.createElement('button');
+  toggleBtn.className = 'btn btn-sm';
+  toggleBtn.textContent = plugin.IsActive ? 'Disable' : 'Enable';
+  toggleBtn.onclick = async () => {
+    try {
+      await bindings.togglePlugin(plugin.ID);
+      loadPlugins();
+    } catch (e) { console.error('toggle plugin', e); }
+  };
+  card.appendChild(toggleBtn);
+
   return card;
 }
 
@@ -350,6 +364,21 @@ async function loadLibrary() {
     }
   } catch (err) {
     grid.replaceChildren(errorState('Failed to load library', loadLibrary));
+  }
+}
+
+async function syncLibrary() {
+  const btn = $('#sync-btn');
+  btn.disabled = true;
+  btn.textContent = '⏳ Syncing…';
+  try {
+    await bindings.syncLibrary();
+    await loadLibrary();
+  } catch (e) {
+    console.error('sync library', e);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '⟳ Sync';
   }
 }
 
