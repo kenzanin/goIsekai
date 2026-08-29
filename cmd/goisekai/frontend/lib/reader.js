@@ -40,6 +40,8 @@ export const readerView = () => ({
       const close = () => { this.showShortcuts = false; document.removeEventListener('keydown', close); };
       document.addEventListener('keydown', close);
     });
+    // Handle a direct page-load at a read URL (no hashchange fires on refresh).
+    this.reloadFromHash();
   },
 
   async load(pid, mid, cid, page) {
@@ -183,6 +185,14 @@ export const readerView = () => ({
     this.goNext();
   },
 
+  // <img @error> handler: mark the page errored, stop the spinner, and log the
+  // failing URL so broken-image failures are traceable in the Go stdout log.
+  onImageError() {
+    this.error = true;
+    this.loading = false;
+    console.error('[reader] image failed to load:', this.pageSrc, '(page ' + (this.currentPage + 1) + ')');
+  },
+
   setViewMode(v) {
     this.viewMode = v;
     settings.viewMode = v;
@@ -211,9 +221,48 @@ export const readerView = () => ({
   get nextChapterID() {
     const list = this.orderedChapters;
     const idx = list.findIndex(c => c.id === this.chapterID);
-    if (idx === -1) return null;
+    if (idx === -1) {
+      console.warn('[reader] nextChapterID: current chapter "' + this.chapterID + '" not found in reading-order list (len ' + list.length + ')');
+      return null;
+    }
     const target = list[this.direction === 'rtl' ? idx - 1 : idx + 1];
-    return target ? target.id : null;
+    const id = target ? target.id : null;
+    console.log('[reader] nextChapterID: idx ' + idx + ' (' + this.direction + ') -> "' + id + '"');
+    return id;
+  },
+
+  // "Next Chapter" button (completion overlay). Navigates to the next chapter
+  // in reading order; the reader re-loads via @window:hashchange -> reloadFromHash.
+  goNextChapter() {
+    const next = this.nextChapterID;
+    console.log('[reader] next-chapter click: current "' + this.chapterID + '" next "' + next + '"');
+    if (!next) {
+      console.warn('[reader] next-chapter: no next chapter to navigate to');
+      return;
+    }
+    this.$store.app.navigate(
+      '#/read/' + encodeURIComponent(this.pluginID) + '/' + encodeURIComponent(this.mangaID) + '/' + encodeURIComponent(next)
+    );
+  },
+
+  // Re-load the reader from the current URL. Covers reader->reader hash
+  // navigation (Next Chapter, etc.), which the old x-effect couldn't trigger
+  // because window.location.hash isn't reactive and currentView stays 'reader'
+  // (so updateRoute() is a no-op). Also run on mount for a direct read URL.
+  reloadFromHash() {
+    const h = window.location.hash || '';
+    if (!h.startsWith('#/read/')) return;
+    const segs = h.split('?')[0].replace('#/read/', '').split('/');
+    if (segs.length < 3) return;
+    const params = new URLSearchParams(h.split('?')[1] || '');
+    const pid = decodeURIComponent(segs[0]);
+    const mid = decodeURIComponent(segs[1]);
+    const cid = decodeURIComponent(segs[2]);
+    const page = parseInt(params.get('page') || '0', 10) || 0;
+    // Skip redundant reloads (e.g. a mount that already loaded this URL).
+    if (pid === this.pluginID && mid === this.mangaID && cid === this.chapterID && page === this.currentPage) return;
+    console.log('[reader] reloadFromHash: "' + pid + '"|"' + mid + '"|"' + cid + '" page=' + page);
+    this.load(pid, mid, cid, page);
   },
 
   // Silently prefetch the next K chapters' page blobs so they open instantly.
