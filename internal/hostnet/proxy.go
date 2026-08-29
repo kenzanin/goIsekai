@@ -5,11 +5,13 @@ import (
 	"fmt"
 	"io"
 	"maps"
-	"net/http"
-	"net/http/cookiejar"
+	"sort"
 	"strings"
 	"sync"
-	"time"
+
+	http "github.com/bogdanfinn/fhttp"
+	tls_client "github.com/bogdanfinn/tls-client"
+	"github.com/bogdanfinn/tls-client/profiles"
 
 	"goisekai/pkg/types"
 )
@@ -20,16 +22,19 @@ import (
 type Proxy struct {
 	mu             sync.Mutex
 	defaultHeaders map[string]string
-	client         *http.Client
-	jars           map[string]*cookiejar.Jar // keyed by plugin id
+	clients        map[string]tls_client.HttpClient // keyed by plugin id
 }
 
 // defaultUA is a browser-like User-Agent so requests are less likely to be
 // blocked by anti-bot measures.
 const defaultUA = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36"
 
-// NewProxy initializes a Proxy with browser-like default headers, an
-// http.Client with a 30s timeout, and an empty per-plugin jar map.
+// defaultHeaderOrder fixes the order in which default headers are applied so
+// the derived HeaderOrderKey is deterministic regardless of map iteration.
+var defaultHeaderOrder = []string{"User-Agent", "Accept-Language", "Referer"}
+
+// NewProxy initializes a Proxy with browser-like default headers and an empty
+// per-plugin client map. Each client is created lazily on first use.
 func NewProxy() *Proxy {
 	return &Proxy{
 		defaultHeaders: map[string]string{
@@ -38,8 +43,7 @@ func NewProxy() *Proxy {
 			// Empty Referer by default; only injected when a plugin sets one.
 			"Referer": "",
 		},
-		client: &http.Client{Timeout: 30 * time.Second},
-		jars:   make(map[string]*cookiejar.Jar),
+		clients: make(map[string]tls_client.HttpClient),
 	}
 }
 
@@ -58,20 +62,60 @@ func (p *Proxy) SetDefaultHeader(key, value string) {
 	p.defaultHeaders[key] = value
 }
 
-// jar returns the cookie jar for pluginID, creating one on first use.
-func (p *Proxy) jar(pluginID string) *cookiejar.Jar {
+// client returns the tls-client for pluginID, creating one on first use with a
+// browser TLS profile and an isolated cookie jar.
+func (p *Proxy) client(pluginID string) (tls_client.HttpClient, error) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
-	jar, ok := p.jars[pluginID]
-	if !ok {
-		j, err := cookiejar.New(nil)
-		if err != nil {
-			return nil
-		}
-		p.jars[pluginID] = j
-		jar = j
+	c, ok := p.clients[pluginID]
+	if ok {
+		return c, nil
 	}
-	return jar
+	c, err := tls_client.NewHttpClient(tls_client.NewNoopLogger(),
+		tls_client.WithTimeoutSeconds(30),
+		tls_client.WithClientProfile(profiles.Chrome_146),
+		tls_client.WithCookieJar(tls_client.NewCookieJar()),
+	)
+	if err != nil {
+		return nil, err
+	}
+	p.clients[pluginID] = c
+	return c, nil
+}
+
+// buildHeaders assembles the complete header set for a request. tls-client
+// applies its client defaults only when req.Header is empty, so a populated
+// header fully replaces them; we must therefore supply the full set here.
+// The returned Header carries a lowercase HeaderOrderKey for stable ordering.
+func (p *Proxy) buildHeaders(overrides map[string]string) http.Header {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
+	header := make(http.Header)
+	order := make([]string, 0, len(p.defaultHeaders)+len(overrides))
+
+	for _, k := range defaultHeaderOrder {
+		v := p.defaultHeaders[k]
+		if strings.EqualFold(k, "Referer") && v == "" {
+			continue
+		}
+		header.Set(k, v)
+		order = append(order, strings.ToLower(k))
+	}
+
+	// Per-request overrides, in deterministic (sorted) order.
+	keys := make([]string, 0, len(overrides))
+	for k := range overrides {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	for _, k := range keys {
+		header.Set(k, overrides[k])
+		order = append(order, strings.ToLower(k))
+	}
+
+	header[http.HeaderOrderKey] = order
+	return header
 }
 
 // Request builds, executes, and returns the response for a plugin HTTP request.
@@ -89,14 +133,14 @@ func (p *Proxy) Request(pluginID string, req types.HTTPRequest) (types.HTTPRespo
 		return types.HTTPResponse{}, fmt.Errorf("hostnet: build request: %w", err)
 	}
 
-	p.injectHeaders(httpReq.Header, req.Headers)
+	httpReq.Header = p.buildHeaders(req.Headers)
 
-	// Shallow-copy the client so the per-plugin jar is isolated to this call
-	// without racing on the shared client's Jar field.
-	execClient := *p.client
-	execClient.Jar = p.jar(pluginID)
+	client, err := p.client(pluginID)
+	if err != nil {
+		return types.HTTPResponse{}, fmt.Errorf("hostnet: init client: %w", err)
+	}
 
-	resp, err := execClient.Do(httpReq)
+	resp, err := client.Do(httpReq)
 	if err != nil {
 		return types.HTTPResponse{}, fmt.Errorf("hostnet: execute request: %w", err)
 	}
@@ -114,23 +158,6 @@ func (p *Proxy) Request(pluginID string, req types.HTTPRequest) (types.HTTPRespo
 		Headers: flattenHeaders(resp.Header),
 		Body:    string(raw),
 	}, nil
-}
-
-// injectHeaders applies default headers, then overlays the per-request headers
-// (page-level headers win). An empty default Referer is skipped.
-func (p *Proxy) injectHeaders(header http.Header, overrides map[string]string) {
-	p.mu.Lock()
-	defer p.mu.Unlock()
-
-	for k, v := range p.defaultHeaders {
-		if strings.EqualFold(k, "Referer") && v == "" {
-			continue
-		}
-		header.Set(k, v)
-	}
-	for k, v := range overrides {
-		header.Set(k, v)
-	}
 }
 
 // flattenHeaders collapses multi-valued response headers into a single
