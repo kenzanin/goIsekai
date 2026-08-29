@@ -5,11 +5,16 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>goIsekai</title>
   <style>body{font-family:Inter,system-ui,sans-serif;background:#0f0f14;color:#e4e4e7}</style>
-  <div id="js-errors" style="position:fixed;top:0;left:0;right:0;z-index:99999;background:#c00;color:white;padding:12px;font-size:13px;font-family:monospace;display:none;white-space:pre-wrap;max-height:40vh;overflow:auto"></div>
+  <div id="js-errors" style="position:fixed;top:0;left:0;right:0;z-index:99999;background:#c00;color:white;padding:12px;font-size:13px;font-family:monospace;display:none;white-space:pre-wrap;max-height:40vh;overflow:auto;cursor:pointer" onclick="this.style.display='none'" title="click to dismiss"></div>
   <script>
     (function(){
       var box=document.getElementById('js-errors');
-      function show(msg){box.style.display='block';box.textContent+=msg+'\n';}
+      function show(msg){
+        // Filter out benign Wails internal LOAD FAILs (favicon, runtime, etc.)
+        if (/LOAD FAIL: wails:\/\/localhost\/?$/.test(msg)) return;
+        box.style.display='block';
+        box.textContent+=msg+'\n';
+      }
       window.onerror=function(m,s,l,c,e){show('ERROR: '+m+' ('+s+':'+l+':'+c+')');};
       window.addEventListener('unhandledrejection',function(e){show('PROMISE: '+(e.reason?.message||e.reason||'unknown'))});
       window.addEventListener('error',function(e){if(e.target&&e.target.src)show('LOAD FAIL: '+e.target.src);},true);
