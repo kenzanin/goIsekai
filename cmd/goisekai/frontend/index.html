@@ -326,7 +326,7 @@
      </div>
 
       <!-- Image wrap -->
-      <div @mousemove="scheduleAutoHide()" class="flex items-center justify-center w-full h-full overflow-auto p-10 no-scrollbar">
+      <div @mousemove="scheduleAutoHide()" class="flex items-start justify-center w-full h-full overflow-auto p-10 no-scrollbar">
         <!-- Loading spinner -->
         <div x-show="loading" class="absolute inset-0 flex flex-col items-center justify-center gap-3 z-10">
           <div class="w-10 h-10 border-2 border-white/20 border-t-accent rounded-full animate-spin"></div>
@@ -341,6 +341,11 @@
               'gpu-compositing': gpu
             }">
          <img x-show="pageSrc && !error" :src="pageSrc" alt="" class="block">
+         <!-- Retry button for failed images -->
+         <div x-show="error && !loading" class="flex flex-col items-center justify-center gap-4 text-center">
+           <span class="text-zinc-400 text-sm">Failed to load page</span>
+           <button @click="goToPage(currentPage, true)" class="px-4 py-2 rounded-card bg-accent text-white text-sm hover:bg-accent/80 transition-all">↻ Retry</button>
+         </div>
        </div>
      </div>
 

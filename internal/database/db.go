@@ -54,7 +54,7 @@ type DB struct{ db *sql.DB }
 // Open opens the SQLite database at path, enables foreign keys so cascade
 // deletes work, and applies pending migrations.
 func Open(path string) (*DB, error) {
-	db, err := sql.Open("sqlite", path+"?_foreign_keys=1")
+	db, err := sql.Open("sqlite", path+"?_foreign_keys=1&_journal_mode=WAL&_busy_timeout=5000")
 	if err != nil {
 		return nil, err
 	}
