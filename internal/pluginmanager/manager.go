@@ -16,6 +16,7 @@ import (
 	"github.com/tetratelabs/wazero/imports/wasi_snapshot_preview1"
 
 	"goisekai/internal/hostnet"
+	"goisekai/internal/logger"
 	"goisekai/pkg/types"
 )
 
@@ -36,6 +37,8 @@ type loadedPlugin struct {
 	mod      api.Module
 	// fn maps an ABI function name (types.*Func) to its resolved api.Function.
 	fn map[string]api.Function
+	// contractVersion is the plugin's resolved contract_version.
+	contractVersion int32
 	// mu serializes invocations: api.Function.Call is not goroutine-safe, and a
 	// single plugin instance must not be re-entered concurrently.
 	mu sync.Mutex
@@ -91,20 +94,25 @@ func (m *Manager) Discover() error {
 		return fmt.Errorf("instantiate host module: %w", err)
 	}
 
-	matches, err := filepath.Glob(filepath.Join(m.pluginsDir, "*.wasm"))
+	pattern := filepath.Join(m.pluginsDir, "*.wasm")
+	matches, err := filepath.Glob(pattern)
 	if err != nil {
 		return err
 	}
+	logger.Debug("discovering plugins", "dir", m.pluginsDir, "count", len(matches))
 
 	m.runtime = rt
 	for _, path := range matches {
 		id := strings.TrimSuffix(filepath.Base(path), ".wasm")
+		logger.Debug("loading plugin", "id", id, "path", path)
 		p, err := m.load(rt, id, path)
 		if err != nil {
+			logger.Error("plugin load failed", "id", id, "error", err)
 			_ = rt.Close(m.ctx)
 			return fmt.Errorf("load plugin %s: %w", id, err)
 		}
 		m.plugins[id] = p
+		logger.Debug("plugin loaded", "id", id, "version", p.contractVersion)
 	}
 	return nil
 }
@@ -157,8 +165,9 @@ func (m *Manager) load(rt wazero.Runtime, id, wasmPath string) (*loadedPlugin, e
 	if err := types.CheckVersion(int32(verRes[0])); err != nil {
 		return nil, err
 	}
+	logger.Debug("contract_version resolved", "id", id, "version", int32(verRes[0]))
 
-	p := &loadedPlugin{id: id, wasmPath: wasmPath, mod: mod, fn: make(map[string]api.Function)}
+	p := &loadedPlugin{id: id, wasmPath: wasmPath, mod: mod, contractVersion: int32(verRes[0]), fn: make(map[string]api.Function)}
 	for _, name := range []string{types.SearchFunc, types.GetMangaDetailFunc, types.GetChapterListFunc, types.GetPageListFunc} {
 		f := mod.ExportedFunction(name)
 		if f == nil {
@@ -181,6 +190,7 @@ func (m *Manager) Install(wasmPath string) (string, error) {
 	}
 	id := strings.TrimSuffix(filepath.Base(wasmPath), ".wasm")
 	dest := filepath.Join(m.pluginsDir, id+".wasm")
+	logger.Debug("installing plugin", "source", wasmPath, "dest", dest)
 	if filepath.Clean(wasmPath) != filepath.Clean(dest) {
 		if err := copyFile(wasmPath, dest); err != nil {
 			return "", fmt.Errorf("copy plugin %s: %w", id, err)
@@ -188,9 +198,11 @@ func (m *Manager) Install(wasmPath string) (string, error) {
 	}
 	p, err := m.load(m.runtime, id, dest)
 	if err != nil {
+		logger.Error("plugin install failed", "id", id, "error", err)
 		return "", fmt.Errorf("install plugin %s: %w", id, err)
 	}
 	m.plugins[id] = p
+	logger.Debug("plugin installed", "id", id)
 	return dest, nil
 }
 
