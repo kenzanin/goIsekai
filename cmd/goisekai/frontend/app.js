@@ -3,21 +3,15 @@
 // (§6.1 / §9.1): the invocation shape lives in one place, so the bridge path can
 // be verified / adjusted without touching view code.
 
-'use strict';
+import { Call } from "/wails/runtime.js";
 
 /* ------------------------------------------------------------------ *
  * 1. Bindings — centralized Wails v3 bridge access (§6.1 / §9.1)
  * ------------------------------------------------------------------ */
-// ponytail: Wails v3 exposes bound Go services on window.<appName>.<pkg>.<Service>.
-// The spec documents goisekai.bridge.AppService; the exact namespace is resolved
-// once here so a runtime mismatch is a one-line fix, not a file-wide search.
-const AppService = (function () {
-  const svc = window.goisekai && window.goisekai.bridge && window.goisekai.bridge.AppService;
-  // Debug: log available bindings (§9.1)
-  console.log('Wails bindings:', window.goisekai);
-  console.log('AppService methods:', svc);
-  return svc || null;
-})();
+// Wails v3 built with `go build` (no `wails3 generate bindings`): bound
+// services are invoked via Call({ methodName, args }) from /wails/runtime.js.
+// methodName is the fully-qualified name `package/path.Service.Method`.
+const SVC = 'goisekai/internal/bridge.AppService';
 
 const bindings = {
   search: (pluginID, filter) => call('SearchManga', pluginID, filter),
@@ -31,12 +25,9 @@ const bindings = {
   listPlugins: () => call('ListPlugins'),
 };
 
-// Thin wrapper: rejects on Go error return; callers handle via try/catch (§6.4).
+// Thin wrapper: resolves to the Go return value(s), rejects on Go error (§6.4).
 function call(method, ...args) {
-  if (!AppService) {
-    return Promise.reject(new Error('Wails bridge not available (expected window.goisekai.bridge.AppService)'));
-  }
-  return AppService[method](...args);
+  return Call({ methodName: SVC + '.' + method, args });
 }
 
 /* ------------------------------------------------------------------ *
@@ -281,7 +272,7 @@ function makeBlobUrl(pluginID, url, headers) {
     const cached = state.blobCache.get(url);
     if (cached) return cached;
     try {
-      const bytes = await call('GetImage', pluginID, url, headers || {});
+      const bytes = toBytes(await call('GetImage', pluginID, url, headers || {}));
       if (!bytes) return null;
       const blob = new Blob([bytes], { type: detectImageType(bytes) });
       const blobUrl = URL.createObjectURL(blob);
@@ -296,6 +287,21 @@ function makeBlobUrl(pluginID, url, headers) {
       return null;
     }
   })();
+}
+
+// Wails v3 marshals a Go []byte return as a base64 string (encoding/json).
+// Normalize to a Uint8Array so Blob() and magic-byte sniffing work uniformly.
+function toBytes(v) {
+  if (v == null) return null;
+  if (v instanceof Uint8Array) return v;
+  if (Array.isArray(v)) return new Uint8Array(v);
+  if (typeof v === 'string') {
+    const bin = atob(v);
+    const out = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
+    return out;
+  }
+  return null;
 }
 
 // ponytail: sniff magic bytes instead of trusting a content-type GetImage strips.
