@@ -139,6 +139,18 @@ func (s *AppService) TogglePlugin(id string) error {
 	return s.db.TogglePluginActive(id)
 }
 
+// Log receives a console message from the frontend and writes it to the Go logger.
+func (s *AppService) Log(level string, msg string) {
+	switch level {
+	case "error":
+		logger.Error("[ui] " + msg)
+	case "warn":
+		logger.Warn("[ui] " + msg)
+	default:
+		logger.Debug("[ui] " + msg)
+	}
+}
+
 // SyncLibrary re-fetches chapter lists from source plugins for every manga in the library.
 func (s *AppService) SyncLibrary() error {
 	library, err := s.db.ListLibrary()

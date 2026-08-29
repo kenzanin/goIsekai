@@ -21,11 +21,23 @@ const bindings = {
   togglePlugin: (id) => call('TogglePlugin', id),
   syncLibrary: () => call('SyncLibrary'),
   getImage: (pluginID, url, headers) => call('GetImage', pluginID, url, headers),
+  log: (level, msg) => call('Log', level, msg),
 };
 
 function call(method, ...args) {
   return Call.ByName(SVC + '.' + method, ...args);
 }
+
+// Forward console errors/warns to Go logger so they show in terminal.
+const _origError = console.error, _origWarn = console.warn, _origLog = console.log;
+function _fwd(level, args) {
+  try { bindings.log(level, args.map(a => typeof a === 'string' ? a : JSON.stringify(a)).join(' ')); } catch (_) {}
+}
+console.error = (...a) => { _origError(...a); _fwd('error', a); };
+console.warn  = (...a) => { _origWarn(...a);  _fwd('warn',  a); };
+console.log   = (...a) => { _origLog(...a);   _fwd('debug', a); };
+window.addEventListener('error', e => _fwd('error', [e.message + ' at ' + e.filename + ':' + e.lineno]));
+window.addEventListener('unhandledrejection', e => _fwd('error', ['Unhandled: ' + (e.reason?.message || e.reason)]));
 
 /* ------------------------------------------------------------------ *
  * 2. Image loading — GetImage bytes → Blob URL (cache per-URL)
