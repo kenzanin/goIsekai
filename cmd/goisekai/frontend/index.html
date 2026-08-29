@@ -328,9 +328,21 @@
       <!-- Image wrap -->
       <div @mousemove="scheduleAutoHide()" class="flex items-start justify-center w-full h-full overflow-auto p-10 no-scrollbar">
         <!-- Loading spinner -->
-        <div x-show="loading" class="absolute inset-0 flex flex-col items-center justify-center gap-3 z-10">
+        <div x-show="loading" class="absolute inset-0 flex flex-col items-center justify-center gap-3 z-50">
           <div class="w-10 h-10 border-2 border-white/20 border-t-accent rounded-full animate-spin"></div>
           <span class="text-sm text-zinc-400">Loading page…</span>
+        </div>
+        <!-- Error panel: absolute overlay outside .reader-page -->
+        <div x-show="error && !loading" class="absolute inset-0 flex flex-col items-center justify-center gap-4 text-center z-40">
+          <span class="text-zinc-400 text-sm">Failed to load page <span x-text="currentPage + 1"></span></span>
+          <label class="flex items-center gap-2 text-sm text-zinc-300 cursor-pointer">
+            <input type="checkbox" x-model="deleteCacheOnRetry" class="accent-accent w-4 h-4">
+            Delete cached image first
+          </label>
+          <div class="flex gap-3">
+            <button @click="retryPage()" class="px-4 py-2 rounded-card bg-accent text-white text-sm hover:bg-accent/80 transition-all">↻ Retry</button>
+            <button @click="skipPage()" class="px-4 py-2 rounded-card border border-border text-zinc-300 text-sm hover:bg-white/10 transition-all">Skip →</button>
+          </div>
         </div>
         <div class="reader-page"
             :class="{
@@ -340,21 +352,9 @@
               'img-sharp': renderMode === 'sharp',
               'gpu-compositing': gpu
             }">
-         <img x-show="pageSrc && !error" :src="pageSrc" alt="" class="block" @error="error = true; loading = false">
-          <!-- Error panel: retry + skip + delete cache -->
-          <div x-show="error && !loading" class="flex flex-col items-center justify-center gap-4 text-center">
-            <span class="text-zinc-400 text-sm">Failed to load page <span x-text="currentPage + 1"></span></span>
-            <label class="flex items-center gap-2 text-sm text-zinc-300 cursor-pointer">
-              <input type="checkbox" x-model="deleteCacheOnRetry" class="accent-accent w-4 h-4">
-              Delete cached image first
-            </label>
-            <div class="flex gap-3">
-              <button @click="retryPage()" class="px-4 py-2 rounded-card bg-accent text-white text-sm hover:bg-accent/80 transition-all">↻ Retry</button>
-              <button @click="skipPage()" class="px-4 py-2 rounded-card border border-border text-zinc-300 text-sm hover:bg-white/10 transition-all">Skip →</button>
-            </div>
-          </div>
-       </div>
-     </div>
+          <img x-show="pageSrc && !error" :src="pageSrc" alt="" class="block" @error="error = true; loading = false">
+        </div>
+      </div>
 
      <!-- Shortcuts legend (auto-dismiss on any key/click) -->
      <div x-show="showShortcuts" class="absolute inset-0 z-30 flex items-center justify-center bg-black/80" @click="showShortcuts = false">
