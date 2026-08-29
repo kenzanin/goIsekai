@@ -9,15 +9,18 @@ import (
 	"os"
 	"strconv"
 	"strings"
+
+	"goisekai/internal/logger"
 )
 
 // Config holds the reader's persisted settings.
 type Config struct {
 	// [app]
-	DataDir string
-	Title   string
-	Width   int
-	Height  int
+	DataDir  string
+	Title    string
+	LogLevel string
+	Width    int
+	Height   int
 
 	// [network] — default headers injected into plugin HTTP requests.
 	UserAgent      string
@@ -30,6 +33,7 @@ func Default() *Config {
 	return &Config{
 		DataDir:        "app_data",
 		Title:          "goIsekai",
+		LogLevel:       "info",
 		Width:          1200,
 		Height:         800,
 		UserAgent:      "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36",
@@ -85,6 +89,7 @@ func (c *Config) Save(path string) error {
 	fmt.Fprintf(&b, "[app]\n")
 	fmt.Fprintf(&b, "data_dir = %s\n", c.DataDir)
 	fmt.Fprintf(&b, "title = %s\n", c.Title)
+	fmt.Fprintf(&b, "log_level = %s\n", c.LogLevel)
 	fmt.Fprintf(&b, "width = %d\n", c.Width)
 	fmt.Fprintf(&b, "height = %d\n", c.Height)
 	fmt.Fprintf(&b, "\n[network]\n")
@@ -106,6 +111,13 @@ func (c *Config) set(section, key, val string) {
 			c.DataDir = val
 		case "title":
 			c.Title = val
+		case "log_level":
+			// ponytail: reject garbage here rather than storing it; the logger
+			// is the single source of truth for valid levels, so an unknown
+			// value leaves the "info" default in place. (No strconv.Atoi.)
+			if _, err := logger.ParseLevel(val); err == nil {
+				c.LogLevel = val
+			}
 		case "width":
 			if n, err := strconv.Atoi(val); err == nil {
 				c.Width = n

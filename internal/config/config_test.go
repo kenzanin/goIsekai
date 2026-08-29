@@ -11,7 +11,7 @@ func TestLoadMissingFileReturnsDefaults(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Load missing file: %v", err)
 	}
-	if c.DataDir != "app_data" || c.Width != 1200 || c.Height != 800 {
+	if c.DataDir != "app_data" || c.Width != 1200 || c.Height != 800 || c.LogLevel != "info" {
 		t.Fatalf("unexpected defaults: %+v", c)
 	}
 }
@@ -26,6 +26,7 @@ func TestRoundTrip(t *testing.T) {
 	c.UserAgent = "CustomAgent/1.0"
 	c.AcceptLanguage = "id-ID,id;q=0.9"
 	c.Referer = "https://example.com"
+	c.LogLevel = "debug"
 
 	if err := c.Save(path); err != nil {
 		t.Fatalf("Save: %v", err)
@@ -38,7 +39,7 @@ func TestRoundTrip(t *testing.T) {
 	if got.DataDir != c.DataDir || got.Title != c.Title ||
 		got.Width != c.Width || got.Height != c.Height ||
 		got.UserAgent != c.UserAgent || got.AcceptLanguage != c.AcceptLanguage ||
-		got.Referer != c.Referer {
+		got.Referer != c.Referer || got.LogLevel != c.LogLevel {
 		t.Fatalf("round-trip mismatch:\n got %+v\nwant %+v", got, c)
 	}
 }
@@ -70,5 +71,45 @@ referer = https://ref.example
 	// Untouched keys keep their defaults.
 	if c.DataDir != "app_data" || c.Height != 800 || c.AcceptLanguage == "" {
 		t.Fatalf("defaults not preserved: %+v", c)
+	}
+}
+
+func TestLogLevelRoundTrips(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "loglevel.ini")
+	c := Default()
+	c.LogLevel = "warning"
+	if err := c.Save(path); err != nil {
+		t.Fatalf("Save: %v", err)
+	}
+	got, err := Load(path)
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	if got.LogLevel != "warning" {
+		t.Fatalf("log_level round-trip: got %q want %q", got.LogLevel, "warning")
+	}
+}
+
+func TestMissingOrUnknownLogLevelKeepsDefault(t *testing.T) {
+	// Missing key keeps the "info" default.
+	c, err := Load(filepath.Join(t.TempDir(), "nolevel.ini"))
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	if c.LogLevel != "info" {
+		t.Fatalf("missing log_level: got %q want %q", c.LogLevel, "info")
+	}
+
+	// Unknown value is ignored (default preserved), not applied.
+	path := filepath.Join(t.TempDir(), "badlevel.ini")
+	if err := os.WriteFile(path, []byte("[app]\nlog_level = foo\n"), 0o644); err != nil {
+		t.Fatalf("write: %v", err)
+	}
+	got, err := Load(path)
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	if got.LogLevel != "info" {
+		t.Fatalf("unknown log_level: got %q want %q", got.LogLevel, "info")
 	}
 }
