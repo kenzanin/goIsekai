@@ -27,7 +27,7 @@ const bindings = {
 
 // Thin wrapper: resolves to the Go return value(s), rejects on Go error (§6.4).
 function call(method, ...args) {
-  return Call({ methodName: SVC + '.' + method, args });
+  return Call.ByName(SVC + '.' + method, ...args);
 }
 
 /* ------------------------------------------------------------------ *
@@ -220,26 +220,26 @@ function createPluginCard(plugin) {
 
   const icon = document.createElement('div');
   icon.className = 'plugin-card-icon';
-  if (plugin.iconURL) {
+  if (plugin.IconURL) {
     const img = document.createElement('img');
-    img.src = plugin.iconURL;
-    img.alt = (plugin.name || 'plugin') + ' icon';
-    img.onerror = () => { icon.innerHTML = fallbackInitial(plugin.name); };
+    img.src = plugin.IconURL;
+    img.alt = (plugin.Name || 'plugin') + ' icon';
+    img.onerror = () => { icon.innerHTML = fallbackInitial(plugin.Name); };
     icon.appendChild(img);
   } else {
-    icon.innerHTML = fallbackInitial(plugin.name);
+    icon.innerHTML = fallbackInitial(plugin.Name);
   }
 
   const info = document.createElement('div');
   info.className = 'plugin-card-info';
   const h3 = document.createElement('h3');
-  h3.textContent = plugin.name || plugin.id;
+  h3.textContent = plugin.Name || plugin.ID;
   const idEl = document.createElement('span');
   idEl.className = 'plugin-card-id';
-  idEl.textContent = plugin.id;
+  idEl.textContent = plugin.ID;
   const verEl = document.createElement('span');
   verEl.className = 'plugin-card-version';
-  verEl.textContent = plugin.version || 'v0.0.0';
+  verEl.textContent = plugin.Version || 'v0.0.0';
   info.appendChild(h3);
   info.appendChild(idEl);
   info.appendChild(verEl);
@@ -248,7 +248,7 @@ function createPluginCard(plugin) {
   status.className = 'plugin-card-status';
   const badge = document.createElement('span');
   badge.className = 'badge badge-active';
-  badge.textContent = plugin.isActive ? 'Active' : 'Inactive';
+  badge.textContent = plugin.IsActive ? 'Active' : 'Inactive';
   status.appendChild(badge);
 
   card.appendChild(icon);
@@ -353,6 +353,22 @@ async function loadLibrary() {
   }
 }
 
+async function loadPlugins() {
+  const list = $('#plugin-list');
+  const empty = $('#plugins-empty');
+  try {
+    state.plugins = await bindings.listPlugins();
+    list.innerHTML = '';
+    for (const p of state.plugins) {
+      list.appendChild(createPluginCard(p));
+    }
+    empty.style.display = state.plugins.length === 0 ? 'flex' : 'none';
+    populatePluginSelect();
+  } catch (err) {
+    list.replaceChildren(errorState('Failed to load plugins', loadPlugins));
+  }
+}
+
 async function loadSearch(pluginID, query, page) {
   // Populate the plugin picker on first entry (§6.3).
   if (!state.plugins || state.plugins.length === 0) {
@@ -361,7 +377,7 @@ async function loadSearch(pluginID, query, page) {
   populatePluginSelect();
 
   const select = $('#plugin-select');
-  if (pluginID && state.plugins.some((p) => p.id === pluginID)) {
+  if (pluginID && state.plugins.some((p) => p.ID === pluginID)) {
     select.value = pluginID;
     state.searchPlugin = pluginID;
   } else if (!state.searchPlugin && state.plugins.length > 0) {
@@ -425,12 +441,12 @@ function populatePluginSelect() {
   select.innerHTML = '<option value="">Select a source…</option>';
   for (const p of state.plugins) {
     const opt = document.createElement('option');
-    opt.value = p.id;
-    opt.textContent = p.name || p.id;
+    opt.value = p.ID;
+    opt.textContent = p.Name || p.ID;
     select.appendChild(opt);
   }
-  if (current && state.plugins.some((p) => p.id === current)) select.value = current;
-  else if (state.plugins.length === 1) select.value = state.plugins[0].id;
+  if (current && state.plugins.some((p) => p.ID === current)) select.value = current;
+  else if (state.plugins.length === 1) select.value = state.plugins[0].ID;
 }
 
 async function loadMangaDetail(pluginID, mangaID) {
@@ -837,8 +853,8 @@ function fallbackInitial(name) {
 }
 
 function lookupPluginName(pluginID) {
-  const found = state.plugins.find((p) => p.id === pluginID);
-  return found ? (found.name || found.id) : '';
+  const found = state.plugins.find((p) => p.ID === pluginID);
+  return found ? (found.Name || found.ID) : '';
 }
 
 function formatChapterNum(num) {
