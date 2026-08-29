@@ -1,42 +1,66 @@
 package database
 
-// UpsertChapter inserts a chapter or, on a duplicate id (primary key), updates
-// only the identifying/metadata fields. is_read, last_page_read, and
-// download_status are left untouched so refreshing from the source never
-// resets a reader's progress.
+import (
+	. "github.com/go-jet/jet/v2/sqlite"
+	. "goisekai/internal/database/.gen/table"
+)
+
+// UpsertChapter inserts a chapter or, on a duplicate id, refreshes the
+// identifying/metadata columns while preserving is_read, last_page_read and
+// download_status.
 func (d *DB) UpsertChapter(c Chapter) error {
-	_, err := d.db.Exec(`
-		INSERT INTO chapters
-			(id, manga_id, source_chapter_id, title, chapter_num, volume_num, is_read, last_page_read, download_status, fetched_at)
-	VALUES
-			(?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
-		ON CONFLICT(id) DO UPDATE SET
-			manga_id = excluded.manga_id,
-			source_chapter_id = excluded.source_chapter_id,
-			title = excluded.title,
-			chapter_num = excluded.chapter_num,
-			volume_num = excluded.volume_num,
-			fetched_at = CURRENT_TIMESTAMP`,
-		c.ID, c.MangaID, c.SourceChapterID, c.Title, c.ChapterNum, c.VolumeNum,
-		intFromBool(c.IsRead), c.LastPageRead, c.DownloadStatus,
-	)
+	_, err := Chapters.INSERT(
+		Chapters.ID,
+		Chapters.MangaID,
+		Chapters.SourceChapterID,
+		Chapters.Title,
+		Chapters.ChapterNum,
+		Chapters.VolumeNum,
+		Chapters.IsRead,
+		Chapters.LastPageRead,
+		Chapters.DownloadStatus,
+		Chapters.FetchedAt,
+	).VALUES(
+		c.ID,
+		c.MangaID,
+		c.SourceChapterID,
+		c.Title,
+		c.ChapterNum,
+		c.VolumeNum,
+		boolToInt(c.IsRead),
+		c.LastPageRead,
+		c.DownloadStatus,
+		RawTimestamp("CURRENT_TIMESTAMP"),
+	).ON_CONFLICT(Chapters.ID).DO_UPDATE(
+		SET(
+			Chapters.MangaID.SET(Chapters.EXCLUDED.MangaID),
+			Chapters.SourceChapterID.SET(Chapters.EXCLUDED.SourceChapterID),
+			Chapters.Title.SET(Chapters.EXCLUDED.Title),
+			Chapters.ChapterNum.SET(Chapters.EXCLUDED.ChapterNum),
+			Chapters.VolumeNum.SET(Chapters.EXCLUDED.VolumeNum),
+			Chapters.FetchedAt.SET(RawTimestamp("CURRENT_TIMESTAMP")),
+		),
+	).Exec(d.db)
 	return err
 }
 
-// SetChapterProgress records the reader's last page and marks the chapter read.
+// SetChapterProgress records the last page read and marks the chapter read.
 func (d *DB) SetChapterProgress(chapterID string, lastPage int) error {
-	_, err := d.db.Exec(
-		`UPDATE chapters SET last_page_read = ?, is_read = 1 WHERE id = ?`,
-		lastPage, chapterID,
-	)
+	_, err := Chapters.UPDATE().
+		SET(
+			Chapters.LastPageRead.SET(Int(int64(lastPage))),
+			Chapters.IsRead.SET(Int(1)),
+		).
+		WHERE(Chapters.ID.EQ(String(chapterID))).
+		Exec(d.db)
 	return err
 }
 
-// SetDownloadStatus records a chapter's download state.
+// SetDownloadStatus records the download status of a chapter.
 func (d *DB) SetDownloadStatus(chapterID string, status string) error {
-	_, err := d.db.Exec(
-		`UPDATE chapters SET download_status = ? WHERE id = ?`,
-		status, chapterID,
-	)
+	_, err := Chapters.UPDATE().
+		SET(Chapters.DownloadStatus.SET(String(status))).
+		WHERE(Chapters.ID.EQ(String(chapterID))).
+		Exec(d.db)
 	return err
 }

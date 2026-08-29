@@ -1,41 +1,70 @@
 package database
 
+import (
+	. "github.com/go-jet/jet/v2/sqlite"
+	"goisekai/internal/database/.gen/model"
+	. "goisekai/internal/database/.gen/table"
+)
+
 // UpsertManga inserts a manga or, on a duplicate (plugin_id, source_manga_id),
-// updates the mutable fields and refreshes updated_at.
+// refreshes the mutable columns and updated_at.
 func (d *DB) UpsertManga(m Manga) error {
-	_, err := d.db.Exec(`
-		INSERT INTO mangas
-			(id, plugin_id, source_manga_id, title, cover_url, description, status, in_library, created_at, updated_at)
-	VALUES
-			(?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
-		ON CONFLICT(plugin_id, source_manga_id) DO UPDATE SET
-			title = excluded.title,
-			cover_url = excluded.cover_url,
-			description = excluded.description,
-			status = excluded.status,
-			updated_at = CURRENT_TIMESTAMP`,
-		m.ID, m.PluginID, m.SourceMangaID, m.Title, m.CoverURL, m.Description, m.Status, intFromBool(m.InLibrary),
-	)
+	_, err := Mangas.INSERT(
+		Mangas.ID,
+		Mangas.PluginID,
+		Mangas.SourceMangaID,
+		Mangas.Title,
+		Mangas.CoverURL,
+		Mangas.Description,
+		Mangas.Status,
+		Mangas.InLibrary,
+		Mangas.CreatedAt,
+		Mangas.UpdatedAt,
+	).VALUES(
+		m.ID,
+		m.PluginID,
+		m.SourceMangaID,
+		m.Title,
+		m.CoverURL,
+		m.Description,
+		m.Status,
+		boolToInt(m.InLibrary),
+		RawTimestamp("CURRENT_TIMESTAMP"),
+		RawTimestamp("CURRENT_TIMESTAMP"),
+	).ON_CONFLICT(Mangas.PluginID, Mangas.SourceMangaID).DO_UPDATE(
+		SET(
+			Mangas.Title.SET(Mangas.EXCLUDED.Title),
+			Mangas.CoverURL.SET(Mangas.EXCLUDED.CoverURL),
+			Mangas.Description.SET(Mangas.EXCLUDED.Description),
+			Mangas.Status.SET(Mangas.EXCLUDED.Status),
+			Mangas.UpdatedAt.SET(RawTimestamp("CURRENT_TIMESTAMP")),
+		),
+	).Exec(d.db)
 	return err
 }
 
-// ToggleLibrary flips the in_library flag for a manga.
+// ToggleLibrary flips the in_library flag (0 <-> 1) for a manga.
 func (d *DB) ToggleLibrary(mangaID string) error {
-	_, err := d.db.Exec(
-		`UPDATE mangas SET in_library = 1 - in_library, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
-		mangaID,
-	)
+	_, err := Mangas.UPDATE().
+		SET(Mangas.InLibrary.SET(Int(1).SUB(Mangas.InLibrary))).
+		WHERE(Mangas.ID.EQ(String(mangaID))).
+		Exec(d.db)
 	return err
 }
 
-// ListLibrary returns all in-library mangas, most recently updated first.
+// ListLibrary returns all in-library manga ordered by last update.
 func (d *DB) ListLibrary() ([]Manga, error) {
-	rows, err := d.db.Query(
-		`SELECT id, plugin_id, source_manga_id, title, cover_url, description, status, in_library, created_at, updated_at
-		FROM mangas WHERE in_library = 1 ORDER BY updated_at DESC`,
-	)
+	var models []model.Mangas
+	err := Mangas.SELECT(Mangas.AllColumns).
+		WHERE(Mangas.InLibrary.EQ(Int(1))).
+		ORDER_BY(Mangas.UpdatedAt.DESC()).
+		Query(d.db, &models)
 	if err != nil {
 		return nil, err
 	}
-	return scanManga(rows)
+	result := make([]Manga, len(models))
+	for i, m := range models {
+		result[i] = mangaFromModel(m)
+	}
+	return result, nil
 }
