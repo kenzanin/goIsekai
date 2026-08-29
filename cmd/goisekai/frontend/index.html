@@ -267,7 +267,7 @@
            <div x-show="startTarget" class="mt-4">
              <button @click="startReading()"
                      class="w-full px-5 py-3 rounded-card bg-accent text-white font-bold text-lg hover:bg-accent-hover hover:shadow-glow transition-all">
-               <span x-text="startTarget.label + (startTarget.num ? ' Ch. ' + formatChapterNum(startTarget.num) : '')"></span>
+               <span x-text="startTarget ? startTarget.label + (startTarget.num ? ' Ch. ' + formatChapterNum(startTarget.num) : '') : ''"></span>
              </button>
            </div>
 
