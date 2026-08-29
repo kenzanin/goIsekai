@@ -6,9 +6,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/wailsapp/wails/v2"
-	"github.com/wailsapp/wails/v2/pkg/options"
-	"github.com/wailsapp/wails/v2/pkg/options/assetserver"
+	"github.com/wailsapp/wails/v3/pkg/application"
 
 	"goisekai/internal/bridge"
 	"goisekai/internal/config"
@@ -62,16 +60,19 @@ func main() {
 
 	svc := bridge.NewAppService(db, mgr, proxy)
 
-	err = wails.Run(&options.App{
-		Title:  cfg.Title,
-		Width:  cfg.Width,
-		Height: cfg.Height,
-		AssetServer: &assetserver.Options{
-			Assets: assets,
+	app := application.New(application.Options{
+		Name: "goIsekai",
+		Assets: application.AssetOptions{
+			Handler: application.AssetFileServerFS(assets),
 		},
-		Bind: []any{svc},
+		Services: []application.Service{
+			application.NewService(svc),
+		},
 	})
-	if err != nil {
+	app.Window.NewWithOptions(application.WebviewWindowOptions{
+		Title: cfg.Title, Width: cfg.Width, Height: cfg.Height,
+	})
+	if err := app.Run(); err != nil {
 		log.Fatal(err)
 	}
 }
