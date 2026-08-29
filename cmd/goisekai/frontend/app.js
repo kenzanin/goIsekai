@@ -28,6 +28,28 @@ function call(method, ...args) {
   return Call.ByName(SVC + '.' + method, ...args);
 }
 
+/* ------------------------------------------------------------------ *
+ * 1b. Settings — persisted to localStorage with the `gi_` prefix
+ * ------------------------------------------------------------------ */
+function getSetting(key, def) {
+  try { return localStorage.getItem('gi_' + key) ?? def; } catch (_) { return def; }
+}
+function saveSetting(key, value) {
+  try { localStorage.setItem('gi_' + key, String(value)); } catch (_) {}
+}
+const settings = {
+  renderMode: getSetting('renderMode', 'smooth'),   // 'smooth' | 'sharp'
+  gpuCompositing: getSetting('gpuCompositing', 'false') === 'true',
+  readAhead: (() => { const n = parseInt(getSetting('readAhead', '3'), 10); return Number.isNaN(n) ? 3 : Math.max(0, Math.min(10, n)); })(),
+  direction: getSetting('direction', 'ltr'),        // 'ltr' | 'rtl'
+  viewMode: getSetting('viewMode', 'fitWidth'),     // 'fitWidth' | 'fitHeight' | 'original'
+};
+window.settings = settings;
+
+// Shared reader control-button classes (defined here so index.html templates can reference them).
+const RBTN = 'px-3 py-1.5 rounded-card border border-border text-zinc-100 bg-black/30 hover:bg-white/10 transition-all text-sm font-medium';
+const RBTN_ACTIVE = 'px-3 py-1.5 rounded-card border border-accent text-accent bg-black/40 transition-all text-sm font-medium';
+
 // Forward console errors/warns to Go logger so they show in terminal.
 const _origError = console.error, _origWarn = console.warn, _origLog = console.log;
 function _fwd(level, args) {
@@ -146,6 +168,8 @@ document.addEventListener('alpine:init', () => {
     plugins: [],
     libraryList: null,
     readProgress: {},
+    // chapters sorted ascending (by chapter_num), keyed by `pluginID|mangaID`
+    chaptersByManga: {},
 
     navigate(hash) {
       revokeAllBlobUrls();
@@ -305,6 +329,10 @@ document.addEventListener('alpine:init', () => {
           if (url) this.coverUrl = url;
         }
 
+        // Expose chapters (ascending by number) to the reader for next-chapter nav.
+        const asc = this.chapters.slice().sort((a, b) => (a.chapter_num || 0) - (b.chapter_num || 0));
+        this.$store.app.chaptersByManga[pid + '|' + mid] = asc;
+
         // Check library membership
         if (!this.$store.app.libraryList) await this.$store.app.loadLibrary();
         this.inLibrary = (this.$store.app.libraryList || []).some(
@@ -334,6 +362,43 @@ document.addEventListener('alpine:init', () => {
     readProgress(ch) {
       return this.$store.app.readProgress[ch.id] || null;
     },
+
+    get chaptersAscending() {
+      return this.chapters.slice().sort((a, b) => (a.chapter_num || 0) - (b.chapter_num || 0));
+    },
+
+    // Where the "Continue Reading" button points: first chapter, or the
+    // furthest-read chapter (at its last page), or the next chapter once the
+    // furthest-read one is complete.
+    get startTarget() {
+      const list = this.chaptersAscending;
+      if (!list.length) return null;
+      let best = null, bestPage = -1;
+      for (const ch of list) {
+        const p = this.readProgress(ch);
+        if (p && p.lastPage > bestPage) { bestPage = p.lastPage; best = ch; }
+      }
+      if (!best) {
+        return { chapter: list[0], page: 0, label: 'Start Reading' };
+      }
+      const p = this.readProgress(best);
+      if (p.lastPage >= p.pageCount) {
+        const idx = list.indexOf(best);
+        const nextCh = list[idx + 1];
+        if (nextCh) return { chapter: nextCh, page: 0, label: 'Continue Reading', num: nextCh.chapter_num };
+        return null; // fully caught up
+      }
+      return { chapter: best, page: p.lastPage, label: 'Continue Reading', num: best.chapter_num };
+    },
+
+    startReading() {
+      const t = this.startTarget;
+      if (!t || !t.chapter) return;
+      this.$store.app.navigate(
+        `#/read/${encodeURIComponent(this.pluginID)}/${encodeURIComponent(this.mangaID)}` +
+        `/${encodeURIComponent(t.chapter.id)}?page=${t.page}`
+      );
+    },
   }));
 
   // ── Reader component ──────────────────────────────────────────────
@@ -347,11 +412,30 @@ document.addEventListener('alpine:init', () => {
     pageSrc: '',
     loading: false,
     error: false,
-    complete: false,
-    nextChapterID: null,
-    autoHideTimer: null,
+     complete: false,
+     autoHideTimer: null,
     controlsVisible: true,
     _boundKeyHandler: null,
+    // Settings mirrored from window.settings (updated live in load()).
+    renderMode: 'smooth',
+    gpu: false,
+    viewMode: 'fitWidth',
+    direction: 'ltr',
+    showShortcuts: false,
+
+    init() {
+      const s = window.settings;
+      this.renderMode = s.renderMode;
+      this.gpu = s.gpuCompositing;
+      this.viewMode = s.viewMode;
+      this.direction = s.direction;
+      // Auto-dismiss the shortcuts legend on any key or click (see index.html).
+      this.$watch('showShortcuts', (open) => {
+        if (!open) return;
+        const close = () => { this.showShortcuts = false; document.removeEventListener('keydown', close); };
+        document.addEventListener('keydown', close);
+      });
+    },
 
     async load(pid, mid, cid, page) {
       this.pluginID = pid;
@@ -362,20 +446,25 @@ document.addEventListener('alpine:init', () => {
       this.pageSrc = '';
       this.loading = true;
       this.error = false;
-      this.complete = false;
-      this.nextChapterID = null;
+       this.complete = false;
+       this.renderMode = window.settings.renderMode;
+       this.gpu = window.settings.gpuCompositing;
+       this.viewMode = window.settings.viewMode;
+       this.direction = window.settings.direction;
 
-      try {
-        const pages = await bindings.pageList(pid, cid);
+       try {
+         const pages = await bindings.pageList(pid, cid);
         if (!pages || pages.length === 0) {
           this.loading = false;
           return;
         }
-        this.pages = pages;
-        this.currentPage = clamp(page || 0, 0, pages.length - 1);
+         this.pages = pages;
+
+         this.currentPage = clamp(page || 0, 0, pages.length - 1);
         await this.goToPage(this.currentPage);
         this.scheduleAutoHide();
         this.bindKeys();
+        this.prefetchNextChapters();
       } catch (err) {
         console.error('Failed to load chapter:', err);
         this.loading = false;
@@ -436,9 +525,6 @@ document.addEventListener('alpine:init', () => {
 
     showComplete() {
       this.complete = true;
-      // Find next chapter from detail view's chapters list (stored in app store detail)
-      // For simplicity, we compute next chapter ID from the hash context
-      this.nextChapterID = null;
     },
 
     scheduleAutoHide() {
@@ -452,14 +538,79 @@ document.addEventListener('alpine:init', () => {
       if (this._boundKeyHandler) document.removeEventListener('keydown', this._boundKeyHandler);
       this._boundKeyHandler = (e) => {
         const inField = e.target.matches('input, select, textarea');
+        // A shortcuts-legend open wins: any key closes it before anything else.
+        if (this.showShortcuts) { e.preventDefault(); this.showShortcuts = false; return; }
         if (e.key === 'Escape') { e.preventDefault(); this.exit(); return; }
+        if (e.key === '?') { e.preventDefault(); this.showShortcuts = true; return; }
         if (e.key === 'f' || e.key === 'F') { e.preventDefault(); this.toggleFullscreen(); return; }
+        if (!inField && e.key === ' ') { e.preventDefault(); this.goNext(); return; }
         if (e.key === 'Home') { e.preventDefault(); this.goToPage(0); return; }
         if (e.key === 'End') { e.preventDefault(); this.goToPage(this.pages.length - 1); return; }
-        if (!inField && (e.key === 'ArrowLeft' || e.key === 'a' || e.key === 'A')) { e.preventDefault(); this.goToPage(this.currentPage - 1); return; }
-        if (!inField && (e.key === 'ArrowRight' || e.key === 'd' || e.key === 'D')) { e.preventDefault(); this.goToPage(this.currentPage + 1); return; }
+        // ArrowRight: LTR → next, RTL → prev. ArrowLeft: LTR → prev, RTL → next.
+        if (!inField && e.key === 'ArrowRight') { e.preventDefault(); this.direction === 'rtl' ? this.goPrev() : this.goNext(); return; }
+        if (!inField && e.key === 'ArrowLeft')  { e.preventDefault(); this.direction === 'rtl' ? this.goNext()  : this.goPrev(); return; }
+        if (!inField && (e.key === 'a' || e.key === 'A')) { e.preventDefault(); this.goPrev(); return; }
+        if (!inField && (e.key === 'd' || e.key === 'D')) { e.preventDefault(); this.goNext(); return; }
       };
       document.addEventListener('keydown', this._boundKeyHandler);
+    },
+
+    // Reading-order navigation: always +1 / -1 by page index. Which key maps to
+    // these (ArrowLeft vs ArrowRight) is decided in bindKeys() by the direction.
+    goNext() { this.goToPage(this.currentPage + 1); },
+    goPrev() { this.goToPage(this.currentPage - 1); },
+
+    setViewMode(v) {
+      this.viewMode = v;
+      window.settings.viewMode = v;
+      saveSetting('viewMode', v);
+    },
+
+    toggleDirection() {
+      this.direction = this.direction === 'ltr' ? 'rtl' : 'ltr';
+      window.settings.direction = this.direction;
+      saveSetting('direction', this.direction);
+    },
+
+    get progressPct() {
+      if (!this.pages.length) return 0;
+      if (this.pages.length === 1) return 100;
+      return Math.round((this.currentPage / (this.pages.length - 1)) * 100);
+    },
+
+    get orderedChapters() {
+      const list = this.$store.app.chaptersByManga[this.pluginID + '|' + this.mangaID];
+      return Array.isArray(list) ? list : [];
+    },
+
+    // Chapter after the current one in reading order. LTR → higher chapter
+    // number (index+1); RTL → lower (index-1).
+    get nextChapterID() {
+      const list = this.orderedChapters;
+      const idx = list.findIndex(c => c.id === this.chapterID);
+      if (idx === -1) return null;
+      const target = list[this.direction === 'rtl' ? idx - 1 : idx + 1];
+      return target ? target.id : null;
+    },
+
+    // Silently prefetch the next K chapters' page blobs so they open instantly.
+    prefetchNextChapters() {
+      const k = clamp(settings.readAhead, 0, 10);
+      if (k <= 0) return;
+      const idx = this.orderedChapters.findIndex(c => c.id === this.chapterID);
+      if (idx === -1) return;
+      let remaining = k;
+      for (let i = idx + 1; i < this.orderedChapters.length && remaining > 0; i++) {
+        const ch = this.orderedChapters[i];
+        bindings.pageList(this.pluginID, ch.id)
+          .then(pages => {
+            if (Array.isArray(pages)) {
+              for (const p of pages) loadImage(this.pluginID, p.url, p.headers);
+            }
+          })
+          .catch(() => {});
+        remaining--;
+      }
     },
 
     unbindKeys() {
@@ -547,6 +698,36 @@ document.addEventListener('alpine:init', () => {
 
     get plugins() { return this.$store.app.plugins; },
   }));
+
+  // ── Settings component ────────────────────────────────────────────
+  Alpine.data('settingsView', () => {
+    const s = window.settings;
+    return {
+      renderMode: s.renderMode,
+      gpuCompositing: s.gpuCompositing,
+      readAhead: s.readAhead,
+      direction: s.direction,
+      viewMode: s.viewMode,
+
+      persist() {
+        window.settings.renderMode = this.renderMode;
+        window.settings.gpuCompositing = this.gpuCompositing;
+        window.settings.readAhead = this.readAhead;
+        window.settings.direction = this.direction;
+        window.settings.viewMode = this.viewMode;
+        saveSetting('renderMode', this.renderMode);
+        saveSetting('gpuCompositing', String(this.gpuCompositing));
+        saveSetting('readAhead', String(this.readAhead));
+        saveSetting('direction', this.direction);
+        saveSetting('viewMode', this.viewMode);
+      },
+
+      setReadAhead(v) {
+        const n = parseInt(v, 10);
+        this.readAhead = Number.isNaN(n) ? 0 : Math.max(0, Math.min(10, n));
+      },
+    };
+  });
 
 });
 
