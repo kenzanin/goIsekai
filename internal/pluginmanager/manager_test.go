@@ -105,3 +105,37 @@ func TestPanickingPlugin(t *testing.T) {
 		t.Fatal("expected error from panicking plugin Search")
 	}
 }
+
+func TestInstallCopiesPlugin(t *testing.T) {
+	wasmPath := buildFixture(t, "plugin") // lives in its own temp dir
+	pluginsDir := t.TempDir()             // separate, empty target dir
+
+	mgr := NewManager(hostnet.NewProxy(), pluginsDir)
+	if err := mgr.Discover(); err != nil {
+		t.Fatalf("Discover: %v", err)
+	}
+	defer func() { _ = mgr.Close() }()
+
+	dest, err := mgr.Install(wasmPath)
+	if err != nil {
+		t.Fatalf("Install: %v", err)
+	}
+	if filepath.Dir(dest) != pluginsDir {
+		t.Fatalf("Install returned %q, want a copy under %q", dest, pluginsDir)
+	}
+	if _, err := os.Stat(dest); err != nil {
+		t.Fatalf("installed plugin missing: %v", err)
+	}
+	if _, err := os.Stat(wasmPath); err != nil {
+		t.Fatalf("source plugin was moved/deleted, want a copy: %v", err)
+	}
+
+	// The copied plugin must be usable through the runtime.
+	mangas, err := mgr.Search("plugin", types.SearchFilter{Query: "test"})
+	if err != nil {
+		t.Fatalf("Search after Install: %v", err)
+	}
+	if len(mangas) != 1 || mangas[0].ID != "m1" {
+		t.Fatalf("unexpected Search result: %+v", mangas)
+	}
+}

@@ -22,6 +22,7 @@ var assets embed.FS
 
 func main() {
 	logLevel := flag.String("logLevel", "", "log level: debug|info|warning (overrides goisekai.ini log_level)")
+	genIni := flag.Bool("genini", false, "generate a default goisekai.ini and exit")
 	flag.Parse()
 
 	// Config file: goisekai.ini in the working directory, overridable via
@@ -30,6 +31,22 @@ func main() {
 	if cfgPath == "" {
 		cfgPath = "goisekai.ini"
 	}
+
+	if *genIni {
+		if err := config.Default().Save(cfgPath); err != nil {
+			log.Fatalf("generate config: %v", err)
+		}
+		log.Printf("wrote default config to %s", cfgPath)
+		return
+	}
+
+	// Auto-generate a default config on first run so there is a file to edit.
+	if _, err := os.Stat(cfgPath); os.IsNotExist(err) {
+		if err := config.Default().Save(cfgPath); err != nil {
+			log.Fatalf("generate config: %v", err)
+		}
+	}
+
 	cfg, err := config.Load(cfgPath)
 	if err != nil {
 		log.Fatalf("load config: %v", err)

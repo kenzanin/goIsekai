@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -168,22 +169,47 @@ func (m *Manager) load(rt wazero.Runtime, id, wasmPath string) (*loadedPlugin, e
 	return p, nil
 }
 
-// Install hot-loads a single plugin wasm file into the already-discovered
-// runtime and registers it under its base filename. It must be called after
-// Discover. The caller is responsible for placing the file in pluginsDir.
-func (m *Manager) Install(wasmPath string) error {
+// Install copies a plugin wasm file into pluginsDir, hot-loads it into the
+// already-discovered runtime, and registers it under its base filename. It
+// must be called after Discover. It returns the path of the copy inside
+// pluginsDir, which the caller should persist as the plugin's WasmPath.
+func (m *Manager) Install(wasmPath string) (string, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	if m.runtime == nil {
-		return fmt.Errorf("Discover must be called before Install")
+		return "", fmt.Errorf("Discover must be called before Install")
 	}
 	id := strings.TrimSuffix(filepath.Base(wasmPath), ".wasm")
-	p, err := m.load(m.runtime, id, wasmPath)
+	dest := filepath.Join(m.pluginsDir, id+".wasm")
+	if filepath.Clean(wasmPath) != filepath.Clean(dest) {
+		if err := copyFile(wasmPath, dest); err != nil {
+			return "", fmt.Errorf("copy plugin %s: %w", id, err)
+		}
+	}
+	p, err := m.load(m.runtime, id, dest)
 	if err != nil {
-		return fmt.Errorf("install plugin %s: %w", id, err)
+		return "", fmt.Errorf("install plugin %s: %w", id, err)
 	}
 	m.plugins[id] = p
-	return nil
+	return dest, nil
+}
+
+// copyFile copies src to dst, truncating dst if it exists.
+func copyFile(src, dst string) error {
+	in, err := os.Open(src)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = in.Close() }()
+	out, err := os.Create(dst)
+	if err != nil {
+		return err
+	}
+	if _, err := io.Copy(out, in); err != nil {
+		_ = out.Close()
+		return err
+	}
+	return out.Close()
 }
 
 // get returns the loaded plugin for pluginID under a read lock.

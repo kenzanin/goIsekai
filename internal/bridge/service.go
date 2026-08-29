@@ -84,18 +84,21 @@ func (s *AppService) ToggleLibraryItem(pluginID, mangaID string) error {
 	return nil
 }
 
-// InstallPlugin hot-loads a plugin wasm and registers it in the database as
-// active, deriving its id from the file basename (minus the .wasm extension).
+// InstallPlugin copies a plugin wasm into the managed plugins directory,
+// hot-loads it, and registers it in the database as active. The plugin id is
+// derived from the file basename (minus the .wasm extension); WasmPath points
+// at the copy inside the plugins directory so it survives a restart.
 func (s *AppService) InstallPlugin(wasmPath string) error {
-	if err := s.mgr.Install(wasmPath); err != nil {
+	dest, err := s.mgr.Install(wasmPath)
+	if err != nil {
 		return fmt.Errorf("bridge: install plugin: %w", err)
 	}
-	id := strings.TrimSuffix(filepath.Base(wasmPath), ".wasm")
+	id := strings.TrimSuffix(filepath.Base(dest), ".wasm")
 	if err := s.db.RegisterPlugin(database.Plugin{
 		ID:       id,
 		Name:     id,
 		Version:  "",
-		WasmPath: wasmPath,
+		WasmPath: dest,
 		IsActive: true,
 	}); err != nil {
 		return fmt.Errorf("bridge: register plugin: %w", err)
