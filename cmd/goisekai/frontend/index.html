@@ -325,9 +325,14 @@
        <div class="h-full reader-progress-fill transition-[width] duration-150" :style="'width:' + progressPct + '%'"></div>
      </div>
 
-     <!-- Image wrap -->
-     <div @mousemove="scheduleAutoHide()" class="flex items-center justify-center w-full h-full overflow-auto p-10 no-scrollbar">
-       <div class="reader-page"
+      <!-- Image wrap -->
+      <div @mousemove="scheduleAutoHide()" class="flex items-center justify-center w-full h-full overflow-auto p-10 no-scrollbar">
+        <!-- Loading spinner -->
+        <div x-show="loading" class="absolute inset-0 flex flex-col items-center justify-center gap-3 z-10">
+          <div class="w-10 h-10 border-2 border-white/20 border-t-accent rounded-full animate-spin"></div>
+          <span class="text-sm text-zinc-400">Loading page…</span>
+        </div>
+        <div class="reader-page"
             :class="{
               'reader-fit-width': viewMode === 'fitWidth',
               'reader-fit-height': viewMode === 'fitHeight',

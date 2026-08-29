@@ -19,11 +19,11 @@ dev:
 
 ## devrun: build with devtools and launch.
 devrun: dev
-	./$(BINARY) $(ARGS)
+	./$(BINARY) -logLevel debug $(ARGS) 
 
 ## run: build and launch the app. Pass flags via ARGS, e.g.: make run ARGS=-logLevel=debug
 run: build
-	./$(BINARY) $(ARGS)
+	./$(BINARY) -logLevel debug $(ARGS)
 
 ## check: full quality gate — format, race tests, modernize, lint.
 check: fmt race modernize lint
