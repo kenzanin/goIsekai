@@ -43,7 +43,9 @@ func main() {
 	if err != nil {
 		log.Fatalf("open database: %v", err)
 	}
-	defer db.Close()
+	defer func() {
+		_ = db.Close()
+	}()
 
 	proxy := hostnet.NewProxy()
 	proxy.SetDefaultHeader("User-Agent", cfg.UserAgent)
@@ -54,7 +56,9 @@ func main() {
 	if err := mgr.Discover(); err != nil {
 		log.Fatalf("discover plugins: %v", err)
 	}
-	defer mgr.Close()
+	defer func() {
+		_ = mgr.Close()
+	}()
 
 	svc := bridge.NewAppService(db, mgr, proxy)
 
@@ -65,7 +69,7 @@ func main() {
 		AssetServer: &assetserver.Options{
 			Assets: assets,
 		},
-		Bind: []interface{}{svc},
+		Bind: []any{svc},
 	})
 	if err != nil {
 		log.Fatal(err)

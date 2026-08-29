@@ -12,7 +12,9 @@ func openTestDB(t *testing.T) *DB {
 	if err != nil {
 		t.Fatalf("Open: %v", err)
 	}
-	t.Cleanup(func() { db.Close() })
+	t.Cleanup(func() {
+		_ = db.Close()
+	})
 	return db
 }
 
@@ -23,7 +25,9 @@ func TestMigrationsRun(t *testing.T) {
 	if err != nil {
 		t.Fatalf("sqlite_master: %v", err)
 	}
-	defer rows.Close()
+	defer func() {
+		_ = rows.Close()
+	}()
 
 	want := map[string]bool{"mangas": false, "chapters": false, "read_history": false, "plugins": false}
 	for rows.Next() {
@@ -231,7 +235,9 @@ func TestPersistenceAcrossRestart(t *testing.T) {
 	if err != nil {
 		t.Fatalf("reopen: %v", err)
 	}
-	defer db2.Close()
+	defer func() {
+		_ = db2.Close()
+	}()
 
 	lib, err := db2.ListLibrary()
 	if err != nil {

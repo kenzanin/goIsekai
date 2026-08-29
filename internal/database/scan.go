@@ -39,10 +39,17 @@ func parseTime(b []byte) time.Time {
 
 func boolFromInt(v int) bool { return v != 0 }
 
-func intFromBool(b bool) int { if b { return 1 }; return 0 }
+func intFromBool(b bool) int {
+	if b {
+		return 1
+	}
+	return 0
+}
 
 func scanManga(rows *sql.Rows) ([]Manga, error) {
-	defer rows.Close()
+	defer func() {
+		_ = rows.Close()
+	}()
 	var out []Manga
 	for rows.Next() {
 		var (
@@ -65,32 +72,10 @@ func scanManga(rows *sql.Rows) ([]Manga, error) {
 	return out, rows.Err()
 }
 
-func scanChapter(rows *sql.Rows) ([]Chapter, error) {
-	defer rows.Close()
-	var out []Chapter
-	for rows.Next() {
-		var (
-			c            Chapter
-			isRead       int
-			lastPageRead int
-			fetchedAt    any
-		)
-		if err := rows.Scan(
-			&c.ID, &c.MangaID, &c.SourceChapterID, &c.Title, &c.ChapterNum,
-			&c.VolumeNum, &isRead, &lastPageRead, &c.DownloadStatus, &fetchedAt,
-		); err != nil {
-			return nil, err
-		}
-		c.IsRead = boolFromInt(isRead)
-		c.LastPageRead = lastPageRead
-		c.FetchedAt = scanTime(fetchedAt)
-		out = append(out, c)
-	}
-	return out, rows.Err()
-}
-
 func scanPlugin(rows *sql.Rows) ([]Plugin, error) {
-	defer rows.Close()
+	defer func() {
+		_ = rows.Close()
+	}()
 	var out []Plugin
 	for rows.Next() {
 		var (

@@ -125,10 +125,10 @@ func TestToggleLibraryRoundTrip(t *testing.T) {
 }
 
 func TestGetImageCaches(t *testing.T) {
-	var hits int32
+	var hits atomic.Int32
 	payload := []byte("\x89PNG\r\n\x1a\n-static-bytes-")
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		atomic.AddInt32(&hits, 1)
+		hits.Add(1)
 		w.Header().Set("Content-Type", "image/png")
 		_, _ = w.Write(payload)
 	}))
@@ -150,15 +150,15 @@ func TestGetImageCaches(t *testing.T) {
 	if string(second) != string(payload) {
 		t.Errorf("second bytes = %q, want %q", second, payload)
 	}
-	if got := atomic.LoadInt32(&hits); got != 1 {
+	if got := hits.Load(); got != 1 {
 		t.Errorf("expected exactly 1 network hit (2nd served from cache), got %d", got)
 	}
 }
 
 func TestGetImageNonSuccessNotCached(t *testing.T) {
-	var hits int32
+	var hits atomic.Int32
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		atomic.AddInt32(&hits, 1)
+		hits.Add(1)
 		http.Error(w, "boom", http.StatusInternalServerError)
 	}))
 	defer srv.Close()
@@ -171,7 +171,7 @@ func TestGetImageNonSuccessNotCached(t *testing.T) {
 	if _, err := s.GetImage("plugin-x", srv.URL+"/missing.png", nil); err == nil {
 		t.Fatal("expected error on second call too")
 	}
-	if got := atomic.LoadInt32(&hits); got != 2 {
+	if got := hits.Load(); got != 2 {
 		t.Errorf("expected 2 network hits (error responses not cached), got %d", got)
 	}
 }

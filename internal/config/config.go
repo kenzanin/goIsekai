@@ -49,7 +49,9 @@ func Load(path string) (*Config, error) {
 		}
 		return nil, err
 	}
-	defer f.Close()
+	defer func() {
+		_ = f.Close()
+	}()
 
 	section := ""
 	sc := bufio.NewScanner(f)
@@ -62,12 +64,12 @@ func Load(path string) (*Config, error) {
 			section = strings.TrimSpace(line[1 : len(line)-1])
 			continue
 		}
-		eq := strings.IndexByte(line, '=')
-		if eq < 0 {
+		before, after, ok := strings.Cut(line, "=")
+		if !ok {
 			continue // not a key=value line; skip silently
 		}
-		key := strings.TrimSpace(line[:eq])
-		val := strings.TrimSpace(line[eq+1:])
+		key := strings.TrimSpace(before)
+		val := strings.TrimSpace(after)
 		c.set(section, key, val)
 	}
 	if err := sc.Err(); err != nil {

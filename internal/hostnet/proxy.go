@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"maps"
 	"net/http"
 	"net/http/cookiejar"
 	"strings"
@@ -46,9 +47,7 @@ func NewProxy() *Proxy {
 // request.
 func (p *Proxy) DefaultHeaders() map[string]string {
 	out := make(map[string]string, len(p.defaultHeaders))
-	for k, v := range p.defaultHeaders {
-		out[k] = v
-	}
+	maps.Copy(out, p.defaultHeaders)
 	return out
 }
 
@@ -101,7 +100,9 @@ func (p *Proxy) Request(pluginID string, req types.HTTPRequest) (types.HTTPRespo
 	if err != nil {
 		return types.HTTPResponse{}, fmt.Errorf("hostnet: execute request: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() {
+		_ = resp.Body.Close()
+	}()
 
 	raw, err := io.ReadAll(resp.Body)
 	if err != nil {

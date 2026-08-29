@@ -34,7 +34,9 @@ func TestManagerRoundTrip(t *testing.T) {
 	if err := mgr.Discover(); err != nil {
 		t.Fatalf("Discover: %v", err)
 	}
-	defer mgr.Close()
+	defer func() {
+		_ = mgr.Close()
+	}()
 
 	mangas, err := mgr.Search("plugin", types.SearchFilter{Query: "test"})
 	if err != nil {
@@ -75,7 +77,9 @@ func TestUnknownPlugin(t *testing.T) {
 	if err := mgr.Discover(); err != nil {
 		t.Fatalf("Discover: %v", err)
 	}
-	defer mgr.Close()
+	defer func() {
+		_ = mgr.Close()
+	}()
 
 	if _, err := mgr.Search("nope", types.SearchFilter{}); err == nil {
 		t.Fatal("expected error for unknown plugin")
@@ -93,7 +97,9 @@ func TestPanickingPlugin(t *testing.T) {
 	if err := mgr.Discover(); err != nil {
 		t.Fatalf("Discover: %v", err)
 	}
-	defer mgr.Close()
+	defer func() {
+		_ = mgr.Close()
+	}()
 
 	if _, err := mgr.Search("panicplugin", types.SearchFilter{}); err == nil {
 		t.Fatal("expected error from panicking plugin Search")

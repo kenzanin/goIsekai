@@ -60,12 +60,12 @@ func Open(path string) (*DB, error) {
 	}
 	// modernc.org/sqlite is pure Go; ping ensures the file is usable.
 	if err := db.Ping(); err != nil {
-		db.Close()
+		_ = db.Close()
 		return nil, err
 	}
 	d := &DB{db: db}
 	if err := d.runMigrations(); err != nil {
-		db.Close()
+		_ = db.Close()
 		return nil, err
 	}
 	return d, nil
@@ -81,7 +81,9 @@ func (d *DB) runMigrations() error {
 	if err != nil {
 		return err
 	}
-	defer tx.Rollback()
+	defer func() {
+		_ = tx.Rollback()
+	}()
 
 	var v int
 	if err := tx.QueryRow("PRAGMA user_version").Scan(&v); err != nil {
