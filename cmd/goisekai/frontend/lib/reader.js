@@ -277,11 +277,13 @@ export const readerView = () => ({
     // Calculate final scale
     const scale = this._baseScale * this._zoom;
 
-    // Calculate image position (centered by default)
+    // Calculate image position. Center horizontally; vertically align to the
+    // top when the image overflows the viewport so the page's top isn't cut
+    // off (center-anchoring a tall page pushes its top out of frame).
     const imgWidth = this._img.naturalWidth * scale;
     const imgHeight = this._img.naturalHeight * scale;
     const x = (canvasWidth - imgWidth) / 2 + this._panX;
-    const y = (canvasHeight - imgHeight) / 2 + this._panY;
+    const y = Math.max((canvasHeight - imgHeight) / 2, 0) + this._panY;
 
     // Draw image
     ctx.drawImage(this._img, x, y, imgWidth, imgHeight);
@@ -431,11 +433,12 @@ export const readerView = () => ({
   },
 
   scheduleAutoHide() {
+    // Toolbars are kept persistent (requested: back button + page number must
+    // stay visible). Moving the mouse still re-asserts visibility.
     clearTimeout(this.autoHideTimer);
     this.controlsVisible = true;
-    this.autoHideTimer = setTimeout(() => {
-      this.controlsVisible = false;
-    }, 3000);
+    /* ponytail: auto-hide disabled per user request; re-enable with a
+       setTimeout(() => { this.controlsVisible = false; }, 3000) if wanted. */
   },
 
   bindKeys() {
