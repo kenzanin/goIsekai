@@ -14,19 +14,21 @@ import (
 
 // EvictImageCache removes a URL from both L1 (memory) and L2 (disk) cache.
 // Called when the user wants to force re-fetch a corrupt/stale image.
-func (s *AppService) EvictImageCache(pluginID, url string) {
+func (s *AppService) EvictImageCache(pluginID, url string, mangaID, chapterID string) {
 	s.imageMu.Lock()
 	delete(s.imageCache, url)
 	s.imageMu.Unlock()
-	if diskPath := s.diskCachePath(pluginID, url); diskPath != "" {
+	if diskPath := s.diskCachePath(pluginID, mangaID, chapterID, url); diskPath != "" {
 		_ = os.Remove(diskPath)
 	}
 }
 
 // GetImage fetches image bytes for pluginID from url (with optional per-request
 // headers) through the hostnet proxy. Results are cached in memory (L1) and on
-// disk (L2) so repeat lookups skip the network entirely.
-func (s *AppService) GetImage(pluginID, url string, headers map[string]string) ([]byte, error) {
+// disk (L2) so repeat lookups skip the network entirely. mangaID/chapterID scope
+// the L2 path: page images land under images/<pluginID>/<mangaID>/<chapterID>/,
+// and thumbnails (empty mangaID) under images/<pluginID>/library/.
+func (s *AppService) GetImage(pluginID, url string, headers map[string]string, mangaID, chapterID string) ([]byte, error) {
 	// L1: in-memory cache.
 	s.imageMu.RLock()
 	if cached, ok := s.imageCache[url]; ok {
@@ -36,7 +38,7 @@ func (s *AppService) GetImage(pluginID, url string, headers map[string]string) (
 	s.imageMu.RUnlock()
 
 	// L2: disk cache.
-	if diskPath := s.diskCachePath(pluginID, url); diskPath != "" {
+	if diskPath := s.diskCachePath(pluginID, mangaID, chapterID, url); diskPath != "" {
 		if data, err := os.ReadFile(diskPath); err == nil {
 			s.imageMu.Lock()
 			s.imageCache[url] = data
@@ -67,7 +69,7 @@ func (s *AppService) GetImage(pluginID, url string, headers map[string]string) (
 	s.imageMu.Unlock()
 
 	// L2 cache: write to disk.
-	if diskPath := s.diskCachePath(pluginID, url); diskPath != "" {
+	if diskPath := s.diskCachePath(pluginID, mangaID, chapterID, url); diskPath != "" {
 		if err := os.MkdirAll(filepath.Dir(diskPath), 0o755); err == nil {
 			_ = os.WriteFile(diskPath, body, 0o644)
 		}
@@ -76,12 +78,18 @@ func (s *AppService) GetImage(pluginID, url string, headers map[string]string) (
 	return body, nil
 }
 
-// diskCachePath returns the L2 cache file path for a plugin's image URL
-// (SHA256 hex in cacheDir/images/<pluginID>/), or "" if cacheDir is not set.
-func (s *AppService) diskCachePath(pluginID, url string) string {
+// diskCachePath returns the L2 cache file path for a plugin's image URL (SHA256
+// hex), or "" if cacheDir is not set. Page images are scoped to
+// images/<pluginID>/<mangaID>/<chapterID>/; thumbnails (covers, empty mangaID)
+// to images/<pluginID>/library/.
+func (s *AppService) diskCachePath(pluginID, mangaID, chapterID, url string) string {
 	if s.cacheDir == "" {
 		return ""
 	}
 	h := sha256.Sum256([]byte(url))
-	return filepath.Join(s.cacheDir, "images", pluginID, hex.EncodeToString(h[:8])+".img")
+	sub := "library"
+	if mangaID != "" && chapterID != "" {
+		sub = filepath.Join(mangaID, chapterID)
+	}
+	return filepath.Join(s.cacheDir, "images", pluginID, sub, hex.EncodeToString(h[:8])+".img")
 }

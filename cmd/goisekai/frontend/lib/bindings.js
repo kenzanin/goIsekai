@@ -17,11 +17,11 @@ export const bindings = {
   listPlugins: () => call('ListPlugins'),
   togglePlugin: (id) => call('TogglePlugin', id),
   syncLibrary: () => call('SyncLibrary'),
-  getImage: (pluginID, url, headers) => call('GetImage', pluginID, url, headers),
+  getImage: (pluginID, url, headers, mangaID, chapterID) => call('GetImage', pluginID, url, headers, mangaID, chapterID),
   log: (level, msg) => call('Log', level, msg),
   reloadConfig: () => call('ReloadConfig'),
   getConfigPath: () => call('GetConfigPath'),
-  evictImageCache: (pluginID, url) => call('EvictImageCache', pluginID, url),
+  evictImageCache: (pluginID, url, mangaID, chapterID) => call('EvictImageCache', pluginID, url, mangaID, chapterID),
 };
 
 export function call(method, ...args) {

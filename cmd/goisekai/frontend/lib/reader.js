@@ -297,7 +297,7 @@ export const readerView = () => ({
     this.loading = true;
     const page = this.pages[next];
     try {
-      const url = await loadImage(this.pluginID, page.url, page.headers);
+      const url = await loadImage(this.pluginID, page.url, page.headers, this.mangaID, this.chapterID);
       if (url) {
         this.pageSrc = url;
         
@@ -344,7 +344,7 @@ export const readerView = () => ({
     for (const delta of [-1, 1]) {
       const i = this.currentPage + delta;
       if (i >= 0 && i < this.pages.length) {
-        loadImage(this.pluginID, this.pages[i].url, this.pages[i].headers);
+        loadImage(this.pluginID, this.pages[i].url, this.pages[i].headers, this.mangaID, this.chapterID);
       }
     }
   },
@@ -404,7 +404,7 @@ export const readerView = () => ({
   async retryPage() {
     if (this.deleteCacheOnRetry) {
       const page = this.pages[this.currentPage];
-      if (page) await bindings.evictImageCache(this.pluginID, page.url);
+      if (page) await bindings.evictImageCache(this.pluginID, page.url, this.mangaID, this.chapterID);
     }
     await this.goToPage(this.currentPage, true);
   },
@@ -506,7 +506,7 @@ export const readerView = () => ({
       bindings.pageList(this.pluginID, ch.id)
         .then(pages => {
           if (Array.isArray(pages)) {
-            for (const p of pages) loadImage(this.pluginID, p.url, p.headers);
+            for (const p of pages) loadImage(this.pluginID, p.url, p.headers, this.mangaID, ch.id);
           }
         })
         .catch(() => {});

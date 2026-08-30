@@ -136,11 +136,11 @@ func TestGetImageCaches(t *testing.T) {
 
 	s := newTestService(t)
 
-	first, err := s.GetImage("plugin-x", srv.URL+"/img.png", nil)
+	first, err := s.GetImage("plugin-x", srv.URL+"/img.png", nil, "", "")
 	if err != nil {
 		t.Fatalf("GetImage first call: %v", err)
 	}
-	second, err := s.GetImage("plugin-x", srv.URL+"/img.png", nil)
+	second, err := s.GetImage("plugin-x", srv.URL+"/img.png", nil, "", "")
 	if err != nil {
 		t.Fatalf("GetImage second call: %v", err)
 	}
@@ -164,11 +164,11 @@ func TestGetImageNonSuccessNotCached(t *testing.T) {
 	defer srv.Close()
 
 	s := newTestService(t)
-	if _, err := s.GetImage("plugin-x", srv.URL+"/missing.png", nil); err == nil {
+	if _, err := s.GetImage("plugin-x", srv.URL+"/missing.png", nil, "", ""); err == nil {
 		t.Fatal("expected error for non-2xx response")
 	}
 	// A fresh call for the failed URL must hit the network again (error not cached).
-	if _, err := s.GetImage("plugin-x", srv.URL+"/missing.png", nil); err == nil {
+	if _, err := s.GetImage("plugin-x", srv.URL+"/missing.png", nil, "", ""); err == nil {
 		t.Fatal("expected error on second call too")
 	}
 	if got := hits.Load(); got != 2 {

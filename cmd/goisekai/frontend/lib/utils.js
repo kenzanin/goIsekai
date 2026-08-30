@@ -50,12 +50,12 @@ function revokeAllBlobUrls() {
   blobCache.clear();
 }
 
-async function loadImage(pluginID, url, headers) {
+async function loadImage(pluginID, url, headers, mangaID, chapterID) {
   if (!url) return null;
   const cached = blobCache.get(url);
   if (cached) return cached;
   try {
-    const bytes = toBytes(await call('GetImage', pluginID, url, headers || {}));
+    const bytes = toBytes(await call('GetImage', pluginID, url, headers || {}, mangaID, chapterID));
     if (!bytes) return null;
     const blob = new Blob([bytes], { type: detectImageType(bytes) });
     const blobUrl = URL.createObjectURL(blob);
