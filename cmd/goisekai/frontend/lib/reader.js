@@ -252,6 +252,9 @@ export const readerView = () => ({
   // (so updateRoute() is a no-op). Also run on mount for a direct read URL.
   reloadFromHash() {
     const h = window.location.hash || '';
+    // Unconditional entry log so we can see which branch fires on mount
+    // (non-#/read/ hash, empty-id guard, or already-loaded guard).
+    console.log('[reader] reloadFromHash entry:', h);
     if (!h.startsWith('#/read/')) return;
     const segs = h.split('?')[0].replace('#/read/', '').split('/');
     if (segs.length < 3) return;
@@ -267,8 +270,13 @@ export const readerView = () => ({
       return;
     }
     const page = parseInt(params.get('page') || '0', 10) || 0;
-    // Skip redundant reloads (e.g. a mount that already loaded this URL).
-    if (pid === this.pluginID && mid === this.mangaID && cid === this.chapterID && page === this.currentPage) return;
+    // Only skip if the chapter is ACTUALLY loaded (pages present). A first
+    // mount with a valid hash has empty pages and must always proceed; the old
+    // guard could return silently before the log above. Log+skip otherwise.
+    if (pid === this.pluginID && mid === this.mangaID && cid === this.chapterID && this.pages.length > 0 && page === this.currentPage) {
+      console.log('[reader] reloadFromHash: already loaded, skip');
+      return;
+    }
     console.log('[reader] reloadFromHash:', h, '-> pid=' + pid + ' mid=' + mid + ' cid=' + cid + ' page=' + page);
     this.load(pid, mid, cid, page);
   },
