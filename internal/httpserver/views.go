@@ -65,6 +65,7 @@ func (s *Server) viewMangaDetail(w http.ResponseWriter, r *http.Request) {
 	}
 	s.renderPage(w, "views/detail.jet", "search", map[string]any{
 		"PluginID": pluginID,
+		"MangaID": mangaID,
 		"Manga":    manga,
 		"Chapters": chapters,
 	})

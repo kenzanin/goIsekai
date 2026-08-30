@@ -16,7 +16,7 @@
 {{else}}
 <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-4">
     {{range i, m := .Mangas }}
-    <a href="/view/manga/{{m.PluginID}}/{{m.ID}}" class="bg-neutral-900 rounded-lg overflow-hidden hover:ring-1 hover:ring-indigo-500 transition">
+    <a href="/view/manga/{{m.PluginID}}/{{m.SourceMangaID}}" class="bg-neutral-900 rounded-lg overflow-hidden hover:ring-1 hover:ring-indigo-500 transition">
         {{if m.CoverURL != ""}}
         <img src="/image?pluginID={{m.PluginID}}&amp;url={{m.CoverURL}}" alt="{{m.Title}}" class="h-64 w-full object-cover" loading="lazy">
         {{else}}
