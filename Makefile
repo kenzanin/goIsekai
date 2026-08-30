@@ -48,15 +48,17 @@ lint:
 	## gtk3/webkit2gtk-4.1 path; golangci-lint honours GOFLAGS.
 	CGO_ENABLED=1 GOFLAGS="-tags=$(TAGS)" golangci-lint run $(PKGS)
 
-## test-frontend: syntax-check the pure JS frontend modules (no browser needed).
-## Covers the readhash unit tests, which assert the empty/hash-parsing +
-## idempotency logic that previously regressed (reader mounting blank).
+## test-frontend: syntax-check + unit-test the pure JS frontend modules
+## (no browser needed). Covers readhash (reader hash parsing/idempotency/next-chapter
+## ordering) and format (image-byte sniffing + format/convert helpers).
 test-frontend:
 	node --check cmd/goisekai/frontend/lib/readhash.js
-		node --check cmd/goisekai/frontend/lib/readhash.test.js
-	node --check cmd/goisekai/frontend/lib/reader.js
+	node --check cmd/goisekai/frontend/lib/readhash.test.js
+	node --check cmd/goisekai/frontend/lib/format.js
+	node --check cmd/goisekai/frontend/lib/format.test.js
 	node cmd/goisekai/frontend/lib/readhash.test.js
+	node cmd/goisekai/frontend/lib/format.test.js
 
-## test-reader: run just the reader hash-parsing/idempotency unit tests.
+## test-reader: run just the reader hash-parsing/idempotency/next-chapter tests.
 test-reader:
 	node cmd/goisekai/frontend/lib/readhash.test.js

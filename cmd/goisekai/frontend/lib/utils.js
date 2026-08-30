@@ -1,8 +1,20 @@
 // goIsekai frontend — shared utilities.
-// Image loading + blob cache, format helpers, console→Go logging bridge,
-// and reader toolbar button classes.
+// Image loading + blob cache, console→Go logging bridge, and reader toolbar
+// button classes. Pure format/convert helpers live in format.js (re-exported
+// here so existing imports + the window.* bindings keep working).
 
 import { bindings, call } from "./bindings.js";
+import {
+  toBytes,
+  detectImageType,
+  clamp,
+  escapeHtml,
+  getInitials,
+  fallbackInitial,
+  lookupPluginName,
+  formatChapterNum,
+  formatDate,
+} from "./format.js";
 
 /* ------------------------------------------------------------------ *
  * 1. Error handling — forward console errors/warns to the Go logger
@@ -55,64 +67,6 @@ async function loadImage(pluginID, url, headers) {
     console.error('Failed to load image:', url, err?.message || err?.toString() || JSON.stringify(err));
     return null;
   }
-}
-
-function toBytes(v) {
-  if (v == null) return null;
-  if (v instanceof Uint8Array) return v;
-  if (Array.isArray(v)) return new Uint8Array(v);
-  if (typeof v === 'string') {
-    const bin = atob(v);
-    const out = new Uint8Array(bin.length);
-    for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
-    return out;
-  }
-  return null;
-}
-
-function detectImageType(bytes) {
-  if (!bytes || bytes.length < 4) return 'image/jpeg';
-  if (bytes[0] === 0xFF && bytes[1] === 0xD8) return 'image/jpeg';
-  if (bytes[0] === 0x89 && bytes[1] === 0x50 && bytes[2] === 0x4e && bytes[3] === 0x47) return 'image/png';
-  if (bytes[0] === 0x47 && bytes[1] === 0x49 && bytes[2] === 0x46) return 'image/gif';
-  if (bytes[0] === 0x52 && bytes[1] === 0x49 && bytes[2] === 0x46 && bytes[3] === 0x46) return 'image/webp';
-  return 'image/jpeg';
-}
-
-/* ------------------------------------------------------------------ *
- * 4. Format + lookup helpers
- * ------------------------------------------------------------------ */
-const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
-
-function escapeHtml(s) {
-  return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-}
-
-function getInitials(title) {
-  const parts = String(title || '').trim().split(/\s+/).slice(0, 2);
-  return parts.map((p) => p.charAt(0)).join('').toUpperCase() || '?';
-}
-
-function fallbackInitial(name) {
-  return String(name || '?').charAt(0).toUpperCase() || '?';
-}
-
-function lookupPluginName(plugins, pluginID) {
-  const found = plugins.find((p) => p.ID === pluginID);
-  return found ? (found.Name || found.ID) : '';
-}
-
-function formatChapterNum(num) {
-  const n = Number(num);
-  if (Number.isNaN(n)) return '—';
-  return Number.isInteger(n) ? String(n) : String(n).replace(/\.?0+$/, '');
-}
-
-function formatDate(dateStr) {
-  if (!dateStr) return '';
-  const date = new Date(dateStr);
-  if (isNaN(date.getTime())) return '';
-  return date.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
 }
 
 // Expose helpers needed by Alpine inline expressions in index.html.
