@@ -284,6 +284,12 @@ export const readerView = () => ({
     this.viewMode = settings.viewMode;
     this.direction = settings.direction;
 
+    // The canvas is sized at mount via $nextTick, but the reader section is
+    // hidden (x-show) at app start, so getBoundingClientRect() returned 0x0
+    // and the backing store is permanently zero-sized. Re-measure now that
+    // the section is visible so rendered pages actually draw.
+    this.$nextTick(() => this._updateCanvasSize());
+
     try {
       const pages = await bindings.pageList(pid, cid);
       if (!pages || pages.length === 0) {
