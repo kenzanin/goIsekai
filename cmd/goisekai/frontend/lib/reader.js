@@ -4,6 +4,11 @@
 import { bindings } from "./bindings.js";
 import { loadImage, clamp } from "./utils.js";
 import { settings, saveSetting } from "./state.js";
+// Pure reader-hash helpers live in their own zero-browser-dependency module so
+// they can be unit-tested with plain node (see readhash.test.js). Imported here
+// and re-exported so reader logic uses the single source of truth.
+import { parseReadHash, shouldReload } from "./readhash.js";
+export { parseReadHash, shouldReload };
 
 // `readerView` is the Alpine.data('readerView', readerView) factory.
 export const readerView = () => ({
@@ -27,6 +32,7 @@ export const readerView = () => ({
   direction: 'ltr',
   showShortcuts: false,
   deleteCacheOnRetry: false,
+  lastReadHash: '',
 
   init() {
     const s = settings;
@@ -41,7 +47,15 @@ export const readerView = () => ({
       document.addEventListener('keydown', close);
     });
     // Handle a direct page-load at a read URL (no hashchange fires on refresh).
+    // The hash may be empty/stale at mount if the router hasn\'t stamped the read
+    // URL yet — recover on the next tick so the reader isn\'t stuck blank.
     this.reloadFromHash();
+    setTimeout(() => {
+      if (window.location.hash.startsWith('#/read/')) {
+        console.log('[reader] mount recovery reloadFromHash:', window.location.hash);
+        this.reloadFromHash();
+      }
+    }, 0);
   },
 
   async load(pid, mid, cid, page) {
@@ -252,33 +266,24 @@ export const readerView = () => ({
   // (so updateRoute() is a no-op). Also run on mount for a direct read URL.
   reloadFromHash() {
     const h = window.location.hash || '';
-    // Unconditional entry log so we can see which branch fires on mount
-    // (non-#/read/ hash, empty-id guard, or already-loaded guard).
+    const parsed = parseReadHash(h);
+    if (!parsed) {
+      if (!h) {
+        console.warn('[reader] reloadFromHash: empty hash, mount recovery will retry');
+      } else {
+        console.warn('[reader] reloadFromHash: skipping non-read/non-canonical hash:', h);
+      } 
+      return;
+    }
+    const key = parsed.pid + '|' + parsed.mid + '|' + parsed.cid + '|' + parsed.page;
+    if (key === this.lastReadHash) {
+      console.log('[reader] reloadFromHash: already loaded, skip', key);
+      return;
+    }
+    this.lastReadHash = key;
     console.log('[reader] reloadFromHash entry:', h);
-    if (!h.startsWith('#/read/')) return;
-    const segs = h.split('?')[0].replace('#/read/', '').split('/');
-    if (segs.length < 3) return;
-    const params = new URLSearchParams(h.split('?')[1] || '');
-    const pid = decodeURIComponent(segs[0]);
-    const mid = decodeURIComponent(segs[1]);
-    const cid = decodeURIComponent(segs[2]);
-    // Guard: a partial read hash (e.g. #/read/pid/mid/ with a trailing slash, or
-    // #/read/pid//cid) decodes to an empty segment and would reset the reader to
-    // empty IDs — never call load() with an empty id.
-    if (!pid || !mid || !cid) {
-      console.error('[reader] skipping load, bad read hash:', h);
-      return;
-    }
-    const page = parseInt(params.get('page') || '0', 10) || 0;
-    // Only skip if the chapter is ACTUALLY loaded (pages present). A first
-    // mount with a valid hash has empty pages and must always proceed; the old
-    // guard could return silently before the log above. Log+skip otherwise.
-    if (pid === this.pluginID && mid === this.mangaID && cid === this.chapterID && this.pages.length > 0 && page === this.currentPage) {
-      console.log('[reader] reloadFromHash: already loaded, skip');
-      return;
-    }
-    console.log('[reader] reloadFromHash:', h, '-> pid=' + pid + ' mid=' + mid + ' cid=' + cid + ' page=' + page);
-    this.load(pid, mid, cid, page);
+    console.log('[reader] reloadFromHash:', h, '-> pid=' + parsed.pid + ' mid=' + parsed.mid + ' cid=' + parsed.cid + ' page=' + parsed.page);
+    this.load(parsed.pid, parsed.mid, parsed.cid, parsed.page);
   },
 
   // Silently prefetch the next K chapters' page blobs so they open instantly.

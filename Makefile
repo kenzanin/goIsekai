@@ -6,7 +6,7 @@ BINARY := goisekai
 TAGS   := gtk3,production
 PKGS   := ./internal/... ./pkg/... ./cmd/...
 
-.PHONY: build dev devrun run check fmt test race modernize lint
+.PHONY: build dev devrun run check fmt test race modernize lint test-reader test-frontend
 
 ## build: compile the desktop binary (requires webkit2gtk-4.1 on Linux via the gtk3 tag).
 ## Wails v3 needs CGO for webkit2gtk-4.1 (no separate webkit2_41 tag).
@@ -47,3 +47,16 @@ lint:
 	## typecheck linter must compile cmd (imports wails/v3 cgo) against the
 	## gtk3/webkit2gtk-4.1 path; golangci-lint honours GOFLAGS.
 	CGO_ENABLED=1 GOFLAGS="-tags=$(TAGS)" golangci-lint run $(PKGS)
+
+## test-frontend: syntax-check the pure JS frontend modules (no browser needed).
+## Covers the readhash unit tests, which assert the empty/hash-parsing +
+## idempotency logic that previously regressed (reader mounting blank).
+test-frontend:
+	node --check cmd/goisekai/frontend/lib/readhash.js
+		node --check cmd/goisekai/frontend/lib/readhash.test.js
+	node --check cmd/goisekai/frontend/lib/reader.js
+	node cmd/goisekai/frontend/lib/readhash.test.js
+
+## test-reader: run just the reader hash-parsing/idempotency unit tests.
+test-reader:
+	node cmd/goisekai/frontend/lib/readhash.test.js
