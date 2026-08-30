@@ -1,0 +1,13 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>goIsekai</title>
+    <link rel="stylesheet" href="/static/lib/tailwind.css">
+</head>
+<body class="bg-neutral-950 text-neutral-100 min-h-full">
+    {{block body()}}{{end}}
+    <script src="/static/lib/htmx.min.js" defer></script>
+</body>
+</html>

@@ -1,7 +1,7 @@
-{{extends "/layouts/base.jet"}}
+{{extends "/layouts/blank.jet"}}
 
 {{ block body() }}
-<div id="reader" class="relative mx-auto" style="height:calc(100vh - 9rem)" data-plugin-id="{{.PluginID}}" data-manga-id="{{.MangaID}}" data-chapter-id="{{.ChapterID}}" data-manga-title="{{.Manga.Title}}">
+<div id="reader" class="relative w-full h-screen" data-plugin-id="{{.PluginID}}" data-manga-id="{{.MangaID}}" data-chapter-id="{{.ChapterID}}" data-manga-title="{{.Manga.Title}}">
   <!-- Top bar: persistent (back + page counter + controls) -->
   <div class="absolute top-0 left-0 right-0 z-30 flex items-center gap-2 bg-black/90 px-3 py-2 text-sm">
     <a href="/view/manga/{{.PluginID}}/{{.MangaID}}" class="border border-neutral-700 hover:bg-neutral-800 rounded-md px-3 py-1.5">← Back</a>
@@ -188,8 +188,17 @@
     im.src = url;
   }
 
+  // rAF never fires in a hidden/background tab (Chrome throttles it), which
+  // left the first draw pending forever. setTimeout(0) is the safe fallback.
+  function nextFrame(fn) {
+    var done = false;
+    var run = function () { if (done) return; done = true; fn(); };
+    requestAnimationFrame(run);
+    setTimeout(run, 50); // hidden tabs never fire rAF — this is the real path
+  }
+
   function afterImage() {
-    if (!measure()) { requestAnimationFrame(function () { measure(); resetZoom(); }); return; }
+    if (!measure()) { nextFrame(function () { measure(); resetZoom(); }); return; }
     resetZoom();
   }
 
@@ -250,7 +259,7 @@
 
   document.getElementById('btn-prev-page').addEventListener('click', prev);
   document.getElementById('btn-next-page').addEventListener('click', next);
-  document.getElementById('btn-retry').addEventListener('click', function () { drawPage(current); });
+  document.getElementById('btn-retry').addEventListener('click', function () { if (!pages.length) loadChapter(); else drawPage(current); });
   document.getElementById('btn-skip').addEventListener('click', next);
   document.getElementById('btn-zoom-in').addEventListener('click', function () { zoomBy(1.2); });
   document.getElementById('btn-zoom-out').addEventListener('click', function () { zoomBy(1 / 1.2); });
@@ -291,17 +300,24 @@
   window.addEventListener('resize', function () { if (measure()) render(); });
 
   // Boot: fetch page data, then first draw after the canvas is visible.
-  fetch('/api/reader-data/' + [pid, mid, cid].map(encodeURIComponent).join('/'))
-    .then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
-    .then(function (data) {
-      pages = data.pages || [];
-      if (!pages.length) { showError(true); return; }
-      requestAnimationFrame(function () { drawPage(0); });
-    })
-    .catch(function (err) {
-      errPanel.querySelector('p').textContent = 'Gagal memuat chapter: ' + err.message;
-      showError(true);
-    });
+  function loadChapter() {
+    fetch('/api/reader-data/' + [pid, mid, cid].map(encodeURIComponent).join('/'))
+      .then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+      .then(function (data) {
+        pages = data.pages || [];
+        if (!pages.length) {
+          errPanel.querySelector('p').textContent = 'Chapter kosong (plugin gagal ambil halaman) — coba Retry';
+          showError(true);
+          return;
+        }
+        nextFrame(function () { drawPage(0); });
+      })
+      .catch(function (err) {
+        errPanel.querySelector('p').textContent = 'Gagal memuat chapter: ' + err.message;
+        showError(true);
+      });
+  }
+  loadChapter();
 })();
 </script>
 {{ end }}
