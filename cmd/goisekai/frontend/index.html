@@ -62,483 +62,490 @@
 
   <!-- ── Top Navigation (hidden in reader) ───────────────────────── -->
   <nav x-show="$store.app.currentView !== 'reader'" x-cloak
-       class="flex items-center justify-between px-6 py-3 bg-surface border-b border-border sticky top-0 z-[100]">
-    <a href="#/library" class="text-xl font-bold tracking-tight text-zinc-100 hover:text-accent transition-colors">goIsekai</a>
-    <div class="flex gap-1">
-      <a href="#/library"
-         :class="$store.app.currentView === 'library' ? 'text-accent bg-accent-subtle shadow-[inset_0_-2px_0_#7c5cfc]' : 'text-zinc-400 hover:text-zinc-100 hover:bg-surface-alt'"
-         class="px-4 py-2 rounded-card font-medium transition-all">Library</a>
-      <a href="#/search"
-         :class="$store.app.currentView === 'search' ? 'text-accent bg-accent-subtle shadow-[inset_0_-2px_0_#7c5cfc]' : 'text-zinc-400 hover:text-zinc-100 hover:bg-surface-alt'"
-         class="px-4 py-2 rounded-card font-medium transition-all">Search</a>
-      <a href="#/plugins"
-         :class="$store.app.currentView === 'plugins' ? 'text-accent bg-accent-subtle shadow-[inset_0_-2px_0_#7c5cfc]' : 'text-zinc-400 hover:text-zinc-100 hover:bg-surface-alt'"
-         class="px-4 py-2 rounded-card font-medium transition-all">Plugins</a>
-       <a href="#/settings"
-          :class="$store.app.currentView === 'settings' ? 'text-accent bg-accent-subtle shadow-[inset_0_-2px_0_#7c5cfc]' : 'text-zinc-400 hover:text-zinc-100 hover:bg-surface-alt'"
-          class="px-4 py-2 rounded-card font-medium transition-all">⚙ Settings</a>
-     </div>
-  </nav>
+     class="flex items-center justify-between px-6 py-3 bg-surface border-b border-border sticky top-0 z-[100]">
+  <a href="#/library" class="text-xl font-bold tracking-tight text-zinc-100 hover:text-accent transition-colors">goIsekai</a>
+  <div class="flex gap-1">
+    <a href="#/library"
+       :class="$store.app.currentView === 'library' ? 'text-accent bg-accent-subtle shadow-[inset_0_-2px_0_#7c5cfc]' : 'text-zinc-400 hover:text-zinc-100 hover:bg-surface-alt'"
+       class="px-4 py-2 rounded-card font-medium transition-all">Library</a>
+    <a href="#/search"
+       :class="$store.app.currentView === 'search' ? 'text-accent bg-accent-subtle shadow-[inset_0_-2px_0_#7c5cfc]' : 'text-zinc-400 hover:text-zinc-100 hover:bg-surface-alt'"
+       class="px-4 py-2 rounded-card font-medium transition-all">Search</a>
+    <a href="#/plugins"
+       :class="$store.app.currentView === 'plugins' ? 'text-accent bg-accent-subtle shadow-[inset_0_-2px_0_#7c5cfc]' : 'text-zinc-400 hover:text-zinc-100 hover:bg-surface-alt'"
+       class="px-4 py-2 rounded-card font-medium transition-all">Plugins</a>
+     <a href="#/settings"
+        :class="$store.app.currentView === 'settings' ? 'text-accent bg-accent-subtle shadow-[inset_0_-2px_0_#7c5cfc]' : 'text-zinc-400 hover:text-zinc-100 hover:bg-surface-alt'"
+        class="px-4 py-2 rounded-card font-medium transition-all">⚙ Settings</a>
+   </div>
+</nav>
+
 
   <!-- ── Library View ─────────────────────────────────────────────── -->
   <section x-show="$store.app.currentView === 'library'" x-cloak x-data="libraryView" class="fade-in min-h-[calc(100vh-57px)]">
-    <div class="flex items-center justify-between px-6 py-6 pb-4">
-      <h1 class="text-3xl font-bold text-zinc-100">Library</h1>
-      <button @click="sync()" :disabled="syncing"
-              class="inline-flex items-center gap-2 px-4 py-2 rounded-card bg-surface-alt text-zinc-100 font-medium transition-all hover:bg-surface-elevated disabled:opacity-40 disabled:cursor-not-allowed">
-        <span x-show="!syncing">⟳ Sync</span>
-        <span x-show="syncing">⏳ Syncing…</span>
-      </button>
-    </div>
+  <div class="flex items-center justify-between px-6 py-6 pb-4">
+    <h1 class="text-3xl font-bold text-zinc-100">Library</h1>
+    <button @click="sync()" :disabled="syncing"
+            class="inline-flex items-center gap-2 px-4 py-2 rounded-card bg-surface-alt text-zinc-100 font-medium transition-all hover:bg-surface-elevated disabled:opacity-40 disabled:cursor-not-allowed">
+      <span x-show="!syncing">⟳ Sync</span>
+      <span x-show="syncing">⏳ Syncing…</span>
+    </button>
+  </div>
 
-    <!-- Loading -->
-    <div x-show="loading" class="flex flex-col items-center justify-center gap-4 py-16 text-zinc-400">
-      <div class="w-10 h-10 border-[3px] border-border border-t-accent rounded-full animate-spin-slow"></div>
-      <p>Loading library…</p>
-    </div>
+  <!-- Loading -->
+  <div x-show="loading" class="flex flex-col items-center justify-center gap-4 py-16 text-zinc-400">
+    <div class="w-10 h-10 border-[3px] border-border border-t-accent rounded-full animate-spin-slow"></div>
+    <p>Loading library…</p>
+  </div>
 
-    <!-- Error -->
-    <div x-show="error" class="flex flex-col items-center justify-center gap-3 py-16 text-error">
-      <span class="text-4xl">⚠️</span>
-      <p x-text="error"></p>
-      <button @click="load()" class="px-5 py-2 rounded-card border border-border text-zinc-100 hover:bg-surface-alt transition-all">Retry</button>
-    </div>
+  <!-- Error -->
+  <div x-show="error" class="flex flex-col items-center justify-center gap-3 py-16 text-error">
+    <span class="text-4xl">⚠️</span>
+    <p x-text="error"></p>
+    <button @click="load()" class="px-5 py-2 rounded-card border border-border text-zinc-100 hover:bg-surface-alt transition-all">Retry</button>
+  </div>
 
-    <!-- Empty state -->
-    <div x-show="!loading && !error && items.length === 0" class="flex flex-col items-center justify-center gap-4 py-16">
-      <span class="text-6xl">📚</span>
-      <h2 class="text-xl font-semibold text-zinc-100">Your library is empty</h2>
-      <p class="text-zinc-400 max-w-sm text-center">Search for manga and add them here.</p>
-      <a href="#/search" class="px-5 py-2 rounded-card bg-accent text-white font-medium hover:bg-accent-hover hover:shadow-glow transition-all">Browse Sources</a>
-    </div>
+  <!-- Empty state -->
+  <div x-show="!loading && !error && items.length === 0" class="flex flex-col items-center justify-center gap-4 py-16">
+    <span class="text-6xl">📚</span>
+    <h2 class="text-xl font-semibold text-zinc-100">Your library is empty</h2>
+    <p class="text-zinc-400 max-w-sm text-center">Search for manga and add them here.</p>
+    <a href="#/search" class="px-5 py-2 rounded-card bg-accent text-white font-medium hover:bg-accent-hover hover:shadow-glow transition-all">Browse Sources</a>
+  </div>
 
-    <!-- Grid -->
-    <div x-show="!loading && items.length > 0" class="grid grid-cols-[repeat(auto-fill,minmax(180px,1fr))] gap-6 px-6">
-      <template x-for="manga in items" :key="manga.ID + manga.SourceMangaID">
-        <a :href="'#/manga/' + encodeURIComponent(manga.PluginID) + '/' + encodeURIComponent(manga.SourceMangaID)"
-           class="flex flex-col bg-surface border border-border rounded-card overflow-hidden transition-all hover:-translate-y-1 hover:shadow-card-hover hover:border-accent no-underline text-inherit group">
-          <div x-data="{ imgSrc: '', failed: false }" x-init="loadImage(manga.PluginID, manga.CoverURL).then(u => { if(u) imgSrc = u; else failed = true; }).catch(() => failed = true)"
-               class="relative aspect-[2/3] bg-surface-alt overflow-hidden cover-wrap"
-               :class="{ 'cover-failed': failed }">
-            <img :src="imgSrc" :alt="manga.Title || 'cover'" loading="lazy"
-                 @error="failed = true"
-                 class="w-full h-full object-cover block group-hover:scale-105 transition-transform">
-            <div class="absolute inset-0 hidden items-center justify-center text-2xl font-bold text-zinc-400 bg-surface-elevated cover-fallback"
-                 x-text="getInitials(manga.Title)"></div>
-            <div class="absolute inset-0 flex items-end p-2">
-              <span x-show="manga.Status" x-text="manga.Status"
-                    class="inline-block px-2 py-0.5 rounded bg-black/60 text-zinc-100 text-xs font-medium"></span>
-            </div>
+  <!-- Grid -->
+  <div x-show="!loading && items.length > 0" class="grid grid-cols-[repeat(auto-fill,minmax(180px,1fr))] gap-6 px-6">
+    <template x-for="manga in items" :key="manga.ID + manga.SourceMangaID">
+      <a :href="'#/manga/' + encodeURIComponent(manga.PluginID) + '/' + encodeURIComponent(manga.SourceMangaID)"
+         class="flex flex-col bg-surface border border-border rounded-card overflow-hidden transition-all hover:-translate-y-1 hover:shadow-card-hover hover:border-accent no-underline text-inherit group">
+        <div x-data="{ imgSrc: '', failed: false }" x-init="loadImage(manga.PluginID, manga.CoverURL).then(u => { if(u) imgSrc = u; else failed = true; }).catch(() => failed = true)"
+             class="relative aspect-[2/3] bg-surface-alt overflow-hidden cover-wrap"
+             :class="{ 'cover-failed': failed }">
+          <img :src="imgSrc" :alt="manga.Title || 'cover'" loading="lazy"
+               @error="failed = true"
+               class="w-full h-full object-cover block group-hover:scale-105 transition-transform">
+          <div class="absolute inset-0 hidden items-center justify-center text-2xl font-bold text-zinc-400 bg-surface-elevated cover-fallback"
+               x-text="getInitials(manga.Title)"></div>
+          <div class="absolute inset-0 flex items-end p-2">
+            <span x-show="manga.Status" x-text="manga.Status"
+                  class="inline-block px-2 py-0.5 rounded bg-black/60 text-zinc-100 text-xs font-medium"></span>
           </div>
-          <div class="px-3 py-2 pb-3">
-            <h3 class="text-base font-semibold text-zinc-100 truncate" x-text="manga.Title || 'Untitled'"></h3>
-            <span class="block mt-0.5 text-sm text-zinc-400 truncate" x-text="$store.app.pluginName(manga.PluginID) || manga.PluginID"></span>
-          </div>
-        </a>
-      </template>
-    </div>
-  </section>
+        </div>
+        <div class="px-3 py-2 pb-3">
+          <h3 class="text-base font-semibold text-zinc-100 truncate" x-text="manga.Title || 'Untitled'"></h3>
+          <span class="block mt-0.5 text-sm text-zinc-400 truncate" x-text="$store.app.pluginName(manga.PluginID) || manga.PluginID"></span>
+        </div>
+      </a>
+    </template>
+  </div>
+</section>
+
 
   <!-- ── Search View ──────────────────────────────────────────────── -->
   <section x-show="$store.app.currentView === 'search'" x-cloak x-data="searchView" class="fade-in min-h-[calc(100vh-57px)]">
-    <div class="flex flex-wrap gap-4 px-6 py-6">
-      <select x-model="pluginID" id="search-input-select"
-              class="px-4 py-2.5 bg-surface-alt border border-border rounded-card text-zinc-100 font-sans text-base transition-colors focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent-subtle">
-        <option value="">Select a source…</option>
-        <template x-for="p in $store.app.plugins" :key="p.ID">
-          <option :value="p.ID" x-text="p.Name || p.ID"></option>
-        </template>
-      </select>
-      <div class="flex gap-2 flex-1 min-w-[260px] items-center">
-        <input x-model="query" @keydown.enter="search()" id="search-input" type="text" placeholder="Search manga…"
-               autocomplete="off"
-               class="flex-1 px-4 py-2.5 bg-surface-alt border border-border rounded-card text-zinc-100 font-sans text-base placeholder:text-muted transition-colors focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent-subtle" />
-        <button @click="search()" :disabled="!pluginID || !query.trim()"
-                class="px-5 py-2.5 rounded-card bg-accent text-white font-medium hover:bg-accent-hover hover:shadow-glow transition-all disabled:opacity-40 disabled:cursor-not-allowed">
-          Search
-        </button>
-      </div>
-    </div>
-
-    <!-- Loading -->
-    <div x-show="loading" class="flex flex-col items-center justify-center gap-4 py-16 text-zinc-400">
-      <div class="w-10 h-10 border-[3px] border-border border-t-accent rounded-full animate-spin-slow"></div>
-      <p>Searching…</p>
-    </div>
-
-    <!-- Error -->
-    <div x-show="error" class="flex flex-col items-center justify-center gap-3 py-16 text-error">
-      <span class="text-4xl">⚠️</span>
-      <p x-text="error"></p>
-      <button @click="search()" class="px-5 py-2 rounded-card border border-border text-zinc-100 hover:bg-surface-alt transition-all">Retry</button>
-    </div>
-
-    <!-- Empty state -->
-    <div x-show="showEmpty" class="flex flex-col items-center justify-center gap-4 py-16">
-      <span class="text-6xl">🔍</span>
-      <h2 class="text-xl font-semibold text-zinc-100">No results found</h2>
-      <p class="text-zinc-400 max-w-sm text-center">Try a different search term or source.</p>
-    </div>
-
-    <!-- Pre-search hint -->
-    <div x-show="!searched && !loading && !error" class="flex flex-col items-center justify-center gap-4 py-16">
-      <span class="text-6xl">🔍</span>
-      <h2 class="text-xl font-semibold text-zinc-100">Search for manga</h2>
-      <p class="text-zinc-400 max-w-sm text-center">Select a source, type a title, and press Enter or click Search.</p>
-    </div>
-
-    <!-- Results grid -->
-    <div x-show="hasResults" class="grid grid-cols-[repeat(auto-fill,minmax(180px,1fr))] gap-6 px-6">
-      <template x-for="m in results" :key="m.id">
-        <a :href="'#/manga/' + encodeURIComponent(pluginID) + '/' + encodeURIComponent(m.id)"
-           class="flex flex-col bg-surface border border-border rounded-card overflow-hidden transition-all hover:-translate-y-1 hover:shadow-card-hover hover:border-accent no-underline text-inherit group">
-          <div x-data="{ imgSrc: '', failed: false }" x-init="loadImage(pluginID, m.cover_url).then(u => { if(u) imgSrc = u; else failed = true; }).catch(() => failed = true)"
-               class="relative aspect-[2/3] bg-surface-alt overflow-hidden cover-wrap"
-               :class="{ 'cover-failed': failed }">
-            <img :src="imgSrc" :alt="m.title || 'cover'" loading="lazy"
-                 @error="failed = true"
-                 class="w-full h-full object-cover block group-hover:scale-105 transition-transform">
-            <div class="absolute inset-0 hidden items-center justify-center text-2xl font-bold text-zinc-400 bg-surface-elevated cover-fallback"
-                 x-text="getInitials(m.title)"></div>
-            <div class="absolute inset-0 flex items-end p-2">
-              <span x-show="m.status" x-text="m.status"
-                    class="inline-block px-2 py-0.5 rounded bg-black/60 text-zinc-100 text-xs font-medium"></span>
-            </div>
-          </div>
-          <div class="px-3 py-2 pb-3">
-            <h3 class="text-base font-semibold text-zinc-100 truncate" x-text="m.title || 'Untitled'"></h3>
-            <span class="block mt-0.5 text-sm text-zinc-400 truncate" x-text="m.author || ''"></span>
-          </div>
-        </a>
+  <div class="flex flex-wrap gap-4 px-6 py-6">
+    <select x-model="pluginID" id="search-input-select"
+            class="px-4 py-2.5 bg-surface-alt border border-border rounded-card text-zinc-100 font-sans text-base transition-colors focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent-subtle">
+      <option value="">Select a source…</option>
+      <template x-for="p in $store.app.plugins" :key="p.ID">
+        <option :value="p.ID" x-text="p.Name || p.ID"></option>
       </template>
+    </select>
+    <div class="flex gap-2 flex-1 min-w-[260px] items-center">
+      <input x-model="query" @keydown.enter="search()" id="search-input" type="text" placeholder="Search manga…"
+             autocomplete="off"
+             class="flex-1 px-4 py-2.5 bg-surface-alt border border-border rounded-card text-zinc-100 font-sans text-base placeholder:text-muted transition-colors focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent-subtle" />
+      <button @click="search()" :disabled="!pluginID || !query.trim()"
+              class="px-5 py-2.5 rounded-card bg-accent text-white font-medium hover:bg-accent-hover hover:shadow-glow transition-all disabled:opacity-40 disabled:cursor-not-allowed">
+        Search
+      </button>
     </div>
+  </div>
 
-    <!-- Pagination -->
-    <div x-show="hasResults" class="flex items-center justify-center gap-6 px-6 py-6 text-zinc-400 font-medium">
-      <button @click="prevPage()" :disabled="page <= 1"
-              class="px-5 py-2 rounded-card border border-border text-zinc-100 hover:bg-surface-alt transition-all disabled:opacity-40 disabled:cursor-not-allowed">← Prev</button>
-      <span x-text="'Page ' + page"></span>
-      <button @click="nextPage()"
-              class="px-5 py-2 rounded-card border border-border text-zinc-100 hover:bg-surface-alt transition-all">Next →</button>
-    </div>
-  </section>
+  <!-- Loading -->
+  <div x-show="loading" class="flex flex-col items-center justify-center gap-4 py-16 text-zinc-400">
+    <div class="w-10 h-10 border-[3px] border-border border-t-accent rounded-full animate-spin-slow"></div>
+    <p>Searching…</p>
+  </div>
+
+  <!-- Error -->
+  <div x-show="error" class="flex flex-col items-center justify-center gap-3 py-16 text-error">
+    <span class="text-4xl">⚠️</span>
+    <p x-text="error"></p>
+    <button @click="search()" class="px-5 py-2 rounded-card border border-border text-zinc-100 hover:bg-surface-alt transition-all">Retry</button>
+  </div>
+
+  <!-- Empty state -->
+  <div x-show="showEmpty" class="flex flex-col items-center justify-center gap-4 py-16">
+    <span class="text-6xl">🔍</span>
+    <h2 class="text-xl font-semibold text-zinc-100">No results found</h2>
+    <p class="text-zinc-400 max-w-sm text-center">Try a different search term or source.</p>
+  </div>
+
+  <!-- Pre-search hint -->
+  <div x-show="!searched && !loading && !error" class="flex flex-col items-center justify-center gap-4 py-16">
+    <span class="text-6xl">🔍</span>
+    <h2 class="text-xl font-semibold text-zinc-100">Search for manga</h2>
+    <p class="text-zinc-400 max-w-sm text-center">Select a source, type a title, and press Enter or click Search.</p>
+  </div>
+
+  <!-- Results grid -->
+  <div x-show="hasResults" class="grid grid-cols-[repeat(auto-fill,minmax(180px,1fr))] gap-6 px-6">
+    <template x-for="m in results" :key="m.id">
+      <a :href="'#/manga/' + encodeURIComponent(pluginID) + '/' + encodeURIComponent(m.id)"
+         class="flex flex-col bg-surface border border-border rounded-card overflow-hidden transition-all hover:-translate-y-1 hover:shadow-card-hover hover:border-accent no-underline text-inherit group">
+        <div x-data="{ imgSrc: '', failed: false }" x-init="loadImage(pluginID, m.cover_url).then(u => { if(u) imgSrc = u; else failed = true; }).catch(() => failed = true)"
+             class="relative aspect-[2/3] bg-surface-alt overflow-hidden cover-wrap"
+             :class="{ 'cover-failed': failed }">
+          <img :src="imgSrc" :alt="m.title || 'cover'" loading="lazy"
+               @error="failed = true"
+               class="w-full h-full object-cover block group-hover:scale-105 transition-transform">
+          <div class="absolute inset-0 hidden items-center justify-center text-2xl font-bold text-zinc-400 bg-surface-elevated cover-fallback"
+               x-text="getInitials(m.title)"></div>
+          <div class="absolute inset-0 flex items-end p-2">
+            <span x-show="m.status" x-text="m.status"
+                  class="inline-block px-2 py-0.5 rounded bg-black/60 text-zinc-100 text-xs font-medium"></span>
+          </div>
+        </div>
+        <div class="px-3 py-2 pb-3">
+          <h3 class="text-base font-semibold text-zinc-100 truncate" x-text="m.title || 'Untitled'"></h3>
+          <span class="block mt-0.5 text-sm text-zinc-400 truncate" x-text="m.author || ''"></span>
+        </div>
+      </a>
+    </template>
+  </div>
+
+  <!-- Pagination -->
+  <div x-show="hasResults" class="flex items-center justify-center gap-6 px-6 py-6 text-zinc-400 font-medium">
+    <button @click="prevPage()" :disabled="page <= 1"
+            class="px-5 py-2 rounded-card border border-border text-zinc-100 hover:bg-surface-alt transition-all disabled:opacity-40 disabled:cursor-not-allowed">← Prev</button>
+    <span x-text="'Page ' + page"></span>
+    <button @click="nextPage()"
+            class="px-5 py-2 rounded-card border border-border text-zinc-100 hover:bg-surface-alt transition-all">Next →</button>
+  </div>
+</section>
+
 
   <!-- ── Manga Detail View ────────────────────────────────────────── -->
   <section x-show="$store.app.currentView === 'detail'" x-cloak x-data="detailView" class="fade-in min-h-[calc(100vh-57px)]"
-            x-effect="const h = window.location.hash; if ($store.app.currentView === 'detail') { if (!h.startsWith('#/manga/')) { console.error('[detail] skipping load, bad hash:', h); } else { const s = h.replace('#/manga/','').split('/'); const pid = s[0] ? decodeURIComponent(s[0]) : ''; const mid = s.length >= 2 && s[1] ? decodeURIComponent(s[1]) : ''; if (!pid || !mid) { console.error('[detail] skipping load, bad hash:', h); } else if (pid !== pluginID || mid !== mangaID) { load(pid, mid); } } }">
+          x-effect="const h = window.location.hash; if ($store.app.currentView === 'detail') { if (!h.startsWith('#/manga/')) { console.error('[detail] skipping load, bad hash:', h); } else { const s = h.replace('#/manga/','').split('/'); const pid = s[0] ? decodeURIComponent(s[0]) : ''; const mid = s.length >= 2 && s[1] ? decodeURIComponent(s[1]) : ''; if (!pid || !mid) { console.error('[detail] skipping load, bad hash:', h); } else if (pid !== pluginID || mid !== mangaID) { load(pid, mid); } } }">
 
-    <!-- Loading -->
-    <div x-show="loading" class="flex flex-col items-center justify-center gap-4 py-16 text-zinc-400">
-      <div class="w-10 h-10 border-[3px] border-border border-t-accent rounded-full animate-spin-slow"></div>
-      <p>Loading manga details…</p>
-    </div>
+  <!-- Loading -->
+  <div x-show="loading" class="flex flex-col items-center justify-center gap-4 py-16 text-zinc-400">
+    <div class="w-10 h-10 border-[3px] border-border border-t-accent rounded-full animate-spin-slow"></div>
+    <p>Loading manga details…</p>
+  </div>
 
-    <!-- Error -->
-    <div x-show="error" class="flex flex-col items-center justify-center gap-3 py-16 text-error">
-      <span class="text-4xl">⚠️</span>
-      <p x-text="error"></p>
-      <button @click="load(pluginID, mangaID)" class="px-5 py-2 rounded-card border border-border text-zinc-100 hover:bg-surface-alt transition-all">Retry</button>
-    </div>
+  <!-- Error -->
+  <div x-show="error" class="flex flex-col items-center justify-center gap-3 py-16 text-error">
+    <span class="text-4xl">⚠️</span>
+    <p x-text="error"></p>
+    <button @click="load(pluginID, mangaID)" class="px-5 py-2 rounded-card border border-border text-zinc-100 hover:bg-surface-alt transition-all">Retry</button>
+  </div>
 
-    <!-- Detail content -->
-    <div x-show="!loading && manga" class="px-6 py-8">
-      <div class="flex gap-8 flex-col sm:flex-row">
-        <!-- Cover -->
-        <div class="flex-shrink-0 w-60">
-          <img :src="coverUrl" :alt="manga?.title || 'cover'"
-               class="w-full aspect-[2/3] object-cover rounded-card border border-border">
+  <!-- Detail content -->
+  <div x-show="!loading && manga" class="px-6 py-8">
+    <div class="flex gap-8 flex-col sm:flex-row">
+      <!-- Cover -->
+      <div class="flex-shrink-0 w-60">
+        <img :src="coverUrl" :alt="manga?.title || 'cover'"
+             class="w-full aspect-[2/3] object-cover rounded-card border border-border">
+      </div>
+      <!-- Meta -->
+      <div class="flex-1 flex flex-col gap-4">
+        <h1 class="text-3xl font-bold text-zinc-100" x-text="manga?.title || 'Untitled'"></h1>
+        <div class="flex flex-wrap gap-2">
+          <span x-show="manga?.status" x-text="manga?.status"
+                class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-accent-subtle text-accent"></span>
+          <span x-show="manga?.author" x-text="'By ' + (manga?.author || 'Unknown')"
+                class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-accent-subtle text-accent"></span>
         </div>
-        <!-- Meta -->
-        <div class="flex-1 flex flex-col gap-4">
-          <h1 class="text-3xl font-bold text-zinc-100" x-text="manga?.title || 'Untitled'"></h1>
-          <div class="flex flex-wrap gap-2">
-            <span x-show="manga?.status" x-text="manga?.status"
-                  class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-accent-subtle text-accent"></span>
-            <span x-show="manga?.author" x-text="'By ' + (manga?.author || 'Unknown')"
-                  class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-accent-subtle text-accent"></span>
-          </div>
-          <p class="text-zinc-400 leading-relaxed max-w-[70ch]" x-text="manga?.description || 'No description available.'"></p>
-          <div class="flex gap-2">
-            <button @click="toggleLibrary()"
-                    :class="inLibrary
-                      ? 'bg-transparent border border-border text-zinc-100 hover:bg-surface-alt'
-                      : 'bg-accent text-white hover:bg-accent-hover hover:shadow-glow'"
-                    class="px-5 py-2 rounded-card font-medium transition-all">
-              <span x-text="inLibrary ? 'In Library ✓' : 'Add to Library'"></span>
-             </button>
-           </div>
+        <p class="text-zinc-400 leading-relaxed max-w-[70ch]" x-text="manga?.description || 'No description available.'"></p>
+        <div class="flex gap-2">
+          <button @click="toggleLibrary()"
+                  :class="inLibrary
+                    ? 'bg-transparent border border-border text-zinc-100 hover:bg-surface-alt'
+                    : 'bg-accent text-white hover:bg-accent-hover hover:shadow-glow'"
+                  class="px-5 py-2 rounded-card font-medium transition-all">
+            <span x-text="inLibrary ? 'In Library ✓' : 'Add to Library'"></span>
+           </button>
+         </div>
 
-           <!-- Continue Reading -->
-           <div x-show="startTarget" class="mt-4">
-             <button @click="startReading()"
-                     class="w-full px-5 py-3 rounded-card bg-accent text-white font-bold text-lg hover:bg-accent-hover hover:shadow-glow transition-all">
-               <span x-text="startTarget ? startTarget.label + (startTarget.num ? ' Ch. ' + formatChapterNum(startTarget.num) : '') : ''"></span>
-             </button>
-           </div>
+         <!-- Continue Reading -->
+         <div x-show="startTarget" class="mt-4">
+           <button @click="startReading()"
+                   class="w-full px-5 py-3 rounded-card bg-accent text-white font-bold text-lg hover:bg-accent-hover hover:shadow-glow transition-all">
+             <span x-text="startTarget ? startTarget.label + (startTarget.num ? ' Ch. ' + formatChapterNum(startTarget.num) : '') : ''"></span>
+           </button>
+         </div>
 
-           <!-- Chapters -->
-          <div class="mt-4" x-show="chapters.length > 0">
-            <h2 class="text-xl font-semibold text-zinc-100 mb-2">Chapters</h2>
-            <div class="flex flex-col gap-1">
-              <template x-for="ch in chapters" :key="ch.id">
-                <a :href="chapterUrl(ch)"
-                   class="flex items-center gap-4 px-4 py-3 rounded-card border border-border bg-surface transition-all hover:bg-surface-alt hover:border-accent no-underline text-inherit">
-                  <span class="flex-shrink-0 min-w-16 font-semibold text-accent text-lg" x-text="'Ch. ' + formatChapterNum(ch.chapter_num)"></span>
-                  <span class="flex-1 text-zinc-100" x-text="ch.title || 'Chapter ' + formatChapterNum(ch.chapter_num)"></span>
-                  <span class="flex-shrink-0 text-sm text-zinc-400" x-text="formatDate(ch.released_at)"></span>
-                  <span class="flex-shrink-0 w-[90px] text-xs text-success text-right">
-                    <template x-if="readProgress(ch)?.lastPage >= readProgress(ch)?.pageCount">
-                      <span>✓ Read</span>
-                    </template>
-                    <template x-if="readProgress(ch) && readProgress(ch).lastPage < readProgress(ch).pageCount">
-                      <span x-text="Math.min(100, Math.round((readProgress(ch).lastPage / Math.max(1, readProgress(ch).pageCount)) * 100)) + '%'"></span>
-                    </template>
-                  </span>
-                </a>
-              </template>
-            </div>
+         <!-- Chapters -->
+        <div class="mt-4" x-show="chapters.length > 0">
+          <h2 class="text-xl font-semibold text-zinc-100 mb-2">Chapters</h2>
+          <div class="flex flex-col gap-1">
+            <template x-for="ch in chapters" :key="ch.id">
+              <a :href="chapterUrl(ch)"
+                 class="flex items-center gap-4 px-4 py-3 rounded-card border border-border bg-surface transition-all hover:bg-surface-alt hover:border-accent no-underline text-inherit">
+                <span class="flex-shrink-0 min-w-16 font-semibold text-accent text-lg" x-text="'Ch. ' + formatChapterNum(ch.chapter_num)"></span>
+                <span class="flex-1 text-zinc-100" x-text="ch.title || 'Chapter ' + formatChapterNum(ch.chapter_num)"></span>
+                <span class="flex-shrink-0 text-sm text-zinc-400" x-text="formatDate(ch.released_at)"></span>
+                <span class="flex-shrink-0 w-[90px] text-xs text-success text-right">
+                  <template x-if="readProgress(ch)?.lastPage >= readProgress(ch)?.pageCount">
+                    <span>✓ Read</span>
+                  </template>
+                  <template x-if="readProgress(ch) && readProgress(ch).lastPage < readProgress(ch).pageCount">
+                    <span x-text="Math.min(100, Math.round((readProgress(ch).lastPage / Math.max(1, readProgress(ch).pageCount)) * 100)) + '%'"></span>
+                  </template>
+                </span>
+              </a>
+            </template>
           </div>
         </div>
       </div>
     </div>
-  </section>
+  </div>
+</section>
+
 
   <!-- ── Reader View ──────────────────────────────────────────────── -->
-   <section x-show="$store.app.currentView === 'reader'" x-cloak x-data="readerView" class="fixed inset-0 z-[500] bg-black overflow-hidden"
-            x-effect="if ($store.app.currentView === 'reader') reloadFromHash()" @hashchange.window="reloadFromHash()">
+  <section x-show="$store.app.currentView === 'reader'" x-cloak x-data="readerView" class="fixed inset-0 z-[500] bg-black overflow-hidden"
+          x-effect="if ($store.app.currentView === 'reader') reloadFromHash()" @hashchange.window="reloadFromHash()">
 
-    <!-- Top bar -->
-    <div @mousemove="scheduleAutoHide()" @mouseover="clearTimeout(autoHideTimer); controlsVisible = true"
-         x-show="controlsVisible" x-transition.opacity.duration.300ms
-         class="absolute top-0 left-0 right-0 z-10 flex items-center justify-between gap-4 px-6 py-3 bg-black/60 backdrop-blur-sm">
-       <button @click="exit()" class="px-4 py-2 rounded-card border border-border text-zinc-100 hover:bg-white/10 transition-all text-sm">← Back</button>
-       <span class="flex-1 text-center text-zinc-100 font-medium truncate" x-text="title || 'Manga'"></span>
-       <div class="flex items-center gap-2 min-w-[140px] justify-end">
-          <button type="button" :class="viewMode === 'fitWidth' ? RBTN_ACTIVE : RBTN" @click="setViewMode('fitWidth')" title="Fit width">↔</button>
-          <button type="button" :class="viewMode === 'fitHeight' ? RBTN_ACTIVE : RBTN" @click="setViewMode('fitHeight')" title="Fit height">↕</button>
-          <button type="button" :class="viewMode === 'original' ? RBTN_ACTIVE : RBTN" @click="setViewMode('original')" title="Original size">1:1</button>
-          <button type="button" :class="RBTN" @click="_resetZoom()" title="Reset zoom (R)">↺</button>
-         <span class="w-px h-6 bg-white/20"></span>
-         <button type="button" :class="direction === 'rtl' ? RBTN_ACTIVE : RBTN" @click="toggleDirection()" x-text="direction === 'rtl' ? 'RTL' : 'LTR'" title="Reading direction"></button>
-         <button type="button" :class="RBTN" @click="showShortcuts = true" title="Shortcuts (?)">?</button>
-         <span class="text-xs font-medium text-zinc-100 min-w-[64px] text-right" x-text="'Page ' + pageInfo"></span>
-       </div>
+  <!-- Top bar -->
+  <div @mousemove="scheduleAutoHide()" @mouseover="clearTimeout(autoHideTimer); controlsVisible = true"
+       x-show="controlsVisible" x-transition.opacity.duration.300ms
+       class="absolute top-0 left-0 right-0 z-10 flex items-center justify-between gap-4 px-6 py-3 bg-black/60 backdrop-blur-sm">
+     <button @click="exit()" class="px-4 py-2 rounded-card border border-border text-zinc-100 hover:bg-white/10 transition-all text-sm">← Back</button>
+     <span class="flex-1 text-center text-zinc-100 font-medium truncate" x-text="title || 'Manga'"></span>
+     <div class="flex items-center gap-2 min-w-[140px] justify-end">
+        <button type="button" :class="viewMode === 'fitWidth' ? RBTN_ACTIVE : RBTN" @click="setViewMode('fitWidth')" title="Fit width">↔</button>
+        <button type="button" :class="viewMode === 'fitHeight' ? RBTN_ACTIVE : RBTN" @click="setViewMode('fitHeight')" title="Fit height">↕</button>
+        <button type="button" :class="viewMode === 'original' ? RBTN_ACTIVE : RBTN" @click="setViewMode('original')" title="Original size">1:1</button>
+        <button type="button" :class="RBTN" @click="_resetZoom()" title="Reset zoom (R)">↺</button>
+       <span class="w-px h-6 bg-white/20"></span>
+       <button type="button" :class="direction === 'rtl' ? RBTN_ACTIVE : RBTN" @click="toggleDirection()" x-text="direction === 'rtl' ? 'RTL' : 'LTR'" title="Reading direction"></button>
+       <button type="button" :class="RBTN" @click="showShortcuts = true" title="Shortcuts (?)">?</button>
+       <span class="text-xs font-medium text-zinc-100 min-w-[64px] text-right" x-text="'Page ' + pageInfo"></span>
      </div>
+   </div>
 
-     <!-- Progress bar (top edge) -->
-     <div class="absolute top-0 left-0 right-0 z-20 h-1 overflow-hidden bg-black/40">
-       <div class="h-full reader-progress-fill transition-[width] duration-150" :style="'width:' + progressPct + '%'"></div>
-     </div>
+   <!-- Progress bar (top edge) -->
+   <div class="absolute top-0 left-0 right-0 z-20 h-1 overflow-hidden bg-black/40">
+     <div class="h-full reader-progress-fill transition-[width] duration-150" :style="'width:' + progressPct + '%'"></div>
+   </div>
 
-      <!-- Canvas wrap -->
-      <div @mousemove="scheduleAutoHide()" class="relative w-full h-full">
-        <!-- Loading spinner -->
-        <div x-show="loading" class="absolute inset-0 flex flex-col items-center justify-center gap-3 z-50">
-          <div class="w-10 h-10 border-2 border-white/20 border-t-accent rounded-full animate-spin"></div>
-          <span class="text-sm text-zinc-400">Loading page…</span>
-        </div>
-        <!-- Error panel -->
-        <div x-show="error && !loading" class="absolute inset-0 flex flex-col items-center justify-center gap-4 text-center z-40 bg-black/85 backdrop-blur-sm">
-          <span class="text-zinc-400 text-sm">Failed to load page <span x-text="currentPage + 1"></span></span>
-          <label class="flex items-center gap-2 text-sm text-zinc-300 cursor-pointer">
-            <input type="checkbox" x-model="deleteCacheOnRetry" class="accent-accent w-4 h-4">
-            Delete cached image first
-          </label>
-          <div class="flex gap-3">
-            <button @click="retryPage()" class="px-4 py-2 rounded-card bg-accent text-white text-sm hover:bg-accent/80 transition-all">↻ Retry</button>
-            <button @click="skipPage()" class="px-4 py-2 rounded-card border border-border text-zinc-300 text-sm hover:bg-white/10 transition-all">Skip →</button>
-          </div>
-        </div>
-        <!-- Canvas for rendering -->
-        <canvas id="reader-canvas" class="w-full h-full"></canvas>
+    <!-- Canvas wrap -->
+    <div @mousemove="scheduleAutoHide()" class="relative w-full h-full">
+      <!-- Loading spinner -->
+      <div x-show="loading" class="absolute inset-0 flex flex-col items-center justify-center gap-3 z-50">
+        <div class="w-10 h-10 border-2 border-white/20 border-t-accent rounded-full animate-spin"></div>
+        <span class="text-sm text-zinc-400">Loading page…</span>
       </div>
-
-     <!-- Shortcuts legend (auto-dismiss on any key/click) -->
-     <div x-show="showShortcuts" class="absolute inset-0 z-30 flex items-center justify-center bg-black/80" @click="showShortcuts = false">
-       <div class="bg-surface border border-border rounded-card p-6 max-w-sm w-full shadow-card-hover" @click.stop>
-         <h2 class="text-xl font-bold text-zinc-100 mb-4">Keyboard Shortcuts</h2>
-         <ul class="space-y-2 text-sm text-zinc-300">
-           <li class="flex items-center justify-between"><span>Next page</span><span class="flex gap-1"><kbd class="px-2 py-0.5 rounded bg-surface-elevated border border-border text-xs">→</kbd><kbd class="px-2 py-0.5 rounded bg-surface-elevated border border-border text-xs">Space</kbd></span></li>
-           <li class="flex items-center justify-between"><span>Previous page</span><kbd class="px-2 py-0.5 rounded bg-surface-elevated border border-border text-xs">←</kbd></li>
-           <li class="flex items-center justify-between"><span>First page</span><kbd class="px-2 py-0.5 rounded bg-surface-elevated border border-border text-xs">Home</kbd></li>
-           <li class="flex items-center justify-between"><span>Last page</span><kbd class="px-2 py-0.5 rounded bg-surface-elevated border border-border text-xs">End</kbd></li>
-           <li class="flex items-center justify-between"><span>Fullscreen</span><kbd class="px-2 py-0.5 rounded bg-surface-elevated border border-border text-xs">F</kbd></li>
-           <li class="flex items-center justify-between"><span>Shortcuts</span><kbd class="px-2 py-0.5 rounded bg-surface-elevated border border-border text-xs">?</kbd></li>
-            <li class="flex items-center justify-between"><span>Exit</span><kbd class="px-2 py-0.5 rounded bg-surface-elevated border border-border text-xs">Esc</kbd></li>
-            <li class="flex items-center justify-between"><span>Reset zoom</span><kbd class="px-2 py-0.5 rounded bg-surface-elevated border border-border text-xs">R</kbd></li>
-         </ul>
-         <p class="mt-4 text-center text-xs text-zinc-500">Press any key or click to close</p>
-       </div>
-     </div>
-
-    <!-- Click zones with drag disambiguation -->
-    <div @mousedown="_isDragging = false; _dragMoved = false; $event.stopPropagation()" @click="handleZoneClick('left', $event)" class="absolute top-0 bottom-12 left-0 w-[35%] z-10 cursor-pointer"></div>
-    <div @mousedown="_isDragging = false; _dragMoved = false; $event.stopPropagation()" @click="handleZoneClick('right', $event)" class="absolute top-0 bottom-12 right-0 w-[35%] z-10 cursor-pointer"></div>
-
-    <!-- Bottom bar -->
-    <div @mousemove="scheduleAutoHide()" @mouseover="clearTimeout(autoHideTimer); controlsVisible = true"
-         x-show="controlsVisible" x-transition.opacity.duration.300ms
-         class="absolute bottom-0 left-0 right-0 z-10 flex items-center justify-center gap-4 px-6 py-3 bg-black/60 backdrop-blur-sm">
-      <input type="range" :min="0" :max="sliderMax" :value="currentPage"
-             @input="goToPage(parseInt($event.target.value))"
-             class="flex-1 max-w-[520px] accent-slider">
-    </div>
-
-    <!-- Loading overlay -->
-    <div x-show="loading" class="absolute inset-0 z-20 flex items-center justify-center bg-black">
-      <div class="w-10 h-10 border-[3px] border-zinc-700 border-t-accent rounded-full animate-spin-slow"></div>
-    </div>
-
-    <!-- Error overlay -->
-    <div x-show="error" class="absolute inset-0 z-20 flex flex-col items-center justify-center gap-4 bg-black/85 text-error">
-      <span class="text-5xl">⚠️</span>
-      <p>Failed to load page</p>
-      <button @click="error = false; goToPage(currentPage, true)"
-              class="px-5 py-2 rounded-card border border-border text-zinc-100 hover:bg-white/10 transition-all">Retry</button>
-    </div>
-
-    <!-- Chapter complete overlay -->
-    <div x-show="complete" x-transition class="absolute inset-0 z-20 flex items-center justify-center bg-black/85">
-      <div class="flex flex-col items-center gap-6">
-        <h2 class="text-2xl font-bold text-zinc-100">Chapter Complete</h2>
-        <div class="flex gap-2">
-           <button x-show="nextChapterID" @click="goNextChapter()"
-                  class="px-5 py-2 rounded-card bg-accent text-white font-medium hover:bg-accent-hover hover:shadow-glow transition-all">Next Chapter</button>
-          <a :href="backToManga()"
-             class="px-5 py-2 rounded-card border border-border text-zinc-100 hover:bg-white/10 transition-all no-underline">Back to Manga</a>
+      <!-- Error panel -->
+      <div x-show="error && !loading" class="absolute inset-0 flex flex-col items-center justify-center gap-4 text-center z-40 bg-black/85 backdrop-blur-sm">
+        <span class="text-zinc-400 text-sm">Failed to load page <span x-text="currentPage + 1"></span></span>
+        <label class="flex items-center gap-2 text-sm text-zinc-300 cursor-pointer">
+          <input type="checkbox" x-model="deleteCacheOnRetry" class="accent-accent w-4 h-4">
+          Delete cached image first
+        </label>
+        <div class="flex gap-3">
+          <button @click="retryPage()" class="px-4 py-2 rounded-card bg-accent text-white text-sm hover:bg-accent/80 transition-all">↻ Retry</button>
+          <button @click="skipPage()" class="px-4 py-2 rounded-card border border-border text-zinc-300 text-sm hover:bg-white/10 transition-all">Skip →</button>
         </div>
       </div>
+      <!-- Canvas for rendering -->
+      <canvas id="reader-canvas" class="w-full h-full"></canvas>
     </div>
-  </section>
+
+   <!-- Shortcuts legend (auto-dismiss on any key/click) -->
+   <div x-show="showShortcuts" class="absolute inset-0 z-30 flex items-center justify-center bg-black/80" @click="showShortcuts = false">
+     <div class="bg-surface border border-border rounded-card p-6 max-w-sm w-full shadow-card-hover" @click.stop>
+       <h2 class="text-xl font-bold text-zinc-100 mb-4">Keyboard Shortcuts</h2>
+       <ul class="space-y-2 text-sm text-zinc-300">
+         <li class="flex items-center justify-between"><span>Next page</span><span class="flex gap-1"><kbd class="px-2 py-0.5 rounded bg-surface-elevated border border-border text-xs">→</kbd><kbd class="px-2 py-0.5 rounded bg-surface-elevated border border-border text-xs">Space</kbd></span></li>
+         <li class="flex items-center justify-between"><span>Previous page</span><kbd class="px-2 py-0.5 rounded bg-surface-elevated border border-border text-xs">←</kbd></li>
+         <li class="flex items-center justify-between"><span>First page</span><kbd class="px-2 py-0.5 rounded bg-surface-elevated border border-border text-xs">Home</kbd></li>
+         <li class="flex items-center justify-between"><span>Last page</span><kbd class="px-2 py-0.5 rounded bg-surface-elevated border border-border text-xs">End</kbd></li>
+         <li class="flex items-center justify-between"><span>Fullscreen</span><kbd class="px-2 py-0.5 rounded bg-surface-elevated border border-border text-xs">F</kbd></li>
+         <li class="flex items-center justify-between"><span>Shortcuts</span><kbd class="px-2 py-0.5 rounded bg-surface-elevated border border-border text-xs">?</kbd></li>
+          <li class="flex items-center justify-between"><span>Exit</span><kbd class="px-2 py-0.5 rounded bg-surface-elevated border border-border text-xs">Esc</kbd></li>
+          <li class="flex items-center justify-between"><span>Reset zoom</span><kbd class="px-2 py-0.5 rounded bg-surface-elevated border border-border text-xs">R</kbd></li>
+       </ul>
+       <p class="mt-4 text-center text-xs text-zinc-500">Press any key or click to close</p>
+     </div>
+   </div>
+
+  <!-- Click zones with drag disambiguation -->
+  <div @mousedown="_isDragging = false; _dragMoved = false; $event.stopPropagation()" @click="handleZoneClick('left', $event)" class="absolute top-0 bottom-12 left-0 w-[35%] z-10 cursor-pointer"></div>
+  <div @mousedown="_isDragging = false; _dragMoved = false; $event.stopPropagation()" @click="handleZoneClick('right', $event)" class="absolute top-0 bottom-12 right-0 w-[35%] z-10 cursor-pointer"></div>
+
+  <!-- Bottom bar -->
+  <div @mousemove="scheduleAutoHide()" @mouseover="clearTimeout(autoHideTimer); controlsVisible = true"
+       x-show="controlsVisible" x-transition.opacity.duration.300ms
+       class="absolute bottom-0 left-0 right-0 z-10 flex items-center justify-center gap-4 px-6 py-3 bg-black/60 backdrop-blur-sm">
+    <input type="range" :min="0" :max="sliderMax" :value="currentPage"
+           @input="goToPage(parseInt($event.target.value))"
+           class="flex-1 max-w-[520px] accent-slider">
+  </div>
+
+  <!-- Loading overlay -->
+  <div x-show="loading" class="absolute inset-0 z-20 flex items-center justify-center bg-black">
+    <div class="w-10 h-10 border-[3px] border-zinc-700 border-t-accent rounded-full animate-spin-slow"></div>
+  </div>
+
+  <!-- Error overlay -->
+  <div x-show="error" class="absolute inset-0 z-20 flex flex-col items-center justify-center gap-4 bg-black/85 text-error">
+    <span class="text-5xl">⚠️</span>
+    <p>Failed to load page</p>
+    <button @click="error = false; goToPage(currentPage, true)"
+            class="px-5 py-2 rounded-card border border-border text-zinc-100 hover:bg-white/10 transition-all">Retry</button>
+  </div>
+
+  <!-- Chapter complete overlay -->
+  <div x-show="complete" x-transition class="absolute inset-0 z-20 flex items-center justify-center bg-black/85">
+    <div class="flex flex-col items-center gap-6">
+      <h2 class="text-2xl font-bold text-zinc-100">Chapter Complete</h2>
+      <div class="flex gap-2">
+         <button x-show="nextChapterID" @click="goNextChapter()"
+                class="px-5 py-2 rounded-card bg-accent text-white font-medium hover:bg-accent-hover hover:shadow-glow transition-all">Next Chapter</button>
+        <a :href="backToManga()"
+           class="px-5 py-2 rounded-card border border-border text-zinc-100 hover:bg-white/10 transition-all no-underline">Back to Manga</a>
+      </div>
+    </div>
+  </div>
+</section>
+
 
   <!-- ── Plugins View ─────────────────────────────────────────────── -->
   <section x-show="$store.app.currentView === 'plugins'" x-cloak x-data="pluginsView" class="fade-in min-h-[calc(100vh-57px)]">
-    <div class="flex items-center justify-between px-6 py-6 pb-4">
-      <h1 class="text-3xl font-bold text-zinc-100">Plugins</h1>
-      <button @click="installPlugin()"
-              class="inline-flex items-center gap-2 px-5 py-2 rounded-card bg-accent text-white font-medium hover:bg-accent-hover hover:shadow-glow transition-all">
-        Install Plugin
-      </button>
-    </div>
+  <div class="flex items-center justify-between px-6 py-6 pb-4">
+    <h1 class="text-3xl font-bold text-zinc-100">Plugins</h1>
+    <button @click="installPlugin()"
+            class="inline-flex items-center gap-2 px-5 py-2 rounded-card bg-accent text-white font-medium hover:bg-accent-hover hover:shadow-glow transition-all">
+      Install Plugin
+    </button>
+  </div>
 
-    <!-- Loading -->
-    <div x-show="loading" class="flex flex-col items-center justify-center gap-4 py-16 text-zinc-400">
-      <div class="w-10 h-10 border-[3px] border-border border-t-accent rounded-full animate-spin-slow"></div>
-      <p>Loading plugins…</p>
-    </div>
+  <!-- Loading -->
+  <div x-show="loading" class="flex flex-col items-center justify-center gap-4 py-16 text-zinc-400">
+    <div class="w-10 h-10 border-[3px] border-border border-t-accent rounded-full animate-spin-slow"></div>
+    <p>Loading plugins…</p>
+  </div>
 
-    <!-- Error -->
-    <div x-show="error" class="flex flex-col items-center justify-center gap-3 py-16 text-error">
-      <span class="text-4xl">⚠️</span>
-      <p x-text="error"></p>
-      <button @click="load()" class="px-5 py-2 rounded-card border border-border text-zinc-100 hover:bg-surface-alt transition-all">Retry</button>
-    </div>
+  <!-- Error -->
+  <div x-show="error" class="flex flex-col items-center justify-center gap-3 py-16 text-error">
+    <span class="text-4xl">⚠️</span>
+    <p x-text="error"></p>
+    <button @click="load()" class="px-5 py-2 rounded-card border border-border text-zinc-100 hover:bg-surface-alt transition-all">Retry</button>
+  </div>
 
-    <!-- Empty state -->
-    <div x-show="!loading && !error && plugins.length === 0" class="flex flex-col items-center justify-center gap-4 py-16">
-      <span class="text-6xl">🧩</span>
-      <h2 class="text-xl font-semibold text-zinc-100">No plugins installed</h2>
-      <p class="text-zinc-400 max-w-sm text-center">Install a .wasm plugin to start reading.</p>
-    </div>
+  <!-- Empty state -->
+  <div x-show="!loading && !error && plugins.length === 0" class="flex flex-col items-center justify-center gap-4 py-16">
+    <span class="text-6xl">🧩</span>
+    <h2 class="text-xl font-semibold text-zinc-100">No plugins installed</h2>
+    <p class="text-zinc-400 max-w-sm text-center">Install a .wasm plugin to start reading.</p>
+  </div>
 
-    <!-- Plugin list -->
-    <div x-show="!loading && plugins.length > 0" class="flex flex-col gap-4 px-6">
-      <template x-for="plugin in plugins" :key="plugin.ID">
-        <div class="flex items-center gap-4 p-4 bg-surface border border-border rounded-card transition-all hover:-translate-y-0.5 hover:shadow-card-hover">
-          <!-- Icon -->
-          <div class="flex-shrink-0 w-14 h-14 rounded-card bg-surface-elevated overflow-hidden flex items-center justify-center">
-            <template x-if="plugin.IconURL">
-              <img :src="plugin.IconURL" :alt="(plugin.Name || 'plugin') + ' icon'"
-                   class="w-full h-full object-cover"
-                   @error="$el.style.display='none'; $el.parentElement.innerHTML='<span class=\'flex items-center justify-center w-full h-full text-2xl font-bold text-accent\'>' + fallbackInitial(plugin.Name) + '</span>'">
-            </template>
-            <template x-if="!plugin.IconURL">
-              <span class="text-2xl font-bold text-accent" x-text="fallbackInitial(plugin.Name)"></span>
-            </template>
-          </div>
-          <!-- Info -->
-          <div class="flex-1">
-            <h3 class="text-lg font-semibold text-zinc-100" x-text="plugin.Name || plugin.ID"></h3>
-            <span class="block text-xs text-muted font-mono" x-text="plugin.ID"></span>
-            <span class="block text-sm text-zinc-400" x-text="plugin.Version || 'v0.0.0'"></span>
-          </div>
-          <!-- Status + toggle -->
-          <div class="flex items-center gap-3">
-            <span :class="plugin.IsActive ? 'bg-success/15 text-success' : 'bg-accent-subtle text-accent'"
-                  class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium"
-                  x-text="plugin.IsActive ? 'Active' : 'Inactive'"></span>
-            <button @click="togglePlugin(plugin.ID)"
-                    class="px-4 py-2 rounded-card bg-surface-alt text-zinc-100 font-medium text-sm hover:bg-surface-elevated transition-all"
-                    x-text="plugin.IsActive ? 'Disable' : 'Enable'"></button>
-          </div>
+  <!-- Plugin list -->
+  <div x-show="!loading && plugins.length > 0" class="flex flex-col gap-4 px-6">
+    <template x-for="plugin in plugins" :key="plugin.ID">
+      <div class="flex items-center gap-4 p-4 bg-surface border border-border rounded-card transition-all hover:-translate-y-0.5 hover:shadow-card-hover">
+        <!-- Icon -->
+        <div class="flex-shrink-0 w-14 h-14 rounded-card bg-surface-elevated overflow-hidden flex items-center justify-center">
+          <template x-if="plugin.IconURL">
+            <img :src="plugin.IconURL" :alt="(plugin.Name || 'plugin') + ' icon'"
+                 class="w-full h-full object-cover"
+                 @error="$el.style.display='none'; $el.parentElement.innerHTML='<span class=\'flex items-center justify-center w-full h-full text-2xl font-bold text-accent\'>' + fallbackInitial(plugin.Name) + '</span>'">
+          </template>
+          <template x-if="!plugin.IconURL">
+            <span class="text-2xl font-bold text-accent" x-text="fallbackInitial(plugin.Name)"></span>
+          </template>
         </div>
-      </template>
-    </div>
+        <!-- Info -->
+        <div class="flex-1">
+          <h3 class="text-lg font-semibold text-zinc-100" x-text="plugin.Name || plugin.ID"></h3>
+          <span class="block text-xs text-muted font-mono" x-text="plugin.ID"></span>
+          <span class="block text-sm text-zinc-400" x-text="plugin.Version || 'v0.0.0'"></span>
+        </div>
+        <!-- Status + toggle -->
+        <div class="flex items-center gap-3">
+          <span :class="plugin.IsActive ? 'bg-success/15 text-success' : 'bg-accent-subtle text-accent'"
+                class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium"
+                x-text="plugin.IsActive ? 'Active' : 'Inactive'"></span>
+          <button @click="togglePlugin(plugin.ID)"
+                  class="px-4 py-2 rounded-card bg-surface-alt text-zinc-100 font-medium text-sm hover:bg-surface-elevated transition-all"
+                  x-text="plugin.IsActive ? 'Disable' : 'Enable'"></button>
+        </div>
+      </div>
+    </template>
+  </div>
 
-    <!-- Hidden file input for plugin install -->
-    <input type="file" id="plugin-file-input" accept=".wasm" class="hidden" @change="onFileSelected($event)" />
-  </section>
+  <!-- Hidden file input for plugin install -->
+  <input type="file" id="plugin-file-input" accept=".wasm" class="hidden" @change="onFileSelected($event)" />
+</section>
+
 
   <!-- ── Settings View ─────────────────────────────────────────────── -->
   <section x-show="$store.app.currentView === 'settings'" x-cloak x-data="settingsView" class="fade-in min-h-[calc(100vh-57px)]">
-    <div class="flex items-center justify-between px-6 py-6 pb-4">
-      <h1 class="text-3xl font-bold text-zinc-100">Settings</h1>
-    </div>
+  <div class="flex items-center justify-between px-6 py-6 pb-4">
+    <h1 class="text-3xl font-bold text-zinc-100">Settings</h1>
+  </div>
 
-    <div class="px-6 space-y-8 max-w-2xl">
-      <!-- Image rendering -->
-      <section class="space-y-3">
-        <h2 class="text-lg font-semibold text-zinc-100">Image Rendering</h2>
-        <p class="text-sm text-zinc-400">Control how manga pages are scaled and composited.</p>
-        <div class="grid grid-cols-[1fr_auto] items-center gap-4">
-          <select x-model="renderMode" @change="persist()"
-                  class="px-4 py-2 bg-surface-alt border border-border rounded-card text-zinc-100 focus:outline-none focus:border-accent">
-            <option value="smooth">Smooth (bilinear)</option>
-            <option value="sharp">Sharp Pixels (pixelated)</option>
-          </select>
-          <label class="flex items-center gap-2">
-            <input type="checkbox" :checked="gpuCompositing" @change="gpuCompositing = !gpuCompositing; persist()"
-                   style="accent-color: #7c5cfc" class="w-5 h-5" />
-            <span class="text-sm text-zinc-300">GPU compositing</span>
-          </label>
-        </div>
-      </section>
+  <div class="px-6 space-y-8 max-w-2xl">
+    <!-- Image rendering -->
+    <section class="space-y-3">
+      <h2 class="text-lg font-semibold text-zinc-100">Image Rendering</h2>
+      <p class="text-sm text-zinc-400">Control how manga pages are scaled and composited.</p>
+      <div class="grid grid-cols-[1fr_auto] items-center gap-4">
+        <select x-model="renderMode" @change="persist()"
+                class="px-4 py-2 bg-surface-alt border border-border rounded-card text-zinc-100 focus:outline-none focus:border-accent">
+          <option value="smooth">Smooth (bilinear)</option>
+          <option value="sharp">Sharp Pixels (pixelated)</option>
+        </select>
+        <label class="flex items-center gap-2">
+          <input type="checkbox" :checked="gpuCompositing" @change="gpuCompositing = !gpuCompositing; persist()"
+                 style="accent-color: #7c5cfc" class="w-5 h-5" />
+          <span class="text-sm text-zinc-300">GPU compositing</span>
+        </label>
+      </div>
+    </section>
 
-      <!-- Reading preferences -->
-      <section class="space-y-3">
-        <h2 class="text-lg font-semibold text-zinc-100">Reading</h2>
-        <div class="grid grid-cols-[1fr_auto] items-center gap-4">
-          <select x-model="direction" @change="persist()"
-                  class="px-4 py-2 bg-surface-alt border border-border rounded-card text-zinc-100 focus:outline-none focus:border-accent">
-            <option value="ltr">Left → Right (webtoon)</option>
-            <option value="rtl">Right → Left (manga)</option>
-          </select>
-        </div>
-        <div class="grid grid-cols-[1fr_auto] items-center gap-4">
-          <select x-model="viewMode" @change="persist()"
-                  class="px-4 py-2 bg-surface-alt border border-border rounded-card text-zinc-100 focus:outline-none focus:border-accent">
-            <option value="fitWidth">Fit Width</option>
-            <option value="fitHeight">Fit Height</option>
-            <option value="original">Original</option>
-          </select>
-        </div>
-        <div class="grid grid-cols-[1fr_auto] items-center gap-4">
-          <input type="number" x-model="readAhead" min="0" max="10" step="1"
-                 @change="setReadAhead(readAhead); persist()"
-                 class="w-24 px-4 py-2 bg-surface-alt border border-border rounded-card text-zinc-100 focus:outline-none focus:border-accent" />
-        </div>
-        <p class="text-xs text-zinc-500">Read-ahead chapters: how many upcoming chapters' pages are prefetched in the background.</p>
-      </section>
+    <!-- Reading preferences -->
+    <section class="space-y-3">
+      <h2 class="text-lg font-semibold text-zinc-100">Reading</h2>
+      <div class="grid grid-cols-[1fr_auto] items-center gap-4">
+        <select x-model="direction" @change="persist()"
+                class="px-4 py-2 bg-surface-alt border border-border rounded-card text-zinc-100 focus:outline-none focus:border-accent">
+          <option value="ltr">Left → Right (webtoon)</option>
+          <option value="rtl">Right → Left (manga)</option>
+        </select>
+      </div>
+      <div class="grid grid-cols-[1fr_auto] items-center gap-4">
+        <select x-model="viewMode" @change="persist()"
+                class="px-4 py-2 bg-surface-alt border border-border rounded-card text-zinc-100 focus:outline-none focus:border-accent">
+          <option value="fitWidth">Fit Width</option>
+          <option value="fitHeight">Fit Height</option>
+          <option value="original">Original</option>
+        </select>
+      </div>
+      <div class="grid grid-cols-[1fr_auto] items-center gap-4">
+        <input type="number" x-model="readAhead" min="0" max="10" step="1"
+               @change="setReadAhead(readAhead); persist()"
+               class="w-24 px-4 py-2 bg-surface-alt border border-border rounded-card text-zinc-100 focus:outline-none focus:border-accent" />
+      </div>
+      <p class="text-xs text-zinc-500">Read-ahead chapters: how many upcoming chapters' pages are prefetched in the background.</p>
+    </section>
 
-      <!-- App config -->
-      <section class="space-y-3">
-        <h2 class="text-lg font-semibold text-zinc-100">App Config</h2>
-        <p class="text-sm text-zinc-400">Config file: <code x-text="configPath" class="text-accent"></code></p>
-        <button @click="reloadConfig()" class="px-4 py-2 bg-surface-alt border border-border rounded-card text-zinc-100 hover:bg-white/10 transition-all text-sm">Reload Config</button>
-        <span x-show="configStatus" x-text="configStatus" class="text-sm text-accent ml-2"></span>
-      </section>
-    </div>
-  </section>
+    <!-- App config -->
+    <section class="space-y-3">
+      <h2 class="text-lg font-semibold text-zinc-100">App Config</h2>
+      <p class="text-sm text-zinc-400">Config file: <code x-text="configPath" class="text-accent"></code></p>
+      <button @click="reloadConfig()" class="px-4 py-2 bg-surface-alt border border-border rounded-card text-zinc-100 hover:bg-white/10 transition-all text-sm">Reload Config</button>
+      <span x-show="configStatus" x-text="configStatus" class="text-sm text-accent ml-2"></span>
+    </section>
+  </div>
+</section>
+
 
 </body>
 </html>

@@ -1,0 +1,106 @@
+<section x-show="$store.app.currentView === 'reader'" x-cloak x-data="readerView" class="fixed inset-0 z-[500] bg-black overflow-hidden"
+          x-effect="if ($store.app.currentView === 'reader') reloadFromHash()" @hashchange.window="reloadFromHash()">
+
+  <!-- Top bar -->
+  <div @mousemove="scheduleAutoHide()" @mouseover="clearTimeout(autoHideTimer); controlsVisible = true"
+       x-show="controlsVisible" x-transition.opacity.duration.300ms
+       class="absolute top-0 left-0 right-0 z-10 flex items-center justify-between gap-4 px-6 py-3 bg-black/60 backdrop-blur-sm">
+     <button @click="exit()" class="px-4 py-2 rounded-card border border-border text-zinc-100 hover:bg-white/10 transition-all text-sm">← Back</button>
+     <span class="flex-1 text-center text-zinc-100 font-medium truncate" x-text="title || 'Manga'"></span>
+     <div class="flex items-center gap-2 min-w-[140px] justify-end">
+        <button type="button" :class="viewMode === 'fitWidth' ? RBTN_ACTIVE : RBTN" @click="setViewMode('fitWidth')" title="Fit width">↔</button>
+        <button type="button" :class="viewMode === 'fitHeight' ? RBTN_ACTIVE : RBTN" @click="setViewMode('fitHeight')" title="Fit height">↕</button>
+        <button type="button" :class="viewMode === 'original' ? RBTN_ACTIVE : RBTN" @click="setViewMode('original')" title="Original size">1:1</button>
+        <button type="button" :class="RBTN" @click="_resetZoom()" title="Reset zoom (R)">↺</button>
+       <span class="w-px h-6 bg-white/20"></span>
+       <button type="button" :class="direction === 'rtl' ? RBTN_ACTIVE : RBTN" @click="toggleDirection()" x-text="direction === 'rtl' ? 'RTL' : 'LTR'" title="Reading direction"></button>
+       <button type="button" :class="RBTN" @click="showShortcuts = true" title="Shortcuts (?)">?</button>
+       <span class="text-xs font-medium text-zinc-100 min-w-[64px] text-right" x-text="'Page ' + pageInfo"></span>
+     </div>
+   </div>
+
+   <!-- Progress bar (top edge) -->
+   <div class="absolute top-0 left-0 right-0 z-20 h-1 overflow-hidden bg-black/40">
+     <div class="h-full reader-progress-fill transition-[width] duration-150" :style="'width:' + progressPct + '%'"></div>
+   </div>
+
+    <!-- Canvas wrap -->
+    <div @mousemove="scheduleAutoHide()" class="relative w-full h-full">
+      <!-- Loading spinner -->
+      <div x-show="loading" class="absolute inset-0 flex flex-col items-center justify-center gap-3 z-50">
+        <div class="w-10 h-10 border-2 border-white/20 border-t-accent rounded-full animate-spin"></div>
+        <span class="text-sm text-zinc-400">Loading page…</span>
+      </div>
+      <!-- Error panel -->
+      <div x-show="error && !loading" class="absolute inset-0 flex flex-col items-center justify-center gap-4 text-center z-40 bg-black/85 backdrop-blur-sm">
+        <span class="text-zinc-400 text-sm">Failed to load page <span x-text="currentPage + 1"></span></span>
+        <label class="flex items-center gap-2 text-sm text-zinc-300 cursor-pointer">
+          <input type="checkbox" x-model="deleteCacheOnRetry" class="accent-accent w-4 h-4">
+          Delete cached image first
+        </label>
+        <div class="flex gap-3">
+          <button @click="retryPage()" class="px-4 py-2 rounded-card bg-accent text-white text-sm hover:bg-accent/80 transition-all">↻ Retry</button>
+          <button @click="skipPage()" class="px-4 py-2 rounded-card border border-border text-zinc-300 text-sm hover:bg-white/10 transition-all">Skip →</button>
+        </div>
+      </div>
+      <!-- Canvas for rendering -->
+      <canvas id="reader-canvas" class="w-full h-full"></canvas>
+    </div>
+
+   <!-- Shortcuts legend (auto-dismiss on any key/click) -->
+   <div x-show="showShortcuts" class="absolute inset-0 z-30 flex items-center justify-center bg-black/80" @click="showShortcuts = false">
+     <div class="bg-surface border border-border rounded-card p-6 max-w-sm w-full shadow-card-hover" @click.stop>
+       <h2 class="text-xl font-bold text-zinc-100 mb-4">Keyboard Shortcuts</h2>
+       <ul class="space-y-2 text-sm text-zinc-300">
+         <li class="flex items-center justify-between"><span>Next page</span><span class="flex gap-1"><kbd class="px-2 py-0.5 rounded bg-surface-elevated border border-border text-xs">→</kbd><kbd class="px-2 py-0.5 rounded bg-surface-elevated border border-border text-xs">Space</kbd></span></li>
+         <li class="flex items-center justify-between"><span>Previous page</span><kbd class="px-2 py-0.5 rounded bg-surface-elevated border border-border text-xs">←</kbd></li>
+         <li class="flex items-center justify-between"><span>First page</span><kbd class="px-2 py-0.5 rounded bg-surface-elevated border border-border text-xs">Home</kbd></li>
+         <li class="flex items-center justify-between"><span>Last page</span><kbd class="px-2 py-0.5 rounded bg-surface-elevated border border-border text-xs">End</kbd></li>
+         <li class="flex items-center justify-between"><span>Fullscreen</span><kbd class="px-2 py-0.5 rounded bg-surface-elevated border border-border text-xs">F</kbd></li>
+         <li class="flex items-center justify-between"><span>Shortcuts</span><kbd class="px-2 py-0.5 rounded bg-surface-elevated border border-border text-xs">?</kbd></li>
+          <li class="flex items-center justify-between"><span>Exit</span><kbd class="px-2 py-0.5 rounded bg-surface-elevated border border-border text-xs">Esc</kbd></li>
+          <li class="flex items-center justify-between"><span>Reset zoom</span><kbd class="px-2 py-0.5 rounded bg-surface-elevated border border-border text-xs">R</kbd></li>
+       </ul>
+       <p class="mt-4 text-center text-xs text-zinc-500">Press any key or click to close</p>
+     </div>
+   </div>
+
+  <!-- Click zones with drag disambiguation -->
+  <div @mousedown="_isDragging = false; _dragMoved = false; $event.stopPropagation()" @click="handleZoneClick('left', $event)" class="absolute top-0 bottom-12 left-0 w-[35%] z-10 cursor-pointer"></div>
+  <div @mousedown="_isDragging = false; _dragMoved = false; $event.stopPropagation()" @click="handleZoneClick('right', $event)" class="absolute top-0 bottom-12 right-0 w-[35%] z-10 cursor-pointer"></div>
+
+  <!-- Bottom bar -->
+  <div @mousemove="scheduleAutoHide()" @mouseover="clearTimeout(autoHideTimer); controlsVisible = true"
+       x-show="controlsVisible" x-transition.opacity.duration.300ms
+       class="absolute bottom-0 left-0 right-0 z-10 flex items-center justify-center gap-4 px-6 py-3 bg-black/60 backdrop-blur-sm">
+    <input type="range" :min="0" :max="sliderMax" :value="currentPage"
+           @input="goToPage(parseInt($event.target.value))"
+           class="flex-1 max-w-[520px] accent-slider">
+  </div>
+
+  <!-- Loading overlay -->
+  <div x-show="loading" class="absolute inset-0 z-20 flex items-center justify-center bg-black">
+    <div class="w-10 h-10 border-[3px] border-zinc-700 border-t-accent rounded-full animate-spin-slow"></div>
+  </div>
+
+  <!-- Error overlay -->
+  <div x-show="error" class="absolute inset-0 z-20 flex flex-col items-center justify-center gap-4 bg-black/85 text-error">
+    <span class="text-5xl">⚠️</span>
+    <p>Failed to load page</p>
+    <button @click="error = false; goToPage(currentPage, true)"
+            class="px-5 py-2 rounded-card border border-border text-zinc-100 hover:bg-white/10 transition-all">Retry</button>
+  </div>
+
+  <!-- Chapter complete overlay -->
+  <div x-show="complete" x-transition class="absolute inset-0 z-20 flex items-center justify-center bg-black/85">
+    <div class="flex flex-col items-center gap-6">
+      <h2 class="text-2xl font-bold text-zinc-100">Chapter Complete</h2>
+      <div class="flex gap-2">
+         <button x-show="nextChapterID" @click="goNextChapter()"
+                class="px-5 py-2 rounded-card bg-accent text-white font-medium hover:bg-accent-hover hover:shadow-glow transition-all">Next Chapter</button>
+        <a :href="backToManga()"
+           class="px-5 py-2 rounded-card border border-border text-zinc-100 hover:bg-white/10 transition-all no-underline">Back to Manga</a>
+      </div>
+    </div>
+  </div>
+</section>

@@ -1,0 +1,78 @@
+<section x-show="$store.app.currentView === 'detail'" x-cloak x-data="detailView" class="fade-in min-h-[calc(100vh-57px)]"
+          x-effect="const h = window.location.hash; if ($store.app.currentView === 'detail') { if (!h.startsWith('#/manga/')) { console.error('[detail] skipping load, bad hash:', h); } else { const s = h.replace('#/manga/','').split('/'); const pid = s[0] ? decodeURIComponent(s[0]) : ''; const mid = s.length >= 2 && s[1] ? decodeURIComponent(s[1]) : ''; if (!pid || !mid) { console.error('[detail] skipping load, bad hash:', h); } else if (pid !== pluginID || mid !== mangaID) { load(pid, mid); } } }">
+
+  <!-- Loading -->
+  <div x-show="loading" class="flex flex-col items-center justify-center gap-4 py-16 text-zinc-400">
+    <div class="w-10 h-10 border-[3px] border-border border-t-accent rounded-full animate-spin-slow"></div>
+    <p>Loading manga details…</p>
+  </div>
+
+  <!-- Error -->
+  <div x-show="error" class="flex flex-col items-center justify-center gap-3 py-16 text-error">
+    <span class="text-4xl">⚠️</span>
+    <p x-text="error"></p>
+    <button @click="load(pluginID, mangaID)" class="px-5 py-2 rounded-card border border-border text-zinc-100 hover:bg-surface-alt transition-all">Retry</button>
+  </div>
+
+  <!-- Detail content -->
+  <div x-show="!loading && manga" class="px-6 py-8">
+    <div class="flex gap-8 flex-col sm:flex-row">
+      <!-- Cover -->
+      <div class="flex-shrink-0 w-60">
+        <img :src="coverUrl" :alt="manga?.title || 'cover'"
+             class="w-full aspect-[2/3] object-cover rounded-card border border-border">
+      </div>
+      <!-- Meta -->
+      <div class="flex-1 flex flex-col gap-4">
+        <h1 class="text-3xl font-bold text-zinc-100" x-text="manga?.title || 'Untitled'"></h1>
+        <div class="flex flex-wrap gap-2">
+          <span x-show="manga?.status" x-text="manga?.status"
+                class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-accent-subtle text-accent"></span>
+          <span x-show="manga?.author" x-text="'By ' + (manga?.author || 'Unknown')"
+                class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-accent-subtle text-accent"></span>
+        </div>
+        <p class="text-zinc-400 leading-relaxed max-w-[70ch]" x-text="manga?.description || 'No description available.'"></p>
+        <div class="flex gap-2">
+          <button @click="toggleLibrary()"
+                  :class="inLibrary
+                    ? 'bg-transparent border border-border text-zinc-100 hover:bg-surface-alt'
+                    : 'bg-accent text-white hover:bg-accent-hover hover:shadow-glow'"
+                  class="px-5 py-2 rounded-card font-medium transition-all">
+            <span x-text="inLibrary ? 'In Library ✓' : 'Add to Library'"></span>
+           </button>
+         </div>
+
+         <!-- Continue Reading -->
+         <div x-show="startTarget" class="mt-4">
+           <button @click="startReading()"
+                   class="w-full px-5 py-3 rounded-card bg-accent text-white font-bold text-lg hover:bg-accent-hover hover:shadow-glow transition-all">
+             <span x-text="startTarget ? startTarget.label + (startTarget.num ? ' Ch. ' + formatChapterNum(startTarget.num) : '') : ''"></span>
+           </button>
+         </div>
+
+         <!-- Chapters -->
+        <div class="mt-4" x-show="chapters.length > 0">
+          <h2 class="text-xl font-semibold text-zinc-100 mb-2">Chapters</h2>
+          <div class="flex flex-col gap-1">
+            <template x-for="ch in chapters" :key="ch.id">
+              <a :href="chapterUrl(ch)"
+                 class="flex items-center gap-4 px-4 py-3 rounded-card border border-border bg-surface transition-all hover:bg-surface-alt hover:border-accent no-underline text-inherit">
+                <span class="flex-shrink-0 min-w-16 font-semibold text-accent text-lg" x-text="'Ch. ' + formatChapterNum(ch.chapter_num)"></span>
+                <span class="flex-1 text-zinc-100" x-text="ch.title || 'Chapter ' + formatChapterNum(ch.chapter_num)"></span>
+                <span class="flex-shrink-0 text-sm text-zinc-400" x-text="formatDate(ch.released_at)"></span>
+                <span class="flex-shrink-0 w-[90px] text-xs text-success text-right">
+                  <template x-if="readProgress(ch)?.lastPage >= readProgress(ch)?.pageCount">
+                    <span>✓ Read</span>
+                  </template>
+                  <template x-if="readProgress(ch) && readProgress(ch).lastPage < readProgress(ch).pageCount">
+                    <span x-text="Math.min(100, Math.round((readProgress(ch).lastPage / Math.max(1, readProgress(ch).pageCount)) * 100)) + '%'"></span>
+                  </template>
+                </span>
+              </a>
+            </template>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>

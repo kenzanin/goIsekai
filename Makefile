@@ -6,15 +6,15 @@ BINARY := goisekai
 TAGS   := gtk3,production
 PKGS   := ./internal/... ./pkg/... ./cmd/...
 
-.PHONY: build dev devrun run check fmt fmt-web test race modernize lint lint-web test-reader test-frontend
+.PHONY: build dev devrun run check gen-frontend fmt fmt-web test race modernize lint lint-web test-reader test-frontend
 
 ## build: compile the desktop binary (requires webkit2gtk-4.1 on Linux via the gtk3 tag).
 ## Wails v3 needs CGO for webkit2gtk-4.1 (no separate webkit2_41 tag).
-build:
+build: gen-frontend
 	CGO_ENABLED=1 go build -tags $(TAGS) -o $(BINARY) ./cmd/goisekai
 
 ## dev: build with devtools enabled (Ctrl+Shift+F12 to open inspector).
-dev:
+dev: gen-frontend
 	CGO_ENABLED=1 go build -tags gtk3 -o $(BINARY) ./cmd/goisekai
 
 ## devrun: build with devtools and launch.
@@ -25,11 +25,16 @@ devrun: dev
 run: build
 	./$(BINARY) -logLevel debug $(ARGS)
 
-## check: full quality gate — format, race tests, modernize, lint (Go + web).
-check: fmt fmt-web race modernize lint lint-web
+## check: full quality gate — regenerate frontend, format, race tests, modernize, lint (Go + web).
+check: gen-frontend fmt fmt-web race modernize lint lint-web
 
 fmt:
 	go fmt $(PKGS)
+
+## gen-frontend: assemble cmd/goisekai/frontend/index.html from shell.html + views/ partials.
+## Runs before build so go:embed always picks up partial edits.
+gen-frontend:
+	go run ./cmd/frontendgen
 
 ## fmt-web: format + auto-fix the frontend (Biome).
 fmt-web:

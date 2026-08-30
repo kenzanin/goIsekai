@@ -1,0 +1,66 @@
+<section x-show="$store.app.currentView === 'plugins'" x-cloak x-data="pluginsView" class="fade-in min-h-[calc(100vh-57px)]">
+  <div class="flex items-center justify-between px-6 py-6 pb-4">
+    <h1 class="text-3xl font-bold text-zinc-100">Plugins</h1>
+    <button @click="installPlugin()"
+            class="inline-flex items-center gap-2 px-5 py-2 rounded-card bg-accent text-white font-medium hover:bg-accent-hover hover:shadow-glow transition-all">
+      Install Plugin
+    </button>
+  </div>
+
+  <!-- Loading -->
+  <div x-show="loading" class="flex flex-col items-center justify-center gap-4 py-16 text-zinc-400">
+    <div class="w-10 h-10 border-[3px] border-border border-t-accent rounded-full animate-spin-slow"></div>
+    <p>Loading plugins…</p>
+  </div>
+
+  <!-- Error -->
+  <div x-show="error" class="flex flex-col items-center justify-center gap-3 py-16 text-error">
+    <span class="text-4xl">⚠️</span>
+    <p x-text="error"></p>
+    <button @click="load()" class="px-5 py-2 rounded-card border border-border text-zinc-100 hover:bg-surface-alt transition-all">Retry</button>
+  </div>
+
+  <!-- Empty state -->
+  <div x-show="!loading && !error && plugins.length === 0" class="flex flex-col items-center justify-center gap-4 py-16">
+    <span class="text-6xl">🧩</span>
+    <h2 class="text-xl font-semibold text-zinc-100">No plugins installed</h2>
+    <p class="text-zinc-400 max-w-sm text-center">Install a .wasm plugin to start reading.</p>
+  </div>
+
+  <!-- Plugin list -->
+  <div x-show="!loading && plugins.length > 0" class="flex flex-col gap-4 px-6">
+    <template x-for="plugin in plugins" :key="plugin.ID">
+      <div class="flex items-center gap-4 p-4 bg-surface border border-border rounded-card transition-all hover:-translate-y-0.5 hover:shadow-card-hover">
+        <!-- Icon -->
+        <div class="flex-shrink-0 w-14 h-14 rounded-card bg-surface-elevated overflow-hidden flex items-center justify-center">
+          <template x-if="plugin.IconURL">
+            <img :src="plugin.IconURL" :alt="(plugin.Name || 'plugin') + ' icon'"
+                 class="w-full h-full object-cover"
+                 @error="$el.style.display='none'; $el.parentElement.innerHTML='<span class=\'flex items-center justify-center w-full h-full text-2xl font-bold text-accent\'>' + fallbackInitial(plugin.Name) + '</span>'">
+          </template>
+          <template x-if="!plugin.IconURL">
+            <span class="text-2xl font-bold text-accent" x-text="fallbackInitial(plugin.Name)"></span>
+          </template>
+        </div>
+        <!-- Info -->
+        <div class="flex-1">
+          <h3 class="text-lg font-semibold text-zinc-100" x-text="plugin.Name || plugin.ID"></h3>
+          <span class="block text-xs text-muted font-mono" x-text="plugin.ID"></span>
+          <span class="block text-sm text-zinc-400" x-text="plugin.Version || 'v0.0.0'"></span>
+        </div>
+        <!-- Status + toggle -->
+        <div class="flex items-center gap-3">
+          <span :class="plugin.IsActive ? 'bg-success/15 text-success' : 'bg-accent-subtle text-accent'"
+                class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium"
+                x-text="plugin.IsActive ? 'Active' : 'Inactive'"></span>
+          <button @click="togglePlugin(plugin.ID)"
+                  class="px-4 py-2 rounded-card bg-surface-alt text-zinc-100 font-medium text-sm hover:bg-surface-elevated transition-all"
+                  x-text="plugin.IsActive ? 'Disable' : 'Enable'"></button>
+        </div>
+      </div>
+    </template>
+  </div>
+
+  <!-- Hidden file input for plugin install -->
+  <input type="file" id="plugin-file-input" accept=".wasm" class="hidden" @change="onFileSelected($event)" />
+</section>
