@@ -266,7 +266,6 @@ export const readerView = () => ({
       console.error('[reader] skipping load, bad read hash:', h);
       return;
     }
-    const params = new URLSearchParams(h.split('?')[1] || '');
     const page = parseInt(params.get('page') || '0', 10) || 0;
     // Skip redundant reloads (e.g. a mount that already loaded this URL).
     if (pid === this.pluginID && mid === this.mangaID && cid === this.chapterID && page === this.currentPage) return;
