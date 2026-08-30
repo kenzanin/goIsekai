@@ -27,3 +27,25 @@ export function parseReadHash(h) {
 export function shouldReload(newKey, lastReadHash) {
   return Boolean(newKey) && newKey !== lastReadHash;
 }
+
+// Reading-order next chapter. `list` is the ordered chapter array (each item
+// has an `id`), `currentID` is the chapter being read, `direction` is 'ltr' or
+// 'rtl'. Returns the neighbouring chapter id in reading direction, or null when
+// the current chapter is not in the list or there is no neighbour that way.
+// LTR → next (index+1); RTL → previous (index-1). This is the logic that drives
+// the "Next Chapter" button, extracted so it can be unit-tested without Alpine.
+export function nextChapterInList(list, currentID, direction) {
+  if (!Array.isArray(list)) return null;
+  const idx = list.findIndex((c) => c && c.id === currentID);
+  if (idx === -1) return null;
+  const target = list[direction === 'rtl' ? idx - 1 : idx + 1];
+  return target ? target.id : null;
+}
+
+// Build a `#/read/<pid>/<mid>/<cid>?page=N` hash (the inverse of parseReadHash).
+// `page` is omitted when 0/absent. Used by goNextChapter to navigate.
+export function buildReadHash(pid, mid, cid, page) {
+  let h = '#/read/' + encodeURIComponent(pid) + '/' + encodeURIComponent(mid) + '/' + encodeURIComponent(cid);
+  if (page && page > 0) h += '?page=' + page;
+  return h;
+}

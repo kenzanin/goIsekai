@@ -7,8 +7,8 @@ import { settings, saveSetting } from "./state.js";
 // Pure reader-hash helpers live in their own zero-browser-dependency module so
 // they can be unit-tested with plain node (see readhash.test.js). Imported here
 // and re-exported so reader logic uses the single source of truth.
-import { parseReadHash, shouldReload } from "./readhash.js";
-export { parseReadHash, shouldReload };
+import { parseReadHash, shouldReload, nextChapterInList, buildReadHash } from "./readhash.js";
+export { parseReadHash, shouldReload, nextChapterInList, buildReadHash };
 
 // `readerView` is the Alpine.data('readerView', readerView) factory.
 export const readerView = () => ({
@@ -235,14 +235,12 @@ export const readerView = () => ({
   // number (index+1); RTL → lower (index-1).
   get nextChapterID() {
     const list = this.orderedChapters;
-    const idx = list.findIndex(c => c.id === this.chapterID);
-    if (idx === -1) {
+    const id = nextChapterInList(list, this.chapterID, this.direction);
+    if (id === null) {
       console.warn('[reader] nextChapterID: current chapter "' + this.chapterID + '" not found in reading-order list (len ' + list.length + ')');
       return null;
     }
-    const target = list[this.direction === 'rtl' ? idx - 1 : idx + 1];
-    const id = target ? target.id : null;
-    console.log('[reader] nextChapterID: idx ' + idx + ' (' + this.direction + ') -> "' + id + '"');
+    console.log('[reader] nextChapterID: idx ' + list.findIndex(c => c.id === this.chapterID) + ' (' + this.direction + ') -> "' + id + '"');
     return id;
   },
 
@@ -255,9 +253,7 @@ export const readerView = () => ({
       console.warn('[reader] next-chapter: no next chapter to navigate to');
       return;
     }
-    this.$store.app.navigate(
-      '#/read/' + encodeURIComponent(this.pluginID) + '/' + encodeURIComponent(this.mangaID) + '/' + encodeURIComponent(next)
-    );
+    this.$store.app.navigate(buildReadHash(this.pluginID, this.mangaID, next));
   },
 
   // Re-load the reader from the current URL. Covers reader->reader hash
