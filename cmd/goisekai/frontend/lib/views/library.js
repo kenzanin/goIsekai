@@ -1,5 +1,4 @@
-import { bindings } from "../bindings.js";
-import { loadImage } from "../utils.js";
+import { bindings } from '../bindings.js';
 
 // ── Library component ─────────────────────────────────────────────
 export const libraryView = () => ({
@@ -19,7 +18,7 @@ export const libraryView = () => ({
     this.error = null;
     try {
       await this.$store.app.loadLibrary();
-    } catch (err) {
+    } catch (_err) {
       this.error = 'Failed to load library';
     } finally {
       this.loading = false;

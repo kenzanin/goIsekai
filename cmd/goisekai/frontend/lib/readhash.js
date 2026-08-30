@@ -45,7 +45,13 @@ export function nextChapterInList(list, currentID, direction) {
 // Build a `#/read/<pid>/<mid>/<cid>?page=N` hash (the inverse of parseReadHash).
 // `page` is omitted when 0/absent. Used by goNextChapter to navigate.
 export function buildReadHash(pid, mid, cid, page) {
-  let h = '#/read/' + encodeURIComponent(pid) + '/' + encodeURIComponent(mid) + '/' + encodeURIComponent(cid);
-  if (page && page > 0) h += '?page=' + page;
+  let h =
+    '#/read/' +
+    encodeURIComponent(pid) +
+    '/' +
+    encodeURIComponent(mid) +
+    '/' +
+    encodeURIComponent(cid);
+  if (page && page > 0) h += `?page=${page}`;
   return h;
 }

@@ -21,10 +21,12 @@ export function toBytes(v) {
 // Sniff an image's MIME type from its magic bytes (defaults to jpeg).
 export function detectImageType(bytes) {
   if (!bytes || bytes.length < 4) return 'image/jpeg';
-  if (bytes[0] === 0xFF && bytes[1] === 0xD8) return 'image/jpeg';
-  if (bytes[0] === 0x89 && bytes[1] === 0x50 && bytes[2] === 0x4e && bytes[3] === 0x47) return 'image/png';
+  if (bytes[0] === 0xff && bytes[1] === 0xd8) return 'image/jpeg';
+  if (bytes[0] === 0x89 && bytes[1] === 0x50 && bytes[2] === 0x4e && bytes[3] === 0x47)
+    return 'image/png';
   if (bytes[0] === 0x47 && bytes[1] === 0x49 && bytes[2] === 0x46) return 'image/gif';
-  if (bytes[0] === 0x52 && bytes[1] === 0x49 && bytes[2] === 0x46 && bytes[3] === 0x46) return 'image/webp';
+  if (bytes[0] === 0x52 && bytes[1] === 0x49 && bytes[2] === 0x46 && bytes[3] === 0x46)
+    return 'image/webp';
   return 'image/jpeg';
 }
 
@@ -36,18 +38,30 @@ export function escapeHtml(s) {
 
 // Up to 2 initials from a title's first two words, or '?'.
 export function getInitials(title) {
-  const parts = String(title || '').trim().split(/\s+/).slice(0, 2);
-  return parts.map((p) => p.charAt(0)).join('').toUpperCase() || '?';
+  const parts = String(title || '')
+    .trim()
+    .split(/\s+/)
+    .slice(0, 2);
+  return (
+    parts
+      .map((p) => p.charAt(0))
+      .join('')
+      .toUpperCase() || '?'
+  );
 }
 
 export function fallbackInitial(name) {
-  return String(name || '?').charAt(0).toUpperCase() || '?';
+  return (
+    String(name || '?')
+      .charAt(0)
+      .toUpperCase() || '?'
+  );
 }
 
 // Resolve a plugin name from the PascalCase plugin list (p.ID / p.Name).
 export function lookupPluginName(plugins, pluginID) {
   const found = plugins.find((p) => p.ID === pluginID);
-  return found ? (found.Name || found.ID) : '';
+  return found ? found.Name || found.ID : '';
 }
 
 // Format a chapter number: integers as-is, floats with trailing zeros stripped,
@@ -62,6 +76,6 @@ export function formatChapterNum(num) {
 export function formatDate(dateStr) {
   if (!dateStr) return '';
   const date = new Date(dateStr);
-  if (isNaN(date.getTime())) return '';
+  if (Number.isNaN(date.getTime())) return '';
   return date.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
 }

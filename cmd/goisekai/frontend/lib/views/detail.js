@@ -1,6 +1,5 @@
-import { bindings } from "../bindings.js";
-import { loadImage } from "../utils.js";
-import { readerView } from "../reader.js";
+import { bindings } from '../bindings.js';
+import { loadImage } from '../utils.js';
 
 // ── Manga detail component ────────────────────────────────────────
 export const detailView = () => ({
@@ -18,7 +17,7 @@ export const detailView = () => ({
     // x-effect re-runs on every reactive change and load() itself mutates
     // reactive state). Without this the re-fire blanks manga/coverUrl mid-load.
     if (this.loading && pid === this.pluginID && mid === this.mangaID) return;
-    console.log('[detail] load:', 'pid=' + pid + ' mid=' + mid + ' hash=' + (window.location.hash || ''));
+    console.log('[detail] load:', `pid=${pid} mid=${mid} hash=${window.location.hash || ''}`);
     this.pluginID = pid;
     this.mangaID = mid;
     this.loading = true;
@@ -41,14 +40,14 @@ export const detailView = () => ({
 
       // Expose chapters (ascending by number) to the reader for next-chapter nav.
       const asc = this.chapters.slice().sort((a, b) => (a.chapter_num || 0) - (b.chapter_num || 0));
-      this.$store.app.chaptersByManga[pid + '|' + mid] = asc;
+      this.$store.app.chaptersByManga[`${pid}|${mid}`] = asc;
 
       // Check library membership
       if (!this.$store.app.libraryList) await this.$store.app.loadLibrary();
       this.inLibrary = (this.$store.app.libraryList || []).some(
-        (m) => m.PluginID === pid && m.SourceMangaID === mid
+        (m) => m.PluginID === pid && m.SourceMangaID === mid,
       );
-    } catch (err) {
+    } catch (_err) {
       this.error = 'Failed to load manga details';
     } finally {
       this.loading = false;
@@ -83,10 +82,14 @@ export const detailView = () => ({
   get startTarget() {
     const list = this.chaptersAscending;
     if (!list.length) return null;
-    let best = null, bestPage = -1;
+    let best = null,
+      bestPage = -1;
     for (const ch of list) {
       const p = this.readProgress(ch);
-      if (p && p.lastPage > bestPage) { bestPage = p.lastPage; best = ch; }
+      if (p && p.lastPage > bestPage) {
+        bestPage = p.lastPage;
+        best = ch;
+      }
     }
     if (!best) {
       return { chapter: list[0], page: 0, label: 'Start Reading' };
@@ -95,7 +98,8 @@ export const detailView = () => ({
     if (p.lastPage >= p.pageCount) {
       const idx = list.indexOf(best);
       const nextCh = list[idx + 1];
-      if (nextCh) return { chapter: nextCh, page: 0, label: 'Continue Reading', num: nextCh.chapter_num };
+      if (nextCh)
+        return { chapter: nextCh, page: 0, label: 'Continue Reading', num: nextCh.chapter_num };
       return null; // fully caught up
     }
     return { chapter: best, page: p.lastPage, label: 'Continue Reading', num: best.chapter_num };
@@ -105,10 +109,10 @@ export const detailView = () => ({
     const t = this.startTarget;
     // Never build a read URL with an empty plugin/manga id (would produce a
     // broken #/read// or #/read/pid//cid that resets the reader to empty IDs).
-    if (!t || !t.chapter || !this.pluginID || !this.mangaID) return;
+    if (!t?.chapter || !this.pluginID || !this.mangaID) return;
     this.$store.app.navigate(
       `#/read/${encodeURIComponent(this.pluginID)}/${encodeURIComponent(this.mangaID)}` +
-      `/${encodeURIComponent(t.chapter.id)}?page=${t.page}`
+        `/${encodeURIComponent(t.chapter.id)}?page=${t.page}`,
     );
   },
 });

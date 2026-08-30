@@ -1,4 +1,4 @@
-import { bindings } from "../bindings.js";
+import { bindings } from '../bindings.js';
 
 // ── Search component ──────────────────────────────────────────────
 export const searchView = () => ({
@@ -24,9 +24,12 @@ export const searchView = () => ({
     this.error = null;
     this.searched = true;
     try {
-      const items = await bindings.search(this.pluginID, { query: this.query.trim(), page: this.page });
+      const items = await bindings.search(this.pluginID, {
+        query: this.query.trim(),
+        page: this.page,
+      });
       this.results = items || [];
-    } catch (err) {
+    } catch (_err) {
       this.error = 'Search failed';
       this.results = [];
     } finally {
@@ -34,9 +37,21 @@ export const searchView = () => ({
     }
   },
 
-  nextPage() { this.page++; this.search(); },
-  prevPage() { if (this.page > 1) { this.page--; this.search(); } },
+  nextPage() {
+    this.page++;
+    this.search();
+  },
+  prevPage() {
+    if (this.page > 1) {
+      this.page--;
+      this.search();
+    }
+  },
 
-  get hasResults() { return this.results.length > 0; },
-  get showEmpty() { return this.searched && !this.loading && !this.error && this.results.length === 0; },
+  get hasResults() {
+    return this.results.length > 0;
+  },
+  get showEmpty() {
+    return this.searched && !this.loading && !this.error && this.results.length === 0;
+  },
 });

@@ -6,7 +6,7 @@ BINARY := goisekai
 TAGS   := gtk3,production
 PKGS   := ./internal/... ./pkg/... ./cmd/...
 
-.PHONY: build dev devrun run check fmt test race modernize lint test-reader test-frontend
+.PHONY: build dev devrun run check fmt fmt-web test race modernize lint lint-web test-reader test-frontend
 
 ## build: compile the desktop binary (requires webkit2gtk-4.1 on Linux via the gtk3 tag).
 ## Wails v3 needs CGO for webkit2gtk-4.1 (no separate webkit2_41 tag).
@@ -25,11 +25,19 @@ devrun: dev
 run: build
 	./$(BINARY) -logLevel debug $(ARGS)
 
-## check: full quality gate — format, race tests, modernize, lint.
-check: fmt race modernize lint
+## check: full quality gate — format, race tests, modernize, lint (Go + web).
+check: fmt fmt-web race modernize lint lint-web
 
 fmt:
 	go fmt $(PKGS)
+
+## fmt-web: format + auto-fix the frontend (Biome).
+fmt-web:
+	biome check --write cmd/goisekai/frontend
+
+## lint-web: lint + format-check the frontend (Biome), read-only.
+lint-web:
+	biome check cmd/goisekai/frontend
 
 test:
 	CGO_ENABLED=1 go test -tags $(TAGS) $(PKGS)

@@ -3,39 +3,58 @@
 // button classes. Pure format/convert helpers live in format.js (re-exported
 // here so existing imports + the window.* bindings keep working).
 
-import { bindings, call } from "./bindings.js";
+import { bindings, call } from './bindings.js';
 import {
-  toBytes,
-  detectImageType,
   clamp,
+  detectImageType,
   escapeHtml,
-  getInitials,
   fallbackInitial,
-  lookupPluginName,
   formatChapterNum,
   formatDate,
-} from "./format.js";
+  getInitials,
+  lookupPluginName,
+  toBytes,
+} from './format.js';
 
 /* ------------------------------------------------------------------ *
  * 1. Error handling — forward console errors/warns to the Go logger
  *    so they surface in the terminal.
  * ------------------------------------------------------------------ */
-const _origError = console.error, _origWarn = console.warn, _origLog = console.log;
+const _origError = console.error,
+  _origWarn = console.warn,
+  _origLog = console.log;
 function _fwd(level, args) {
-  try { bindings.log(level, args.map(a => typeof a === 'string' ? a : JSON.stringify(a)).join(' ')); } catch (_) {}
+  try {
+    bindings.log(level, args.map((a) => (typeof a === 'string' ? a : JSON.stringify(a))).join(' '));
+  } catch (_) {}
 }
-console.error = (...a) => { _origError(...a); _fwd('error', a); };
-console.warn  = (...a) => { _origWarn(...a);  _fwd('warn',  a); };
-console.log   = (...a) => { _origLog(...a);   _fwd('debug', a); };
-window.addEventListener('error', e => _fwd('error', [e.message + ' at ' + e.filename + ':' + e.lineno]));
-window.addEventListener('unhandledrejection', e => _fwd('error', ['Unhandled: ' + (e.reason?.message || e.reason)]));
+console.error = (...a) => {
+  _origError(...a);
+  _fwd('error', a);
+};
+console.warn = (...a) => {
+  _origWarn(...a);
+  _fwd('warn', a);
+};
+console.log = (...a) => {
+  _origLog(...a);
+  _fwd('debug', a);
+};
+window.addEventListener('error', (e) =>
+  _fwd('error', [`${e.message} at ${e.filename}:${e.lineno}`]),
+);
+window.addEventListener('unhandledrejection', (e) =>
+  _fwd('error', [`Unhandled: ${e.reason?.message || e.reason}`]),
+);
 
 /* ------------------------------------------------------------------ *
  * 2. Reader toolbar button classes (module-scoped, not exposed to the
  *    Alpine template scope — matches pre-split behavior).
  * ------------------------------------------------------------------ */
-export const RBTN = 'px-3 py-1.5 rounded-card border border-border text-zinc-100 bg-black/30 hover:bg-white/10 transition-all text-sm font-medium';
-export const RBTN_ACTIVE = 'px-3 py-1.5 rounded-card border border-accent text-accent bg-black/40 transition-all text-sm font-medium';
+export const RBTN =
+  'px-3 py-1.5 rounded-card border border-border text-zinc-100 bg-black/30 hover:bg-white/10 transition-all text-sm font-medium';
+export const RBTN_ACTIVE =
+  'px-3 py-1.5 rounded-card border border-accent text-accent bg-black/40 transition-all text-sm font-medium';
 
 /* ------------------------------------------------------------------ *
  * 3. Image loading — GetImage bytes → Blob URL (cache per-URL).
@@ -64,7 +83,11 @@ async function loadImage(pluginID, url, headers, mangaID, chapterID) {
     while (blobUrls.length > MAX_BLOBS) URL.revokeObjectURL(blobUrls.shift());
     return blobUrl;
   } catch (err) {
-    console.error('Failed to load image:', url, err?.message || err?.toString() || JSON.stringify(err));
+    console.error(
+      'Failed to load image:',
+      url,
+      err?.message || err?.toString() || JSON.stringify(err),
+    );
     return null;
   }
 }
@@ -80,15 +103,15 @@ window.RBTN_ACTIVE = RBTN_ACTIVE;
 
 export {
   blobCache,
-  revokeAllBlobUrls,
-  loadImage,
-  toBytes,
-  detectImageType,
   clamp,
+  detectImageType,
   escapeHtml,
-  getInitials,
   fallbackInitial,
-  lookupPluginName,
   formatChapterNum,
   formatDate,
+  getInitials,
+  loadImage,
+  lookupPluginName,
+  revokeAllBlobUrls,
+  toBytes,
 };

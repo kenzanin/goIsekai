@@ -1,14 +1,15 @@
 // goIsekai frontend — reader component logic: prefetch, keyboard handling,
 // progress tracking, and page navigation.
 
-import { bindings } from "./bindings.js";
-import { loadImage, clamp } from "./utils.js";
-import { settings, saveSetting } from "./state.js";
+import { bindings } from './bindings.js';
 // Pure reader-hash helpers live in their own zero-browser-dependency module so
 // they can be unit-tested with plain node (see readhash.test.js). Imported here
 // and re-exported so reader logic uses the single source of truth.
-import { parseReadHash, shouldReload, nextChapterInList, buildReadHash } from "./readhash.js";
-export { parseReadHash, shouldReload, nextChapterInList, buildReadHash };
+import { buildReadHash, nextChapterInList, parseReadHash, shouldReload } from './readhash.js';
+import { saveSetting, settings } from './state.js';
+import { clamp, loadImage } from './utils.js';
+
+export { buildReadHash, nextChapterInList, parseReadHash, shouldReload };
 
 // `readerView` is the Alpine.data('readerView', readerView) factory.
 export const readerView = () => ({
@@ -33,7 +34,7 @@ export const readerView = () => ({
   showShortcuts: false,
   deleteCacheOnRetry: false,
   lastReadHash: '',
-  
+
   // Canvas rendering state
   _canvas: null,
   _ctx: null,
@@ -57,7 +58,10 @@ export const readerView = () => ({
     // Auto-dismiss the shortcuts legend on any key or click (see index.html).
     this.$watch('showShortcuts', (open) => {
       if (!open) return;
-      const close = () => { this.showShortcuts = false; document.removeEventListener('keydown', close); };
+      const close = () => {
+        this.showShortcuts = false;
+        document.removeEventListener('keydown', close);
+      };
       document.addEventListener('keydown', close);
     });
     // Handle a direct page-load at a read URL (no hashchange fires on refresh).
@@ -70,19 +74,19 @@ export const readerView = () => ({
         this.reloadFromHash();
       }
     }, 0);
-    
+
     // Initialize canvas after Alpine has rendered the DOM
     this.$nextTick(() => {
       this._initCanvas();
     });
-    
+
     // Handle window resize
     window.addEventListener('resize', () => {
       this._updateCanvasSize();
       this._render();
     });
   },
-  
+
   _initCanvas() {
     this._canvas = document.getElementById('reader-canvas');
     if (!this._canvas) {
@@ -94,30 +98,34 @@ export const readerView = () => ({
     this._setupGlobalMouseEvents();
     this._updateCanvasSize();
   },
-  
+
   _setupCanvasEvents() {
     if (!this._canvas) return;
-    
+
     // Mouse wheel zoom
-    this._canvas.addEventListener('wheel', (e) => {
-      e.preventDefault();
-      const rect = this._canvas.getBoundingClientRect();
-      const mouseX = e.clientX - rect.left;
-      const mouseY = e.clientY - rect.top;
-      
-      // Calculate zoom factor
-      const zoomFactor = e.deltaY > 0 ? 0.9 : 1.1;
-      const newZoom = Math.max(0.2, Math.min(5, this._zoom * zoomFactor));
-      
-      // Adjust pan to keep point under cursor
-      const scaleChange = newZoom / this._zoom;
-      this._panX = mouseX - (mouseX - this._panX) * scaleChange;
-      this._panY = mouseY - (mouseY - this._panY) * scaleChange;
-      this._zoom = newZoom;
-      
-      this._render();
-    }, { passive: false });
-    
+    this._canvas.addEventListener(
+      'wheel',
+      (e) => {
+        e.preventDefault();
+        const rect = this._canvas.getBoundingClientRect();
+        const mouseX = e.clientX - rect.left;
+        const mouseY = e.clientY - rect.top;
+
+        // Calculate zoom factor
+        const zoomFactor = e.deltaY > 0 ? 0.9 : 1.1;
+        const newZoom = Math.max(0.2, Math.min(5, this._zoom * zoomFactor));
+
+        // Adjust pan to keep point under cursor
+        const scaleChange = newZoom / this._zoom;
+        this._panX = mouseX - (mouseX - this._panX) * scaleChange;
+        this._panY = mouseY - (mouseY - this._panY) * scaleChange;
+        this._zoom = newZoom;
+
+        this._render();
+      },
+      { passive: false },
+    );
+
     // Mouse drag for panning - only on canvas itself
     this._canvas.addEventListener('mousedown', (e) => {
       if (e.button !== 0) return; // Only left mouse button
@@ -127,26 +135,26 @@ export const readerView = () => ({
       this._dragStartY = e.clientY;
       this._canvas.style.cursor = 'grabbing';
     });
-    
+
     // Double-click to reset zoom
     this._canvas.addEventListener('dblclick', () => {
       this._resetZoom();
     });
   },
-  
+
   // Global mouse events for drag (attached once)
   _setupGlobalMouseEvents() {
     document.addEventListener('mousemove', (e) => {
       if (!this._isDragging) return;
-      
+
       const dx = e.clientX - this._dragStartX;
       const dy = e.clientY - this._dragStartY;
-      
+
       // Check if we've moved beyond threshold
       if (Math.abs(dx) > this._dragThreshold || Math.abs(dy) > this._dragThreshold) {
         this._dragMoved = true;
       }
-      
+
       if (this._dragMoved) {
         this._panX += dx;
         this._panY += dy;
@@ -155,7 +163,7 @@ export const readerView = () => ({
         this._render();
       }
     });
-    
+
     document.addEventListener('mouseup', () => {
       if (this._isDragging) {
         this._isDragging = false;
@@ -163,33 +171,33 @@ export const readerView = () => ({
       }
     });
   },
-  
+
   _updateCanvasSize() {
     if (!this._canvas) return;
     const dpr = window.devicePixelRatio || 1;
     const rect = this._canvas.getBoundingClientRect();
-    
+
     // Set canvas backing store size
     this._canvas.width = rect.width * dpr;
     this._canvas.height = rect.height * dpr;
-    
+
     // Scale context for high DPI
     this._ctx.scale(dpr, dpr);
-    
+
     // Recalculate base scale when size changes
     this._calculateBaseScale();
   },
-  
+
   _calculateBaseScale() {
     if (!this._img || !this._canvas) return;
-    
+
     const canvasWidth = this._canvas.width / (window.devicePixelRatio || 1);
     const canvasHeight = this._canvas.height / (window.devicePixelRatio || 1);
     const imgWidth = this._img.naturalWidth;
     const imgHeight = this._img.naturalHeight;
-    
+
     if (imgWidth === 0 || imgHeight === 0) return;
-    
+
     switch (this.viewMode) {
       case 'fitWidth':
         this._baseScale = canvasWidth / imgWidth;
@@ -203,53 +211,65 @@ export const readerView = () => ({
       default:
         this._baseScale = canvasWidth / imgWidth;
     }
-    
+
     // Reset zoom and pan when view mode changes
     this._zoom = 1;
     this._panX = 0;
     this._panY = 0;
   },
-  
+
   _resetZoom() {
     this._zoom = 1;
     this._panX = 0;
     this._panY = 0;
     this._render();
   },
-  
+
   _render() {
     if (!this._ctx || !this._img || !this._canvas) return;
-    
+
     const ctx = this._ctx;
     const canvas = this._canvas;
     const dpr = window.devicePixelRatio || 1;
     const canvasWidth = canvas.width / dpr;
     const canvasHeight = canvas.height / dpr;
-    
+
     // Clear canvas
     ctx.clearRect(0, 0, canvasWidth, canvasHeight);
-    
+
     // Set image smoothing based on render mode
     ctx.imageSmoothingEnabled = this.renderMode === 'smooth';
     if (this.renderMode === 'smooth') {
       ctx.imageSmoothingQuality = 'high';
     }
-    
+
     // Calculate final scale
     const scale = this._baseScale * this._zoom;
-    
+
     // Calculate image position (centered by default)
     const imgWidth = this._img.naturalWidth * scale;
     const imgHeight = this._img.naturalHeight * scale;
     const x = (canvasWidth - imgWidth) / 2 + this._panX;
     const y = (canvasHeight - imgHeight) / 2 + this._panY;
-    
+
     // Draw image
     ctx.drawImage(this._img, x, y, imgWidth, imgHeight);
   },
 
   async load(pid, mid, cid, page) {
-    console.log('[reader] load:', 'pid=' + pid + ' mid=' + mid + ' cid=' + cid + ' page=' + (page || 0) + ' hash=' + (window.location.hash || ''));
+    console.log(
+      '[reader] load:',
+      'pid=' +
+        pid +
+        ' mid=' +
+        mid +
+        ' cid=' +
+        cid +
+        ' page=' +
+        (page || 0) +
+        ' hash=' +
+        (window.location.hash || ''),
+    );
     this.pluginID = pid;
     this.mangaID = mid;
     this.chapterID = cid;
@@ -292,15 +312,24 @@ export const readerView = () => ({
     this.error = false;
     this.complete = false;
 
-    if (!changed && this.pageSrc) { this.loading = false; return; }
+    if (!changed && this.pageSrc) {
+      this.loading = false;
+      return;
+    }
 
     this.loading = true;
     const page = this.pages[next];
     try {
-      const url = await loadImage(this.pluginID, page.url, page.headers, this.mangaID, this.chapterID);
+      const url = await loadImage(
+        this.pluginID,
+        page.url,
+        page.headers,
+        this.mangaID,
+        this.chapterID,
+      );
       if (url) {
         this.pageSrc = url;
-        
+
         // Load image into canvas
         const img = new Image();
         img.onload = () => {
@@ -314,7 +343,7 @@ export const readerView = () => ({
         img.onerror = () => {
           this.error = true;
           this.loading = false;
-          console.error('[reader] image failed to load:', url, '(page ' + (this.currentPage + 1) + ')');
+          console.error('[reader] image failed to load:', url, `(page ${this.currentPage + 1})`);
         };
         img.src = url;
       } else {
@@ -329,12 +358,17 @@ export const readerView = () => ({
   },
 
   onProgress() {
-    bindings.recordRead(this.pluginID, this.mangaID, this.chapterID, this.currentPage)
+    bindings
+      .recordRead(this.pluginID, this.mangaID, this.chapterID, this.currentPage)
       .catch((e) => console.error('recordRead failed', e));
-    this.$store.app.readProgress[this.chapterID] = { lastPage: this.currentPage, pageCount: this.pages.length };
+    this.$store.app.readProgress[this.chapterID] = {
+      lastPage: this.currentPage,
+      pageCount: this.pages.length,
+    };
 
     if (this.currentPage >= this.pages.length - 1) {
-      bindings.setChapterProgress(this.pluginID, this.mangaID, this.chapterID, this.pages.length - 1)
+      bindings
+        .setChapterProgress(this.pluginID, this.mangaID, this.chapterID, this.pages.length - 1)
         .catch((e) => console.error('setChapterProgress failed', e));
       this.showComplete();
     }
@@ -344,7 +378,13 @@ export const readerView = () => ({
     for (const delta of [-1, 1]) {
       const i = this.currentPage + delta;
       if (i >= 0 && i < this.pages.length) {
-        loadImage(this.pluginID, this.pages[i].url, this.pages[i].headers, this.mangaID, this.chapterID);
+        loadImage(
+          this.pluginID,
+          this.pages[i].url,
+          this.pages[i].headers,
+          this.mangaID,
+          this.chapterID,
+        );
       }
     }
   },
@@ -356,7 +396,9 @@ export const readerView = () => ({
   scheduleAutoHide() {
     clearTimeout(this.autoHideTimer);
     this.controlsVisible = true;
-    this.autoHideTimer = setTimeout(() => { this.controlsVisible = false; }, 3000);
+    this.autoHideTimer = setTimeout(() => {
+      this.controlsVisible = false;
+    }, 3000);
   },
 
   bindKeys() {
@@ -365,33 +407,85 @@ export const readerView = () => ({
     this._boundKeyHandler = (e) => {
       const inField = e.target.matches('input, select, textarea');
       // A shortcuts-legend open wins: any key closes it before anything else.
-      if (this.showShortcuts) { e.preventDefault(); this.showShortcuts = false; return; }
-      if (e.key === 'Escape') { e.preventDefault(); this.exit(); return; }
-      if (e.key === '?') { e.preventDefault(); this.showShortcuts = true; return; }
-      if (e.key === 'f' || e.key === 'F') { e.preventDefault(); this.toggleFullscreen(); return; }
-      if (!inField && e.key === ' ') { e.preventDefault(); this.goNext(); return; }
-      if (e.key === 'Home') { e.preventDefault(); this.goToPage(0); return; }
-      if (e.key === 'End') { e.preventDefault(); this.goToPage(this.pages.length - 1); return; }
+      if (this.showShortcuts) {
+        e.preventDefault();
+        this.showShortcuts = false;
+        return;
+      }
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        this.exit();
+        return;
+      }
+      if (e.key === '?') {
+        e.preventDefault();
+        this.showShortcuts = true;
+        return;
+      }
+      if (e.key === 'f' || e.key === 'F') {
+        e.preventDefault();
+        this.toggleFullscreen();
+        return;
+      }
+      if (!inField && e.key === ' ') {
+        e.preventDefault();
+        this.goNext();
+        return;
+      }
+      if (e.key === 'Home') {
+        e.preventDefault();
+        this.goToPage(0);
+        return;
+      }
+      if (e.key === 'End') {
+        e.preventDefault();
+        this.goToPage(this.pages.length - 1);
+        return;
+      }
       // ArrowRight: LTR → next, RTL → prev. ArrowLeft: LTR → prev, RTL → next.
-      if (!inField && e.key === 'ArrowRight') { e.preventDefault(); this.direction === 'rtl' ? this.goPrev() : this.goNext(); return; }
-      if (!inField && e.key === 'ArrowLeft')  { e.preventDefault(); this.direction === 'rtl' ? this.goNext()  : this.goPrev(); return; }
-      if (!inField && (e.key === 'a' || e.key === 'A')) { e.preventDefault(); this.goPrev(); return; }
-      if (!inField && (e.key === 'd' || e.key === 'D')) { e.preventDefault(); this.goNext(); return; }
-      if (!inField && (e.key === 'r' || e.key === 'R')) { e.preventDefault(); this._resetZoom(); return; }
+      if (!inField && e.key === 'ArrowRight') {
+        e.preventDefault();
+        this.direction === 'rtl' ? this.goPrev() : this.goNext();
+        return;
+      }
+      if (!inField && e.key === 'ArrowLeft') {
+        e.preventDefault();
+        this.direction === 'rtl' ? this.goNext() : this.goPrev();
+        return;
+      }
+      if (!inField && (e.key === 'a' || e.key === 'A')) {
+        e.preventDefault();
+        this.goPrev();
+        return;
+      }
+      if (!inField && (e.key === 'd' || e.key === 'D')) {
+        e.preventDefault();
+        this.goNext();
+        return;
+      }
+      if (!inField && (e.key === 'r' || e.key === 'R')) {
+        e.preventDefault();
+        this._resetZoom();
+        return;
+      }
     };
     document.addEventListener('keydown', this._boundKeyHandler);
   },
 
   // Reading-order navigation: always +1 / -1 by page index. Which key maps to
   // these (ArrowLeft vs ArrowRight) is decided in bindKeys() by the direction.
-  goNext() { this.goToPage(this.currentPage + 1); },
-  goPrev() { this.goToPage(this.currentPage - 1); },
-  
+  goNext() {
+    this.goToPage(this.currentPage + 1);
+  },
+  goPrev() {
+    this.goToPage(this.currentPage - 1);
+  },
+
   // Handle click on left/right zones with drag disambiguation
-  handleZoneClick(direction, event) {
+  handleZoneClick(direction, _event) {
     // If we were dragging, don't navigate
     if (this._dragMoved) return;
-    
+
     // Navigate based on direction
     if (direction === 'left') {
       this.goPrev();
@@ -404,7 +498,8 @@ export const readerView = () => ({
   async retryPage() {
     if (this.deleteCacheOnRetry) {
       const page = this.pages[this.currentPage];
-      if (page) await bindings.evictImageCache(this.pluginID, page.url, this.mangaID, this.chapterID);
+      if (page)
+        await bindings.evictImageCache(this.pluginID, page.url, this.mangaID, this.chapterID);
     }
     await this.goToPage(this.currentPage, true);
   },
@@ -439,7 +534,7 @@ export const readerView = () => ({
   },
 
   get orderedChapters() {
-    const list = this.$store.app.chaptersByManga[this.pluginID + '|' + this.mangaID];
+    const list = this.$store.app.chaptersByManga[`${this.pluginID}|${this.mangaID}`];
     return Array.isArray(list) ? list : [];
   },
 
@@ -449,10 +544,24 @@ export const readerView = () => ({
     const list = this.orderedChapters;
     const id = nextChapterInList(list, this.chapterID, this.direction);
     if (id === null) {
-      console.warn('[reader] nextChapterID: current chapter "' + this.chapterID + '" not found in reading-order list (len ' + list.length + ')');
+      console.warn(
+        '[reader] nextChapterID: current chapter "' +
+          this.chapterID +
+          '" not found in reading-order list (len ' +
+          list.length +
+          ')',
+      );
       return null;
     }
-    console.log('[reader] nextChapterID: idx ' + list.findIndex(c => c.id === this.chapterID) + ' (' + this.direction + ') -> "' + id + '"');
+    console.log(
+      '[reader] nextChapterID: idx ' +
+        list.findIndex((c) => c.id === this.chapterID) +
+        ' (' +
+        this.direction +
+        ') -> "' +
+        id +
+        '"',
+    );
     return id;
   },
 
@@ -460,7 +569,7 @@ export const readerView = () => ({
   // in reading order; the reader re-loads via @window:hashchange -> reloadFromHash.
   goNextChapter() {
     const next = this.nextChapterID;
-    console.log('[reader] next-chapter click: current "' + this.chapterID + '" next "' + next + '"');
+    console.log(`[reader] next-chapter click: current "${this.chapterID}" next "${next}"`);
     if (!next) {
       console.warn('[reader] next-chapter: no next chapter to navigate to');
       return;
@@ -480,17 +589,21 @@ export const readerView = () => ({
         console.warn('[reader] reloadFromHash: empty hash, mount recovery will retry');
       } else {
         console.warn('[reader] reloadFromHash: skipping non-read/non-canonical hash:', h);
-      } 
+      }
       return;
     }
-    const key = parsed.pid + '|' + parsed.mid + '|' + parsed.cid + '|' + parsed.page;
+    const key = `${parsed.pid}|${parsed.mid}|${parsed.cid}|${parsed.page}`;
     if (key === this.lastReadHash) {
       console.log('[reader] reloadFromHash: already loaded, skip', key);
       return;
     }
     this.lastReadHash = key;
     console.log('[reader] reloadFromHash entry:', h);
-    console.log('[reader] reloadFromHash:', h, '-> pid=' + parsed.pid + ' mid=' + parsed.mid + ' cid=' + parsed.cid + ' page=' + parsed.page);
+    console.log(
+      '[reader] reloadFromHash:',
+      h,
+      `-> pid=${parsed.pid} mid=${parsed.mid} cid=${parsed.cid} page=${parsed.page}`,
+    );
     this.load(parsed.pid, parsed.mid, parsed.cid, parsed.page);
   },
 
@@ -498,13 +611,14 @@ export const readerView = () => ({
   prefetchNextChapters() {
     const k = clamp(settings.readAhead, 0, 10);
     if (k <= 0) return;
-    const idx = this.orderedChapters.findIndex(c => c.id === this.chapterID);
+    const idx = this.orderedChapters.findIndex((c) => c.id === this.chapterID);
     if (idx === -1) return;
     let remaining = k;
     for (let i = idx + 1; i < this.orderedChapters.length && remaining > 0; i++) {
       const ch = this.orderedChapters[i];
-      bindings.pageList(this.pluginID, ch.id)
-        .then(pages => {
+      bindings
+        .pageList(this.pluginID, ch.id)
+        .then((pages) => {
           if (Array.isArray(pages)) {
             for (const p of pages) loadImage(this.pluginID, p.url, p.headers, this.mangaID, ch.id);
           }
@@ -532,7 +646,8 @@ export const readerView = () => ({
   exit() {
     this.unbindKeys();
     if (this.pages.length) {
-      bindings.setChapterProgress(this.pluginID, this.mangaID, this.chapterID, this.currentPage)
+      bindings
+        .setChapterProgress(this.pluginID, this.mangaID, this.chapterID, this.currentPage)
         .catch((e) => console.error('setChapterProgress failed', e));
     }
     // Never navigate to an empty-mid manga hash (e.g. #/manga//). If the reader
@@ -542,7 +657,9 @@ export const readerView = () => ({
       this.$store.app.navigate('#/library');
       return;
     }
-    this.$store.app.navigate(`#/manga/${encodeURIComponent(this.pluginID)}/${encodeURIComponent(this.mangaID)}`);
+    this.$store.app.navigate(
+      `#/manga/${encodeURIComponent(this.pluginID)}/${encodeURIComponent(this.mangaID)}`,
+    );
   },
 
   backToManga() {
@@ -550,6 +667,10 @@ export const readerView = () => ({
     return `#/manga/${encodeURIComponent(this.pluginID)}/${encodeURIComponent(this.mangaID)}`;
   },
 
-  get pageInfo() { return (this.currentPage + 1) + ' / ' + this.pages.length; },
-  get sliderMax() { return Math.max(0, this.pages.length - 1); },
+  get pageInfo() {
+    return `${this.currentPage + 1} / ${this.pages.length}`;
+  },
+  get sliderMax() {
+    return Math.max(0, this.pages.length - 1);
+  },
 });

@@ -1,5 +1,5 @@
-import { bindings } from "../bindings.js";
-import { settings, saveSetting } from "../state.js";
+import { bindings } from '../bindings.js';
+import { saveSetting, settings } from '../state.js';
 
 // ── Settings component ────────────────────────────────────────────
 export const settingsView = () => {
@@ -14,7 +14,12 @@ export const settingsView = () => {
     configStatus: '',
 
     init() {
-      bindings.getConfigPath().then(p => { this.configPath = p; }).catch(() => {});
+      bindings
+        .getConfigPath()
+        .then((p) => {
+          this.configPath = p;
+        })
+        .catch(() => {});
     },
 
     persist() {
@@ -32,9 +37,17 @@ export const settingsView = () => {
 
     reloadConfig() {
       this.configStatus = 'Reloading...';
-      bindings.reloadConfig()
-        .then(() => { this.configStatus = 'Config reloaded ✓'; setTimeout(() => { this.configStatus = ''; }, 3000); })
-        .catch(e => { this.configStatus = 'Error: ' + (e?.message || e); });
+      bindings
+        .reloadConfig()
+        .then(() => {
+          this.configStatus = 'Config reloaded ✓';
+          setTimeout(() => {
+            this.configStatus = '';
+          }, 3000);
+        })
+        .catch((e) => {
+          this.configStatus = `Error: ${e?.message || e}`;
+        });
     },
 
     setReadAhead(v) {

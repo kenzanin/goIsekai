@@ -1,4 +1,4 @@
-import { bindings } from "../bindings.js";
+import { bindings } from '../bindings.js';
 
 // ── Plugins component ─────────────────────────────────────────────
 export const pluginsView = () => ({
@@ -17,7 +17,7 @@ export const pluginsView = () => ({
     this.error = null;
     try {
       await this.$store.app.loadPlugins();
-    } catch (err) {
+    } catch (_err) {
       this.error = 'Failed to load plugins';
     } finally {
       this.loading = false;
@@ -47,9 +47,11 @@ export const pluginsView = () => ({
       await this.load();
     } catch (err) {
       console.error('install plugin failed:', err);
-      alert('Failed to install plugin: ' + err);
+      alert(`Failed to install plugin: ${err}`);
     }
   },
 
-  get plugins() { return this.$store.app.plugins; },
+  get plugins() {
+    return this.$store.app.plugins;
+  },
 });
