@@ -22,11 +22,12 @@ func (s *Server) registerActionRoutes() {
 	s.Router.Post("/action/save-settings", s.handleSaveSettings)
 }
 
-// hxRedirect answers a successful action with an HX-Redirect header, which
-// htmx turns into a client-side navigation to location.
+// hxRedirect answers a successful action with a 303 See Other redirect —
+// plain HTML form posts (browser follows it) and HTMX (follows redirects
+// natively) both land on the target page. 303 forces GET after POST.
 func (s *Server) hxRedirect(w http.ResponseWriter, location string) {
-	w.Header().Set("HX-Redirect", location)
-	w.WriteHeader(http.StatusOK)
+	w.Header().Set("Location", location)
+	w.WriteHeader(http.StatusSeeOther)
 }
 
 // handleInstallPlugin saves the uploaded .wasm to a temp file and installs it
