@@ -26,6 +26,8 @@ export const bindings = {
   getConfigPath: () => call('GetConfigPath'),
   evictImageCache: (pluginID, url, mangaID, chapterID) =>
     call('EvictImageCache', pluginID, url, mangaID, chapterID),
+  getLogs: () => call('GetLogs'),
+  clearLogs: () => call('ClearLogs'),
 };
 
 export function call(method, ...args) {

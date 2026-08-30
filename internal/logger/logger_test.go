@@ -3,7 +3,10 @@ package logger
 import (
 	"context"
 	"log/slog"
+	"strconv"
+	"strings"
 	"testing"
+	"time"
 )
 
 func TestParseLevel(t *testing.T) {
@@ -75,4 +78,69 @@ func TestHelpersDontPanic(t *testing.T) {
 	Info("i", "k", "v")
 	Warn("w", "k", "v")
 	Error("e", "k", "v")
+}
+
+func TestCaptureBuffer(t *testing.T) {
+	// The capture handler appends every record to the ring buffer (GetLines).
+	if err := Init("info"); err != nil {
+		t.Fatalf("Init: %v", err)
+	}
+	Clear()
+	Error("boom", "code", 7)
+	Info("hello", "k", "v")
+
+	lines := GetLines()
+	if len(lines) != 2 {
+		t.Fatalf("GetLines() = %d lines, want 2", len(lines))
+	}
+	// oldest first
+	if !contains(lines[0], "ERROR boom") {
+		t.Errorf("line0 = %q, want to contain 'ERROR boom'", lines[0])
+	}
+	if !contains(lines[1], "hello") || !contains(lines[1], "k=v") {
+		t.Errorf("line1 = %q, want msg + attrs", lines[1])
+	}
+}
+
+func TestCaptureBufferEviction(t *testing.T) {
+	if err := Init("info"); err != nil {
+		t.Fatalf("Init: %v", err)
+	}
+	// Bypass the global mutex to force the ring over its cap cheaply.
+	mu.Lock()
+	lines = make([]string, 0, bufSize)
+	mu.Unlock()
+
+	// Log bufSize+1 records; the oldest must be evicted.
+	for i := 0; i < bufSize+1; i++ {
+		Info("line", "n", i)
+	}
+	got := GetLines()
+	if len(got) != bufSize {
+		t.Fatalf("GetLines() = %d lines, want ring cap %d", len(got), bufSize)
+	}
+	// Oldest (n=0) must be gone, newest (n=bufSize) must be present.
+	if !contains(got[0], "n=1") {
+		t.Errorf("first retained line = %q, want n=1 (oldest evicted)", got[0])
+	}
+	if !contains(got[len(got)-1], "n="+itoa(bufSize)) {
+		t.Errorf("last line = %q, want n=%d", got[len(got)-1], bufSize)
+	}
+}
+
+func TestFormatRecord(t *testing.T) {
+	r := slog.NewRecord(time.Now(), slog.LevelWarn, "something bad", 0)
+	r.AddAttrs(slog.String("k", "v"))
+	s := formatRecord(r)
+	if !contains(s, "WARN") || !contains(s, "something bad") || !contains(s, "k=v") {
+		t.Errorf("formatRecord = %q, want level+msg+attr", s)
+	}
+}
+
+func contains(s, sub string) bool {
+	return strings.Contains(s, sub)
+}
+
+func itoa(n int) string {
+	return strconv.Itoa(n)
 }

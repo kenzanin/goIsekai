@@ -1,0 +1,24 @@
+<section x-show="$store.app.currentView === 'logs'" x-cloak x-data="logsView" class="fade-in min-h-[calc(100vh-57px)]">
+  <div class="flex items-center justify-between px-6 py-6 pb-4">
+    <h1 class="text-3xl font-bold text-zinc-100">Logs</h1>
+    <div class="flex items-center gap-4">
+      <label class="flex items-center gap-2 text-sm text-zinc-300 cursor-pointer">
+        <input type="checkbox" x-model="autoScroll" class="accent-accent w-4 h-4"> Auto-scroll
+      </label>
+      <button @click="clear()"
+              class="px-4 py-2 rounded-card border border-border text-zinc-300 text-sm hover:bg-white/10 transition-all">Clear</button>
+    </div>
+  </div>
+
+  <div class="px-6 pb-6">
+    <div x-ref="logBox"
+         class="h-[calc(100vh-190px)] overflow-auto rounded-card bg-[#0b0b10] border border-border p-4 font-mono text-xs leading-relaxed text-zinc-300">
+      <template x-for="(line, i) in lines" :key="i">
+        <div class="whitespace-pre-wrap break-all hover:bg-white/5 px-1 rounded"
+             :class="line.includes(' ERROR ') ? 'text-error' : (line.includes(' WARN ') ? 'text-amber-400' : '')"
+             x-text="line"></div>
+      </template>
+      <div x-show="lines.length === 0" class="text-zinc-500 italic">No logs yet.</div>
+    </div>
+  </div>
+</section>

@@ -1,6 +1,7 @@
 import { readerView } from '../reader.js';
 import { detailView } from './detail.js';
 import { libraryView } from './library.js';
+import { logsView } from './logs.js';
 import { pluginsView } from './plugins.js';
 import { searchView } from './search.js';
 import { settingsView } from './settings.js';
@@ -12,5 +13,6 @@ export const viewComponents = {
   detailView,
   readerView,
   pluginsView,
+  logsView,
   settingsView,
 };
