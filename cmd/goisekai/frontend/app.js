@@ -22,7 +22,11 @@ window.addEventListener('hashchange', () => {
   if (window.Alpine) Alpine.store('app').updateRoute();
 });
 
+// Resolve the initial hash into currentView on first paint. hashchange never
+// fires for the load-time hash, so without this a deep-link like #/read/... 
+// leaves currentView on its default ('library') and the target section never mounts.
 document.addEventListener('DOMContentLoaded', () => {
+  if (window.Alpine) Alpine.store('app').updateRoute();
   // Global keyboard shortcuts (non-reader)
   document.addEventListener('keydown', (e) => {
     const inField = e.target.matches('input, select, textarea');

@@ -301,7 +301,7 @@
 
   <!-- ── Reader View ──────────────────────────────────────────────── -->
    <section x-show="$store.app.currentView === 'reader'" x-cloak x-data="readerView" class="fixed inset-0 z-[500] bg-black overflow-hidden"
-            @window:hashchange="reloadFromHash()">
+            x-effect="if ($store.app.currentView === 'reader') reloadFromHash()">
 
     <!-- Top bar -->
     <div @mousemove="scheduleAutoHide()" @mouseover="clearTimeout(autoHideTimer); controlsVisible = true"
