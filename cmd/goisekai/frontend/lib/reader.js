@@ -102,25 +102,29 @@ export const readerView = () => ({
   _setupCanvasEvents() {
     if (!this._canvas) return;
 
-    // Mouse wheel zoom
+    // Mouse wheel: scroll the image by default; Ctrl+wheel zooms (cursor-anchored).
     this._canvas.addEventListener(
       'wheel',
       (e) => {
         e.preventDefault();
-        const rect = this._canvas.getBoundingClientRect();
-        const mouseX = e.clientX - rect.left;
-        const mouseY = e.clientY - rect.top;
-
-        // Calculate zoom factor
-        const zoomFactor = e.deltaY > 0 ? 0.9 : 1.1;
-        const newZoom = Math.max(0.2, Math.min(5, this._zoom * zoomFactor));
-
-        // Adjust pan to keep point under cursor
-        const scaleChange = newZoom / this._zoom;
-        this._panX = mouseX - (mouseX - this._panX) * scaleChange;
-        this._panY = mouseY - (mouseY - this._panY) * scaleChange;
-        this._zoom = newZoom;
-
+        if (e.ctrlKey) {
+          // Zoom (cursor-anchored)
+          const rect = this._canvas.getBoundingClientRect();
+          const mouseX = e.clientX - rect.left;
+          const mouseY = e.clientY - rect.top;
+          const zoomFactor = e.deltaY > 0 ? 0.9 : 1.1;
+          const newZoom = Math.max(0.2, Math.min(5, this._zoom * zoomFactor));
+          const scaleChange = newZoom / this._zoom;
+          this._panX = mouseX - (mouseX - this._panX) * scaleChange;
+          this._panY = mouseY - (mouseY - this._panY) * scaleChange;
+          this._zoom = newZoom;
+          this._render();
+          return;
+        }
+        // Scroll: pan the image, clamped to the viewport.
+        this._panX -= e.deltaX;
+        this._panY -= e.deltaY;
+        this._clampPan();
         this._render();
       },
       { passive: false },
@@ -222,6 +226,33 @@ export const readerView = () => ({
     this._zoom = 1;
     this._panX = 0;
     this._panY = 0;
+    this._render();
+  },
+
+  _clampPan() {
+    if (!this._canvas || !this._img) return;
+    const dpr = window.devicePixelRatio || 1;
+    const cw = this._canvas.width / dpr;
+    const ch = this._canvas.height / dpr;
+    const scale = this._baseScale * this._zoom;
+    const iw = this._img.naturalWidth * scale;
+    const ih = this._img.naturalHeight * scale;
+    // If the image fits fully, force it back to centered (no panning needed).
+    if (iw <= cw) this._panX = 0;
+    else this._panX = Math.min(0, Math.max(this._panX, cw - iw));
+    if (ih <= ch) this._panY = 0;
+    else this._panY = Math.min(0, Math.max(this._panY, ch - ih));
+  },
+
+  zoomBy(factor) {
+    const newZoom = Math.max(0.2, Math.min(5, this._zoom * factor));
+    const scaleChange = newZoom / this._zoom;
+    const cw = (this._canvas?.width || 0) / (window.devicePixelRatio || 1);
+    const ch = (this._canvas?.height || 0) / (window.devicePixelRatio || 1);
+    this._panX = cw / 2 - (cw / 2 - this._panX) * scaleChange;
+    this._panY = ch / 2 - (ch / 2 - this._panY) * scaleChange;
+    this._zoom = newZoom;
+    this._clampPan();
     this._render();
   },
 
