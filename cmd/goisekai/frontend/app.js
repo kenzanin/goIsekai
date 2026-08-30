@@ -4,7 +4,7 @@
 // up global routing and keyboard shortcuts.
 
 import { appStore } from "./lib/state.js";
-import { viewComponents } from "./lib/views.js";
+import { viewComponents } from "./lib/views/index.js";
 
 // ── Alpine store + component registration ────────────────────────────────
 // Runs inside alpine:init so stores/components exist before Alpine processes
