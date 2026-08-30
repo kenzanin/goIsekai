@@ -101,6 +101,10 @@ export const detailView = () => ({
   coverUrl: '',
 
   async load(pid, mid) {
+    // Skip a re-entrant/competitive re-fire with the SAME target (the detail
+    // x-effect re-runs on every reactive change and load() itself mutates
+    // reactive state). Without this the re-fire blanks manga/coverUrl mid-load.
+    if (this.loading && pid === this.pluginID && mid === this.mangaID) return;
     console.log('[detail] load:', 'pid=' + pid + ' mid=' + mid + ' hash=' + (window.location.hash || ''));
     this.pluginID = pid;
     this.mangaID = mid;
@@ -186,7 +190,9 @@ export const detailView = () => ({
 
   startReading() {
     const t = this.startTarget;
-    if (!t || !t.chapter) return;
+    // Never build a read URL with an empty plugin/manga id (would produce a
+    // broken #/read// or #/read/pid//cid that resets the reader to empty IDs).
+    if (!t || !t.chapter || !this.pluginID || !this.mangaID) return;
     this.$store.app.navigate(
       `#/read/${encodeURIComponent(this.pluginID)}/${encodeURIComponent(this.mangaID)}` +
       `/${encodeURIComponent(t.chapter.id)}?page=${t.page}`

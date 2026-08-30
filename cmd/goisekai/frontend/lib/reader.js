@@ -314,10 +314,18 @@ export const readerView = () => ({
       bindings.setChapterProgress(this.pluginID, this.mangaID, this.chapterID, this.currentPage)
         .catch((e) => console.error('setChapterProgress failed', e));
     }
+    // Never navigate to an empty-mid manga hash (e.g. #/manga//). If the reader
+    // somehow has no manga id, fall back to the library — a detail view with an
+    // empty mid would just re-fire the detail x-effect's bad-hash skip.
+    if (!this.mangaID) {
+      this.$store.app.navigate('#/library');
+      return;
+    }
     this.$store.app.navigate(`#/manga/${encodeURIComponent(this.pluginID)}/${encodeURIComponent(this.mangaID)}`);
   },
 
   backToManga() {
+    if (!this.mangaID) return '#/library';
     return `#/manga/${encodeURIComponent(this.pluginID)}/${encodeURIComponent(this.mangaID)}`;
   },
 
