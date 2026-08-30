@@ -101,6 +101,7 @@ export const detailView = () => ({
   coverUrl: '',
 
   async load(pid, mid) {
+    console.log('[detail] load:', 'pid=' + pid + ' mid=' + mid + ' hash=' + (window.location.hash || ''));
     this.pluginID = pid;
     this.mangaID = mid;
     this.loading = true;

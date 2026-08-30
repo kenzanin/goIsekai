@@ -45,6 +45,7 @@ export const readerView = () => ({
   },
 
   async load(pid, mid, cid, page) {
+    console.log('[reader] load:', 'pid=' + pid + ' mid=' + mid + ' cid=' + cid + ' page=' + (page || 0) + ' hash=' + (window.location.hash || ''));
     this.pluginID = pid;
     this.mangaID = mid;
     this.chapterID = cid;
@@ -258,10 +259,18 @@ export const readerView = () => ({
     const pid = decodeURIComponent(segs[0]);
     const mid = decodeURIComponent(segs[1]);
     const cid = decodeURIComponent(segs[2]);
+    // Guard: a partial read hash (e.g. #/read/pid/mid/ with a trailing slash, or
+    // #/read/pid//cid) decodes to an empty segment and would reset the reader to
+    // empty IDs — never call load() with an empty id.
+    if (!pid || !mid || !cid) {
+      console.error('[reader] skipping load, bad read hash:', h);
+      return;
+    }
+    const params = new URLSearchParams(h.split('?')[1] || '');
     const page = parseInt(params.get('page') || '0', 10) || 0;
     // Skip redundant reloads (e.g. a mount that already loaded this URL).
     if (pid === this.pluginID && mid === this.mangaID && cid === this.chapterID && page === this.currentPage) return;
-    console.log('[reader] reloadFromHash: "' + pid + '"|"' + mid + '"|"' + cid + '" page=' + page);
+    console.log('[reader] reloadFromHash:', h, '-> pid=' + pid + ' mid=' + mid + ' cid=' + cid + ' page=' + page);
     this.load(pid, mid, cid, page);
   },
 
