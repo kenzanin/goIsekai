@@ -1,6 +1,6 @@
 /** @type {import('tailwindcss').Config} */
 module.exports = {
-  content: ['./cmd/goisekai/frontend/**/*.{html,js}'],
+  content: ['./cmd/goisekai/frontend/**/*.{html,js}', './internal/templates/**/*.jet'],
   theme: {
     extend: {
       colors: {

@@ -15,9 +15,11 @@
     </div>
   </div>
 
-  <!-- Click zones -->
-  <div id="zone-left" class="absolute top-12 bottom-14 left-0 w-[35%] z-10 cursor-pointer"></div>
-  <div id="zone-right" class="absolute top-12 bottom-14 right-0 w-[35%] z-10 cursor-pointer"></div>
+  <!-- Click zones: left/right = page, top/bottom strip = chapter -->
+  <div id="zone-top" class="absolute top-12 left-[35%] right-[35%] h-[18%] z-10 cursor-pointer" title="Previous chapter"></div>
+  <div id="zone-bottom" class="absolute bottom-14 left-[35%] right-[35%] h-[18%] z-10 cursor-pointer" title="Next chapter"></div>
+  <div id="zone-left" class="absolute top-12 bottom-14 left-0 w-[35%] z-10 cursor-pointer" title="Previous page"></div>
+  <div id="zone-right" class="absolute top-12 bottom-14 right-0 w-[35%] z-10 cursor-pointer" title="Next page"></div>
 
   <!-- Canvas -->
   <canvas id="page-canvas" class="absolute inset-0 h-full w-full"></canvas>
@@ -236,8 +238,15 @@
   window.addEventListener('mouseup', function () { dragging = false; canvas.style.cursor = 'default'; });
   canvas.addEventListener('dblclick', resetZoom);
 
+  var prevCh = {{ if .PrevChapterID }}"/view/read/{{.PluginID}}/{{.MangaID}}/{{.PrevChapterID}}"{{ else }}null{{ end }};
+  var nextCh = {{ if .NextChapterID }}"/view/read/{{.PluginID}}/{{.MangaID}}/{{.NextChapterID}}"{{ else }}null{{ end }};
+
   document.getElementById('zone-left').addEventListener('click', function () { if (!moved) (direction === 'rtl' ? next : prev)(); });
   document.getElementById('zone-right').addEventListener('click', function () { if (!moved) (direction === 'rtl' ? prev : next)(); });
+  var zt = document.getElementById('zone-top');
+  if (prevCh) zt.addEventListener('click', function () { if (!moved) window.location.href = prevCh; });
+  var zb = document.getElementById('zone-bottom');
+  if (nextCh) zb.addEventListener('click', function () { if (!moved) window.location.href = nextCh; });
 
   document.getElementById('btn-prev-page').addEventListener('click', prev);
   document.getElementById('btn-next-page').addEventListener('click', next);
