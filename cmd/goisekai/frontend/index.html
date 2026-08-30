@@ -42,14 +42,18 @@
     .cover-wrap.cover-failed .cover-fallback { display: flex; }
     /* Progress bar */
     .progress-fill { height: 4px; border-radius: 9999px; background: #4ade80; }
-    /* Reader page — view modes */
-    .reader-fit-width { width: 100%; }
-    .reader-fit-width img { width: 100%; height: auto; }
-    .reader-fit-height img { max-height: 100vh; width: auto; }
-    .reader-original img { width: auto; height: auto; }
-    /* Reader page — image rendering & GPU compositing */
-    .img-sharp img { image-rendering: pixelated; }
-    .gpu-compositing img { will-change: transform; transform: translateZ(0); }
+    /* Reader canvas */
+    #reader-canvas {
+      width: 100%;
+      height: 100%;
+      cursor: grab;
+      touch-action: none;
+      position: relative;
+      z-index: 1;
+    }
+    #reader-canvas:active {
+      cursor: grabbing;
+    }
     /* Reader progress bar (accent purple) */
     .reader-progress-fill { height: 4px; border-radius: 9999px; background: #7c5cfc; }
   </style>
@@ -310,9 +314,10 @@
        <button @click="exit()" class="px-4 py-2 rounded-card border border-border text-zinc-100 hover:bg-white/10 transition-all text-sm">← Back</button>
        <span class="flex-1 text-center text-zinc-100 font-medium truncate" x-text="title || 'Manga'"></span>
        <div class="flex items-center gap-2 min-w-[140px] justify-end">
-         <button type="button" :class="viewMode === 'fitWidth' ? RBTN_ACTIVE : RBTN" @click="setViewMode('fitWidth')" title="Fit width">↔</button>
-         <button type="button" :class="viewMode === 'fitHeight' ? RBTN_ACTIVE : RBTN" @click="setViewMode('fitHeight')" title="Fit height">↕</button>
-         <button type="button" :class="viewMode === 'original' ? RBTN_ACTIVE : RBTN" @click="setViewMode('original')" title="Original size">1:1</button>
+          <button type="button" :class="viewMode === 'fitWidth' ? RBTN_ACTIVE : RBTN" @click="setViewMode('fitWidth')" title="Fit width">↔</button>
+          <button type="button" :class="viewMode === 'fitHeight' ? RBTN_ACTIVE : RBTN" @click="setViewMode('fitHeight')" title="Fit height">↕</button>
+          <button type="button" :class="viewMode === 'original' ? RBTN_ACTIVE : RBTN" @click="setViewMode('original')" title="Original size">1:1</button>
+          <button type="button" :class="RBTN" @click="_resetZoom()" title="Reset zoom (R)">↺</button>
          <span class="w-px h-6 bg-white/20"></span>
          <button type="button" :class="direction === 'rtl' ? RBTN_ACTIVE : RBTN" @click="toggleDirection()" x-text="direction === 'rtl' ? 'RTL' : 'LTR'" title="Reading direction"></button>
          <button type="button" :class="RBTN" @click="showShortcuts = true" title="Shortcuts (?)">?</button>
@@ -325,14 +330,14 @@
        <div class="h-full reader-progress-fill transition-[width] duration-150" :style="'width:' + progressPct + '%'"></div>
      </div>
 
-      <!-- Image wrap -->
-      <div @mousemove="scheduleAutoHide()" class="flex items-start justify-center w-full h-full overflow-auto p-10 no-scrollbar">
+      <!-- Canvas wrap -->
+      <div @mousemove="scheduleAutoHide()" class="relative w-full h-full">
         <!-- Loading spinner -->
         <div x-show="loading" class="absolute inset-0 flex flex-col items-center justify-center gap-3 z-50">
           <div class="w-10 h-10 border-2 border-white/20 border-t-accent rounded-full animate-spin"></div>
           <span class="text-sm text-zinc-400">Loading page…</span>
         </div>
-        <!-- Error panel: absolute overlay outside .reader-page -->
+        <!-- Error panel -->
         <div x-show="error && !loading" class="absolute inset-0 flex flex-col items-center justify-center gap-4 text-center z-40 bg-black/85 backdrop-blur-sm">
           <span class="text-zinc-400 text-sm">Failed to load page <span x-text="currentPage + 1"></span></span>
           <label class="flex items-center gap-2 text-sm text-zinc-300 cursor-pointer">
@@ -344,17 +349,8 @@
             <button @click="skipPage()" class="px-4 py-2 rounded-card border border-border text-zinc-300 text-sm hover:bg-white/10 transition-all">Skip →</button>
           </div>
         </div>
-        <div class="reader-page"
-            :class="{
-              'reader-fit-width': viewMode === 'fitWidth',
-              'reader-fit-height': viewMode === 'fitHeight',
-              'reader-original': viewMode === 'original',
-              'img-sharp': renderMode === 'sharp',
-              'gpu-compositing': gpu
-            }">
-           <img x-cloak x-show="pageSrc && !error" :src="pageSrc" alt="" class="block" :style="error ? 'display:none' : ''"
-                @error="onImageError()">
-        </div>
+        <!-- Canvas for rendering -->
+        <canvas id="reader-canvas" class="w-full h-full"></canvas>
       </div>
 
      <!-- Shortcuts legend (auto-dismiss on any key/click) -->
@@ -368,15 +364,16 @@
            <li class="flex items-center justify-between"><span>Last page</span><kbd class="px-2 py-0.5 rounded bg-surface-elevated border border-border text-xs">End</kbd></li>
            <li class="flex items-center justify-between"><span>Fullscreen</span><kbd class="px-2 py-0.5 rounded bg-surface-elevated border border-border text-xs">F</kbd></li>
            <li class="flex items-center justify-between"><span>Shortcuts</span><kbd class="px-2 py-0.5 rounded bg-surface-elevated border border-border text-xs">?</kbd></li>
-           <li class="flex items-center justify-between"><span>Exit</span><kbd class="px-2 py-0.5 rounded bg-surface-elevated border border-border text-xs">Esc</kbd></li>
+            <li class="flex items-center justify-between"><span>Exit</span><kbd class="px-2 py-0.5 rounded bg-surface-elevated border border-border text-xs">Esc</kbd></li>
+            <li class="flex items-center justify-between"><span>Reset zoom</span><kbd class="px-2 py-0.5 rounded bg-surface-elevated border border-border text-xs">R</kbd></li>
          </ul>
          <p class="mt-4 text-center text-xs text-zinc-500">Press any key or click to close</p>
        </div>
      </div>
 
-    <!-- Click zones -->
-    <div @click="goToPage(currentPage - 1)" class="absolute top-0 bottom-12 left-0 w-[35%] z-5 cursor-pointer"></div>
-    <div @click="goToPage(currentPage + 1)" class="absolute top-0 bottom-12 right-0 w-[35%] z-5 cursor-pointer"></div>
+    <!-- Click zones with drag disambiguation -->
+    <div @mousedown="_isDragging = false; _dragMoved = false; $event.stopPropagation()" @click="handleZoneClick('left', $event)" class="absolute top-0 bottom-12 left-0 w-[35%] z-10 cursor-pointer"></div>
+    <div @mousedown="_isDragging = false; _dragMoved = false; $event.stopPropagation()" @click="handleZoneClick('right', $event)" class="absolute top-0 bottom-12 right-0 w-[35%] z-10 cursor-pointer"></div>
 
     <!-- Bottom bar -->
     <div @mousemove="scheduleAutoHide()" @mouseover="clearTimeout(autoHideTimer); controlsVisible = true"

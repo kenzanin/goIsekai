@@ -33,6 +33,20 @@ export const readerView = () => ({
   showShortcuts: false,
   deleteCacheOnRetry: false,
   lastReadHash: '',
+  
+  // Canvas rendering state
+  _canvas: null,
+  _ctx: null,
+  _img: null,
+  _baseScale: 1,
+  _zoom: 1,
+  _panX: 0,
+  _panY: 0,
+  _isDragging: false,
+  _dragStartX: 0,
+  _dragStartY: 0,
+  _dragMoved: false,
+  _dragThreshold: 5,
 
   init() {
     const s = settings;
@@ -56,6 +70,182 @@ export const readerView = () => ({
         this.reloadFromHash();
       }
     }, 0);
+    
+    // Initialize canvas after Alpine has rendered the DOM
+    this.$nextTick(() => {
+      this._initCanvas();
+    });
+    
+    // Handle window resize
+    window.addEventListener('resize', () => {
+      this._updateCanvasSize();
+      this._render();
+    });
+  },
+  
+  _initCanvas() {
+    this._canvas = document.getElementById('reader-canvas');
+    if (!this._canvas) {
+      console.error('[reader] Canvas element not found');
+      return;
+    }
+    this._ctx = this._canvas.getContext('2d');
+    this._setupCanvasEvents();
+    this._setupGlobalMouseEvents();
+    this._updateCanvasSize();
+  },
+  
+  _setupCanvasEvents() {
+    if (!this._canvas) return;
+    
+    // Mouse wheel zoom
+    this._canvas.addEventListener('wheel', (e) => {
+      e.preventDefault();
+      const rect = this._canvas.getBoundingClientRect();
+      const mouseX = e.clientX - rect.left;
+      const mouseY = e.clientY - rect.top;
+      
+      // Calculate zoom factor
+      const zoomFactor = e.deltaY > 0 ? 0.9 : 1.1;
+      const newZoom = Math.max(0.2, Math.min(5, this._zoom * zoomFactor));
+      
+      // Adjust pan to keep point under cursor
+      const scaleChange = newZoom / this._zoom;
+      this._panX = mouseX - (mouseX - this._panX) * scaleChange;
+      this._panY = mouseY - (mouseY - this._panY) * scaleChange;
+      this._zoom = newZoom;
+      
+      this._render();
+    }, { passive: false });
+    
+    // Mouse drag for panning - only on canvas itself
+    this._canvas.addEventListener('mousedown', (e) => {
+      if (e.button !== 0) return; // Only left mouse button
+      this._isDragging = true;
+      this._dragMoved = false;
+      this._dragStartX = e.clientX;
+      this._dragStartY = e.clientY;
+      this._canvas.style.cursor = 'grabbing';
+    });
+    
+    // Double-click to reset zoom
+    this._canvas.addEventListener('dblclick', () => {
+      this._resetZoom();
+    });
+  },
+  
+  // Global mouse events for drag (attached once)
+  _setupGlobalMouseEvents() {
+    document.addEventListener('mousemove', (e) => {
+      if (!this._isDragging) return;
+      
+      const dx = e.clientX - this._dragStartX;
+      const dy = e.clientY - this._dragStartY;
+      
+      // Check if we've moved beyond threshold
+      if (Math.abs(dx) > this._dragThreshold || Math.abs(dy) > this._dragThreshold) {
+        this._dragMoved = true;
+      }
+      
+      if (this._dragMoved) {
+        this._panX += dx;
+        this._panY += dy;
+        this._dragStartX = e.clientX;
+        this._dragStartY = e.clientY;
+        this._render();
+      }
+    });
+    
+    document.addEventListener('mouseup', () => {
+      if (this._isDragging) {
+        this._isDragging = false;
+        if (this._canvas) this._canvas.style.cursor = 'grab';
+      }
+    });
+  },
+  
+  _updateCanvasSize() {
+    if (!this._canvas) return;
+    const dpr = window.devicePixelRatio || 1;
+    const rect = this._canvas.getBoundingClientRect();
+    
+    // Set canvas backing store size
+    this._canvas.width = rect.width * dpr;
+    this._canvas.height = rect.height * dpr;
+    
+    // Scale context for high DPI
+    this._ctx.scale(dpr, dpr);
+    
+    // Recalculate base scale when size changes
+    this._calculateBaseScale();
+  },
+  
+  _calculateBaseScale() {
+    if (!this._img || !this._canvas) return;
+    
+    const canvasWidth = this._canvas.width / (window.devicePixelRatio || 1);
+    const canvasHeight = this._canvas.height / (window.devicePixelRatio || 1);
+    const imgWidth = this._img.naturalWidth;
+    const imgHeight = this._img.naturalHeight;
+    
+    if (imgWidth === 0 || imgHeight === 0) return;
+    
+    switch (this.viewMode) {
+      case 'fitWidth':
+        this._baseScale = canvasWidth / imgWidth;
+        break;
+      case 'fitHeight':
+        this._baseScale = canvasHeight / imgHeight;
+        break;
+      case 'original':
+        this._baseScale = 1;
+        break;
+      default:
+        this._baseScale = canvasWidth / imgWidth;
+    }
+    
+    // Reset zoom and pan when view mode changes
+    this._zoom = 1;
+    this._panX = 0;
+    this._panY = 0;
+  },
+  
+  _resetZoom() {
+    this._zoom = 1;
+    this._panX = 0;
+    this._panY = 0;
+    this._render();
+  },
+  
+  _render() {
+    if (!this._ctx || !this._img || !this._canvas) return;
+    
+    const ctx = this._ctx;
+    const canvas = this._canvas;
+    const dpr = window.devicePixelRatio || 1;
+    const canvasWidth = canvas.width / dpr;
+    const canvasHeight = canvas.height / dpr;
+    
+    // Clear canvas
+    ctx.clearRect(0, 0, canvasWidth, canvasHeight);
+    
+    // Set image smoothing based on render mode
+    ctx.imageSmoothingEnabled = this.renderMode === 'smooth';
+    if (this.renderMode === 'smooth') {
+      ctx.imageSmoothingQuality = 'high';
+    }
+    
+    // Calculate final scale
+    const scale = this._baseScale * this._zoom;
+    
+    // Calculate image position (centered by default)
+    const imgWidth = this._img.naturalWidth * scale;
+    const imgHeight = this._img.naturalHeight * scale;
+    const x = (canvasWidth - imgWidth) / 2 + this._panX;
+    const y = (canvasHeight - imgHeight) / 2 + this._panY;
+    
+    // Draw image
+    ctx.drawImage(this._img, x, y, imgWidth, imgHeight);
   },
 
   async load(pid, mid, cid, page) {
@@ -110,12 +300,23 @@ export const readerView = () => ({
       const url = await loadImage(this.pluginID, page.url, page.headers);
       if (url) {
         this.pageSrc = url;
-        this.loading = false;
-        // Reset scroll to top when changing pages.
-        const wrap = document.querySelector('.reader-page')?.parentElement;
-        if (wrap) wrap.scrollTop = 0;
-        this.preloadAdjacent();
-        this.onProgress();
+        
+        // Load image into canvas
+        const img = new Image();
+        img.onload = () => {
+          this._img = img;
+          this._calculateBaseScale();
+          this._render();
+          this.loading = false;
+          this.preloadAdjacent();
+          this.onProgress();
+        };
+        img.onerror = () => {
+          this.error = true;
+          this.loading = false;
+          console.error('[reader] image failed to load:', url, '(page ' + (this.currentPage + 1) + ')');
+        };
+        img.src = url;
       } else {
         this.error = true;
         this.loading = false;
@@ -176,6 +377,7 @@ export const readerView = () => ({
       if (!inField && e.key === 'ArrowLeft')  { e.preventDefault(); this.direction === 'rtl' ? this.goNext()  : this.goPrev(); return; }
       if (!inField && (e.key === 'a' || e.key === 'A')) { e.preventDefault(); this.goPrev(); return; }
       if (!inField && (e.key === 'd' || e.key === 'D')) { e.preventDefault(); this.goNext(); return; }
+      if (!inField && (e.key === 'r' || e.key === 'R')) { e.preventDefault(); this._resetZoom(); return; }
     };
     document.addEventListener('keydown', this._boundKeyHandler);
   },
@@ -184,6 +386,19 @@ export const readerView = () => ({
   // these (ArrowLeft vs ArrowRight) is decided in bindKeys() by the direction.
   goNext() { this.goToPage(this.currentPage + 1); },
   goPrev() { this.goToPage(this.currentPage - 1); },
+  
+  // Handle click on left/right zones with drag disambiguation
+  handleZoneClick(direction, event) {
+    // If we were dragging, don't navigate
+    if (this._dragMoved) return;
+    
+    // Navigate based on direction
+    if (direction === 'left') {
+      this.goPrev();
+    } else {
+      this.goNext();
+    }
+  },
 
   // Retry current page, optionally evicting cache first.
   async retryPage() {
@@ -200,18 +415,15 @@ export const readerView = () => ({
     this.goNext();
   },
 
-  // <img @error> handler: mark the page errored, stop the spinner, and log the
-  // failing URL so broken-image failures are traceable in the Go stdout log.
-  onImageError() {
-    this.error = true;
-    this.loading = false;
-    console.error('[reader] image failed to load:', this.pageSrc, '(page ' + (this.currentPage + 1) + ')');
-  },
+  // Error handling is now done in the img.onerror callback in goToPage()
 
   setViewMode(v) {
     this.viewMode = v;
     settings.viewMode = v;
     saveSetting('viewMode', v);
+    // Recalculate base scale for new view mode
+    this._calculateBaseScale();
+    this._render();
   },
 
   toggleDirection() {
