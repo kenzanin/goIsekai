@@ -44,10 +44,10 @@ fmt-web:
 lint-web:
 	biome check cmd/goisekai/frontend
 
-test:
+test: gen-frontend
 	CGO_ENABLED=1 go test -tags $(TAGS) $(PKGS)
 
-race:
+race: gen-frontend
 	CGO_ENABLED=1 go test -race -tags $(TAGS) $(PKGS)
 
 modernize:

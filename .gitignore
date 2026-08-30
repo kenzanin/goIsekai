@@ -30,3 +30,7 @@ app_data/
 .cortexkit/
 /goisekai
 /goisekai.ini
+
+# Frontend: assembled index.html is generated from shell.html + views/ partials
+# by `make gen-frontend` (cmd/frontendgen). Source of truth is the partials.
+cmd/goisekai/frontend/index.html
