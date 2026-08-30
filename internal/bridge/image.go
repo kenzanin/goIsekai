@@ -14,11 +14,11 @@ import (
 
 // EvictImageCache removes a URL from both L1 (memory) and L2 (disk) cache.
 // Called when the user wants to force re-fetch a corrupt/stale image.
-func (s *AppService) EvictImageCache(url string) {
+func (s *AppService) EvictImageCache(pluginID, url string) {
 	s.imageMu.Lock()
 	delete(s.imageCache, url)
 	s.imageMu.Unlock()
-	if diskPath := s.diskCachePath(url); diskPath != "" {
+	if diskPath := s.diskCachePath(pluginID, url); diskPath != "" {
 		_ = os.Remove(diskPath)
 	}
 }
@@ -36,7 +36,7 @@ func (s *AppService) GetImage(pluginID, url string, headers map[string]string) (
 	s.imageMu.RUnlock()
 
 	// L2: disk cache.
-	if diskPath := s.diskCachePath(url); diskPath != "" {
+	if diskPath := s.diskCachePath(pluginID, url); diskPath != "" {
 		if data, err := os.ReadFile(diskPath); err == nil {
 			s.imageMu.Lock()
 			s.imageCache[url] = data
@@ -67,7 +67,7 @@ func (s *AppService) GetImage(pluginID, url string, headers map[string]string) (
 	s.imageMu.Unlock()
 
 	// L2 cache: write to disk.
-	if diskPath := s.diskCachePath(url); diskPath != "" {
+	if diskPath := s.diskCachePath(pluginID, url); diskPath != "" {
 		if err := os.MkdirAll(filepath.Dir(diskPath), 0o755); err == nil {
 			_ = os.WriteFile(diskPath, body, 0o644)
 		}
@@ -76,12 +76,12 @@ func (s *AppService) GetImage(pluginID, url string, headers map[string]string) (
 	return body, nil
 }
 
-// diskCachePath returns the L2 cache file path for a URL (SHA256 hex in
-// cacheDir/images/), or "" if cacheDir is not set.
-func (s *AppService) diskCachePath(url string) string {
+// diskCachePath returns the L2 cache file path for a plugin's image URL
+// (SHA256 hex in cacheDir/images/<pluginID>/), or "" if cacheDir is not set.
+func (s *AppService) diskCachePath(pluginID, url string) string {
 	if s.cacheDir == "" {
 		return ""
 	}
 	h := sha256.Sum256([]byte(url))
-	return filepath.Join(s.cacheDir, "images", hex.EncodeToString(h[:8]) + ".img")
+	return filepath.Join(s.cacheDir, "images", pluginID, hex.EncodeToString(h[:8])+".img")
 }

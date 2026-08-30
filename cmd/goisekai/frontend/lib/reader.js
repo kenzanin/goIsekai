@@ -174,7 +174,7 @@ export const readerView = () => ({
   async retryPage() {
     if (this.deleteCacheOnRetry) {
       const page = this.pages[this.currentPage];
-      if (page) await bindings.evictImageCache(page.url);
+      if (page) await bindings.evictImageCache(this.pluginID, page.url);
     }
     await this.goToPage(this.currentPage, true);
   },

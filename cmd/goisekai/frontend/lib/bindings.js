@@ -21,7 +21,7 @@ export const bindings = {
   log: (level, msg) => call('Log', level, msg),
   reloadConfig: () => call('ReloadConfig'),
   getConfigPath: () => call('GetConfigPath'),
-  evictImageCache: (url) => call('EvictImageCache', url),
+  evictImageCache: (pluginID, url) => call('EvictImageCache', pluginID, url),
 };
 
 export function call(method, ...args) {
