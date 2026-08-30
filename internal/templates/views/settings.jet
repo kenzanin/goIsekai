@@ -1,0 +1,48 @@
+{{extends "/layouts/base.jet"}}
+
+{{ block body() }}
+<h1 class="text-xl font-semibold mb-1">Settings</h1>
+<p class="text-xs font-mono text-neutral-500 mb-6">{{.Path}}</p>
+
+{{if .Config}}
+<form method="post" action="/action/save-settings" class="space-y-4 max-w-xl">
+    <div>
+        <label for="title" class="block text-sm font-medium mb-1">Title</label>
+        <input id="title" name="title" type="text" value="{{.Config.Title}}" class="w-full bg-neutral-900 border border-neutral-700 rounded-md px-3 py-2 text-sm">
+    </div>
+    <div class="grid grid-cols-2 gap-4">
+        <div>
+            <label for="host" class="block text-sm font-medium mb-1">Host</label>
+            <input id="host" name="host" type="text" value="{{.Config.Host}}" class="w-full bg-neutral-900 border border-neutral-700 rounded-md px-3 py-2 text-sm">
+        </div>
+        <div>
+            <label for="port" class="block text-sm font-medium mb-1">Port</label>
+            <input id="port" name="port" type="number" value="{{.Config.Port}}" class="w-full bg-neutral-900 border border-neutral-700 rounded-md px-3 py-2 text-sm">
+        </div>
+    </div>
+    <div>
+        <label for="log_level" class="block text-sm font-medium mb-1">Log Level</label>
+        <select id="log_level" name="log_level" class="w-full bg-neutral-900 border border-neutral-700 rounded-md px-3 py-2 text-sm">
+            <option value="debug" {{if .Config.LogLevel == "debug"}}selected{{end}}>debug</option>
+            <option value="info" {{if .Config.LogLevel == "info"}}selected{{end}}>info</option>
+            <option value="warning" {{if .Config.LogLevel == "warning"}}selected{{end}}>warning</option>
+        </select>
+    </div>
+    <div>
+        <label for="user_agent" class="block text-sm font-medium mb-1">User Agent</label>
+        <input id="user_agent" name="user_agent" type="text" value="{{.Config.UserAgent}}" class="w-full bg-neutral-900 border border-neutral-700 rounded-md px-3 py-2 text-sm">
+    </div>
+    <div>
+        <label for="accept_language" class="block text-sm font-medium mb-1">Accept Language</label>
+        <input id="accept_language" name="accept_language" type="text" value="{{.Config.AcceptLanguage}}" class="w-full bg-neutral-900 border border-neutral-700 rounded-md px-3 py-2 text-sm">
+    </div>
+    <div>
+        <label for="referer" class="block text-sm font-medium mb-1">Referer</label>
+        <input id="referer" name="referer" type="text" value="{{.Config.Referer}}" class="w-full bg-neutral-900 border border-neutral-700 rounded-md px-3 py-2 text-sm">
+    </div>
+    <button type="submit" class="bg-indigo-600 hover:bg-indigo-500 text-white rounded-md px-4 py-2 text-sm font-medium">Simpan</button>
+</form>
+{{else}}
+<div class="py-16 text-center text-neutral-500">Gagal memuat konfigurasi</div>
+{{end}}
+{{ end }}

@@ -26,6 +26,10 @@ type Config struct {
 	// <DataDir>/cache. Overridable in the [app] section of goisekai.ini.
 	CacheDir string
 
+	// HTTP server
+	Host string
+	Port int
+
 	// [network] — default headers injected into plugin HTTP requests.
 	UserAgent      string
 	AcceptLanguage string
@@ -40,6 +44,8 @@ func Default() *Config {
 		LogLevel:       "info",
 		Width:          1200,
 		Height:         800,
+		Host:           "127.0.0.1",
+		Port:           8080,
 		UserAgent:      "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36",
 		AcceptLanguage: "en-US,en;q=0.9",
 		Referer:        "",
@@ -99,6 +105,8 @@ func (c *Config) Save(path string) error {
 	fmt.Fprintf(&b, "width = %d\n", c.Width)
 	fmt.Fprintf(&b, "height = %d\n", c.Height)
 	fmt.Fprintf(&b, "cache_dir = %s\n", c.CacheDir)
+	fmt.Fprintf(&b, "host = %s\n", c.Host)
+	fmt.Fprintf(&b, "port = %d\n", c.Port)
 	fmt.Fprintf(&b, "\n[network]\n")
 	fmt.Fprintf(&b, "user_agent = %s\n", c.UserAgent)
 	fmt.Fprintf(&b, "accept_language = %s\n", c.AcceptLanguage)
@@ -135,6 +143,12 @@ func (c *Config) set(section, key, val string) {
 			}
 		case "cache_dir":
 			c.CacheDir = val
+		case "host":
+			c.Host = val
+		case "port":
+			if n, err := strconv.Atoi(val); err == nil {
+				c.Port = n
+			}
 		}
 	case "network":
 		switch key {

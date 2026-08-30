@@ -1,0 +1,14 @@
+{{extends "/layouts/base.jet"}}
+
+{{ block body() }}
+<h1 class="text-xl font-semibold mb-6">Logs</h1>
+
+<div id="logview" hx-get="/view/logs" hx-trigger="every 2s" hx-select="#logview" hx-swap="outerHTML" class="space-y-0">
+    {{range i, l := .Logs }}
+    <pre class="text-xs font-mono text-neutral-300 whitespace-pre-wrap break-all border-b border-neutral-900 py-0.5">{{l}}</pre>
+    {{end}}
+    {{if len(.Logs) == 0}}
+    <div class="py-16 text-center text-neutral-500">Belum ada log</div>
+    {{end}}
+</div>
+{{ end }}

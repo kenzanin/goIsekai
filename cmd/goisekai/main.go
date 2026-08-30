@@ -4,17 +4,18 @@ import (
 	"embed"
 	"flag"
 	"log"
-	"os"
+		"log/slog"
+"os"
 	"path/filepath"
-
-	"github.com/wailsapp/wails/v3/pkg/application"
 
 	"goisekai/internal/bridge"
 	"goisekai/internal/config"
 	"goisekai/internal/database"
 	"goisekai/internal/hostnet"
+	"goisekai/internal/httpserver"
 	"goisekai/internal/logger"
 	"goisekai/internal/pluginmanager"
+	"goisekai/internal/templates"
 )
 
 //go:embed all:frontend
@@ -22,6 +23,9 @@ var assets embed.FS
 
 func main() {
 	logLevel := flag.String("logLevel", "", "log level: debug|info|warning (overrides goisekai.ini log_level)")
+	host := flag.String("host", "", "HTTP server bind address (overrides goisekai.ini host)")
+	port := flag.Int("port", 0, "HTTP server port (overrides goisekai.ini port)")
+	open := flag.Bool("open", false, "open the default browser on startup")
 	genIni := flag.Bool("genini", false, "generate a default goisekai.ini and exit")
 	flag.Parse()
 
@@ -52,6 +56,14 @@ func main() {
 		log.Fatalf("load config: %v", err)
 	}
 
+	// CLI flags override config values.
+	if *host != "" {
+		cfg.Host = *host
+	}
+	if *port != 0 {
+		cfg.Port = *port
+	}
+
 	// Logger level: flag overrides config, config overrides the "info" default.
 	level := cfg.LogLevel
 	if *logLevel != "" {
@@ -60,7 +72,7 @@ func main() {
 	if err := logger.Init(level); err != nil {
 		log.Fatalf("init logger: %v", err)
 	}
-	logger.Info("starting goIsekai", "log_level", level, "data_dir", cfg.DataDir)
+	logger.Info("starting goIsekai", "log_level", level, "data_dir", cfg.DataDir, "addr", cfg.Host, "port", cfg.Port)
 
 	// Data directory holds the SQLite file and the plugins/ wasm directory.
 	dataDir := cfg.DataDir
@@ -114,19 +126,16 @@ func main() {
 
 	svc := bridge.NewAppService(db, mgr, proxy, cfgPath, cacheDir)
 
-	app := application.New(application.Options{
-		Name: "goIsekai",
-		Assets: application.AssetOptions{
-			Handler: application.AssetFileServerFS(assets),
-		},
-		Services: []application.Service{
-			application.NewService(svc),
-		},
-	})
-	app.Window.NewWithOptions(application.WebviewWindowOptions{
-		Title: cfg.Title, Width: cfg.Width, Height: cfg.Height,
-	})
-	if err := app.Run(); err != nil {
-		logger.Fatal("run app", "error", err)
+	eng, err := templates.New(false)
+	if err != nil {
+		log.Fatalf("init templates: %v", err)
+	}
+
+	srv := httpserver.New(cfg.Host, cfg.Port, assets, svc, slog.Default(), eng)
+	if *open {
+		srv.OpenBrowser()
+	}
+	if err := srv.ListenAndServe(); err != nil {
+		logger.Fatal("http server", "error", err)
 	}
 }

@@ -1,0 +1,35 @@
+{{extends "/layouts/base.jet"}}
+
+{{ block body() }}
+<div class="flex items-center justify-between mb-6">
+    <h1 class="text-xl font-semibold">Library</h1>
+    <form method="post" action="/action/sync">
+        <button type="submit" class="bg-indigo-600 hover:bg-indigo-500 text-white rounded-md px-4 py-2 text-sm font-medium">⟳ Sync</button>
+    </form>
+</div>
+
+{{if len(.Mangas) == 0}}
+<div class="py-16 text-center text-neutral-500">
+    <p class="mb-2">Library masih kosong — cari manga dulu</p>
+    <a href="/view/search" class="text-indigo-400 hover:text-indigo-300 text-sm">Cari manga</a>
+</div>
+{{else}}
+<div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-4">
+    {{range i, m := .Mangas }}
+    <a href="/view/manga/{{m.PluginID}}/{{m.ID}}" class="bg-neutral-900 rounded-lg overflow-hidden hover:ring-1 hover:ring-indigo-500 transition">
+        {{if m.CoverURL != ""}}
+        <img src="/image?pluginID={{m.PluginID}}&amp;url={{m.CoverURL}}" alt="{{m.Title}}" class="h-64 w-full object-cover" loading="lazy">
+        {{else}}
+        <div class="h-64 w-full bg-neutral-800 flex items-center justify-center text-neutral-500 text-2xl font-semibold">{{getInitials(m.Title)}}</div>
+        {{end}}
+        <div class="p-3">
+            <div class="text-sm font-medium line-clamp-2">{{m.Title}}</div>
+            {{if m.Status != ""}}
+            <span class="text-xs px-2 py-0.5 rounded-full bg-neutral-700/50 text-neutral-400">{{m.Status}}</span>
+            {{end}}
+        </div>
+    </a>
+    {{end}}
+</div>
+{{end}}
+{{ end }}

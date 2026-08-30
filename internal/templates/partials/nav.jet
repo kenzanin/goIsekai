@@ -1,0 +1,7 @@
+<nav hx-boost="true" class="flex flex-wrap gap-2 border-b border-neutral-800 bg-neutral-900 px-4 pt-4">
+    <a href="/" class="rounded-md px-3 py-2 text-sm font-medium hover:bg-neutral-800 {{if .active == "library"}}bg-neutral-800{{end}}">Library</a>
+    <a href="/view/search" class="rounded-md px-3 py-2 text-sm font-medium hover:bg-neutral-800 {{if .active == "search"}}bg-neutral-800{{end}}">Search</a>
+    <a href="/view/plugins" class="rounded-md px-3 py-2 text-sm font-medium hover:bg-neutral-800 {{if .active == "plugins"}}bg-neutral-800{{end}}">Plugins</a>
+    <a href="/view/settings" class="rounded-md px-3 py-2 text-sm font-medium hover:bg-neutral-800 {{if .active == "settings"}}bg-neutral-800{{end}}">Settings</a>
+    <a href="/view/logs" class="rounded-md px-3 py-2 text-sm font-medium hover:bg-neutral-800 {{if .active == "logs"}}bg-neutral-800{{end}}">Logs</a>
+</nav>

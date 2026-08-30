@@ -1,0 +1,50 @@
+{{extends "/layouts/base.jet"}}
+
+{{ block body() }}
+<div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+    <div class="md:col-span-1">
+        {{if .Manga.CoverURL != ""}}
+        <img src="/image?pluginID={{.PluginID}}&amp;url={{.Manga.CoverURL}}" alt="{{.Manga.Title}}" class="w-full rounded-lg object-cover">
+        {{else}}
+        <div class="w-full aspect-[2/3] bg-neutral-800 rounded-lg flex items-center justify-center text-neutral-500 text-4xl font-semibold">{{getInitials(.Manga.Title)}}</div>
+        {{end}}
+    </div>
+    <div class="md:col-span-3">
+        <h1 class="text-2xl font-semibold mb-2">{{.Manga.Title}}</h1>
+        <div class="flex flex-wrap gap-2 mb-3">
+            {{if .Manga.Status != ""}}
+            <span class="text-xs px-2 py-0.5 rounded-full bg-neutral-700/50 text-neutral-400">{{.Manga.Status}}</span>
+            {{end}}
+            {{range i, g := .Manga.Genres }}
+            <span class="text-xs px-2 py-0.5 rounded-full bg-indigo-500/15 text-indigo-400">{{g}}</span>
+            {{end}}
+        </div>
+        {{if .Manga.Author != ""}}
+        <p class="text-sm text-neutral-400 mb-2">{{.Manga.Author}}</p>
+        {{end}}
+        {{if .Manga.Description != ""}}
+        <p class="text-sm text-neutral-400 mb-4">{{.Manga.Description}}</p>
+        {{end}}
+        <form method="post" action="/action/toggle-library/{{.PluginID}}/{{.Manga.ID}}">
+            <button type="submit" class="bg-indigo-600 hover:bg-indigo-500 text-white rounded-md px-4 py-2 text-sm font-medium">+ / − Library</button>
+        </form>
+    </div>
+</div>
+
+<h2 class="text-xl font-semibold mb-4">Chapters</h2>
+{{if len(.Chapters) == 0}}
+<div class="py-16 text-center text-neutral-500">Belum ada chapter</div>
+{{else}}
+<div class="divide-y divide-neutral-800">
+    {{range i, c := .Chapters }}
+    <a href="/view/read/{{.PluginID}}/{{.Manga.ID}}/{{c.ID}}" class="flex items-center justify-between gap-4 py-3 px-2 -mx-2 rounded hover:bg-neutral-900 transition">
+        <span class="text-sm">
+            <span class="text-neutral-400 mr-2">Ch. {{formatChapterNum(c.ChapterNum)}}</span>
+            {{c.Title}}
+        </span>
+        <span class="text-xs text-neutral-500 shrink-0">{{formatDate(c.ReleasedAt.Format("2006-01-02T15:04:05"))}}</span>
+    </a>
+    {{end}}
+</div>
+{{end}}
+{{ end }}
