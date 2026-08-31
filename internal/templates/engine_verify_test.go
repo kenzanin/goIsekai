@@ -30,7 +30,7 @@ func TestRenderHome(t *testing.T) {
 	if !strings.Contains(out, "goIsekai") {
 		t.Errorf("missing title goIsekai")
 	}
-	if !strings.Contains(out, "Library masih kosong") {
+	if !strings.Contains(out, "Your library is empty") {
 		t.Errorf("missing empty-library state")
 	}
 	if !strings.Contains(out, "hx-boost") {

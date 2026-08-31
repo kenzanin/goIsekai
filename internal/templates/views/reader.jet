@@ -31,7 +31,7 @@
 
   <!-- Error panel -->
   <div id="error-panel" class="absolute inset-0 z-40 hidden flex-col items-center justify-center gap-3 bg-black/85">
-    <p class="text-sm text-red-400">Gagal memuat halaman</p>
+    <p class="text-sm text-red-400">Failed to load page</p>
     <div class="flex gap-2">
       <button id="btn-retry" class="bg-indigo-600 hover:bg-indigo-500 rounded-md px-4 py-2 text-sm">↻ Retry</button>
       <button id="btn-skip" class="border border-neutral-700 hover:bg-neutral-800 rounded-md px-4 py-2 text-sm">→ Skip</button>
@@ -228,13 +228,13 @@
     if (current < pages.length - 1) { goToPage(current + 1); return; }
     // Last page → auto-advance to next chapter
     if (nextChID) { window.location.href = '/view/read/' + [pid, mid, nextChID].map(encodeURIComponent).join('/'); return; }
-    showNotice('Ini halaman terakhir');
+    showNotice('Last page');
   }
   function prev() {
     if (current > 0) { goToPage(current - 1); return; }
     // First page → auto-retreat to prev chapter last page
     if (prevChID) { window.location.href = '/view/read/' + [pid, mid, prevChID].map(encodeURIComponent).join('/') + '?page=last'; return; }
-    showNotice('Ini halaman pertama');
+    showNotice('First page');
   }
 
   // Zoom controls (cursor-anchored via wheel; buttons zoom about center).
@@ -331,7 +331,7 @@
       .then(function (data) {
         pages = data.pages || [];
         if (!pages.length) {
-          errPanel.querySelector('p').textContent = 'Chapter kosong (plugin gagal ambil halaman) — coba Retry';
+          errPanel.querySelector('p').textContent = 'Empty chapter (plugin failed to fetch pages) — try Retry';
           showError(true);
           return;
         }
@@ -344,7 +344,7 @@
         });
       })
       .catch(function (err) {
-        errPanel.querySelector('p').textContent = 'Gagal memuat chapter: ' + err.message;
+        errPanel.querySelector('p').textContent = 'Failed to load chapter: ' + err.message;
         showError(true);
       });
   }

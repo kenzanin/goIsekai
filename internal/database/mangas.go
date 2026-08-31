@@ -1,6 +1,8 @@
 package database
 
 import (
+	"database/sql"
+
 	. "github.com/go-jet/jet/v2/sqlite"
 	"goisekai/internal/database/.gen/model"
 	. "goisekai/internal/database/.gen/table"
@@ -50,6 +52,20 @@ func (d *DB) ToggleLibrary(mangaID string) error {
 		WHERE(Mangas.ID.EQ(String(mangaID))).
 		Exec(d.db)
 	return err
+}
+
+// IsInLibrary reports whether a manga is currently saved in the library.
+// A missing row simply means "not in library".
+func (d *DB) IsInLibrary(mangaID string) (bool, error) {
+	var inLib int
+	err := d.db.QueryRow(`SELECT in_library FROM mangas WHERE id = ?`, mangaID).Scan(&inLib)
+	if err == sql.ErrNoRows {
+		return false, nil
+	}
+	if err != nil {
+		return false, err
+	}
+	return inLib == 1, nil
 }
 
 // ListLibrary returns all in-library manga ordered by last update.

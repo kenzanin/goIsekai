@@ -8,7 +8,7 @@
     <pre class="text-xs font-mono text-neutral-300 whitespace-pre-wrap break-all border-b border-neutral-900 py-0.5">{{l}}</pre>
     {{end}}
     {{if len(.Logs) == 0}}
-    <div class="py-16 text-center text-neutral-500">Belum ada log</div>
+    <div class="py-16 text-center text-neutral-500">No logs yet</div>
     {{end}}
 </div>
 {{ end }}

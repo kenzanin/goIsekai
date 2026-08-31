@@ -16,6 +16,15 @@ func (s *AppService) SearchManga(pluginID string, filter types.SearchFilter) ([]
 	return result, nil
 }
 
+// IsInLibrary reports whether a manga (by source ids) is in the library.
+func (s *AppService) IsInLibrary(pluginID, mangaID string) bool {
+	ok, err := s.db.IsInLibrary(mangaRowID(pluginID, mangaID))
+	if err != nil {
+		return false
+	}
+	return ok
+}
+
 // GetMangaDetails fetches a manga and its chapter list from a plugin, persists
 // both to the database as a side effect (so progress can be tracked later),
 // and returns the original plugin types unchanged.

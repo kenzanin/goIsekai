@@ -44,7 +44,7 @@
         <label for="read_ahead" class="block text-sm font-medium mb-1">Read Ahead (pages to prefetch)</label>
         <input id="read_ahead" name="read_ahead" type="number" min="0" max="10" value="3" class="w-full bg-neutral-900 border border-neutral-700 rounded-md px-3 py-2 text-sm">
     </div>
-    <button type="submit" class="bg-indigo-600 hover:bg-indigo-500 text-white rounded-md px-4 py-2 text-sm font-medium">Simpan</button>
+    <button type="submit" class="bg-indigo-600 hover:bg-indigo-500 text-white rounded-md px-4 py-2 text-sm font-medium">Save</button>
 </form>
 <script>
 (function () {
@@ -56,6 +56,6 @@
 })();
 </script>
 {{else}}
-<div class="py-16 text-center text-neutral-500">Gagal memuat konfigurasi</div>
+<div class="py-16 text-center text-neutral-500">Failed to load configuration</div>
 {{end}}
 {{ end }}

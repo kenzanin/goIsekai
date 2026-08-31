@@ -28,11 +28,11 @@
         <div class="flex flex-wrap items-center gap-2 mb-4">
             {{if .Continue}}
             <a href="/view/read/{{.PluginID}}/{{.MangaID}}/{{.Continue.ChapterID}}?page={{.Continue.Page}}" class="bg-indigo-600 hover:bg-indigo-500 text-white rounded-md px-4 py-2 text-sm font-medium">
-                {{if .Continue.Page > 1}}▶ Lanjut: Ch. {{formatChapterNum(.Continue.ChapterN)}} · hal. {{.Continue.Page}}{{else}}▶ Mulai baca{{end}}
+                {{if .Continue.Page > 1}}▶ Continue Reading: Ch. {{formatChapterNum(.Continue.ChapterN)}} · p. {{.Continue.Page}}{{else}}▶ Start Reading{{end}}
             </a>
             {{end}}
             <form method="post" action="/action/toggle-library/{{.PluginID}}/{{.MangaID}}">
-                <button type="submit" class="bg-neutral-700 hover:bg-neutral-600 text-white rounded-md px-4 py-2 text-sm font-medium">+ / − Library</button>
+                {{if .InLibrary}}<button type="submit" class="bg-emerald-600 hover:bg-emerald-500 text-white rounded-md px-4 py-2 text-sm font-medium">✓ In Library</button>{{else}}<button type="submit" class="bg-neutral-700 hover:bg-neutral-600 text-white rounded-md px-4 py-2 text-sm font-medium">+ Add to Library</button>{{end}}
             </form>
         </div>
     </div>
@@ -40,7 +40,7 @@
 
 <h2 class="text-xl font-semibold mb-4">Chapters</h2>
 {{if len(.Chapters) == 0}}
-<div class="py-16 text-center text-neutral-500">Belum ada chapter</div>
+<div class="py-16 text-center text-neutral-500">No chapters yet</div>
 {{else}}
 <div class="divide-y divide-neutral-800">
     {{range i, c := .Chapters }}

@@ -10,7 +10,7 @@
 </div>
 
 {{if len(.Plugins) == 0}}
-<div class="py-16 text-center text-neutral-500">Belum ada plugin terpasang</div>
+<div class="py-16 text-center text-neutral-500">No plugins installed</div>
 {{else}}
 <div class="space-y-3">
     {{range i, p := .Plugins }}

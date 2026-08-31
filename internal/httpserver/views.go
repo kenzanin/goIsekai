@@ -70,13 +70,15 @@ func (s *Server) viewMangaDetail(w http.ResponseWriter, r *http.Request) {
 		progress = map[string]database.ChapterProgress{}
 	}
 	continueTo := computeContinue(chapters, progress)
+	inLibrary := s.service.IsInLibrary(pluginID, mangaID)
 	s.renderPage(w, "views/detail.jet", "search", map[string]any{
-		"PluginID": pluginID,
-		"MangaID":  mangaID,
-		"Manga":    manga,
-		"Chapters": chapters,
-		"Progress": progress,
-		"Continue": continueTo,
+		"PluginID":  pluginID,
+		"MangaID":   mangaID,
+		"Manga":     manga,
+		"Chapters":  chapters,
+		"Progress":  progress,
+		"Continue":  continueTo,
+		"InLibrary": inLibrary,
 	})
 }
 
