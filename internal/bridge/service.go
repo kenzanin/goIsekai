@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"sync"
+	"time"
 
 	"goisekai/internal/config"
 	"goisekai/internal/database"
@@ -26,6 +27,9 @@ type AppService struct {
 	cacheDir   string
 	imageMu    sync.RWMutex
 	imageCache map[string][]byte
+	imgSem     chan struct{} // caps concurrent image fetches per host process
+	imgPaceMu  sync.Mutex
+	imgPace    map[string]time.Time // host -> earliest allowed next request (MD@Home pacing)
 }
 
 // NewAppService returns an AppService backed by the supplied database, plugin

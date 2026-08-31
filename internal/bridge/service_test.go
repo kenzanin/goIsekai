@@ -171,7 +171,9 @@ func TestGetImageNonSuccessNotCached(t *testing.T) {
 	if _, err := s.GetImage("plugin-x", srv.URL+"/missing.png", nil, "", ""); err == nil {
 		t.Fatal("expected error on second call too")
 	}
-	if got := hits.Load(); got != 2 {
-		t.Errorf("expected 2 network hits (error responses not cached), got %d", got)
+	// Each GetImage retries up to 3 attempts (at-home burst rate-limit
+	// workaround), so two calls observe 6 upstream hits.
+	if got := hits.Load(); got != 6 {
+		t.Errorf("expected 6 network hits (2 calls x 3 attempts, errors not cached), got %d", got)
 	}
 }

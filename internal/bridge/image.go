@@ -9,8 +9,11 @@ import (
 	_ "image/jpeg" // register jpeg decoder for image.Decode
 	_ "image/png"  // register png decoder for image.Decode
 	"net/http"
+	neturl "net/url"
 	"os"
 	"path/filepath"
+	"strconv"
+	"time"
 
 	"github.com/gen2brain/webp"
 
@@ -58,11 +61,37 @@ func (s *AppService) GetImage(pluginID, url string, headers map[string]string, m
 	}
 
 	logger.Debug("fetching image", "url", url, "plugin", pluginID)
-	resp, err := s.proxy.Request(pluginID, types.HTTPRequest{
-		Method:  http.MethodGet,
-		URL:     url,
-		Headers: headers,
-	})
+	// At-home image nodes 404 bursts: a browser's draw+prefetch fires several
+	// fetches at once. Serialize per host and pace requests ~1s apart (the
+	// upstream convention for MD@Home), retrying with backoff before giving up.
+	if s.imgSem == nil {
+		s.imgSem = make(chan struct{}, 1)
+	}
+	s.imgSem <- struct{}{}
+	host := func() string {
+		if u, err := neturl.Parse(url); err == nil && u.Host != "" {
+			return u.Host
+		}
+		return url
+	}()
+	var resp types.HTTPResponse
+	var err error
+	for attempt := 0; attempt < 3; attempt++ {
+		if attempt > 0 {
+			time.Sleep(time.Duration(attempt*attempt) * 2500 * time.Millisecond)
+		}
+		s.paceImage(host)
+		resp, err = s.proxy.Request(pluginID, types.HTTPRequest{
+			Method:  http.MethodGet,
+			URL:     url,
+			Headers: headers,
+		})
+		if err == nil && resp.Status >= 200 && resp.Status < 300 {
+			break
+		}
+		logger.Warn("image fetch retrying", "url", url, "attempt", attempt+1, "status", respStatus(resp, err))
+	}
+	<-s.imgSem
 	if err != nil {
 		logger.Error("image fetch failed", "url", url, "error", err)
 		return nil, fmt.Errorf("bridge: get image %s: %w", url, err)
@@ -128,4 +157,33 @@ func webpOrOriginal(data []byte) ([]byte, bool) {
 		return data, false
 	}
 	return buf.Bytes(), true
+}
+
+// respStatus formats the status/err of a retry attempt for logging.
+func respStatus(resp types.HTTPResponse, err error) string {
+	if err != nil {
+		return err.Error()
+	}
+	return strconv.Itoa(resp.Status)
+}
+
+// paceImage blocks until at least a second has passed since the previous
+// request to the same host — MD@Home nodes 404 rapid bursts (upstream
+// convention is ~1 request/second per node).
+func (s *AppService) paceImage(host string) {
+	const gap = 1100 * time.Millisecond
+	s.imgPaceMu.Lock()
+	if s.imgPace == nil {
+		s.imgPace = make(map[string]time.Time)
+	}
+	next, ok := s.imgPace[host]
+	if !ok || time.Now().After(next) {
+		s.imgPace[host] = time.Now().Add(gap)
+		s.imgPaceMu.Unlock()
+		return
+	}
+	wait := time.Until(next)
+	s.imgPace[host] = next.Add(gap) // reserve a slot for this request
+	s.imgPaceMu.Unlock()
+	time.Sleep(wait)
 }
