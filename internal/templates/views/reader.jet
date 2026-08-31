@@ -215,11 +215,12 @@
   }
 
   function afterImage() {
-    if (!measure()) { nextFrame(function () { measure(); resetZoom(); }); return; }
-    resetZoom();
+    if (!measure()) { nextFrame(function () { measure(); restoreZoom(); }); return; }
+    restoreZoom();
   }
 
-  function resetZoom() { zoom = 1; panX = 0; panY = 0; calcBaseScale(); render(); }
+  function resetZoom() { zoom = 1; panX = 0; panY = 0; localStorage.setItem('gi_zoom_' + viewMode, '1'); calcBaseScale(); render(); }
+  function restoreZoom() { zoom = parseFloat(localStorage.getItem('gi_zoom_' + viewMode)) || 1; panX = 0; panY = 0; calcBaseScale(); render(); }
 
   function goToPage(i) {
     if (i < 0 || i >= pages.length) return;
@@ -249,6 +250,7 @@
     panX = mx - (mx - panX) * sc;
     panY = my - (my - panY) * sc;
     zoom = nz;
+    localStorage.setItem('gi_zoom_' + viewMode, String(zoom));
     clampPan(); render();
   }
 
@@ -298,7 +300,7 @@
   fitBtn.addEventListener('click', function () {
     viewMode = fitOrder[(fitOrder.indexOf(viewMode) + 1) % fitOrder.length];
     localStorage.setItem('gi_viewMode', viewMode);
-    syncFitLabel(); resetZoom();
+    syncFitLabel(); restoreZoom();
   });
   syncFitLabel();
 

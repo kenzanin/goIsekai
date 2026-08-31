@@ -56,15 +56,15 @@
         <a href="/view/read/{{.PluginID}}/{{.MangaID}}/{{c.ID}}" class="flex-1 flex items-center justify-between gap-4 min-w-0">
             <span class="text-sm">
                 <span class="text-neutral-400 mr-2">Ch. {{formatChapterNum(c.ChapterNum)}}</span>
-                {{if .Progress[c.ID].TotalPages > 0}}{{if .Progress[c.ID].LastPageRead >= .Progress[c.ID].TotalPages}}<span class="line-through text-neutral-500">{{c.Title}}</span>{{else}}{{c.Title}}{{end}}{{end}}
+                {{if .Progress[c.ID].IsRead}}<span class="line-through text-neutral-500">{{c.Title}}</span>{{else}}{{c.Title}}{{end}}
             </span>
             <span class="flex items-center gap-2 shrink-0">
                 {{if .Progress[c.ID].LastPageRead > 0}}
                 <span class="text-xs px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400">{{.Progress[c.ID].LastPageRead}}{{if .Progress[c.ID].TotalPages > 0}}/{{.Progress[c.ID].TotalPages}}{{end}}</span>
                 {{end}}
-                {{if .Progress[c.ID].TotalPages > 0}}{{if .Progress[c.ID].LastPageRead >= .Progress[c.ID].TotalPages}}
+                {{if .Progress[c.ID].IsRead}}
                 <span class="text-emerald-400 text-xs">✓</span>
-                {{end}}{{end}}
+                {{end}}
                 <span class="text-xs text-neutral-500">{{formatDate(c.ReleasedAt.Format("2006-01-02T15:04:05"))}}</span>
             </span>
         </a>
