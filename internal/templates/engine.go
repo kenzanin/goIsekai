@@ -57,6 +57,7 @@ func New(devMode bool) (*Engine, error) {
 	set.AddGlobal("formatChapterNum", formatChapterNum)
 	set.AddGlobal("getInitials", getInitials)
 	set.AddGlobal("add", add)
+	set.AddGlobal("ratioAt", ratioAt)
 
 	return &Engine{Set: set}, nil
 }
@@ -128,6 +129,12 @@ func formatChapterNum(n any) string {
 // is needed.
 func chapterFloat(f float64) string {
 	return strconv.FormatFloat(f, 'f', -1, 64)
+}
+
+// ratioAt looks up a plugin's thumb ratio by id, returning 0 when unknown —
+// jet v6 has no map index() at runtime, so the map lookup lives here.
+func ratioAt(ratios map[string]float64, pluginID string) float64 {
+	return ratios[pluginID]
 }
 
 // getInitials returns the uppercase first letter of the first two words of

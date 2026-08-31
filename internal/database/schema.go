@@ -46,4 +46,12 @@ var migrations = []string{
     icon_url TEXT
 );`,
 	`ALTER TABLE chapters ADD COLUMN total_pages INTEGER DEFAULT 0;`,
+	`CREATE TABLE IF NOT EXISTS plugin_verify (
+    plugin_id TEXT PRIMARY KEY,
+    verify_url TEXT NOT NULL DEFAULT '',
+    cookies TEXT NOT NULL DEFAULT '',
+    user_agent TEXT NOT NULL DEFAULT '',
+    updated_at INTEGER NOT NULL DEFAULT 0
+);`,
+	`ALTER TABLE plugins ADD COLUMN thumb_ratio REAL DEFAULT 0;`,
 }

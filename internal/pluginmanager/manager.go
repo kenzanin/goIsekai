@@ -40,6 +40,8 @@ type loadedPlugin struct {
 	fn map[string]api.Function
 	// contractVersion is the plugin's resolved contract_version.
 	contractVersion int32
+	// meta is the metadata the plugin declared in its optional Init export.
+	meta types.PluginMeta
 	// mu serializes invocations: api.Function.Call is not goroutine-safe, and a
 	// single plugin instance must not be re-entered concurrently.
 	mu sync.Mutex
@@ -176,9 +178,12 @@ func copyFile(src, dst string) error {
 
 // LoadedPlugin is metadata about a currently-loaded plugin.
 type LoadedPlugin struct {
-	ID       string
-	Version  string // ABI contract version (e.g. "1")
-	WasmPath string
+	ID               string
+	Version          string // ABI contract version (e.g. "1")
+	WasmPath         string
+	VerifyURL        string // from the plugin's optional Init metadata
+	NeedsHumanVerify bool
+	ThumbRatio       float64
 }
 
 // LoadedPlugins returns metadata for every plugin currently loaded in memory,
@@ -189,9 +194,12 @@ func (m *Manager) LoadedPlugins() []LoadedPlugin {
 	out := make([]LoadedPlugin, 0, len(m.plugins))
 	for _, p := range m.plugins {
 		out = append(out, LoadedPlugin{
-			ID:       p.id,
-			Version:  strconv.Itoa(int(p.contractVersion)),
-			WasmPath: p.wasmPath,
+			ID:               p.id,
+			Version:          strconv.Itoa(int(p.contractVersion)),
+			WasmPath:         p.wasmPath,
+			VerifyURL:        p.meta.VerifyURL,
+			NeedsHumanVerify: p.meta.NeedsHumanVerify,
+			ThumbRatio:       p.meta.ThumbRatio,
 		})
 	}
 	sort.Slice(out, func(i, j int) bool { return out[i].ID < out[j].ID })

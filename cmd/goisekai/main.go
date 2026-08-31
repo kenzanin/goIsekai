@@ -114,11 +114,12 @@ func main() {
 	// ListPlugins (Discover only loads them into memory).
 	for _, p := range mgr.LoadedPlugins() {
 		if err := db.RegisterPlugin(database.Plugin{
-			ID:       p.ID,
-			Name:     p.ID,
-			Version:  p.Version,
-			WasmPath: p.WasmPath,
-			IsActive: true,
+			ID:         p.ID,
+			Name:       p.ID,
+			Version:    p.Version,
+			WasmPath:   p.WasmPath,
+			IsActive:   true,
+			ThumbRatio: p.ThumbRatio,
 		}); err != nil {
 			logger.Error("register discovered plugin", "id", p.ID, "error", err)
 		}

@@ -14,6 +14,8 @@ type Proxy struct {
 	mu             sync.Mutex
 	defaultHeaders map[string]string
 	clients        map[string]tls_client.HttpClient // keyed by plugin id
+	uaOverrides    map[string]string                // per-plugin User-Agent override
+	pendingVerify  map[string]verifySeed            // cookie jar seeds awaiting client creation
 }
 
 // defaultUA is a browser-like User-Agent so requests are less likely to be
@@ -34,7 +36,9 @@ func NewProxy() *Proxy {
 			// Empty Referer by default; only injected when a plugin sets one.
 			"Referer": "",
 		},
-		clients: make(map[string]tls_client.HttpClient),
+		clients:       make(map[string]tls_client.HttpClient),
+		uaOverrides:   make(map[string]string),
+		pendingVerify: make(map[string]verifySeed),
 	}
 }
 

@@ -26,8 +26,18 @@ func (p *Proxy) client(pluginID string) (tls_client.HttpClient, error) {
 	if err != nil {
 		return nil, err
 	}
+	if seed, ok := p.pendingVerify[pluginID]; ok {
+		c.SetCookies(seed.url(), seed.cookies)
+	}
 	p.clients[pluginID] = c
 	return c, nil
+}
+
+// uaOverride returns the per-plugin User-Agent override, or "" if none is set.
+func (p *Proxy) uaOverride(pluginID string) string {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	return p.uaOverrides[pluginID]
 }
 
 // buildHeaders assembles the complete header set for a request. tls-client

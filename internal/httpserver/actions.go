@@ -23,6 +23,7 @@ func (s *Server) registerActionRoutes() {
 	s.Router.Post("/action/mark-read-bulk", s.handleMarkChaptersReadBulk)
 	s.Router.Post("/action/mark-read-range/{pluginID}/{mangaID}/{fromID}/{toID}", s.handleMarkChapterReadRange)
 	s.Router.Post("/action/save-settings", s.handleSaveSettings)
+	s.Router.Post("/action/save-verify/{pluginID}", s.handleSaveVerify)
 }
 
 // hxRedirect answers a successful action with a 303 See Other redirect —
@@ -186,6 +187,22 @@ func (s *Server) handleMarkChapterReadRange(w http.ResponseWriter, r *http.Reque
 		return
 	}
 	s.hxRedirect(w, "/view/manga/"+pluginID+"/"+mangaID)
+}
+
+// handleSaveVerify stores pasted verification cookies/UA for a plugin.
+func (s *Server) handleSaveVerify(w http.ResponseWriter, r *http.Request) {
+	pluginID := r.PathValue("pluginID")
+	if err := r.ParseForm(); err != nil {
+		s.logger.Error("save verify: parse form", "error", err)
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	if err := s.service.SavePluginVerify(pluginID, r.FormValue("cookies"), r.FormValue("user_agent")); err != nil {
+		s.logger.Error("save verify", "pluginID", pluginID, "error", err)
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	s.hxRedirect(w, "/view/plugins")
 }
 
 // handleSaveSettings applies only the settings keys present in the form and

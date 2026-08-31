@@ -27,6 +27,14 @@ func derefBool(p *int64) bool {
 	return p != nil && *p != 0
 }
 
+// derefFloat returns the value pointed to by p, or 0 if p is nil.
+func derefFloat(p *float64) float64 {
+	if p != nil {
+		return *p
+	}
+	return 0
+}
+
 // derefTime returns the time pointed to by p, or the zero time if p is nil.
 func derefTime(p *time.Time) time.Time {
 	if p != nil {
@@ -54,11 +62,12 @@ func mangaFromModel(m model.Mangas) Manga {
 // pluginFromModel maps a jet-managed Plugin struct onto the public Plugin.
 func pluginFromModel(m model.Plugins) Plugin {
 	return Plugin{
-		ID:       derefStr(m.ID),
-		Name:     m.Name,
-		Version:  m.Version,
-		WasmPath: m.WasmPath,
-		IsActive: derefBool(m.IsActive),
-		IconURL:  derefStr(m.IconURL),
+		ID:         derefStr(m.ID),
+		Name:       m.Name,
+		Version:    m.Version,
+		WasmPath:   m.WasmPath,
+		IsActive:   derefBool(m.IsActive),
+		IconURL:    derefStr(m.IconURL),
+		ThumbRatio: derefFloat(m.ThumbRatio),
 	}
 }

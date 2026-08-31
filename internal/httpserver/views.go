@@ -2,15 +2,17 @@ package httpserver
 
 import (
 	"embed"
-	"strconv"
 	"encoding/json"
+	"errors"
 	"io/fs"
 	"net/http"
+	"strconv"
 
 	"github.com/go-chi/chi/v5"
 
 	"goisekai/internal/config"
 	"goisekai/internal/database"
+	"goisekai/internal/hostnet"
 	"goisekai/pkg/types"
 )
 
@@ -29,7 +31,11 @@ func (s *Server) viewLibrary(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		s.logger.Error("library list", "error", err)
 	}
-	s.renderPage(w, "views/library.jet", "library", map[string]any{"Mangas": mangas})
+	ratios := make(map[string]float64)
+	for id, m := range s.service.PluginMetas() {
+		ratios[id] = m.ThumbRatio
+	}
+	s.renderPage(w, "views/library.jet", "library", map[string]any{"Mangas": mangas, "Ratios": ratios})
 }
 
 // viewSearch renders the search form and, when q+pluginID are present, results.
@@ -45,19 +51,29 @@ func (s *Server) viewSearch(w http.ResponseWriter, r *http.Request) {
 		page = 1
 	}
 	var results []types.Manga
+	challenge := false
 	if q != "" && pluginID != "" {
 		results, err = s.service.SearchManga(pluginID, types.SearchFilter{Query: q, Page: page})
 		if err != nil {
-			s.logger.Error("search", "error", err, "plugin", pluginID, "q", q)
+			var ch *hostnet.ChallengeError
+			if errors.As(err, &ch) {
+				challenge = true
+				results = nil
+				s.logger.Warn("search blocked by challenge", "plugin", pluginID, "q", q)
+			} else {
+				s.logger.Error("search", "error", err, "plugin", pluginID, "q", q)
+			}
 		}
 	}
 	s.renderPage(w, "views/search.jet", "search", map[string]any{
-		"Plugins":  plugins,
-		"Q":        q,
-		"PluginID": pluginID,
-		"Results":  results,
-		"Page":     page,
-		"HasNext":  len(results) == 24,
+		"Plugins":    plugins,
+		"Q":          q,
+		"PluginID":   pluginID,
+		"Results":    results,
+		"Page":       page,
+		"HasNext":    len(results) == 24,
+		"ThumbRatio": s.service.PluginMeta(pluginID).ThumbRatio,
+		"Challenge":  challenge,
 	})
 }
 
@@ -66,10 +82,17 @@ func (s *Server) viewMangaDetail(w http.ResponseWriter, r *http.Request) {
 	pluginID := chi.URLParam(r, "pluginID")
 	mangaID := chi.URLParam(r, "mangaID")
 	manga, chapters, err := s.service.GetMangaDetails(pluginID, mangaID)
+	challenge := false
 	if err != nil {
-		s.logger.Error("manga detail", "error", err, "plugin", pluginID, "manga", mangaID)
-		http.Error(w, "failed to load manga: "+err.Error(), http.StatusBadGateway)
-		return
+		var ch *hostnet.ChallengeError
+		if errors.As(err, &ch) {
+			challenge = true
+			s.logger.Warn("manga detail blocked by challenge", "plugin", pluginID, "manga", mangaID)
+		} else {
+			s.logger.Error("manga detail", "error", err, "plugin", pluginID, "manga", mangaID)
+			http.Error(w, "failed to load manga: "+err.Error(), http.StatusBadGateway)
+			return
+		}
 	}
 	progress, err := s.service.GetChapterProgresses(pluginID, mangaID)
 	if err != nil {
@@ -86,6 +109,7 @@ func (s *Server) viewMangaDetail(w http.ResponseWriter, r *http.Request) {
 		"Progress":  progress,
 		"Continue":  continueTo,
 		"InLibrary": inLibrary,
+		"Challenge": challenge,
 	})
 }
 
@@ -115,13 +139,39 @@ func computeContinue(chapters []types.Chapter, progress map[string]database.Chap
 	return firstUnread
 }
 
+// PluginView enriches a database plugin with runtime verify metadata and the
+// declared thumbnail ratio for the plugins page.
+type PluginView struct {
+	database.Plugin
+	VerifyURL        string
+	NeedsHumanVerify bool
+	VerifyCookies    string
+	VerifyUserAgent  string
+	ThumbRatio       float64 // runtime meta; shadows database.Plugin.ThumbRatio (0 for bridge-installed plugins)
+}
+
 // viewPlugins renders the plugin manager page.
 func (s *Server) viewPlugins(w http.ResponseWriter, _ *http.Request) {
 	plugins, err := s.service.ListPlugins()
 	if err != nil {
 		s.logger.Error("plugin list", "error", err)
 	}
-	s.renderPage(w, "views/plugins.jet", "plugins", map[string]any{"Plugins": plugins})
+	metas := s.service.PluginMetas()
+	views := make([]PluginView, 0, len(plugins))
+	for _, p := range plugins {
+		v := PluginView{Plugin: p}
+		if m, ok := metas[p.ID]; ok {
+			v.VerifyURL = m.VerifyURL
+			v.NeedsHumanVerify = m.NeedsHumanVerify
+			v.ThumbRatio = m.ThumbRatio
+		}
+		if row, ok, err := s.service.GetPluginVerifyState(p.ID); err == nil && ok {
+			v.VerifyCookies = row.Cookies
+			v.VerifyUserAgent = row.UserAgent
+		}
+		views = append(views, v)
+	}
+	s.renderPage(w, "views/plugins.jet", "plugins", map[string]any{"Plugins": views})
 }
 
 // viewSettings renders the current goisekai.ini values.

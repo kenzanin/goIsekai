@@ -26,9 +26,13 @@
     {{range i, r := .Results }}
     <a href="/view/manga/{{.PluginID}}/{{r.ID}}" class="bg-neutral-900 rounded-lg overflow-hidden hover:ring-1 hover:ring-indigo-500 transition">
         {{if r.CoverURL != ""}}
-        <img src="/image?pluginID={{.PluginID}}&amp;url={{r.CoverURL}}" alt="{{r.Title}}" class="h-64 w-full object-cover" loading="lazy">
+        {{if .ThumbRatio > 0}}
+        <img src="/image?pluginID={{.PluginID}}&amp;url={{r.CoverURL}}" alt="{{r.Title}}" style="aspect-ratio: {{.ThumbRatio}}" class="w-full object-cover" loading="lazy">
         {{else}}
-        <div class="h-64 w-full bg-neutral-800 flex items-center justify-center text-neutral-500 text-2xl font-semibold">{{getInitials(r.Title)}}</div>
+        <img src="/image?pluginID={{.PluginID}}&amp;url={{r.CoverURL}}" alt="{{r.Title}}" class="w-full aspect-[2/3] object-cover" loading="lazy">
+        {{end}}
+        {{else}}
+        <div class="w-full aspect-[2/3] bg-neutral-800 flex items-center justify-center text-neutral-500 text-2xl font-semibold">{{getInitials(r.Title)}}</div>
         {{end}}
         <div class="p-3">
             <div class="text-sm font-medium line-clamp-2">{{r.Title}}</div>
@@ -54,5 +58,8 @@
 {{if .Q != ""}}
 <div class="py-16 text-center text-neutral-500">No results for "{{.Q}}"</div>
 {{end}}
+{{end}}
+{{if .Challenge}}
+<div class="bg-amber-500/15 border border-amber-500/40 text-amber-300 rounded-lg p-4 mb-6">This site needs human verification — go to <a href="/view/plugins" class="underline">Plugins &rarr; Human Verification</a> to paste your session cookies.</div>
 {{end}}
 {{ end }}

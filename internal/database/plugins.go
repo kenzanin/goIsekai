@@ -15,6 +15,7 @@ func (d *DB) RegisterPlugin(p Plugin) error {
 		Plugins.WasmPath,
 		Plugins.IsActive,
 		Plugins.IconURL,
+		Plugins.ThumbRatio,
 	).VALUES(
 		p.ID,
 		p.Name,
@@ -22,6 +23,7 @@ func (d *DB) RegisterPlugin(p Plugin) error {
 		p.WasmPath,
 		boolToInt(p.IsActive),
 		p.IconURL,
+		Float(p.ThumbRatio),
 	).ON_CONFLICT(Plugins.ID).DO_UPDATE(
 		SET(
 			Plugins.Name.SET(Plugins.EXCLUDED.Name),
@@ -29,6 +31,7 @@ func (d *DB) RegisterPlugin(p Plugin) error {
 			Plugins.WasmPath.SET(Plugins.EXCLUDED.WasmPath),
 			Plugins.IsActive.SET(Plugins.EXCLUDED.IsActive),
 			Plugins.IconURL.SET(Plugins.EXCLUDED.IconURL),
+			Plugins.ThumbRatio.SET(Plugins.EXCLUDED.ThumbRatio),
 		),
 	).Exec(d.db)
 	return err

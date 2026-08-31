@@ -2,6 +2,7 @@ package pluginmanager
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 
@@ -60,6 +61,7 @@ func (m *Manager) load(rt wazero.Runtime, id, wasmPath string) (*loadedPlugin, e
 		}
 		p.fn[name] = f
 	}
+	p.meta = m.readInit(p)
 	return p, nil
 }
 
@@ -131,4 +133,40 @@ func (m *Manager) hostHTTPRequest(ctx context.Context, mod api.Module, ptr, leng
 // (low 32 bits = pointer, high 32 bits = length).
 func pack(ptr, length uint32) uint64 {
 	return uint64(length)<<32 | uint64(ptr)
+}
+
+// readInit optionally invokes a plugin's Init export to collect its declared
+// metadata (verify_url, needs_human_verify, thumb_ratio). Init is optional
+// (D7: no ABI version bump), so an absent or failing Init is not fatal: the
+// plugin simply contributes zero metadata.
+func (m *Manager) readInit(p *loadedPlugin) types.PluginMeta {
+	initFn := p.mod.ExportedFunction(types.InitFunc)
+	if initFn == nil {
+		return types.PluginMeta{}
+	}
+	ctx, cancel := context.WithTimeout(m.ctx, invokeTimeout)
+	defer cancel()
+	results, err := initFn.Call(ctx)
+	if err != nil {
+		logger.Debug("plugin Init failed", "id", p.id, "error", err)
+		return types.PluginMeta{}
+	}
+	if len(results) == 0 {
+		return types.PluginMeta{}
+	}
+	outPtr, outLen := unpack(results[0])
+	if outPtr == 0 || outLen == 0 {
+		return types.PluginMeta{}
+	}
+	defer m.free(p, outPtr)
+	out, ok := p.mod.Memory().Read(outPtr, outLen)
+	if !ok {
+		return types.PluginMeta{}
+	}
+	var meta types.PluginMeta
+	if err := json.Unmarshal(out, &meta); err != nil {
+		logger.Debug("plugin Init returned invalid JSON", "id", p.id, "error", err)
+		return types.PluginMeta{}
+	}
+	return meta
 }

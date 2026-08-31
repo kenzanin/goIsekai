@@ -52,6 +52,13 @@ func free(ptr uint32) {
 //go:wasmexport contract_version
 func contractVersion() int32 { return abiVersion }
 
+//go:wasmexport Init
+func Init() uint64 {
+	// MangaDex has no anti-bot challenge, so only the cover aspect ratio is
+	// declared (256/364 ≈ 0.703); no verify_url / needs_human_verify.
+	return returnJSON(types.PluginMeta{ThumbRatio: 0.703})
+}
+
 // readString reinterprets a (ptr, len) pair in WASM linear memory as a Go string.
 func readString(ptr, length uint32) string {
 	return unsafe.String((*byte)(unsafe.Pointer(uintptr(ptr))), int(length))
@@ -200,12 +207,12 @@ type chapterData struct {
 	ID         string `json:"id"`
 	Type       string `json:"type"`
 	Attributes struct {
-		Volume    string `json:"volume"`
-		Chapter   string `json:"chapter"`
-		Title     string `json:"title"`
-		PublishAt string `json:"publishAt"`
+		Volume             string `json:"volume"`
+		Chapter            string `json:"chapter"`
+		Title              string `json:"title"`
+		PublishAt          string `json:"publishAt"`
 		TranslatedLanguage string `json:"translatedLanguage"`
-		ExternalURL string `json:"externalUrl"`
+		ExternalURL        string `json:"externalUrl"`
 	} `json:"attributes"`
 }
 

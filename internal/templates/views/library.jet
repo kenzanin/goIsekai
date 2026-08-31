@@ -18,9 +18,13 @@
     {{range i, m := .Mangas }}
     <a href="/view/manga/{{m.PluginID}}/{{m.SourceMangaID}}" class="bg-neutral-900 rounded-lg overflow-hidden hover:ring-1 hover:ring-indigo-500 transition">
         {{if m.CoverURL != ""}}
-        <img src="/image?pluginID={{m.PluginID}}&amp;url={{m.CoverURL}}" alt="{{m.Title}}" class="h-64 w-full object-cover" loading="lazy">
+        {{if ratioAt(.Ratios, m.PluginID) > 0}}
+        <img src="/image?pluginID={{m.PluginID}}&amp;url={{m.CoverURL}}" alt="{{m.Title}}" style="aspect-ratio: {{ratioAt(.Ratios, m.PluginID)}}" class="w-full object-cover" loading="lazy">
         {{else}}
-        <div class="h-64 w-full bg-neutral-800 flex items-center justify-center text-neutral-500 text-2xl font-semibold">{{getInitials(m.Title)}}</div>
+        <img src="/image?pluginID={{m.PluginID}}&amp;url={{m.CoverURL}}" alt="{{m.Title}}" class="w-full aspect-[2/3] object-cover" loading="lazy">
+        {{end}}
+        {{else}}
+        <div class="w-full aspect-[2/3] bg-neutral-800 flex items-center justify-center text-neutral-500 text-2xl font-semibold">{{getInitials(m.Title)}}</div>
         {{end}}
         <div class="p-3">
             <div class="text-sm font-medium line-clamp-2">{{m.Title}}</div>

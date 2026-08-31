@@ -12,6 +12,7 @@ package table
 func UseSchema(schema string) {
 	Chapters = Chapters.FromSchema(schema)
 	Mangas = Mangas.FromSchema(schema)
+	PluginVerify = PluginVerify.FromSchema(schema)
 	Plugins = Plugins.FromSchema(schema)
 	ReadHistory = ReadHistory.FromSchema(schema)
 }

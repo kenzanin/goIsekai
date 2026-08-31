@@ -44,12 +44,13 @@ type ChapterProgress struct {
 }
 
 type Plugin struct {
-	ID       string
-	Name     string
-	Version  string
-	WasmPath string
-	IsActive bool
-	IconURL  string
+	ID         string
+	Name       string
+	Version    string
+	WasmPath   string
+	IsActive   bool
+	IconURL    string
+	ThumbRatio float64
 }
 
 const (

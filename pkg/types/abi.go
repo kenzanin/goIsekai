@@ -19,6 +19,9 @@ const (
 	// ContractVersionFunc is exported by each plugin and returns the ABI
 	// version it was compiled against.
 	ContractVersionFunc = "contract_version"
+	// InitFunc is an optional export. When present, the host calls it once at
+	// load time with no arguments; it returns a PluginMeta JSON object.
+	InitFunc = "Init"
 )
 
 // HostHTTPRequestFunc is the host-imported function available to plugins for

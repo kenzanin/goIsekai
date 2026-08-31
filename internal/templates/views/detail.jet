@@ -1,6 +1,9 @@
 {{extends "/layouts/base.jet"}}
 
 {{ block body() }}
+{{if .Challenge}}
+<div class="bg-amber-500/15 border border-amber-500/40 text-amber-300 rounded-lg p-4 mb-6">This site needs human verification — go to <a href="/view/plugins" class="underline">Plugins &rarr; Human Verification</a> to paste your session cookies.</div>
+{{end}}
 <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
     <div class="md:col-span-1">
         {{if .Manga.CoverURL != ""}}

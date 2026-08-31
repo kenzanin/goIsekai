@@ -46,6 +46,21 @@ type SearchFilter struct {
 	SortBy string   `json:"sort_by,omitempty"`
 }
 
+// PluginMeta is the metadata a plugin optionally declares in its Init response.
+// All fields are optional; plugins without Init (or an empty response)
+// contribute zero values and the host falls back to defaults (0 thumb_ratio →
+// 2:3 aspect ratio in the UI).
+type PluginMeta struct {
+	// VerifyURL is where the user must go to solve a challenge for this source.
+	VerifyURL string `json:"verify_url,omitempty"`
+	// NeedsHumanVerify reports that this source's site shows a challenge that
+	// requires a one-time manual verification.
+	NeedsHumanVerify bool `json:"needs_human_verify,omitempty"`
+	// ThumbRatio is the cover width/height ratio (e.g. 0.703) used by the UI
+	// to reserve cover space before images load. 0 means use the 2:3 default.
+	ThumbRatio float64 `json:"thumb_ratio,omitempty"`
+}
+
 // HTTPRequest is the request payload a plugin passes to the host-imported
 // host_http_request function.
 type HTTPRequest struct {
