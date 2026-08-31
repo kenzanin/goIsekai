@@ -256,6 +256,102 @@ func TestPersistenceAcrossRestart(t *testing.T) {
 	}
 }
 
+// TestMarkChapterReadRange covers range marking: mid-range chapters marked,
+// out-of-range untouched, order-independent (from > to still marks min..max),
+// and scoped to the manga.
+func TestMarkChapterReadRange(t *testing.T) {
+	db := openTestDB(t)
+
+	if err := db.UpsertManga(Manga{ID: "m1", PluginID: "p1", SourceMangaID: "s1", Title: "R"}); err != nil {
+		t.Fatalf("upsert manga: %v", err)
+	}
+	// A second manga shares a source chapter id to prove range scoping.
+	if err := db.UpsertManga(Manga{ID: "m2", PluginID: "p1", SourceMangaID: "s2", Title: "Other"}); err != nil {
+		t.Fatalf("upsert manga 2: %v", err)
+	}
+	chapters := []Chapter{
+		{ID: "c1", MangaID: "m1", SourceChapterID: "cs1", Title: "Ch1", ChapterNum: 1},
+		{ID: "c2", MangaID: "m1", SourceChapterID: "cs2", Title: "Ch2", ChapterNum: 2},
+		{ID: "c3", MangaID: "m1", SourceChapterID: "cs3", Title: "Ch3", ChapterNum: 3},
+		{ID: "c4", MangaID: "m1", SourceChapterID: "cs4", Title: "Ch4", ChapterNum: 4},
+		{ID: "c5", MangaID: "m1", SourceChapterID: "cs5", Title: "Ch5", ChapterNum: 5},
+		{ID: "d1", MangaID: "m2", SourceChapterID: "cs2", Title: "Other2", ChapterNum: 2},
+	}
+	for _, c := range chapters {
+		if err := db.UpsertChapter(c); err != nil {
+			t.Fatalf("upsert chapter %s: %v", c.ID, err)
+		}
+	}
+
+	assertRead := func(want map[string]bool) {
+		t.Helper()
+		rows, err := db.GetChapterProgressForManga("m1")
+		if err != nil {
+			t.Fatalf("GetChapterProgressForManga: %v", err)
+		}
+		if len(rows) != 5 {
+			t.Fatalf("want 5 rows, got %d", len(rows))
+		}
+		for _, p := range rows {
+			if p.IsRead != want[p.SourceChapterID] {
+				t.Errorf("chapter %s: is_read=%v, want %v", p.SourceChapterID, p.IsRead, want[p.SourceChapterID])
+			}
+		}
+	}
+
+	// Middle range: cs2..cs4 marks cs2, cs3, cs4; cs1 and cs5 untouched.
+	if err := db.MarkChapterReadRange("m1", "cs2", "cs4"); err != nil {
+		t.Fatalf("MarkChapterReadRange: %v", err)
+	}
+	assertRead(map[string]bool{"cs1": false, "cs2": true, "cs3": true, "cs4": true, "cs5": false})
+
+	// The other manga's chapter sharing a source id must be untouched.
+	var otherRead int
+	if err := db.db.QueryRow(`SELECT is_read FROM chapters WHERE id = ?`, "d1").Scan(&otherRead); err != nil {
+		t.Fatalf("scan other manga: %v", err)
+	}
+	if otherRead != 0 {
+		t.Fatalf("chapter in another manga was marked read")
+	}
+
+	// Order-independent: from > to still marks the min..max span.
+	if err := db.MarkChapterReadRange("m1", "cs5", "cs1"); err != nil {
+		t.Fatalf("MarkChapterReadRange reversed: %v", err)
+	}
+	assertRead(map[string]bool{"cs1": true, "cs2": true, "cs3": true, "cs4": true, "cs5": true})
+
+	// Single-chapter range marks just that chapter.
+	if err := db.MarkChapterReadRange("m1", "cs3", "cs3"); err != nil {
+		t.Fatalf("MarkChapterReadRange single: %v", err)
+	}
+	assertRead(map[string]bool{"cs1": true, "cs2": true, "cs3": true, "cs4": true, "cs5": true})
+}
+
+// TestMarkChapterRead covers the single-chapter mark-as-read path.
+func TestMarkChapterRead(t *testing.T) {
+	db := openTestDB(t)
+
+	if err := db.UpsertManga(Manga{ID: "m1", PluginID: "p1", SourceMangaID: "s1", Title: "R"}); err != nil {
+		t.Fatalf("upsert manga: %v", err)
+	}
+	if err := db.UpsertChapter(Chapter{ID: "c1", MangaID: "m1", SourceChapterID: "cs1", Title: "Ch1", ChapterNum: 1}); err != nil {
+		t.Fatalf("upsert chapter: %v", err)
+	}
+	if err := db.MarkChapterRead("c1"); err != nil {
+		t.Fatalf("MarkChapterRead: %v", err)
+	}
+	var isRead, lastPage int
+	if err := db.db.QueryRow(`SELECT is_read, last_page_read FROM chapters WHERE id = ?`, "c1").Scan(&isRead, &lastPage); err != nil {
+		t.Fatalf("scan: %v", err)
+	}
+	if isRead != 1 {
+		t.Fatalf("is_read=%d, want 1", isRead)
+	}
+	if lastPage != 0 {
+		t.Fatalf("last_page_read=%d, want 0 (mark-read must not touch page)", lastPage)
+	}
+}
+
 // TestChapterProgressForManga covers total-pages persistence and the
 // per-manga progress read used by the detail-page badges and Continue button.
 func TestChapterProgressForManga(t *testing.T) {

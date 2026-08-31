@@ -42,23 +42,39 @@
 {{if len(.Chapters) == 0}}
 <div class="py-16 text-center text-neutral-500">No chapters yet</div>
 {{else}}
+<form id="mark-bulk" method="post" action="/action/mark-read-bulk" class="flex items-center gap-2 mb-4">
+    <input type="hidden" name="pluginID" value="{{.PluginID}}">
+    <input type="hidden" name="mangaID" value="{{.MangaID}}">
+    <button type="submit" class="bg-indigo-600 hover:bg-indigo-500 text-white rounded-md px-3 py-1.5 text-sm font-medium">Mark selected as read</button>
+</form>
+{{ firstID := "" }}
 <div class="divide-y divide-neutral-800">
     {{range i, c := .Chapters }}
-    <a href="/view/read/{{.PluginID}}/{{.MangaID}}/{{c.ID}}" class="flex items-center justify-between gap-4 py-3 px-2 -mx-2 rounded hover:bg-neutral-900 transition">
-        <span class="text-sm">
-            <span class="text-neutral-400 mr-2">Ch. {{formatChapterNum(c.ChapterNum)}}</span>
-            {{if .Progress[c.ID].TotalPages > 0}}{{if .Progress[c.ID].LastPageRead >= .Progress[c.ID].TotalPages}}<span class="line-through text-neutral-500">{{c.Title}}</span>{{else}}{{c.Title}}{{end}}{{end}}
-        </span>
-        <span class="flex items-center gap-2 shrink-0">
-            {{if .Progress[c.ID].LastPageRead > 0}}
-            <span class="text-xs px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400">{{.Progress[c.ID].LastPageRead}}{{if .Progress[c.ID].TotalPages > 0}}/{{.Progress[c.ID].TotalPages}}{{end}}</span>
-            {{end}}
-            {{if .Progress[c.ID].TotalPages > 0}}{{if .Progress[c.ID].LastPageRead >= .Progress[c.ID].TotalPages}}
-            <span class="text-emerald-400 text-xs">✓</span>
-            {{end}}{{end}}
-            <span class="text-xs text-neutral-500">{{formatDate(c.ReleasedAt.Format("2006-01-02T15:04:05"))}}</span>
-        </span>
-    </a>
+    {{if i == 0}}{{ firstID = c.ID }}{{end}}
+    <div class="flex items-center gap-3 py-3 px-2 -mx-2 rounded hover:bg-neutral-900 transition">
+        <input type="checkbox" name="chapterIDs" value="{{c.ID}}" form="mark-bulk" class="size-4 accent-indigo-600 shrink-0">
+        <a href="/view/read/{{.PluginID}}/{{.MangaID}}/{{c.ID}}" class="flex-1 flex items-center justify-between gap-4 min-w-0">
+            <span class="text-sm">
+                <span class="text-neutral-400 mr-2">Ch. {{formatChapterNum(c.ChapterNum)}}</span>
+                {{if .Progress[c.ID].TotalPages > 0}}{{if .Progress[c.ID].LastPageRead >= .Progress[c.ID].TotalPages}}<span class="line-through text-neutral-500">{{c.Title}}</span>{{else}}{{c.Title}}{{end}}{{end}}
+            </span>
+            <span class="flex items-center gap-2 shrink-0">
+                {{if .Progress[c.ID].LastPageRead > 0}}
+                <span class="text-xs px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400">{{.Progress[c.ID].LastPageRead}}{{if .Progress[c.ID].TotalPages > 0}}/{{.Progress[c.ID].TotalPages}}{{end}}</span>
+                {{end}}
+                {{if .Progress[c.ID].TotalPages > 0}}{{if .Progress[c.ID].LastPageRead >= .Progress[c.ID].TotalPages}}
+                <span class="text-emerald-400 text-xs">✓</span>
+                {{end}}{{end}}
+                <span class="text-xs text-neutral-500">{{formatDate(c.ReleasedAt.Format("2006-01-02T15:04:05"))}}</span>
+            </span>
+        </a>
+        <form method="post" action="/action/mark-read/{{.PluginID}}/{{.MangaID}}/{{c.ID}}">
+            <button type="submit" title="Mark read" class="text-xs text-indigo-400 hover:text-indigo-300 whitespace-nowrap">✓ read</button>
+        </form>
+        <form method="post" action="/action/mark-read-range/{{.PluginID}}/{{.MangaID}}/{{firstID}}/{{c.ID}}">
+            <button type="submit" title="Mark everything up to and including this chapter as read" class="text-xs text-neutral-500 hover:text-neutral-300 whitespace-nowrap">↑ mark up to here</button>
+        </form>
+    </div>
     {{end}}
 </div>
 {{end}}

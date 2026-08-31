@@ -19,6 +19,9 @@ func (s *Server) registerActionRoutes() {
 	s.Router.Post("/action/toggle-library/{pluginID}/{mangaID}", s.handleToggleLibrary)
 	s.Router.Post("/action/sync", s.handleSync)
 	s.Router.Post("/action/set-chapter-progress", s.handleSetChapterProgress)
+	s.Router.Post("/action/mark-read/{pluginID}/{mangaID}/{chapterID}", s.handleMarkChapterRead)
+	s.Router.Post("/action/mark-read-bulk", s.handleMarkChaptersReadBulk)
+	s.Router.Post("/action/mark-read-range/{pluginID}/{mangaID}/{fromID}/{toID}", s.handleMarkChapterReadRange)
 	s.Router.Post("/action/save-settings", s.handleSaveSettings)
 }
 
@@ -126,6 +129,59 @@ func (s *Server) handleSetChapterProgress(w http.ResponseWriter, r *http.Request
 	}
 	if err := s.service.SetChapterProgress(pluginID, mangaID, chapterID, page); err != nil {
 		s.logger.Error("set chapter progress", "pluginID", pluginID, "mangaID", mangaID, "chapterID", chapterID, "error", err)
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	s.hxRedirect(w, "/view/manga/"+pluginID+"/"+mangaID)
+}
+
+// handleMarkChapterRead marks a single chapter as read.
+func (s *Server) handleMarkChapterRead(w http.ResponseWriter, r *http.Request) {
+	pluginID := r.PathValue("pluginID")
+	mangaID := r.PathValue("mangaID")
+	chapterID := r.PathValue("chapterID")
+	if err := s.service.MarkChapterRead(pluginID, mangaID, chapterID); err != nil {
+		s.logger.Error("mark chapter read", "pluginID", pluginID, "mangaID", mangaID, "chapterID", chapterID, "error", err)
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	s.hxRedirect(w, "/view/manga/"+pluginID+"/"+mangaID)
+}
+
+// handleMarkChaptersReadBulk marks every chapter listed in the repeated
+// chapterIDs form field as read.
+func (s *Server) handleMarkChaptersReadBulk(w http.ResponseWriter, r *http.Request) {
+	if err := r.ParseForm(); err != nil {
+		s.logger.Error("mark chapters read: parse form", "error", err)
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	pluginID := r.FormValue("pluginID")
+	mangaID := r.FormValue("mangaID")
+	ids := r.Form["chapterIDs"]
+	if len(ids) == 0 {
+		http.Error(w, "no chapters selected", http.StatusBadRequest)
+		return
+	}
+	for _, id := range ids {
+		if err := s.service.MarkChapterRead(pluginID, mangaID, id); err != nil {
+			s.logger.Error("mark chapter read", "pluginID", pluginID, "mangaID", mangaID, "chapterID", id, "error", err)
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+	}
+	s.hxRedirect(w, "/view/manga/"+pluginID+"/"+mangaID)
+}
+
+// handleMarkChapterReadRange marks every chapter from the first referenced id
+// up to and including the second, in chapter_num order.
+func (s *Server) handleMarkChapterReadRange(w http.ResponseWriter, r *http.Request) {
+	pluginID := r.PathValue("pluginID")
+	mangaID := r.PathValue("mangaID")
+	fromID := r.PathValue("fromID")
+	toID := r.PathValue("toID")
+	if err := s.service.MarkChapterReadRange(pluginID, mangaID, fromID, toID); err != nil {
+		s.logger.Error("mark chapter read range", "pluginID", pluginID, "mangaID", mangaID, "fromID", fromID, "toID", toID, "error", err)
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}

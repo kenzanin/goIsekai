@@ -66,6 +66,30 @@ func (d *DB) SetChapterTotalPages(chapterID string, total int) error {
 	return err
 }
 
+// MarkChapterRead marks a single chapter as read without touching its page.
+func (d *DB) MarkChapterRead(chapterRowID string) error {
+	_, err := Chapters.UPDATE().
+		SET(Chapters.IsRead.SET(Int(1))).
+		WHERE(Chapters.ID.EQ(String(chapterRowID))).
+		Exec(d.db)
+	return err
+}
+
+// MarkChapterReadRange marks every chapter of the manga whose chapter_num
+// falls between the two referenced source chapter ids as read (inclusive and
+// order-independent: from > to still marks the min..max span). Plain SQL: the
+// bounds need two correlated MIN/MAX lookups that fight the jet row-mapper.
+func (d *DB) MarkChapterReadRange(mangaRowID string, fromSourceID, toSourceID string) error {
+	_, err := d.db.Exec(
+		`UPDATE chapters SET is_read = 1
+		 WHERE manga_id = ?
+		   AND chapter_num BETWEEN
+		       (SELECT MIN(chapter_num) FROM chapters WHERE manga_id = ? AND source_chapter_id IN (?, ?))
+		   AND (SELECT MAX(chapter_num) FROM chapters WHERE manga_id = ? AND source_chapter_id IN (?, ?))`,
+		mangaRowID, mangaRowID, fromSourceID, toSourceID, mangaRowID, fromSourceID, toSourceID)
+	return err
+}
+
 // GetChapterProgressForManga returns per-chapter read progress for every
 // stored chapter of a manga. Plain SQL: the projected columns don't map 1:1
 // to a generated jet model, and a hand scan is clearer than fighting the
