@@ -1,14 +1,82 @@
 {{extends "/layouts/base.jet"}}
 
 {{ block body() }}
-<h1 class="text-xl font-semibold mb-6">Logs</h1>
+<div class="flex items-center justify-between mb-4 gap-2 flex-wrap">
+    <h1 class="text-xl font-semibold">Logs <span class="text-xs font-normal text-neutral-500">last {{.Limit}} lines · ring buffer 2000</span></h1>
+    <div class="flex items-center gap-2">
+        <span id="log-paused" class="hidden text-xs px-2 py-1 rounded-md bg-amber-500/15 text-amber-400">Paused — selecting text</span>
+        <select id="log-limit" class="bg-neutral-800 border border-neutral-700 rounded-md px-2 py-1.5 text-xs">
+            {{range i, n := .Limits }}
+            <option value="{{n}}"{{if n == .Limit}} selected{{end}}>{{n}} lines</option>
+            {{end}}
+        </select>
+        <button id="log-copy" class="border border-neutral-700 hover:bg-neutral-800 rounded-md px-3 py-1.5 text-xs">Copy</button>
+        <form method="post" action="/action/clear-logs" class="inline">
+            <button type="submit" class="border border-neutral-700 hover:bg-neutral-800 rounded-md px-3 py-1.5 text-xs">Clear</button>
+        </form>
+    </div>
+</div>
 
-<div id="logview" hx-get="/view/logs" hx-trigger="every 2s" hx-select="#logview" hx-swap="outerHTML" class="space-y-0">
+<div id="logview" class="space-y-0 select-text">
     {{range i, l := .Logs }}
-    <pre class="text-xs font-mono text-neutral-300 whitespace-pre-wrap break-all border-b border-neutral-900 py-0.5">{{l}}</pre>
+    <pre class="text-xs font-mono text-neutral-300 whitespace-pre-wrap break-all border-b border-neutral-900 py-0.5 select-text">{{l}}</pre>
     {{end}}
     {{if len(.Logs) == 0}}
     <div class="py-16 text-center text-neutral-500">No logs yet</div>
     {{end}}
 </div>
+
+<script>
+(function () {
+    var view = document.getElementById('logview');
+    var pausedBadge = document.getElementById('log-paused');
+    var selecting = false;
+
+    function hasSelection() {
+        var sel = window.getSelection();
+        return !!sel && !sel.isCollapsed && sel.toString().length > 0;
+    }
+
+    document.addEventListener('selectionchange', function () {
+        selecting = hasSelection();
+        pausedBadge.classList.toggle('hidden', !selecting);
+    });
+
+    function refresh() {
+        // Skip the swap while the user is selecting/copying — outerHTML replace
+        // would destroy the selection and mid-copy pointer events.
+        if (selecting || hasSelection()) return;
+        var limit = document.getElementById('log-limit').value;
+        fetch('/view/logs?limit=' + limit + '&partial=1')
+            .then(function (r) { return r.text(); })
+            .then(function (html) {
+                var doc = new DOMParser().parseFromString(html, 'text/html');
+                var fresh = doc.getElementById('logview');
+                if (fresh) view.innerHTML = fresh.innerHTML;
+            })
+            .catch(function () {});
+    }
+    setInterval(refresh, 2000);
+
+    document.getElementById('log-copy').addEventListener('click', function () {
+        var text = view.innerText;
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(text).then(function () {
+                var b = document.getElementById('log-copy');
+                b.textContent = 'Copied ✓';
+                setTimeout(function () { b.textContent = 'Copy'; }, 1200);
+            });
+        } else {
+            var ta = document.createElement('textarea');
+            ta.value = text;
+            document.body.appendChild(ta);
+            ta.select();
+            document.execCommand('copy');
+            document.body.removeChild(ta);
+        }
+    });
+
+    document.getElementById('log-limit').addEventListener('change', function () { refresh(); });
+})();
+</script>
 {{ end }}

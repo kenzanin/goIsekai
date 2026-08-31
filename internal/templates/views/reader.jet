@@ -288,7 +288,7 @@
 
   document.getElementById('btn-prev-page').addEventListener('click', prev);
   document.getElementById('btn-next-page').addEventListener('click', next);
-  document.getElementById('btn-retry').addEventListener('click', function () { if (!pages.length) loadChapter(); else drawPage(current); });
+  document.getElementById('btn-retry').addEventListener('click', function () { loadChapter(true); });
   document.getElementById('btn-skip').addEventListener('click', next);
   document.getElementById('btn-zoom-in').addEventListener('click', function () { zoomBy(1.2); });
   document.getElementById('btn-zoom-out').addEventListener('click', function () { zoomBy(1 / 1.2); });
@@ -329,7 +329,8 @@
   window.addEventListener('resize', function () { if (measure()) render(); });
 
   // Boot: fetch page data, then first draw after the canvas is visible.
-  function loadChapter() {
+  function loadChapter(resume) {
+    preloaded = {}; // stale at-home URLs 404 — drop cached Image objects
     fetch('/api/reader-data/' + [pid, mid, cid].map(encodeURIComponent).join('/'))
       .then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
       .then(function (data) {
@@ -340,8 +341,9 @@
           return;
         }
         nextFrame(function () {
-          // Honor ?page=N (or ?page=last from chapter advance).
-          var sp = startPage;
+          // Honor ?page=N (or ?page=last from chapter advance); a retry keeps
+          // the page the reader was already on.
+          var sp = resume ? current + 1 : startPage;
           if (window.location.search.indexOf('page=last') >= 0) sp = pages.length;
           var initial = sp ? Math.max(1, Math.min(sp, pages.length)) - 1 : 0;
           drawPage(initial);

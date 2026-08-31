@@ -22,6 +22,7 @@ func (s *Server) registerActionRoutes() {
 	s.Router.Post("/action/mark-read/{pluginID}/{mangaID}/{chapterID}", s.handleMarkChapterRead)
 	s.Router.Post("/action/mark-read-bulk", s.handleMarkChaptersReadBulk)
 	s.Router.Post("/action/mark-read-range/{pluginID}/{mangaID}/{fromID}/{toID}", s.handleMarkChapterReadRange)
+	s.Router.Post("/action/clear-logs", s.handleClearLogs)
 	s.Router.Post("/action/save-settings", s.handleSaveSettings)
 	s.Router.Post("/action/save-verify/{pluginID}", s.handleSaveVerify)
 }
@@ -254,4 +255,11 @@ func (s *Server) handleSaveSettings(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s.hxRedirect(w, "/view/settings")
+}
+
+// handleClearLogs empties the in-memory log buffer.
+func (s *Server) handleClearLogs(w http.ResponseWriter, _ *http.Request) {
+	s.service.ClearLogs()
+	w.Header().Set("Location", "/view/logs")
+	w.WriteHeader(303)
 }

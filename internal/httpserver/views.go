@@ -188,8 +188,21 @@ func (s *Server) viewSettings(w http.ResponseWriter, _ *http.Request) {
 }
 
 // viewLogs renders the in-memory log buffer with a 2s HTMX poll.
-func (s *Server) viewLogs(w http.ResponseWriter, _ *http.Request) {
-	s.renderPage(w, "views/logs.jet", "logs", map[string]any{"Logs": s.service.GetLogs()})
+func (s *Server) viewLogs(w http.ResponseWriter, r *http.Request) {
+	limit := 500
+	if v := r.URL.Query().Get("limit"); v != "" {
+		if n, err := strconv.Atoi(v); err == nil && n > 0 {
+			limit = n
+			if limit > 2000 {
+				limit = 2000
+			}
+		}
+	}
+	logs := s.service.GetLogs()
+	if len(logs) > limit {
+		logs = logs[len(logs)-limit:]
+	}
+	s.renderPage(w, "views/logs.jet", "logs", map[string]any{"Logs": logs, "Limit": limit, "Limits": []int{100, 250, 500, 1000, 2000}})
 }
 
 // jsonMarshalLogs writes lines as a JSON array.
