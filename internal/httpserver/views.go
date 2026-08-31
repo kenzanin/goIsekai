@@ -2,6 +2,7 @@ package httpserver
 
 import (
 	"embed"
+	"strconv"
 	"encoding/json"
 	"io/fs"
 	"net/http"
@@ -39,9 +40,13 @@ func (s *Server) viewSearch(w http.ResponseWriter, r *http.Request) {
 	}
 	q := r.URL.Query().Get("q")
 	pluginID := r.URL.Query().Get("pluginID")
+	page, _ := strconv.Atoi(r.URL.Query().Get("page"))
+	if page < 1 {
+		page = 1
+	}
 	var results []types.Manga
 	if q != "" && pluginID != "" {
-		results, err = s.service.SearchManga(pluginID, types.SearchFilter{Query: q})
+		results, err = s.service.SearchManga(pluginID, types.SearchFilter{Query: q, Page: page})
 		if err != nil {
 			s.logger.Error("search", "error", err, "plugin", pluginID, "q", q)
 		}
@@ -51,6 +56,8 @@ func (s *Server) viewSearch(w http.ResponseWriter, r *http.Request) {
 		"Q":        q,
 		"PluginID": pluginID,
 		"Results":  results,
+		"Page":     page,
+		"HasNext":  len(results) == 24,
 	})
 }
 

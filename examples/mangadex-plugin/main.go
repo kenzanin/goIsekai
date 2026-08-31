@@ -348,12 +348,18 @@ func Search(ptr, length uint32) uint64 {
 	}
 
 	q := url.Values{}
-	q.Set("limit", "20")
-	q.Set("offset", strconv.Itoa((f.Page-1)*20))
+	q.Set("limit", "24")
+	q.Set("offset", strconv.Itoa((f.Page-1)*24))
 	q.Add("includes[]", "cover_art")
 	q.Add("includes[]", "author")
 	q.Add("availableTranslatedLanguage[]", lang)
-	q.Add("order[followedCount]", "desc")
+	// Empty query (browse popular) sorts by follows; a text query must sort by
+	// relevance or MangaDex returns scattered popular titles instead of matches.
+	if strings.TrimSpace(f.Query) == "" {
+		q.Add("order[followedCount]", "desc")
+	} else {
+		q.Add("order[relevance]", "desc")
+	}
 	contentRatingQuery(q)
 
 	if title := strings.TrimSpace(f.Query); title != "" {

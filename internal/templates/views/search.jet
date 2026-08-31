@@ -16,9 +16,9 @@
     </div>
     <div class="flex-1 min-w-[200px]">
         <label for="q" class="block text-sm font-medium mb-1">Query</label>
-        <input id="q" name="q" type="text" value="{{.Q}}" placeholder="Judul manga..." class="w-full bg-neutral-900 border border-neutral-700 rounded-md px-3 py-2 text-sm">
+        <input id="q" name="q" type="text" value="{{.Q}}" placeholder="Manga title..." class="w-full bg-neutral-900 border border-neutral-700 rounded-md px-3 py-2 text-sm">
     </div>
-    <button type="submit" class="bg-indigo-600 hover:bg-indigo-500 text-white rounded-md px-4 py-2 text-sm font-medium">Cari</button>
+    <button type="submit" class="bg-indigo-600 hover:bg-indigo-500 text-white rounded-md px-4 py-2 text-sm font-medium">Search</button>
 </form>
 
 {{if .Results}}
@@ -36,9 +36,23 @@
     </a>
     {{end}}
 </div>
+<div class="flex items-center justify-between mt-6">
+    {{if .Page}}
+    {{if .Page > 1}}
+    <a href="/view/search?q={{.Q}}&pluginID={{.PluginID}}&page={{.Page - 1}}" class="text-indigo-400 hover:text-indigo-300 text-sm">← Prev</a>
+    {{else}}
+    <span></span>
+    {{end}}
+    {{if .HasNext}}
+    <a href="/view/search?q={{.Q}}&pluginID={{.PluginID}}&page={{.Page + 1}}" class="text-indigo-400 hover:text-indigo-300 text-sm">Next →</a>
+    {{else}}
+    <span></span>
+    {{end}}
+    {{end}}
+</div>
 {{else}}
 {{if .Q != ""}}
-<div class="py-16 text-center text-neutral-500">Tidak ada hasil untuk "{{.Q}}"</div>
+<div class="py-16 text-center text-neutral-500">No results for "{{.Q}}"</div>
 {{end}}
 {{end}}
 {{ end }}
