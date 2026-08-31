@@ -2,55 +2,54 @@
 
 ## Purpose
 
-Exposes the reader's core operations to the Wails frontend and serves manga images through a local proxy protocol so the UI can read content without CORS or hotlink restrictions.
+Defines the bridge service's HTMX integration contract — how the frontend communicates with the Go backend via HTML fragment endpoints rendered by Jet templates.
 
 ## Requirements
 
-### Requirement: Search service binding
-The host SHALL expose a `SearchManga` service binding that accepts a plugin id and a `SearchFilter` and returns matching manga.
+### Requirement: Bridge service method exposure via HTMX
+The bridge service methods SHALL be exposed via Chi HTTP routes that render Jet templates. Each view endpoint SHALL return an HTML fragment (for HTMX `hx-get`) or a full page (for direct navigation). The system SHALL use Jet template inheritance (extends/block/yield) for consistent layout.
 
-#### Scenario: Search via binding
-- **WHEN** the frontend calls `SearchManga` with a plugin id and filter
-- **THEN** the host returns `[]Manga` results or an error
+#### Scenario: View endpoint returns HTML fragment
+- **WHEN** HTMX sends `GET /view/library` with `HX-Request: true` header
+- **THEN** the bridge renders the library Jet template with manga data and returns an HTML fragment
 
-### Requirement: Manga detail binding
-The host SHALL expose a `GetMangaDetails` service binding returning a manga and its chapter list.
+#### Scenario: View endpoint returns full page
+- **WHEN** a browser navigates to `GET /view/library` without HTMX headers
+- **THEN** the bridge renders the full page layout (extends base template) with the library view
 
-#### Scenario: Fetch manga details
-- **WHEN** the frontend calls `GetMangaDetails` with a plugin id and manga id
-- **THEN** the host returns the `Manga`, its `[]Chapter`, or an error
+#### Scenario: Action endpoint returns updated fragment
+- **WHEN** HTMX sends `POST /action/toggle-plugin/{pluginID}`
+- **THEN** the bridge toggles the plugin state and returns the updated plugin card HTML fragment
 
-### Requirement: Page list binding
-The host SHALL expose a `GetPageList` service binding returning pages for a chapter.
+### Requirement: Image data transfer
+The `GetImage` method SHALL return image bytes as a binary HTTP response. The endpoint SHALL be `GET /image` with query parameters for `pluginID`, `url`, `mangaID`, `chapterID`.
 
-#### Scenario: Fetch pages
-- **WHEN** the frontend calls `GetPageList` with a plugin id and chapter id
-- **THEN** the host returns the ordered `[]Page`, or an error
+#### Scenario: Successful image transfer
+- **WHEN** the browser requests `GET /image?pluginID=mangadex&url=https://...`
+- **THEN** the response contains raw image bytes with the correct `Content-Type` header
 
-### Requirement: Library toggle binding
-The host SHALL expose a `ToggleLibraryItem` service binding that toggles a manga's library membership.
+#### Scenario: Image from disk cache
+- **WHEN** the requested image exists in the disk cache
+- **THEN** the response serves the cached bytes without making a network request
 
-#### Scenario: Toggle library membership
-- **WHEN** the frontend calls `ToggleLibraryItem` for a manga
-- **THEN** the manga's `in_library` flag flips and persists
+### Requirement: Log streaming via WebSocket
+The bridge SHALL stream log entries to connected WebSocket clients at `GET /api/logs/ws`. Each message SHALL be a JSON object with `level`, `message`, and `time` fields. The bridge SHALL also provide `GET /api/logs` to retrieve the current log buffer.
 
-### Requirement: Plugin install binding
-The host SHALL expose an `InstallPlugin` service binding that installs a plugin from a `.wasm` file path.
+#### Scenario: Live log streaming
+- **WHEN** a WebSocket client is connected and a new log entry is generated
+- **THEN** the entry is pushed to all connected clients as a JSON message
 
-#### Scenario: Install a plugin
-- **WHEN** the frontend calls `InstallPlugin` with a `.wasm` file path
-- **THEN** the plugin is registered and becomes callable, or an error is returned
+#### Scenario: Log buffer retrieval
+- **WHEN** the frontend sends `GET /api/logs`
+- **THEN** the response contains the current log buffer as a JSON array
 
-### Requirement: Local image proxy protocol
-The host SHALL register a custom protocol handler (e.g. `manga-img://`) that fetches image bytes with the correct HTTP `Referer` and serves them to the frontend.
+### Requirement: Reader view with canvas rendering
+The reader view SHALL use a Jet template that includes a canvas element and vanilla JavaScript for canvas rendering (zoom/pan/drag). The reader SHALL NOT use HTMX for canvas interactions — these remain client-side JavaScript. HTMX SHALL be used only for chapter navigation (next/prev chapter triggers a new view load).
 
-#### Scenario: Proxy a manga image
-- **WHEN** the frontend requests a page image via the custom protocol
-- **THEN** the host fetches the image bytes using the page's headers (including Referer) and returns them, bypassing CORS and hotlink restrictions
+#### Scenario: Reader loads chapter
+- **WHEN** HTMX sends `GET /view/read/{pluginID}/{mangaID}/{chapterID}`
+- **THEN** the server renders the reader Jet template with page list data and canvas JavaScript
 
-### Requirement: Cached image latency
-Image loading via the custom protocol SHALL maintain sub-second latency for cached images.
-
-#### Scenario: Serve a cached image
-- **WHEN** an image is already cached
-- **THEN** the host serves it in under one second
+#### Scenario: Chapter navigation via HTMX
+- **WHEN** the user clicks "Next Chapter" in the reader
+- **THEN** HTMX sends `GET /view/read/{pluginID}/{mangaID}/{nextChapterID}` and swaps the reader content
