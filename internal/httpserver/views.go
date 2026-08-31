@@ -9,6 +9,7 @@ import (
 	"github.com/go-chi/chi/v5"
 
 	"goisekai/internal/config"
+	"goisekai/internal/database"
 	"goisekai/pkg/types"
 )
 
@@ -63,12 +64,46 @@ func (s *Server) viewMangaDetail(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "failed to load manga: "+err.Error(), http.StatusBadGateway)
 		return
 	}
+	progress, err := s.service.GetChapterProgresses(pluginID, mangaID)
+	if err != nil {
+		s.logger.Warn("chapter progress", "error", err, "manga", mangaID)
+		progress = map[string]database.ChapterProgress{}
+	}
+	continueTo := computeContinue(chapters, progress)
 	s.renderPage(w, "views/detail.jet", "search", map[string]any{
 		"PluginID": pluginID,
-		"MangaID": mangaID,
+		"MangaID":  mangaID,
 		"Manga":    manga,
 		"Chapters": chapters,
+		"Progress": progress,
+		"Continue": continueTo,
 	})
+}
+
+// ContinuePoint names where the Continue button should resume.
+type ContinuePoint struct {
+	ChapterID string
+	ChapterN  float64
+	Page      int
+}
+
+// computeContinue picks the resume target: the first in-progress chapter,
+// else the first unread chapter, else nil when everything is finished.
+func computeContinue(chapters []types.Chapter, progress map[string]database.ChapterProgress) *ContinuePoint {
+	var firstUnread *ContinuePoint
+	for _, c := range chapters {
+		p, ok := progress[c.ID]
+		if ok && p.LastPageRead > 0 {
+			if p.TotalPages == 0 || p.LastPageRead < p.TotalPages {
+				return &ContinuePoint{ChapterID: c.ID, ChapterN: c.ChapterNum, Page: p.LastPageRead}
+			}
+			continue // fully read
+		}
+		if firstUnread == nil {
+			firstUnread = &ContinuePoint{ChapterID: c.ID, ChapterN: c.ChapterNum, Page: 1}
+		}
+	}
+	return firstUnread
 }
 
 // viewPlugins renders the plugin manager page.

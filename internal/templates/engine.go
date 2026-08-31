@@ -82,8 +82,6 @@ func (e *Engine) Render(w io.Writer, name string, vars jet.VarMap, data any) err
 	return tmpl.Execute(w, vars, data)
 }
 
-
-
 // formatDate formats an ISO-8601 timestamp as "Jan 2, 2006". Empty input or a
 // value that does not parse returns "—".
 func formatDate(ts string) string {

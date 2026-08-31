@@ -25,9 +25,16 @@
         {{if .Manga.Description != ""}}
         <p class="text-sm text-neutral-400 mb-4">{{.Manga.Description}}</p>
         {{end}}
-        <form method="post" action="/action/toggle-library/{{.PluginID}}/{{.MangaID}}">
-            <button type="submit" class="bg-indigo-600 hover:bg-indigo-500 text-white rounded-md px-4 py-2 text-sm font-medium">+ / − Library</button>
-        </form>
+        <div class="flex flex-wrap items-center gap-2 mb-4">
+            {{if .Continue}}
+            <a href="/view/read/{{.PluginID}}/{{.MangaID}}/{{.Continue.ChapterID}}?page={{.Continue.Page}}" class="bg-indigo-600 hover:bg-indigo-500 text-white rounded-md px-4 py-2 text-sm font-medium">
+                {{if .Continue.Page > 1}}▶ Lanjut: Ch. {{formatChapterNum(.Continue.ChapterN)}} · hal. {{.Continue.Page}}{{else}}▶ Mulai baca{{end}}
+            </a>
+            {{end}}
+            <form method="post" action="/action/toggle-library/{{.PluginID}}/{{.MangaID}}">
+                <button type="submit" class="bg-neutral-700 hover:bg-neutral-600 text-white rounded-md px-4 py-2 text-sm font-medium">+ / − Library</button>
+            </form>
+        </div>
     </div>
 </div>
 
@@ -40,9 +47,17 @@
     <a href="/view/read/{{.PluginID}}/{{.MangaID}}/{{c.ID}}" class="flex items-center justify-between gap-4 py-3 px-2 -mx-2 rounded hover:bg-neutral-900 transition">
         <span class="text-sm">
             <span class="text-neutral-400 mr-2">Ch. {{formatChapterNum(c.ChapterNum)}}</span>
-            {{c.Title}}
+            {{if .Progress[c.ID].TotalPages > 0}}{{if .Progress[c.ID].LastPageRead >= .Progress[c.ID].TotalPages}}<span class="line-through text-neutral-500">{{c.Title}}</span>{{else}}{{c.Title}}{{end}}{{end}}
         </span>
-        <span class="text-xs text-neutral-500 shrink-0">{{formatDate(c.ReleasedAt.Format("2006-01-02T15:04:05"))}}</span>
+        <span class="flex items-center gap-2 shrink-0">
+            {{if .Progress[c.ID].LastPageRead > 0}}
+            <span class="text-xs px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400">{{.Progress[c.ID].LastPageRead}}{{if .Progress[c.ID].TotalPages > 0}}/{{.Progress[c.ID].TotalPages}}{{end}}</span>
+            {{end}}
+            {{if .Progress[c.ID].TotalPages > 0}}{{if .Progress[c.ID].LastPageRead >= .Progress[c.ID].TotalPages}}
+            <span class="text-emerald-400 text-xs">✓</span>
+            {{end}}{{end}}
+            <span class="text-xs text-neutral-500">{{formatDate(c.ReleasedAt.Format("2006-01-02T15:04:05"))}}</span>
+        </span>
     </a>
     {{end}}
 </div>

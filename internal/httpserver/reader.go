@@ -77,6 +77,13 @@ func (s *Server) readerData(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "failed to load pages: "+err.Error(), http.StatusBadGateway)
 		return
 	}
+	// Record the chapter's page count so the detail-page progress badges can
+	// render "N/M". Best-effort — a failure here must not fail the read.
+	if len(pages) > 0 {
+		if err := s.service.SetChapterTotalPages(pluginID, mangaID, chapterID, len(pages)); err != nil {
+			s.logger.Warn("record total pages", "error", err, "chapter", chapterID)
+		}
+	}
 	_, chapters, err := s.service.GetMangaDetails(pluginID, mangaID)
 	if err != nil {
 		s.logger.Error("reader neighbors", "error", err, "plugin", pluginID, "manga", mangaID)

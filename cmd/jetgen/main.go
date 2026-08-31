@@ -60,6 +60,7 @@ var ddl = []string{
     is_active INTEGER DEFAULT 1,
     icon_url TEXT
 );`,
+	`ALTER TABLE chapters ADD COLUMN total_pages INTEGER DEFAULT 0;`,
 }
 
 func main() {

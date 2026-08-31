@@ -4,8 +4,8 @@ import (
 	"embed"
 	"flag"
 	"log"
-		"log/slog"
-"os"
+	"log/slog"
+	"os"
 	"path/filepath"
 
 	"goisekai/internal/bridge"

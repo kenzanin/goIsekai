@@ -30,8 +30,17 @@ type Chapter struct {
 	VolumeNum       float64
 	IsRead          bool
 	LastPageRead    int
+	TotalPages      int
 	DownloadStatus  string
 	FetchedAt       time.Time
+}
+
+// ChapterProgress is the per-chapter read progress surfaced to the UI.
+type ChapterProgress struct {
+	SourceChapterID string
+	LastPageRead    int
+	TotalPages      int
+	IsRead          bool
 }
 
 type Plugin struct {

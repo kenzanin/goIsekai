@@ -22,4 +22,5 @@ type Chapters struct {
 	LastPageRead    *int64
 	DownloadStatus  *string
 	FetchedAt       *time.Time
+	TotalPages      *int64
 }

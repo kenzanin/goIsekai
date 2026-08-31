@@ -56,6 +56,41 @@ func (d *DB) SetChapterProgress(chapterID string, lastPage int) error {
 	return err
 }
 
+// SetChapterTotalPages records a chapter's page count (best-effort metadata
+// from the plugin; ignored if it would lower an already-known count).
+func (d *DB) SetChapterTotalPages(chapterID string, total int) error {
+	_, err := Chapters.UPDATE().
+		SET(Chapters.TotalPages.SET(Int(int64(total)))).
+		WHERE(Chapters.ID.EQ(String(chapterID))).
+		Exec(d.db)
+	return err
+}
+
+// GetChapterProgressForManga returns per-chapter read progress for every
+// stored chapter of a manga. Plain SQL: the projected columns don't map 1:1
+// to a generated jet model, and a hand scan is clearer than fighting the
+// row mapper for four columns.
+func (d *DB) GetChapterProgressForManga(mangaRowID string) ([]ChapterProgress, error) {
+	rows, err := d.db.Query(
+		`SELECT source_chapter_id, last_page_read, total_pages, is_read
+		 FROM chapters WHERE manga_id = ?`, mangaRowID)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = rows.Close() }()
+	var out []ChapterProgress
+	for rows.Next() {
+		var p ChapterProgress
+		var isRead int
+		if err := rows.Scan(&p.SourceChapterID, &p.LastPageRead, &p.TotalPages, &isRead); err != nil {
+			return nil, err
+		}
+		p.IsRead = isRead != 0
+		out = append(out, p)
+	}
+	return out, rows.Err()
+}
+
 // SetDownloadStatus records the download status of a chapter.
 func (d *DB) SetDownloadStatus(chapterID string, status string) error {
 	_, err := Chapters.UPDATE().

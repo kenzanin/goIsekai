@@ -255,3 +255,50 @@ func TestPersistenceAcrossRestart(t *testing.T) {
 		t.Fatalf("progress not persisted: read=%d page=%d", isRead, lastPage)
 	}
 }
+
+// TestChapterProgressForManga covers total-pages persistence and the
+// per-manga progress read used by the detail-page badges and Continue button.
+func TestChapterProgressForManga(t *testing.T) {
+	db, err := Open(filepath.Join(t.TempDir(), "progress.db"))
+	if err != nil {
+		t.Fatalf("Open: %v", err)
+	}
+	defer func() { _ = db.Close() }()
+
+	if err := db.UpsertManga(Manga{ID: "m1", PluginID: "p1", SourceMangaID: "s1", Title: "P"}); err != nil {
+		t.Fatalf("upsert manga: %v", err)
+	}
+	for _, c := range []Chapter{
+		{ID: "c1", MangaID: "m1", SourceChapterID: "cs1", Title: "Ch1", ChapterNum: 1},
+		{ID: "c2", MangaID: "m1", SourceChapterID: "cs2", Title: "Ch2", ChapterNum: 2},
+	} {
+		if err := db.UpsertChapter(c); err != nil {
+			t.Fatalf("upsert chapter %s: %v", c.ID, err)
+		}
+	}
+	if err := db.SetChapterTotalPages("c1", 18); err != nil {
+		t.Fatalf("set total pages: %v", err)
+	}
+	if err := db.SetChapterProgress("c1", 5); err != nil {
+		t.Fatalf("set progress: %v", err)
+	}
+
+	rows, err := db.GetChapterProgressForManga("m1")
+	if err != nil {
+		t.Fatalf("GetChapterProgressForManga: %v", err)
+	}
+	if len(rows) != 2 {
+		t.Fatalf("want 2 rows, got %d", len(rows))
+	}
+	bySource := map[string]ChapterProgress{}
+	for _, r := range rows {
+		bySource[r.SourceChapterID] = r
+	}
+	p1 := bySource["cs1"]
+	if !p1.IsRead || p1.LastPageRead != 5 || p1.TotalPages != 18 {
+		t.Fatalf("cs1 progress wrong: %+v", p1)
+	}
+	if p2 := bySource["cs2"]; p2.LastPageRead != 0 || p2.TotalPages != 0 || p2.IsRead {
+		t.Fatalf("cs2 should be untouched: %+v", p2)
+	}
+}
