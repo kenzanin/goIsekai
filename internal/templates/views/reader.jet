@@ -73,6 +73,7 @@
   var smoothing = (localStorage.getItem('gi_renderMode') || 'smooth') === 'smooth';
   var zoom = 1, panX = 0, panY = 0, baseScale = 1, dpr = 1;
   var preloaded = {}; // page index -> Image
+  var imgFails = 0; // consecutive image-load failures (at-home nodes flake transiently)
   var readAhead = Math.max(0, Math.min(10, parseInt(localStorage.getItem('gi_readAhead'), 10) || 3));
   var startPage = parseInt(new URLSearchParams(window.location.search).get('page'), 10);
   var nextChID = root.dataset.nextChapterId || '';
@@ -200,7 +201,12 @@
     };
     im.onerror = function () {
       showSpinner(false);
-      showError(true);
+      imgFails++;
+      if (imgFails >= 4) { showError(true); return; } // give up — manual Retry still available
+      // At-home nodes flake transiently: retry the same URL once, then
+      // re-fetch the page list (a fresh request may land on a healthy node).
+      var reFetch = imgFails % 2 === 0;
+      setTimeout(function () { if (reFetch) loadChapter(true); else drawPage(current); }, 1200);
     };
     im.src = url;
   }
@@ -215,6 +221,7 @@
   }
 
   function afterImage() {
+    imgFails = 0;
     if (!measure()) { nextFrame(function () { measure(); restoreZoom(); }); return; }
     restoreZoom();
   }
@@ -288,7 +295,7 @@
 
   document.getElementById('btn-prev-page').addEventListener('click', prev);
   document.getElementById('btn-next-page').addEventListener('click', next);
-  document.getElementById('btn-retry').addEventListener('click', function () { loadChapter(true); });
+  document.getElementById('btn-retry').addEventListener('click', function () { imgFails = 0; loadChapter(true); });
   document.getElementById('btn-skip').addEventListener('click', next);
   document.getElementById('btn-zoom-in').addEventListener('click', function () { zoomBy(1.2); });
   document.getElementById('btn-zoom-out').addEventListener('click', function () { zoomBy(1 / 1.2); });
