@@ -73,20 +73,21 @@
   var smoothing = (localStorage.getItem('gi_renderMode') || 'smooth') === 'smooth';
   var zoom = 1, panX = 0, panY = 0, baseScale = 1, dpr = 1;
   var preloaded = {}; // page index -> Image
+  var nextPages = null; // next chapter page list — fetched lazily for read-ahead spill
   var imgFails = 0; // consecutive image-load failures (at-home nodes flake transiently)
   var readAhead = Math.max(0, Math.min(10, parseInt(localStorage.getItem('gi_readAhead'), 10) || 3));
   var startPage = parseInt(new URLSearchParams(window.location.search).get('page'), 10);
   var nextChID = root.dataset.nextChapterId || '';
   var prevChID = root.dataset.prevChapterId || '';
 
-  function imageUrl(p) {
+  function imageUrl(p, chapterID) {
     var h = p.headers || {};
     // ponytail: /image ignores per-page headers for now; plugins that need
     // them (custom Referer) must be added as query params when required.
     return '/image?pluginID=' + encodeURIComponent(pid)
       + '&url=' + encodeURIComponent(p.url)
       + '&mangaID=' + encodeURIComponent(mid)
-      + '&chapterID=' + encodeURIComponent(cid);
+      + '&chapterID=' + encodeURIComponent(chapterID || cid);
   }
 
   function clampPan() {
@@ -171,12 +172,35 @@
 
   function prefetch() {
     // Read-ahead: keep the next K pages warm in the browser cache.
-    for (var k = 1; k <= readAhead; k++) {
+    // Suwayomi-style spill: near the end of the chapter, the leftover
+    // budget preloads the first pages of the NEXT chapter instead.
+    var remaining = pages.length - 1 - current;
+    var budget = Math.min(readAhead, remaining);
+    for (var k = 1; k <= budget; k++) {
       var idx = current + k;
-      if (idx < pages.length && !preloaded[idx]) {
+      if (!preloaded[idx]) {
         var im = new Image();
         im.src = imageUrl(pages[idx]);
         preloaded[idx] = im;
+      }
+    }
+    var spill = readAhead - budget;
+    if (spill > 0 && nextChID) {
+      if (nextPages) { prefetchNext(spill); return; }
+      // Lazily fetch the next chapter's page list once, then spill into it.
+      fetch('/api/reader-data/' + [pid, mid, nextChID].map(encodeURIComponent).join('/'))
+        .then(function (r) { return r.json(); })
+        .then(function (d) { nextPages = (d && d.pages) || []; if (nextPages.length) prefetchNext(spill); })
+        .catch(function () { /* next-chapter warmup is best-effort */ });
+    }
+  }
+
+  function prefetchNext(n) {
+    for (var k = 0; k < Math.min(n, nextPages.length); k++) {
+      if (!preloaded['n' + k]) {
+        var im = new Image();
+        im.src = imageUrl(nextPages[k], nextChID);
+        preloaded['n' + k] = im;
       }
     }
   }
