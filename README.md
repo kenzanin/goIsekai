@@ -40,6 +40,18 @@ tinygo build -o plugins/mangadex.wasm -target wasm ./plugins/mangadex/
 
 Install a `.wasm` from the Plugins screen in the UI.
 
+### Lua plugins (no toolchain needed)
+
+Plugins can also be plain Lua folders — just a text editor. One folder per site under `plugins/lua/<id>/`, with `main.lua` as the entry point; sibling modules are loadable via `require("module")` (sandboxed to the plugin folder). The runtime (gopher-lua) is pure Go, so the binary stays CGO-free.
+
+`main.lua` declares a `PLUGIN` table and four globals (`search_manga`, `get_manga_detail`, `get_chapter_list`, `get_page_list`). Each takes one JSON-string argument and returns a Lua table or JSON string. Networking goes through the host-provided `http_request({url=..., method=..., headers=...})` global, which rides the same TLS-fingerprinted, cookie-jarred, rate-paced session as WASM plugins. `json.encode`/`json.decode` are provided. Available stdlib: `string`, `table`, `math`, `os.time/date/clock` — no `io`, no `os.execute`. See `plugins/lua/kaliscan/` for a complete example.
+
+```sh
+make install-lua PLUGIN=kaliscan   # copies plugins/lua/kaliscan → app_data/plugins/kaliscan
+```
+
+Sandbox trade-off vs WASM: Lua isolation is "no dangerous library registered" (no hard memory cap; a 15 s call timeout still applies). Use WASM for hardened plugins, Lua for quick ones.
+
 ## Development
 
 ```sh

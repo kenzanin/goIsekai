@@ -53,3 +53,13 @@ lint:
 ## clean: remove the server binary.
 clean:
 	rm -f $(BINARY)
+
+## install-lua: copy a Lua plugin folder into the configured plugins dir.
+## Usage: make install-lua PLUGIN=kaliscan
+PLUGINS_DIR ?= app_data/plugins
+install-lua:
+	@test -f plugins/lua/$(PLUGIN)/main.lua || { echo "plugins/lua/$(PLUGIN)/main.lua not found"; exit 1; }
+	mkdir -p $(PLUGINS_DIR)
+	rm -rf $(PLUGINS_DIR)/$(PLUGIN)
+	cp -r plugins/lua/$(PLUGIN) $(PLUGINS_DIR)/$(PLUGIN)
+	@echo "installed: $(PLUGINS_DIR)/$(PLUGIN)/main.lua (restart the server to load it)"

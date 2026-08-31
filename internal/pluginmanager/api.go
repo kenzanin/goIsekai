@@ -23,6 +23,9 @@ func (m *Manager) get(pluginID string) (*loadedPlugin, error) {
 // per-invocation timeout. A panic or trap inside the plugin surfaces as an
 // error here rather than crashing the host.
 func (m *Manager) call(p *loadedPlugin, fnName, inputJSON string) (string, error) {
+	if p.kind == "lua" {
+		return callLua(p, fnName, inputJSON)
+	}
 	p.mu.Lock()
 	defer p.mu.Unlock()
 

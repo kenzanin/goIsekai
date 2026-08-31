@@ -15,6 +15,7 @@ import (
 	"github.com/tetratelabs/wazero"
 	"github.com/tetratelabs/wazero/api"
 	"github.com/tetratelabs/wazero/imports/wasi_snapshot_preview1"
+	lua "github.com/yuin/gopher-lua"
 
 	"goisekai/internal/hostnet"
 	"goisekai/internal/logger"
@@ -30,14 +31,17 @@ const (
 	hostModuleName = "env"
 )
 
-// loadedPlugin is a compiled and instantiated WASM plugin and its resolved ABI
-// entry points.
+// loadedPlugin is a compiled and instantiated plugin and its resolved ABI
+// entry points. kind is "wasm" or "lua"; only the relevant fields are set.
 type loadedPlugin struct {
 	id       string
 	wasmPath string
+	kind     string // "wasm" or "lua"
 	mod      api.Module
 	// fn maps an ABI function name (types.*Func) to its resolved api.Function.
 	fn map[string]api.Function
+	// lua holds the Lua VM for lua-kind plugins (nil for wasm).
+	lua *lua.LState
 	// contractVersion is the plugin's resolved contract_version.
 	contractVersion int32
 	// meta is the metadata the plugin declared in its optional Init export.
@@ -117,11 +121,31 @@ func (m *Manager) Discover() error {
 		m.plugins[id] = p
 		logger.Debug("plugin loaded", "id", id, "version", p.contractVersion)
 	}
+
+	// Lua plugins: one folder per plugin, main.lua entry, folder name = id.
+	luaMatches, err := filepath.Glob(filepath.Join(m.pluginsDir, "*", "main.lua"))
+	if err != nil {
+		return err
+	}
+	for _, path := range luaMatches {
+		id := filepath.Base(filepath.Dir(path))
+		if _, dup := m.plugins[id]; dup {
+			return fmt.Errorf("plugin id collision: %q (wasm and lua)", id)
+		}
+		logger.Debug("loading lua plugin", "id", id, "path", path)
+		p, err := m.loadLua(id, filepath.Dir(path))
+		if err != nil {
+			logger.Error("lua plugin load failed", "id", id, "error", err)
+			return fmt.Errorf("load lua plugin %s: %w", id, err)
+		}
+		m.plugins[id] = p
+		logger.Debug("lua plugin loaded", "id", id, "version", p.contractVersion)
+	}
 	return nil
 }
 
-// Install copies a plugin wasm file into pluginsDir, hot-loads it into the
-// already-discovered runtime, and registers it under its base filename. It
+// Install copies a plugin file (wasm) or folder (lua, containing main.lua)
+// into pluginsDir, hot-loads it, and registers it under its base name. It
 // must be called after Discover. It returns the path of the copy inside
 // pluginsDir, which the caller should persist as the plugin's WasmPath.
 func (m *Manager) Install(wasmPath string) (string, error) {
@@ -131,6 +155,28 @@ func (m *Manager) Install(wasmPath string) (string, error) {
 		return "", fmt.Errorf("Discover must be called before Install")
 	}
 	id := strings.TrimSuffix(filepath.Base(wasmPath), ".wasm")
+
+	// Lua plugin: source is a folder containing main.lua; copy it recursively.
+	mainLua := filepath.Join(wasmPath, "main.lua")
+	if info, err := os.Stat(mainLua); err == nil && !info.IsDir() {
+		id = filepath.Base(wasmPath)
+		destDir := filepath.Join(m.pluginsDir, id)
+		logger.Debug("installing lua plugin", "source", wasmPath, "dest", destDir)
+		if filepath.Clean(wasmPath) != filepath.Clean(destDir) {
+			if err := copyDir(wasmPath, destDir); err != nil {
+				return "", fmt.Errorf("copy lua plugin %s: %w", id, err)
+			}
+		}
+		p, err := m.loadLua(id, destDir)
+		if err != nil {
+			logger.Error("lua plugin install failed", "id", id, "error", err)
+			return "", fmt.Errorf("install lua plugin %s: %w", id, err)
+		}
+		m.plugins[id] = p
+		logger.Debug("lua plugin installed", "id", id)
+		return filepath.Join(destDir, "main.lua"), nil
+	}
+
 	dest := filepath.Join(m.pluginsDir, id+".wasm")
 	logger.Debug("installing plugin", "source", wasmPath, "dest", dest)
 	if filepath.Clean(wasmPath) != filepath.Clean(dest) {
@@ -148,10 +194,40 @@ func (m *Manager) Install(wasmPath string) (string, error) {
 	return dest, nil
 }
 
+// copyDir recursively copies src dir to dst (lua plugin folders).
+func copyDir(src, dst string) error {
+	entries, err := os.ReadDir(src)
+	if err != nil {
+		return err
+	}
+	if err := os.MkdirAll(dst, 0o755); err != nil {
+		return err
+	}
+	for _, e := range entries {
+		s := filepath.Join(src, e.Name())
+		d := filepath.Join(dst, e.Name())
+		if e.IsDir() {
+			if err := copyDir(s, d); err != nil {
+				return err
+			}
+			continue
+		}
+		if err := copyFile(s, d); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 // Close releases the runtime and all instantiated plugins.
 func (m *Manager) Close() error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
+	for _, p := range m.plugins {
+		if p.kind == "lua" && p.lua != nil {
+			p.lua.Close()
+		}
+	}
 	if m.runtime == nil {
 		return nil
 	}

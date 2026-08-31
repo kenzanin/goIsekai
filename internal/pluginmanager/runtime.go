@@ -53,7 +53,7 @@ func (m *Manager) load(rt wazero.Runtime, id, wasmPath string) (*loadedPlugin, e
 	}
 	logger.Debug("contract_version resolved", "id", id, "version", int32(verRes[0]))
 
-	p := &loadedPlugin{id: id, wasmPath: wasmPath, mod: mod, contractVersion: int32(verRes[0]), fn: make(map[string]api.Function)}
+	p := &loadedPlugin{id: id, wasmPath: wasmPath, kind: "wasm", mod: mod, contractVersion: int32(verRes[0]), fn: make(map[string]api.Function)}
 	for _, name := range []string{types.SearchFunc, types.GetMangaDetailFunc, types.GetChapterListFunc, types.GetPageListFunc} {
 		f := mod.ExportedFunction(name)
 		if f == nil {

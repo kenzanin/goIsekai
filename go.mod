@@ -10,7 +10,9 @@ require (
 	github.com/go-chi/chi/v5 v5.3.2
 	github.com/go-jet/jet/v2 v2.15.0
 	github.com/tetratelabs/wazero v1.12.0
+	github.com/yuin/gopher-lua v1.1.2
 	golang.org/x/net v0.58.0
+	layeh.com/gopher-json v0.0.0-20201124131017-552bb3c4c3bf
 	modernc.org/sqlite v1.57.0
 )
 
