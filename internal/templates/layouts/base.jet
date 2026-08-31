@@ -4,6 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>goIsekai</title>
+    <link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
     <link rel="stylesheet" href="/static/lib/tailwind.css">
 </head>
 <body class="bg-neutral-950 text-neutral-100 min-h-full">
