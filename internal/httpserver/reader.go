@@ -48,14 +48,22 @@ func (s *Server) viewReader(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	prev, next := chapterNeighbors(chapters, chapterID)
+	var currentChapter types.Chapter
+	for _, c := range chapters {
+		if c.ID == chapterID {
+			currentChapter = c
+			break
+		}
+	}
 	s.renderPage(w, "views/reader.jet", "library", map[string]any{
-		"PluginID":      pluginID,
-		"MangaID":       mangaID,
-		"Manga":         manga,
-		"ChapterID":     chapterID,
-		"Chapters":      chapters,
-		"PrevChapterID": prev,
-		"NextChapterID": next,
+		"PluginID":       pluginID,
+		"MangaID":        mangaID,
+		"Manga":          manga,
+		"ChapterID":      chapterID,
+		"Chapters":       chapters,
+		"CurrentChapter": currentChapter,
+		"PrevChapterID":  prev,
+		"NextChapterID":  next,
 	})
 }
 

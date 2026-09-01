@@ -5,9 +5,18 @@
   <!-- Top bar: persistent (back + page counter + controls) -->
   <div class="absolute top-0 left-0 right-0 z-30 flex items-center gap-2 bg-black/90 px-3 py-2 text-sm">
     <a href="/view/manga/{{.PluginID}}/{{.MangaID}}" class="border border-neutral-700 hover:bg-neutral-800 rounded-md px-3 py-1.5">← Back</a>
-    <span class="text-neutral-500 truncate max-w-[30%]">{{.Manga.Title}}</span>
-    <span id="page-counter" class="ml-2 text-neutral-400">– / –</span>
-    <div class="ml-auto flex items-center gap-1">
+    <span class="text-neutral-500 truncate max-w-[25%]">{{.Manga.Title}}</span>
+    <span id="page-counter" class="text-neutral-400">– / –</span>
+    <div class="flex-1 flex justify-center min-w-0">
+      {{ if .CurrentChapter.ChapterNum > 0 || .CurrentChapter.Title != "" }}
+      <span class="text-neutral-300 truncate">
+        {{ if .CurrentChapter.ChapterNum > 0 }}Ch. {{ .CurrentChapter.ChapterNum }}{{ if .CurrentChapter.Title != "" }} — {{ .CurrentChapter.Title }}{{ end }}
+        {{ else }}{{ .CurrentChapter.Title }}
+        {{ end }}
+      </span>
+      {{ end }}
+    </div>
+    <div class="flex items-center gap-1">
       <button id="btn-fit" title="Fit mode" class="border border-neutral-700 hover:bg-neutral-800 rounded-md px-2 py-1 text-xs">Fit W</button>
       <button id="btn-zoom-out" title="Zoom out" class="border border-neutral-700 hover:bg-neutral-800 rounded-md px-2 py-1 text-xs">−</button>
       <button id="btn-zoom-in" title="Zoom in" class="border border-neutral-700 hover:bg-neutral-800 rounded-md px-2 py-1 text-xs">＋</button>
