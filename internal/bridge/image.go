@@ -145,8 +145,11 @@ func (s *AppService) diskCachePath(pluginID, mangaID, chapterID, url string) str
 // gif/webp input, undecodable input, and encode errors all keep the original
 // bytes untouched.
 func webpOrOriginal(data []byte) ([]byte, bool) {
-	if len(data) < 12 || bytes.HasPrefix(data, []byte("GIF8")) || bytes.HasPrefix(data, []byte("RIFF")) {
+	if len(data) < 12 || bytes.HasPrefix(data, []byte("GIF8")) {
 		return data, false
+	}
+	if bytes.HasPrefix(data, []byte("RIFF")) {
+		return data, true
 	}
 	img, _, err := image.Decode(bytes.NewReader(data))
 	if err != nil {

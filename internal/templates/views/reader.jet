@@ -82,12 +82,12 @@
 
   function imageUrl(p, chapterID) {
     var h = p.headers || {};
-    // ponytail: /image ignores per-page headers for now; plugins that need
-    // them (custom Referer) must be added as query params when required.
+    var ref = h.Referer || h.referer || '';
     return '/image?pluginID=' + encodeURIComponent(pid)
       + '&url=' + encodeURIComponent(p.url)
       + '&mangaID=' + encodeURIComponent(mid)
-      + '&chapterID=' + encodeURIComponent(chapterID || cid);
+      + '&chapterID=' + encodeURIComponent(chapterID || cid)
+      + (ref ? '&referer=' + encodeURIComponent(ref) : '');
   }
 
   function clampPan() {

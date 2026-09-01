@@ -25,8 +25,15 @@ func (s *Server) handleImage(w http.ResponseWriter, r *http.Request) {
 	mangaID := q.Get("mangaID")
 	chapterID := q.Get("chapterID")
 
+	// Per-page headers flow through the reader as query params. Currently only
+	// Referer matters (some CDNs 403 without it).
+	var headers map[string]string
+	if ref := q.Get("referer"); ref != "" {
+		headers = map[string]string{"Referer": ref}
+	}
+
 	s.logger.Debug("image request", "pluginID", pluginID, "url", url, "mangaID", mangaID, "chapterID", chapterID)
-	data, err := s.service.GetImage(pluginID, url, nil, mangaID, chapterID)
+	data, err := s.service.GetImage(pluginID, url, headers, mangaID, chapterID)
 	if err != nil {
 		s.logger.Error("image fetch", "url", url, "pluginID", pluginID, "error", err)
 		http.Error(w, err.Error(), http.StatusBadGateway)

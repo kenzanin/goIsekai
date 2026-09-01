@@ -221,7 +221,6 @@ func (m *Manager) loadLua(id, dir string) (*loadedPlugin, error) {
 		}
 	}
 
-	logger.Debug("lua plugin loaded", "id", id, "version", contractVer)
 	return &loadedPlugin{
 		id:              id,
 		wasmPath:        mainPath,

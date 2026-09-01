@@ -29,7 +29,6 @@ func (d *DB) RegisterPlugin(p Plugin) error {
 			Plugins.Name.SET(Plugins.EXCLUDED.Name),
 			Plugins.Version.SET(Plugins.EXCLUDED.Version),
 			Plugins.WasmPath.SET(Plugins.EXCLUDED.WasmPath),
-			Plugins.IsActive.SET(Plugins.EXCLUDED.IsActive),
 			Plugins.IconURL.SET(Plugins.EXCLUDED.IconURL),
 			Plugins.ThumbRatio.SET(Plugins.EXCLUDED.ThumbRatio),
 		),
