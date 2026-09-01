@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
+	"time"
 
 	"goisekai/internal/bridge"
 	"goisekai/internal/config"
@@ -27,6 +28,8 @@ func main() {
 	port := flag.Int("port", 0, "HTTP server port (overrides goisekai.ini port)")
 	open := flag.Bool("open", false, "open the default browser on startup")
 	genIni := flag.Bool("genini", false, "generate a default goisekai.ini and exit")
+	cdpEngine := flag.String("cdpEngine", "", "CDP browser engine for anti-bot solving: off|lightpanda|chrome (overrides goisekai.ini cdp_engine)")
+	cdpPath := flag.String("cdpPath", "", "browser binary path (chrome) or CDP ws:// URL (lightpanda) (overrides goisekai.ini cdp_path)")
 	flag.Parse()
 
 	// Config file: goisekai.ini in the working directory, overridable via
@@ -62,6 +65,12 @@ func main() {
 	}
 	if *port != 0 {
 		cfg.Port = *port
+	}
+	if *cdpEngine != "" {
+		cfg.CDPEngine = *cdpEngine
+	}
+	if *cdpPath != "" {
+		cfg.CDPPath = *cdpPath
 	}
 
 	// Logger level: flag overrides config, config overrides the "info" default.
@@ -101,6 +110,11 @@ func main() {
 	proxy.SetDefaultHeader("User-Agent", cfg.UserAgent)
 	proxy.SetDefaultHeader("Accept-Language", cfg.AcceptLanguage)
 	proxy.SetDefaultHeader("Referer", cfg.Referer)
+	proxy.ConfigureCDP(hostnet.CDPConfig{
+		Engine:  cfg.CDPEngine,
+		Path:    cfg.CDPPath,
+		Timeout: time.Duration(cfg.CDPSolveTimeout) * time.Second,
+	})
 
 	mgr := pluginmanager.NewManager(proxy, pluginsDir)
 	if err := mgr.Discover(); err != nil {

@@ -119,6 +119,7 @@ func (m *Manager) Discover() error {
 			return fmt.Errorf("load plugin %s: %w", id, err)
 		}
 		m.plugins[id] = p
+		m.proxy.SetNeedsJS(id, p.meta.NeedsJS)
 		logger.Debug("plugin loaded", "id", id, "version", p.contractVersion)
 	}
 
@@ -139,6 +140,7 @@ func (m *Manager) Discover() error {
 			return fmt.Errorf("load lua plugin %s: %w", id, err)
 		}
 		m.plugins[id] = p
+		m.proxy.SetNeedsJS(id, p.meta.NeedsJS)
 		logger.Debug("lua plugin loaded", "id", id, "version", p.contractVersion)
 	}
 	return nil
@@ -173,6 +175,7 @@ func (m *Manager) Install(wasmPath string) (string, error) {
 			return "", fmt.Errorf("install lua plugin %s: %w", id, err)
 		}
 		m.plugins[id] = p
+		m.proxy.SetNeedsJS(id, p.meta.NeedsJS)
 		logger.Debug("lua plugin installed", "id", id)
 		return filepath.Join(destDir, "main.lua"), nil
 	}
@@ -190,6 +193,7 @@ func (m *Manager) Install(wasmPath string) (string, error) {
 		return "", fmt.Errorf("install plugin %s: %w", id, err)
 	}
 	m.plugins[id] = p
+	m.proxy.SetNeedsJS(id, p.meta.NeedsJS)
 	logger.Debug("plugin installed", "id", id)
 	return dest, nil
 }
@@ -260,6 +264,7 @@ type LoadedPlugin struct {
 	VerifyURL        string // from the plugin's optional Init metadata
 	NeedsHumanVerify bool
 	ThumbRatio       float64
+	NeedsJS          bool
 }
 
 // LoadedPlugins returns metadata for every plugin currently loaded in memory,
@@ -276,6 +281,7 @@ func (m *Manager) LoadedPlugins() []LoadedPlugin {
 			VerifyURL:        p.meta.VerifyURL,
 			NeedsHumanVerify: p.meta.NeedsHumanVerify,
 			ThumbRatio:       p.meta.ThumbRatio,
+			NeedsJS:          p.meta.NeedsJS,
 		})
 	}
 	sort.Slice(out, func(i, j int) bool { return out[i].ID < out[j].ID })

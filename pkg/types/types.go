@@ -59,6 +59,10 @@ type PluginMeta struct {
 	// ThumbRatio is the cover width/height ratio (e.g. 0.703) used by the UI
 	// to reserve cover space before images load. 0 means use the 2:3 default.
 	ThumbRatio float64 `json:"thumb_ratio,omitempty"`
+	// NeedsJS reports that this source's site renders client-side and should be
+	// routed through the browser engine (when configured) instead of the fast
+	// path. Analogous to NeedsHumanVerify but for JS-capable engines.
+	NeedsJS bool `json:"needs_js,omitempty"`
 }
 
 // HTTPRequest is the request payload a plugin passes to the host-imported

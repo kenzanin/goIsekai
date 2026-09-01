@@ -34,6 +34,15 @@ type Config struct {
 	UserAgent      string
 	AcceptLanguage string
 	Referer        string
+
+	// [network] — CDP browser engine for solving anti-bot challenges.
+	// CDPEngine is "off" (disabled), "lightpanda", or "chrome".
+	CDPEngine string
+	// CDPPath locates the browser: a binary path for chrome, or a CDP
+	// websocket URL (ws://...) for lightpanda.
+	CDPPath string
+	// CDPSolveTimeout bounds a single challenge solve in seconds.
+	CDPSolveTimeout int
 }
 
 // Default returns the built-in defaults.
@@ -49,6 +58,9 @@ func Default() *Config {
 		UserAgent:      "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36",
 		AcceptLanguage: "en-US,en;q=0.9",
 		Referer:        "",
+		CDPEngine:      "off",
+		CDPPath:        "",
+		CDPSolveTimeout: 30,
 	}
 	c.CacheDir = filepath.Join(c.DataDir, "cache")
 	return c
@@ -111,6 +123,9 @@ func (c *Config) Save(path string) error {
 	fmt.Fprintf(&b, "user_agent = %s\n", c.UserAgent)
 	fmt.Fprintf(&b, "accept_language = %s\n", c.AcceptLanguage)
 	fmt.Fprintf(&b, "referer = %s\n", c.Referer)
+	fmt.Fprintf(&b, "cdp_engine = %s\n", c.CDPEngine)
+	fmt.Fprintf(&b, "cdp_path = %s\n", c.CDPPath)
+	fmt.Fprintf(&b, "cdp_solve_timeout = %d\n", c.CDPSolveTimeout)
 	return os.WriteFile(path, []byte(b.String()), 0o644)
 }
 
@@ -158,6 +173,16 @@ func (c *Config) set(section, key, val string) {
 			c.AcceptLanguage = val
 		case "referer":
 			c.Referer = val
+		case "cdp_engine":
+			if val == "off" || val == "lightpanda" || val == "chrome" {
+				c.CDPEngine = val
+			}
+		case "cdp_path":
+			c.CDPPath = val
+		case "cdp_solve_timeout":
+			if n, err := strconv.Atoi(val); err == nil && n > 0 {
+				c.CDPSolveTimeout = n
+			}
 		}
 	}
 }
