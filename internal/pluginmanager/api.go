@@ -26,6 +26,9 @@ func (m *Manager) call(p *loadedPlugin, fnName, inputJSON string) (string, error
 	if p.kind == "lua" {
 		return callLua(p, fnName, inputJSON)
 	}
+	if p.kind == "js" {
+		return callJS(p, fnName, inputJSON)
+	}
 	p.mu.Lock()
 	defer p.mu.Unlock()
 

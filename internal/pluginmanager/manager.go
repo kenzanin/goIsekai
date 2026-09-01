@@ -12,6 +12,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/dop251/goja"
 	"github.com/tetratelabs/wazero"
 	"github.com/tetratelabs/wazero/api"
 	"github.com/tetratelabs/wazero/imports/wasi_snapshot_preview1"
@@ -42,6 +43,8 @@ type loadedPlugin struct {
 	fn map[string]api.Function
 	// lua holds the Lua VM for lua-kind plugins (nil for wasm).
 	lua *lua.LState
+	// js holds the goja VM for js-kind plugins (nil otherwise).
+	js *goja.Runtime
 	// contractVersion is the plugin's resolved contract_version.
 	contractVersion int32
 	// meta is the metadata the plugin declared in its optional Init export.
@@ -143,6 +146,26 @@ func (m *Manager) Discover() error {
 		m.proxy.SetNeedsJS(id, p.meta.NeedsJS)
 		logger.Debug("lua plugin loaded", "id", id, "version", p.contractVersion)
 	}
+	// JS plugins: one folder per plugin, main.js entry, folder name = id.
+	jsMatches, err := filepath.Glob(filepath.Join(m.pluginsDir, "*", "main.js"))
+	if err != nil {
+		return err
+	}
+	for _, path := range jsMatches {
+		id := filepath.Base(filepath.Dir(path))
+		if _, dup := m.plugins[id]; dup {
+			return fmt.Errorf("plugin id collision: %q (wasm/lua and js)", id)
+		}
+		logger.Debug("loading js plugin", "id", id, "path", path)
+		p, err := m.loadJS(id, filepath.Dir(path))
+		if err != nil {
+			logger.Error("js plugin load failed", "id", id, "error", err)
+			return fmt.Errorf("load js plugin %s: %w", id, err)
+		}
+		m.plugins[id] = p
+		m.proxy.SetNeedsJS(id, p.meta.NeedsJS)
+		logger.Debug("js plugin loaded", "id", id, "version", p.contractVersion)
+	}
 	return nil
 }
 
@@ -178,6 +201,27 @@ func (m *Manager) Install(wasmPath string) (string, error) {
 		m.proxy.SetNeedsJS(id, p.meta.NeedsJS)
 		logger.Debug("lua plugin installed", "id", id)
 		return filepath.Join(destDir, "main.lua"), nil
+	}
+	// JS plugin: source is a folder containing main.js; copy it recursively.
+	mainJS := filepath.Join(wasmPath, "main.js")
+	if info, err := os.Stat(mainJS); err == nil && !info.IsDir() {
+		id = filepath.Base(wasmPath)
+		destDir := filepath.Join(m.pluginsDir, id)
+		logger.Debug("installing js plugin", "source", wasmPath, "dest", destDir)
+		if filepath.Clean(wasmPath) != filepath.Clean(destDir) {
+			if err := copyDir(wasmPath, destDir); err != nil {
+				return "", fmt.Errorf("copy js plugin %s: %w", id, err)
+			}
+		}
+		p, err := m.loadJS(id, destDir)
+		if err != nil {
+			logger.Error("js plugin install failed", "id", id, "error", err)
+			return "", fmt.Errorf("install js plugin %s: %w", id, err)
+		}
+		m.plugins[id] = p
+		m.proxy.SetNeedsJS(id, p.meta.NeedsJS)
+		logger.Debug("js plugin installed", "id", id)
+		return filepath.Join(destDir, "main.js"), nil
 	}
 
 	dest := filepath.Join(m.pluginsDir, id+".wasm")
