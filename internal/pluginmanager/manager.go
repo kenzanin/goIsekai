@@ -13,9 +13,8 @@ import (
 	"time"
 
 	"github.com/dop251/goja"
-	"github.com/tetratelabs/wazero"
-	"github.com/tetratelabs/wazero/api"
-	"github.com/tetratelabs/wazero/imports/wasi_snapshot_preview1"
+	"github.com/extism/go-sdk"
+
 	lua "github.com/yuin/gopher-lua"
 
 	"goisekai/internal/hostnet"
@@ -28,8 +27,9 @@ const (
 	memoryLimitPages = 1024
 	// invokeTimeout bounds a single plugin invocation (5.3: 15 s).
 	invokeTimeout = 15 * time.Second
-	// hostModuleName is the module name plugins import host functions from.
-	hostModuleName = "env"
+	// hostModuleName is no longer used after Extism migration.
+	hostModuleName = "env" // ponytail: remove when no other legacy code uses this const
+
 )
 
 // loadedPlugin is a compiled and instantiated plugin and its resolved ABI
@@ -37,11 +37,10 @@ const (
 type loadedPlugin struct {
 	id       string
 	wasmPath string
-	kind     string // "wasm" or "lua"
-	mod      api.Module
-	// fn maps an ABI function name (types.*Func) to its resolved api.Function.
-	fn map[string]api.Function
-	// lua holds the Lua VM for lua-kind plugins (nil for wasm).
+	kind     string // "wasm", "lua", or "js"
+	// extismPlugin holds the Extism plugin instance for wasm-kind plugins (nil otherwise).
+	extismPlugin *extism.Plugin
+	// lua holds the Lua VM for lua-kind plugins (nil for wasm/js).
 	lua *lua.LState
 	// js holds the goja VM for js-kind plugins (nil otherwise).
 	js *goja.Runtime
@@ -49,13 +48,12 @@ type loadedPlugin struct {
 	contractVersion int32
 	// meta is the metadata the plugin declared in its optional Init export.
 	meta types.PluginMeta
-	// mu serializes invocations: api.Function.Call is not goroutine-safe, and a
-	// single plugin instance must not be re-entered concurrently.
+	// mu serializes invocations: concurrent calls to the same plugin must not interleave.
 	mu sync.Mutex
 }
 
 // Manager loads WASM source plugins and exposes their search/detail operations
-// to the host. It owns the shared wazero runtime and wires host_http_request to
+// to the host. It wires host_http_request to
 // the hostnet proxy.
 type Manager struct {
 	proxy      *hostnet.Proxy
@@ -63,7 +61,6 @@ type Manager struct {
 	ctx        context.Context
 
 	mu      sync.RWMutex
-	runtime wazero.Runtime
 	plugins map[string]*loadedPlugin
 }
 
@@ -78,32 +75,14 @@ func NewManager(proxy *hostnet.Proxy, pluginsDir string) *Manager {
 	}
 }
 
-// Discover creates the wazero runtime, instantiates the host module, and loads
+// Discover loads
 // every *.wasm file in pluginsDir. A plugin that fails its contract-version
 // check or instantiation aborts the whole discovery with a descriptive error.
 func (m *Manager) Discover() error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
-	rt := wazero.NewRuntimeWithConfig(m.ctx,
-		wazero.NewRuntimeConfig().
-			WithMemoryLimitPages(memoryLimitPages).
-			WithCloseOnContextDone(true))
-
-	// Go and TinyGo wasip1 modules import WASI; instantiate it so plugin
-	// runtimes that need it can start (5.1: wasip1 target support).
-	if _, err := wasi_snapshot_preview1.Instantiate(m.ctx, rt); err != nil {
-		return fmt.Errorf("instantiate wasi_snapshot_preview1: %w", err)
-	}
-
-	if _, err := rt.NewHostModuleBuilder(hostModuleName).
-		NewFunctionBuilder().
-		WithFunc(m.hostHTTPRequest).
-		Export(types.HostHTTPRequestFunc).
-		Instantiate(m.ctx); err != nil {
-		return fmt.Errorf("instantiate host module: %w", err)
-	}
-
+	// WASM plugins: one .wasm file per plugin, filename (minus .wasm) = id.
 	pattern := filepath.Join(m.pluginsDir, "*.wasm")
 	matches, err := filepath.Glob(pattern)
 	if err != nil {
@@ -111,14 +90,12 @@ func (m *Manager) Discover() error {
 	}
 	logger.Debug("discovering plugins", "dir", m.pluginsDir, "count", len(matches))
 
-	m.runtime = rt
 	for _, path := range matches {
 		id := strings.TrimSuffix(filepath.Base(path), ".wasm")
 		logger.Debug("loading plugin", "id", id, "path", path)
-		p, err := m.load(rt, id, path)
+		p, err := m.load(id, path)
 		if err != nil {
 			logger.Error("plugin load failed", "id", id, "error", err)
-			_ = rt.Close(m.ctx)
 			return fmt.Errorf("load plugin %s: %w", id, err)
 		}
 		m.plugins[id] = p
@@ -176,7 +153,7 @@ func (m *Manager) Discover() error {
 func (m *Manager) Install(wasmPath string) (string, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	if m.runtime == nil {
+	if m.plugins == nil {
 		return "", fmt.Errorf("Discover must be called before Install")
 	}
 	id := strings.TrimSuffix(filepath.Base(wasmPath), ".wasm")
@@ -231,7 +208,7 @@ func (m *Manager) Install(wasmPath string) (string, error) {
 			return "", fmt.Errorf("copy plugin %s: %w", id, err)
 		}
 	}
-	p, err := m.load(m.runtime, id, dest)
+	p, err := m.load(id, dest)
 	if err != nil {
 		logger.Error("plugin install failed", "id", id, "error", err)
 		return "", fmt.Errorf("install plugin %s: %w", id, err)
@@ -275,11 +252,11 @@ func (m *Manager) Close() error {
 		if p.kind == "lua" && p.lua != nil {
 			p.lua.Close()
 		}
+		if p.kind == "wasm" && p.extismPlugin != nil {
+			_ = p.extismPlugin.Close(m.ctx)
+		}
 	}
-	if m.runtime == nil {
-		return nil
-	}
-	return m.runtime.Close(m.ctx)
+	return nil
 }
 
 // copyFile copies src to dst, truncating dst if it exists.

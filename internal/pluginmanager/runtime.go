@@ -4,167 +4,112 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"os"
+	"strconv"
 
-	"github.com/tetratelabs/wazero"
-	"github.com/tetratelabs/wazero/api"
+	"github.com/extism/go-sdk"
 
 	"goisekai/internal/logger"
 	"goisekai/pkg/types"
 )
 
-// load compiles, instantiates, and version-checks a single plugin wasm file.
-func (m *Manager) load(rt wazero.Runtime, id, wasmPath string) (*loadedPlugin, error) {
-	code, err := os.ReadFile(wasmPath)
-	if err != nil {
-		return nil, err
-	}
-	compiled, err := rt.CompileModule(m.ctx, code)
-	if err != nil {
-		return nil, fmt.Errorf("compile: %w", err)
-	}
-	mod, err := rt.InstantiateModule(m.ctx, compiled, wazero.NewModuleConfig().WithName(id).WithStartFunctions())
-	if err != nil {
-		return nil, fmt.Errorf("instantiate: %w", err)
+// load compiles, instantiates, and version-checks a single WASM plugin using
+// the Extism runtime. Each plugin gets its own extism.Plugin instance with
+// a dedicated host_http_request function that routes through the hostnet proxy
+// (keyed by plugin id for cookie isolation).
+func (m *Manager) load(id, wasmPath string) (*loadedPlugin, error) {
+	manifest := extism.Manifest{
+		Wasm:    []extism.Wasm{extism.WasmFile{Path: wasmPath, Name: id}},
+		Memory:  &extism.ManifestMemory{MaxPages: memoryLimitPages},
+		Timeout: uint64(invokeTimeout.Milliseconds()),
 	}
 
-	// A Go wasip1 plugin built with -buildmode=c-shared exports _initialize (the
-	// reactor entry) instead of _start. Run it once to bring the runtime to a
-	// resident, ready state; unlike _start it does not run main() or exit.
-	if initFn := mod.ExportedFunction("_initialize"); initFn != nil {
-		if _, err := initFn.Call(m.ctx); err != nil {
-			return nil, fmt.Errorf("_initialize: %w", err)
-		}
+	hostFuncs := []extism.HostFunction{
+		extism.NewHostFunctionWithStack(
+			types.HostHTTPRequestFunc,
+			m.makeHostHTTPRequest(id),
+			[]extism.ValueType{extism.ValueTypePTR},
+			[]extism.ValueType{extism.ValueTypePTR},
+		),
 	}
 
-	verFn := mod.ExportedFunction(types.ContractVersionFunc)
-	if verFn == nil {
-		return nil, fmt.Errorf("does not export %s", types.ContractVersionFunc)
-	}
-	verRes, err := verFn.Call(m.ctx)
+	plugin, err := extism.NewPlugin(m.ctx, manifest, extism.PluginConfig{
+		EnableWasi: true,
+	}, hostFuncs)
 	if err != nil {
+		return nil, fmt.Errorf("extism.NewPlugin %s: %w", id, err)
+	}
+	plugin.Timeout = invokeTimeout
+
+	// --- contract_version --------------------------------------------------
+	_, verOut, err := plugin.Call(types.ContractVersionFunc, nil)
+	if err != nil {
+		_ = plugin.Close(m.ctx)
 		return nil, fmt.Errorf("contract_version: %w", err)
 	}
-	if len(verRes) == 0 {
-		return nil, fmt.Errorf("contract_version returned no result")
+	ver, err := strconv.Atoi(string(verOut))
+	if err != nil {
+		_ = plugin.Close(m.ctx)
+		return nil, fmt.Errorf("contract_version: parse %q: %w", string(verOut), err)
 	}
-	if err := types.CheckVersion(int32(verRes[0])); err != nil {
+	if err := types.CheckVersion(int32(ver)); err != nil {
+		_ = plugin.Close(m.ctx)
 		return nil, err
 	}
-	logger.Debug("contract_version resolved", "id", id, "version", int32(verRes[0]))
+	logger.Debug("contract_version resolved", "id", id, "version", ver)
 
-	p := &loadedPlugin{id: id, wasmPath: wasmPath, kind: "wasm", mod: mod, contractVersion: int32(verRes[0]), fn: make(map[string]api.Function)}
-	for _, name := range []string{types.SearchFunc, types.GetMangaDetailFunc, types.GetChapterListFunc, types.GetPageListFunc} {
-		f := mod.ExportedFunction(name)
-		if f == nil {
-			return nil, fmt.Errorf("does not export %s", name)
-		}
-		p.fn[name] = f
+	p := &loadedPlugin{
+		id:              id,
+		wasmPath:        wasmPath,
+		kind:            "wasm",
+		extismPlugin:    plugin,
+		contractVersion: int32(ver),
 	}
 	p.meta = m.readInit(p)
 	return p, nil
 }
 
-// alloc returns a pointer to size bytes in the plugin's linear memory by
-// calling its exported malloc, or ok=false when the plugin lacks one or the
-// allocation fails.
-func (m *Manager) alloc(p *loadedPlugin, size uint32) (uint32, bool) {
-	malloc := p.mod.ExportedFunction("malloc")
-	if malloc == nil {
-		return 0, false
+// makeHostHTTPRequest returns a HostFunctionStackCallback that routes plugin
+// HTTP requests through the hostnet proxy keyed by pluginID for cookie
+// isolation. The Extism calling convention passes a single pointer (offset
+// into plugin memory) to a length-prefixed block; the callback reads the
+// request JSON, delegates to the proxy, and writes the response back.
+func (m *Manager) makeHostHTTPRequest(pluginID string) extism.HostFunctionStackCallback {
+	return func(ctx context.Context, p *extism.CurrentPlugin, stack []uint64) {
+		reqJSON, err := p.ReadString(stack[0])
+		if err != nil {
+			logger.Debug("host_http_request: read input", "plugin", pluginID, "error", err)
+			stack[0] = 0
+			return
+		}
+		respJSON, err := m.proxy.HandleRequest(pluginID, reqJSON)
+		if err != nil {
+			// Surface the failure as an empty response rather than
+			// trapping; plugins can detect empty bodies.
+			logger.Debug("host_http_request: proxy error", "plugin", pluginID, "error", err)
+			stack[0] = 0
+			return
+		}
+		stack[0], err = p.WriteString(respJSON)
+		if err != nil {
+			logger.Debug("host_http_request: write output", "plugin", pluginID, "error", err)
+			stack[0] = 0
+		}
 	}
-	res, err := malloc.Call(m.ctx, uint64(size))
-	if err != nil || len(res) == 0 {
-		return 0, false
-	}
-	ptr := uint32(res[0])
-	if ptr == 0 {
-		return 0, false
-	}
-	return ptr, true
 }
 
-// free releases a plugin-malloc'd buffer via the plugin's exported free, when
-// present. Best-effort: a plugin without free simply leaks.
-func (m *Manager) free(p *loadedPlugin, ptr uint32) {
-	if ptr == 0 {
-		return
-	}
-	f := p.mod.ExportedFunction("free")
-	if f == nil {
-		return
-	}
-	_, _ = f.Call(m.ctx, uint64(ptr))
-}
-
-// hostHTTPRequest implements env.host_http_request(ptr, len) -> packed(ptr, len).
-// It reads the request JSON from the plugin's memory, delegates to the hostnet
-// proxy (keyed by plugin id for cookie isolation), and writes the response JSON
-// back into a plugin-malloc'd buffer.
-func (m *Manager) hostHTTPRequest(ctx context.Context, mod api.Module, ptr, length uint32) uint64 {
-	reqBytes, ok := mod.Memory().Read(ptr, length)
-	if !ok {
-		return pack(0, 0)
-	}
-	respJSON, err := m.proxy.HandleRequest(mod.Name(), string(reqBytes))
-	if err != nil {
-		// Surface the failure to the plugin as an empty response rather than
-		// trapping; plugins can detect empty bodies.
-		return pack(0, 0)
-	}
-	resp := []byte(respJSON)
-
-	malloc := mod.ExportedFunction("malloc")
-	if malloc == nil {
-		return pack(0, 0)
-	}
-	allocRes, err := malloc.Call(ctx, uint64(len(resp)))
-	if err != nil || len(allocRes) == 0 {
-		return pack(0, 0)
-	}
-	respPtr := uint32(allocRes[0])
-	if respPtr == 0 || !mod.Memory().Write(respPtr, resp) {
-		return pack(0, 0)
-	}
-	return pack(respPtr, uint32(len(resp)))
-}
-
-// pack combines a pointer and length into the single i64 the ABI returns
-// (low 32 bits = pointer, high 32 bits = length).
-func pack(ptr, length uint32) uint64 {
-	return uint64(length)<<32 | uint64(ptr)
-}
-
-// readInit optionally invokes a plugin's Init export to collect its declared
-// metadata (verify_url, needs_human_verify, thumb_ratio). Init is optional
-// (D7: no ABI version bump), so an absent or failing Init is not fatal: the
-// plugin simply contributes zero metadata.
+// readInit calls the plugin's Init export and parses the returned PluginMeta.
+// A plugin without Init simply contributes zero metadata.
 func (m *Manager) readInit(p *loadedPlugin) types.PluginMeta {
-	initFn := p.mod.ExportedFunction(types.InitFunc)
-	if initFn == nil {
-		return types.PluginMeta{}
-	}
-	ctx, cancel := context.WithTimeout(m.ctx, invokeTimeout)
-	defer cancel()
-	results, err := initFn.Call(ctx)
+	_, initOut, err := p.extismPlugin.Call(types.InitFunc, nil)
 	if err != nil {
 		logger.Debug("plugin Init failed", "id", p.id, "error", err)
 		return types.PluginMeta{}
 	}
-	if len(results) == 0 {
-		return types.PluginMeta{}
-	}
-	outPtr, outLen := unpack(results[0])
-	if outPtr == 0 || outLen == 0 {
-		return types.PluginMeta{}
-	}
-	defer m.free(p, outPtr)
-	out, ok := p.mod.Memory().Read(outPtr, outLen)
-	if !ok {
+	if len(initOut) == 0 {
 		return types.PluginMeta{}
 	}
 	var meta types.PluginMeta
-	if err := json.Unmarshal(out, &meta); err != nil {
+	if err := json.Unmarshal(initOut, &meta); err != nil {
 		logger.Debug("plugin Init returned invalid JSON", "id", p.id, "error", err)
 		return types.PluginMeta{}
 	}

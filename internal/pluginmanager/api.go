@@ -1,7 +1,6 @@
 package pluginmanager
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 
@@ -32,41 +31,11 @@ func (m *Manager) call(p *loadedPlugin, fnName, inputJSON string) (string, error
 	p.mu.Lock()
 	defer p.mu.Unlock()
 
-	ctx, cancel := context.WithTimeout(m.ctx, invokeTimeout)
-	defer cancel()
-
-	input := []byte(inputJSON)
-	inPtr, ok := m.alloc(p, uint32(len(input)))
-	if !ok {
-		return "", fmt.Errorf("plugin %s: malloc failed for input", p.id)
-	}
-	defer m.free(p, inPtr)
-	if !p.mod.Memory().Write(inPtr, input) {
-		return "", fmt.Errorf("plugin %s: write input out of range", p.id)
-	}
-
-	results, err := p.fn[fnName].Call(ctx, uint64(inPtr), uint64(len(input)))
+	_, out, err := p.extismPlugin.Call(fnName, []byte(inputJSON))
 	if err != nil {
 		return "", fmt.Errorf("plugin %s %s: %w", p.id, fnName, err)
 	}
-	if len(results) == 0 {
-		return "", fmt.Errorf("plugin %s %s: no result", p.id, fnName)
-	}
-	outPtr, outLen := unpack(results[0])
-	if outPtr == 0 || outLen == 0 {
-		return "", fmt.Errorf("plugin %s %s: empty result", p.id, fnName)
-	}
-	defer m.free(p, outPtr)
-	out, ok := p.mod.Memory().Read(outPtr, outLen)
-	if !ok {
-		return "", fmt.Errorf("plugin %s %s: result out of range", p.id, fnName)
-	}
 	return string(out), nil
-}
-
-// unpack splits the packed i64 back into (pointer, length).
-func unpack(v uint64) (ptr, length uint32) {
-	return uint32(v & 0xffffffff), uint32(v >> 32)
 }
 
 // Search runs a plugin's Search function and decodes its result.

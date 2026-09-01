@@ -3,9 +3,8 @@
 // Command mangadex-plugin is a goIsekai manga source plugin that fetches
 // manga, chapters, and pages from the MangaDex public API (api.mangadex.org).
 //
-// It implements the full host/plugin ABI (contract_version, malloc/free, and
-// the four JSON-over-memory functions) and uses host_http_request for all
-// network access.
+// It implements the Extism PDK ABI: exports read input via pdk.Input() and
+// write output via pdk.Output(), returning int32 (0 = success).
 package main
 
 import (
@@ -16,13 +15,11 @@ import (
 	"strconv"
 	"strings"
 	"time"
-	"unsafe"
+
+	"github.com/extism/go-pdk"
 
 	"goisekai/pkg/types"
 )
-
-const abiVersion int32 = 1
-
 const (
 	apiURL = "https://api.mangadex.org"
 	cdnURL = "https://uploads.mangadex.org"
@@ -30,114 +27,30 @@ const (
 )
 
 // ---------------------------------------------------------------------------
-// ABI plumbing — identical to examples/dummy-plugin
+// Extism host function — imported from the Extism kernel
 // ---------------------------------------------------------------------------
 
-// allocations tracks every live WASM allocation so we can free() them later.
-var allocations = map[uint32][]byte{}
-
-//go:wasmexport malloc
-func malloc(size uint32) uint32 {
-	b := make([]byte, size)
-	ptr := uint32(uintptr(unsafe.Pointer(unsafe.SliceData(b))))
-	allocations[ptr] = b
-	return ptr
-}
-
-//go:wasmexport free
-func free(ptr uint32) {
-	delete(allocations, ptr)
-}
-
-//go:wasmexport contract_version
-func contractVersion() int32 { return abiVersion }
-
-//go:wasmexport Init
-func Init() uint64 {
-	// MangaDex has no anti-bot challenge, so only the cover aspect ratio is
-	// declared (256/364 ≈ 0.703); no verify_url / needs_human_verify.
-	return returnJSON(types.PluginMeta{ThumbRatio: 0.703})
-}
-
-// readString reinterprets a (ptr, len) pair in WASM linear memory as a Go string.
-func readString(ptr, length uint32) string {
-	return unsafe.String((*byte)(unsafe.Pointer(uintptr(ptr))), int(length))
-}
-
-// readID decodes a host-supplied id. The host JSON-encodes ids
-// (json.Marshal(mangaID)), so this unmarshals the input string.
-func readID(ptr, length uint32) string {
-	var id string
-	_ = json.Unmarshal([]byte(readString(ptr, length)), &id)
-	return id
-}
-
-// returnJSON marshals v and returns the packed (ptr, len) i64 the ABI expects:
-// low 32 bits = pointer, high 32 bits = length.
-func returnJSON(v any) uint64 {
-	b, err := json.Marshal(v)
-	if err != nil {
-		return 0
-	}
-	ptr := malloc(uint32(len(b)))
-	copy(allocations[ptr], b)
-	return uint64(uint32(len(b)))<<32 | uint64(ptr)
-}
-
-// hostHTTPRequest is imported from the host ("env" module). It performs all
-// network access on the plugin's behalf: the host injects the default headers
-// (User-Agent, Accept-Language, Referer), manages a per-plugin cookie jar, and
-// enforces the no-direct-socket rule.
-//
-//go:wasmimport env host_http_request
-func hostHTTPRequest(ptr, length uint32) uint64
-
-// unpack splits the host's packed (ptr, len) i64 into its parts.
-func unpack(packed uint64) (ptr, length uint32) {
-	return uint32(packed), uint32(packed >> 32)
-}
+//go:wasmimport extism:host/user host_http_request
+func hostHTTPRequest(offset uint64) uint64
 
 // fetch performs an HTTP GET through the host proxy and decodes the response.
-func fetch(url string) (*types.HTTPResponse, error) {
-	b, err := json.Marshal(types.HTTPRequest{Method: "GET", URL: url})
+func doFetch(requestURL string) (*types.HTTPResponse, error) {
+	b, err := json.Marshal(types.HTTPRequest{Method: "GET", URL: requestURL})
 	if err != nil {
 		return nil, err
 	}
-	inPtr := malloc(uint32(len(b)))
-	copy(allocations[inPtr], b)
-	defer free(inPtr)
+	mem := pdk.AllocateString(string(b))
+	defer mem.Free()
 
-	outPtr, outLen := unpack(hostHTTPRequest(inPtr, uint32(len(b))))
-	if outPtr == 0 || outLen == 0 {
-		return nil, fmt.Errorf("host_http_request returned empty result")
+	respOffset := hostHTTPRequest(mem.Offset())
+	if respOffset == 0 {
+		return nil, fmt.Errorf("host function failed")
 	}
-	defer free(outPtr)
+	respMem := pdk.FindMemory(respOffset)
+	defer respMem.Free()
 
 	var resp types.HTTPResponse
-	if err := json.Unmarshal([]byte(readString(outPtr, outLen)), &resp); err != nil {
-		return nil, err
-	}
-	return &resp, nil
-}
-
-// fetchWithHeaders performs an HTTP request with extra headers.
-func fetchWithHeaders(method, requestURL string, headers map[string]string) (*types.HTTPResponse, error) {
-	b, err := json.Marshal(types.HTTPRequest{Method: method, URL: requestURL, Headers: headers})
-	if err != nil {
-		return nil, err
-	}
-	inPtr := malloc(uint32(len(b)))
-	copy(allocations[inPtr], b)
-	defer free(inPtr)
-
-	outPtr, outLen := unpack(hostHTTPRequest(inPtr, uint32(len(b))))
-	if outPtr == 0 || outLen == 0 {
-		return nil, fmt.Errorf("host_http_request returned empty result")
-	}
-	defer free(outPtr)
-
-	var resp types.HTTPResponse
-	if err := json.Unmarshal([]byte(readString(outPtr, outLen)), &resp); err != nil {
+	if err := json.Unmarshal(respMem.ReadBytes(), &resp); err != nil {
 		return nil, err
 	}
 	return &resp, nil
@@ -204,25 +117,25 @@ type chapterListResp struct {
 }
 
 type chapterData struct {
-	ID         string `json:"id"`
-	Type       string `json:"type"`
-	Attributes struct {
-		Volume             string `json:"volume"`
-		Chapter            string `json:"chapter"`
-		Title              string `json:"title"`
-		PublishAt          string `json:"publishAt"`
-		TranslatedLanguage string `json:"translatedLanguage"`
-		ExternalURL        string `json:"externalUrl"`
-	} `json:"attributes"`
+	ID         string          `json:"id"`
+	Attributes chapterAttrs    `json:"attributes"`
+	Relationships []relationship `json:"relationships"`
+}
+
+type chapterAttrs struct {
+	Chapter      string `json:"chapter"`
+	Volume       string `json:"volume"`
+	Title        string `json:"title"`
+	TranslatedLanguage string `json:"translatedLanguage"`
+	PublishAt    string `json:"publishAt"`
+	ExternalURL  string `json:"externalURL"`
 }
 
 type atHomeResp struct {
-	Result  string `json:"result"`
-	BaseURL string `json:"baseUrl"`
-	Chapter struct {
-		Hash      string   `json:"hash"`
-		Data      []string `json:"data"`
-		DataSaver []string `json:"dataSaver"`
+	BaseURL  string `json:"baseUrl"`
+	Chapter  struct {
+		Hash string   `json:"hash"`
+		Data []string `json:"data"`
 	} `json:"chapter"`
 }
 
@@ -230,12 +143,29 @@ type atHomeResp struct {
 // Helpers
 // ---------------------------------------------------------------------------
 
-// titleFrom picks the best title: English first, then first available.
-func titleFrom(m map[string]string) string {
-	if t, ok := m[lang]; ok && t != "" {
+func defaultHeaders() map[string]string {
+	return map[string]string{
+		"Referer": cdnURL + "/",
+	}
+}
+
+func firstTitle(attrs mangaAttrs) string {
+	if t, ok := attrs.Title[lang]; ok && t != "" {
 		return t
 	}
-	for _, t := range m {
+	for _, at := range attrs.AltTitles {
+		if t, ok := at[lang]; ok && t != "" {
+			return t
+		}
+	}
+	for _, at := range attrs.AltTitles {
+		for _, t := range at {
+			if t != "" {
+				return t
+			}
+		}
+	}
+	for _, t := range attrs.Title {
 		if t != "" {
 			return t
 		}
@@ -243,112 +173,62 @@ func titleFrom(m map[string]string) string {
 	return ""
 }
 
-// bestTitle picks the best display title from title + altTitles.
-func bestTitle(attrs mangaAttrs) string {
-	if t := titleFrom(attrs.Title); t != "" {
-		return t
-	}
-	for _, alt := range attrs.AltTitles {
-		if t := titleFrom(alt); t != "" {
-			return t
-		}
-	}
-	return "Unknown"
-}
-
-// descFrom picks the English description.
-func descFrom(attrs mangaAttrs) string {
-	if d, ok := attrs.Description[lang]; ok && d != "" {
-		return d
-	}
-	for _, d := range attrs.Description {
-		if d != "" {
-			return d
-		}
-	}
-	return ""
-}
-
-// coverURL returns the MangaDex CDN cover URL (256px thumb).
 func coverURL(md mangaData) string {
-	for _, rel := range md.Relationships {
-		if rel.Type == "cover_art" && rel.Attributes != nil && rel.Attributes.FileName != "" {
-			return cdnURL + "/covers/" + md.ID + "/" + rel.Attributes.FileName + ".256.jpg"
+	for _, r := range md.Relationships {
+		if r.Type == "cover_art" && r.Attributes != nil {
+			return cdnURL + "/covers/" + md.ID + "/" + r.Attributes.FileName + ".256.jpg"
 		}
 	}
 	return ""
 }
 
-// authorName extracts the first author name from relationships.
-func authorName(md mangaData) string {
-	for _, rel := range md.Relationships {
-		if rel.Type == "author" && rel.Attributes != nil && rel.Attributes.Name != "" {
-			return rel.Attributes.Name
-		}
-	}
-	return ""
-}
-
-// genreTags collects tag names where group == "genre".
-func genreTags(attrs mangaAttrs) []string {
-	var out []string
-	for _, t := range attrs.Tags {
-		if t.Attributes.Group == "genre" {
-			if name := titleFrom(t.Attributes.Name); name != "" {
-				out = append(out, name)
-			}
-		}
-	}
-	return out
-}
-
-// toManga converts a MangaDex mangaData to our types.Manga.
 func toManga(md mangaData) types.Manga {
 	return types.Manga{
-		ID:          md.ID,
-		Title:       bestTitle(md.Attributes),
-		CoverURL:    coverURL(md),
-		Author:      authorName(md),
-		Description: descFrom(md.Attributes),
-		Status:      md.Attributes.Status,
-		Genres:      genreTags(md.Attributes),
+		ID:       md.ID,
+		Title:    firstTitle(md.Attributes),
+		CoverURL: coverURL(md),
 	}
 }
 
-// parseFloat64 parses a string to float64, returning 0 on failure.
 func parseFloat64(s string) float64 {
 	f, _ := strconv.ParseFloat(s, 64)
 	return f
 }
 
-// parseTime parses an ISO8601 timestamp, returning zero time on failure.
 func parseTime(s string) time.Time {
 	t, _ := time.Parse(time.RFC3339, s)
 	return t
 }
 
-// contentRatingQuery returns the contentRating URL params.
 func contentRatingQuery(q url.Values) {
 	q.Add("contentRating[]", "safe")
 	q.Add("contentRating[]", "suggestive")
 	q.Add("contentRating[]", "erotica")
 }
 
-// defaultHeaders returns the Referer header MangaDex pages expect.
-func defaultHeaders() map[string]string {
-	return map[string]string{"Referer": "https://mangadex.org/"}
+// ---------------------------------------------------------------------------
+// Extism ABI exports — pdk.Input() / pdk.Output(), return int32
+// ---------------------------------------------------------------------------
+
+//export contract_version
+func contractVersion() int32 {
+	pdk.OutputString("1")
+	return 0
 }
 
-// ---------------------------------------------------------------------------
-// ABI exports
-// ---------------------------------------------------------------------------
+//export Init
+func Init() int32 {
+	b, _ := json.Marshal(types.PluginMeta{ThumbRatio: 0.703})
+	pdk.Output(b)
+	return 0
+}
 
 // Search returns manga matching a query. Empty query returns popular manga.
 //
-//go:wasmexport Search
-func Search(ptr, length uint32) uint64 {
+//export Search
+func Search() int32 {
 	var f types.SearchFilter
-	_ = json.Unmarshal([]byte(readString(ptr, length)), &f)
+	_ = json.Unmarshal(pdk.Input(), &f)
 
 	if f.Page < 1 {
 		f.Page = 1
@@ -360,8 +240,6 @@ func Search(ptr, length uint32) uint64 {
 	q.Add("includes[]", "cover_art")
 	q.Add("includes[]", "author")
 	q.Add("availableTranslatedLanguage[]", lang)
-	// Empty query (browse popular) sorts by follows; a text query must sort by
-	// relevance or MangaDex returns scattered popular titles instead of matches.
 	if strings.TrimSpace(f.Query) == "" {
 		q.Add("order[followedCount]", "desc")
 	} else {
@@ -373,30 +251,39 @@ func Search(ptr, length uint32) uint64 {
 		q.Set("title", title)
 	}
 
-	resp, err := fetch(apiURL + "/manga?" + q.Encode())
+	resp, err := doFetch(apiURL + "/manga?" + q.Encode())
 	if err != nil || resp.Status < 200 || resp.Status >= 300 {
-		return returnJSON([]types.Manga{})
+		b, _ := json.Marshal([]types.Manga{})
+		pdk.Output(b)
+		return 0
 	}
 
 	var list mangaListResp
 	if err := json.Unmarshal([]byte(resp.Body), &list); err != nil {
-		return returnJSON([]types.Manga{})
+		b, _ := json.Marshal([]types.Manga{})
+		pdk.Output(b)
+		return 0
 	}
 
 	results := make([]types.Manga, 0, len(list.Data))
 	for _, md := range list.Data {
 		results = append(results, toManga(md))
 	}
-	return returnJSON(results)
+	b, _ := json.Marshal(results)
+	pdk.Output(b)
+	return 0
 }
 
 // GetMangaDetail returns full metadata for a single manga by ID.
 //
-//go:wasmexport GetMangaDetail
-func GetMangaDetail(ptr, length uint32) uint64 {
-	mangaID := readID(ptr, length)
+//export GetMangaDetail
+func GetMangaDetail() int32 {
+	var mangaID string
+	_ = json.Unmarshal(pdk.Input(), &mangaID)
 	if mangaID == "" {
-		return returnJSON(types.Manga{})
+		b, _ := json.Marshal(types.Manga{})
+		pdk.Output(b)
+		return 0
 	}
 
 	q := url.Values{}
@@ -404,25 +291,34 @@ func GetMangaDetail(ptr, length uint32) uint64 {
 	q.Add("includes[]", "author")
 	q.Add("includes[]", "artist")
 
-	resp, err := fetch(apiURL + "/manga/" + mangaID + "?" + q.Encode())
+	resp, err := doFetch(apiURL + "/manga/" + mangaID + "?" + q.Encode())
 	if err != nil || resp.Status < 200 || resp.Status >= 300 {
-		return returnJSON(types.Manga{})
+		b, _ := json.Marshal(types.Manga{})
+		pdk.Output(b)
+		return 0
 	}
 
 	var single singleMangaResp
 	if err := json.Unmarshal([]byte(resp.Body), &single); err != nil {
-		return returnJSON(types.Manga{})
+		b, _ := json.Marshal(types.Manga{})
+		pdk.Output(b)
+		return 0
 	}
-	return returnJSON(toManga(single.Data))
+	b, _ := json.Marshal(toManga(single.Data))
+	pdk.Output(b)
+	return 0
 }
 
 // GetChapterList returns all chapters for a manga (paginated feed).
 //
-//go:wasmexport GetChapterList
-func GetChapterList(ptr, length uint32) uint64 {
-	mangaID := readID(ptr, length)
+//export GetChapterList
+func GetChapterList() int32 {
+	var mangaID string
+	_ = json.Unmarshal(pdk.Input(), &mangaID)
 	if mangaID == "" {
-		return returnJSON([]types.Chapter{})
+		b, _ := json.Marshal([]types.Chapter{})
+		pdk.Output(b)
+		return 0
 	}
 
 	var all []types.Chapter
@@ -438,7 +334,7 @@ func GetChapterList(ptr, length uint32) uint64 {
 		q.Set("includeEmptyPages", "0")
 		contentRatingQuery(q)
 
-		resp, err := fetch(apiURL + "/manga/" + mangaID + "/feed?" + q.Encode())
+		resp, err := doFetch(apiURL + "/manga/" + mangaID + "/feed?" + q.Encode())
 		if err != nil || resp.Status < 200 || resp.Status >= 300 {
 			break
 		}
@@ -449,7 +345,6 @@ func GetChapterList(ptr, length uint32) uint64 {
 		}
 
 		for _, cd := range list.Data {
-			// Skip chapters hosted on external sites (e.g. MangaPlus).
 			if cd.Attributes.ExternalURL != "" {
 				continue
 			}
@@ -488,26 +383,35 @@ func GetChapterList(ptr, length uint32) uint64 {
 			break
 		}
 	}
-	return returnJSON(all)
+	b, _ := json.Marshal(all)
+	pdk.Output(b)
+	return 0
 }
 
 // GetPageList returns image URLs for a single chapter via the MangaDex at-home API.
 //
-//go:wasmexport GetPageList
-func GetPageList(ptr, length uint32) uint64 {
-	chapterID := readID(ptr, length)
+//export GetPageList
+func GetPageList() int32 {
+	var chapterID string
+	_ = json.Unmarshal(pdk.Input(), &chapterID)
 	if chapterID == "" {
-		return returnJSON([]types.Page{})
+		b, _ := json.Marshal([]types.Page{})
+		pdk.Output(b)
+		return 0
 	}
 
-	resp, err := fetch(apiURL + "/at-home/server/" + chapterID)
+	resp, err := doFetch(apiURL + "/at-home/server/" + chapterID)
 	if err != nil || resp.Status < 200 || resp.Status >= 300 {
-		return returnJSON([]types.Page{})
+		b, _ := json.Marshal([]types.Page{})
+		pdk.Output(b)
+		return 0
 	}
 
 	var ah atHomeResp
 	if err := json.Unmarshal([]byte(resp.Body), &ah); err != nil {
-		return returnJSON([]types.Page{})
+		b, _ := json.Marshal([]types.Page{})
+		pdk.Output(b)
+		return 0
 	}
 
 	pages := make([]types.Page, 0, len(ah.Chapter.Data))
@@ -518,7 +422,9 @@ func GetPageList(ptr, length uint32) uint64 {
 			Headers: defaultHeaders(),
 		})
 	}
-	return returnJSON(pages)
+	b, _ := json.Marshal(pages)
+	pdk.Output(b)
+	return 0
 }
 
 func main() {}
