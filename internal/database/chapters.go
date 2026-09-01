@@ -44,13 +44,13 @@ func (d *DB) UpsertChapter(c Chapter) error {
 	return err
 }
 
-// SetChapterProgress records the last page read and marks the chapter read.
+// SetChapterProgress records the last page read. It intentionally does NOT
+// set is_read: a chapter is only "read" (struck through) when it's manually
+// marked read or fully read (last_page_read >= total_pages), never merely
+// opened. The derived Done flag is computed in GetChapterProgressForManga.
 func (d *DB) SetChapterProgress(chapterID string, lastPage int) error {
 	_, err := Chapters.UPDATE().
-		SET(
-			Chapters.LastPageRead.SET(Int(int64(lastPage))),
-			Chapters.IsRead.SET(Int(1)),
-		).
+		SET(Chapters.LastPageRead.SET(Int(int64(lastPage)))).
 		WHERE(Chapters.ID.EQ(String(chapterID))).
 		Exec(d.db)
 	return err
@@ -110,9 +110,36 @@ func (d *DB) GetChapterProgressForManga(mangaRowID string) ([]ChapterProgress, e
 			return nil, err
 		}
 		p.IsRead = isRead != 0
+		p.Done = p.IsRead || (p.TotalPages > 0 && p.LastPageRead >= p.TotalPages)
 		out = append(out, p)
 	}
 	return out, rows.Err()
+}
+
+// ResetChapterProgress clears a chapter's read progress: last_page_read back
+// to 0 and is_read off. total_pages is left intact (page-count metadata, not
+// read state).
+func (d *DB) ResetChapterProgress(chapterRowID string) error {
+	_, err := Chapters.UPDATE().
+		SET(
+			Chapters.LastPageRead.SET(Int(0)),
+			Chapters.IsRead.SET(Int(0)),
+		).
+		WHERE(Chapters.ID.EQ(String(chapterRowID))).
+		Exec(d.db)
+	return err
+}
+
+// ResetMangaProgress clears read progress for every chapter of a manga.
+func (d *DB) ResetMangaProgress(mangaRowID string) error {
+	_, err := Chapters.UPDATE().
+		SET(
+			Chapters.LastPageRead.SET(Int(0)),
+			Chapters.IsRead.SET(Int(0)),
+		).
+		WHERE(Chapters.MangaID.EQ(String(mangaRowID))).
+		Exec(d.db)
+	return err
 }
 
 // SetDownloadStatus records the download status of a chapter.

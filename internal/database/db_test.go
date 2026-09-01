@@ -251,7 +251,8 @@ func TestPersistenceAcrossRestart(t *testing.T) {
 	if err := db2.db.QueryRow(`SELECT is_read, last_page_read FROM chapters WHERE id = ?`, "c1").Scan(&isRead, &lastPage); err != nil {
 		t.Fatalf("scan chapter: %v", err)
 	}
-	if isRead != 1 || lastPage != 7 {
+	// SetChapterProgress records the page but does NOT mark read.
+	if isRead != 0 || lastPage != 7 {
 		t.Fatalf("progress not persisted: read=%d page=%d", isRead, lastPage)
 	}
 }
@@ -391,10 +392,79 @@ func TestChapterProgressForManga(t *testing.T) {
 		bySource[r.SourceChapterID] = r
 	}
 	p1 := bySource["cs1"]
-	if !p1.IsRead || p1.LastPageRead != 5 || p1.TotalPages != 18 {
+	// Progress alone (5/18) must NOT mark the chapter read or done.
+	if p1.IsRead || p1.Done || p1.LastPageRead != 5 || p1.TotalPages != 18 {
 		t.Fatalf("cs1 progress wrong: %+v", p1)
 	}
-	if p2 := bySource["cs2"]; p2.LastPageRead != 0 || p2.TotalPages != 0 || p2.IsRead {
+	if p2 := bySource["cs2"]; p2.LastPageRead != 0 || p2.TotalPages != 0 || p2.IsRead || p2.Done {
 		t.Fatalf("cs2 should be untouched: %+v", p2)
+	}
+}
+
+// TestChapterDoneDerivation covers the "read" strikethrough semantics: a
+// chapter is Done when manually marked read OR fully read (last >= total > 0),
+// and ResetChapterProgress clears both signals.
+func TestChapterDoneDerivation(t *testing.T) {
+	db, err := Open(filepath.Join(t.TempDir(), "done.db"))
+	if err != nil {
+		t.Fatalf("Open: %v", err)
+	}
+	defer func() { _ = db.Close() }()
+
+	if err := db.UpsertManga(Manga{ID: "m1", PluginID: "p1", SourceMangaID: "s1", Title: "D"}); err != nil {
+		t.Fatalf("upsert manga: %v", err)
+	}
+	for _, c := range []Chapter{
+		{ID: "c1", MangaID: "m1", SourceChapterID: "cs1", Title: "A", ChapterNum: 1},
+		{ID: "c2", MangaID: "m1", SourceChapterID: "cs2", Title: "B", ChapterNum: 2},
+		{ID: "c3", MangaID: "m1", SourceChapterID: "cs3", Title: "C", ChapterNum: 3},
+	} {
+		if err := db.UpsertChapter(c); err != nil {
+			t.Fatalf("upsert chapter %s: %v", c.ID, err)
+		}
+	}
+
+	get := func() map[string]ChapterProgress {
+		rows, err := db.GetChapterProgressForManga("m1")
+		if err != nil {
+			t.Fatalf("GetChapterProgressForManga: %v", err)
+		}
+		m := map[string]ChapterProgress{}
+		for _, r := range rows {
+			m[r.SourceChapterID] = r
+		}
+		return m
+	}
+
+	// Fully read: last == total == 10 => Done, IsRead false.
+	if err := db.SetChapterTotalPages("c1", 10); err != nil {
+		t.Fatalf("set total pages: %v", err)
+	}
+	if err := db.SetChapterProgress("c1", 10); err != nil {
+		t.Fatalf("set progress: %v", err)
+	}
+	p := get()["cs1"]
+	if p.IsRead || !p.Done {
+		t.Fatalf("fully-read chapter should be Done but not IsRead: %+v", p)
+	}
+
+	// Manually marked read with no page read => Done via IsRead.
+	if err := db.MarkChapterRead("c2"); err != nil {
+		t.Fatalf("mark read: %v", err)
+	}
+	p = get()["cs2"]
+	if !p.IsRead || !p.Done {
+		t.Fatalf("manually-read chapter should be IsRead and Done: %+v", p)
+	}
+
+	// Reset clears both the full-read and the manual-read chapter.
+	if err := db.ResetMangaProgress("m1"); err != nil {
+		t.Fatalf("reset manga progress: %v", err)
+	}
+	for _, src := range []string{"cs1", "cs2", "cs3"} {
+		p := get()[src]
+		if p.IsRead || p.Done || p.LastPageRead != 0 {
+			t.Fatalf("reset should clear %s: %+v", src, p)
+		}
 	}
 }

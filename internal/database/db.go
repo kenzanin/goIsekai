@@ -40,7 +40,9 @@ type ChapterProgress struct {
 	SourceChapterID string
 	LastPageRead    int
 	TotalPages      int
-	IsRead          bool
+	IsRead          bool // manually marked read (mark-read actions)
+	Done            bool // IsRead OR fully read (LastPageRead >= TotalPages > 0)
+	CachedPages     int  // page files present in the disk cache (populated by the bridge layer)
 }
 
 type Plugin struct {

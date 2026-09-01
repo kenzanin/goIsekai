@@ -50,6 +50,9 @@
     <input type="hidden" name="mangaID" value="{{.MangaID}}">
     <button type="submit" class="bg-indigo-600 hover:bg-indigo-500 text-white rounded-md px-3 py-1.5 text-sm font-medium">Mark selected as read</button>
 </form>
+<form method="post" action="/action/reset-progress-all/{{.PluginID}}/{{.MangaID}}" class="mb-4">
+    <button type="submit" title="Clear read progress for every chapter" class="bg-neutral-700 hover:bg-neutral-600 text-white rounded-md px-3 py-1.5 text-sm font-medium">↺ Reset all read status</button>
+</form>
 {{ firstID := "" }}
 <div class="divide-y divide-neutral-800">
     {{range i, c := .Chapters }}
@@ -59,13 +62,13 @@
         <a href="/view/read/{{.PluginID}}/{{.MangaID}}/{{c.ID}}" class="flex-1 flex items-center justify-between gap-4 min-w-0">
             <span class="text-sm">
                 <span class="text-neutral-400 mr-2">Ch. {{formatChapterNum(c.ChapterNum)}}</span>
-                {{if .Progress[c.ID].IsRead}}<span class="line-through text-neutral-500">{{c.Title}}</span>{{else}}{{c.Title}}{{end}}
+                {{if .Progress[c.ID].Done}}<span class="line-through text-neutral-500">{{c.Title}}</span>{{else}}{{c.Title}}{{end}}
             </span>
             <span class="flex items-center gap-2 shrink-0">
-                {{if .Progress[c.ID].LastPageRead > 0}}
-                <span class="text-xs px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400">{{.Progress[c.ID].LastPageRead}}{{if .Progress[c.ID].TotalPages > 0}}/{{.Progress[c.ID].TotalPages}}{{end}}</span>
+                {{if .Progress[c.ID].TotalPages > 0}}
+                <span class="text-xs px-2 py-0.5 rounded-full bg-neutral-800 text-neutral-400">{{.Progress[c.ID].LastPageRead}}/{{.Progress[c.ID].TotalPages}} read{{if .Progress[c.ID].CachedPages > 0}} · {{.Progress[c.ID].CachedPages}} cached{{end}}</span>
                 {{end}}
-                {{if .Progress[c.ID].IsRead}}
+                {{if .Progress[c.ID].Done}}
                 <span class="text-emerald-400 text-xs">✓</span>
                 {{end}}
                 <span class="text-xs text-neutral-500">{{formatDate(c.ReleasedAt.Format("2006-01-02T15:04:05"))}}</span>
@@ -73,6 +76,9 @@
         </a>
         <form method="post" action="/action/mark-read/{{.PluginID}}/{{.MangaID}}/{{c.ID}}">
             <button type="submit" title="Mark read" class="text-xs text-indigo-400 hover:text-indigo-300 whitespace-nowrap">✓ read</button>
+        </form>
+        <form method="post" action="/action/reset-progress/{{.PluginID}}/{{.MangaID}}/{{c.ID}}">
+            <button type="submit" title="Clear this chapter's read progress" class="text-xs text-neutral-500 hover:text-neutral-300 whitespace-nowrap">↺ reset</button>
         </form>
         <form method="post" action="/action/mark-read-range/{{.PluginID}}/{{.MangaID}}/{{firstID}}/{{c.ID}}">
             <button type="submit" title="Mark everything up to and including this chapter as read" class="text-xs text-neutral-500 hover:text-neutral-300 whitespace-nowrap">↑ mark up to here</button>

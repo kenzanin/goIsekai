@@ -22,6 +22,8 @@ func (s *Server) registerActionRoutes() {
 	s.Router.Post("/action/mark-read/{pluginID}/{mangaID}/{chapterID}", s.handleMarkChapterRead)
 	s.Router.Post("/action/mark-read-bulk", s.handleMarkChaptersReadBulk)
 	s.Router.Post("/action/mark-read-range/{pluginID}/{mangaID}/{fromID}/{toID}", s.handleMarkChapterReadRange)
+	s.Router.Post("/action/reset-progress/{pluginID}/{mangaID}/{chapterID}", s.handleResetChapterProgress)
+	s.Router.Post("/action/reset-progress-all/{pluginID}/{mangaID}", s.handleResetMangaProgress)
 	s.Router.Post("/action/clear-logs", s.handleClearLogs)
 	s.Router.Post("/action/save-settings", s.handleSaveSettings)
 	s.Router.Post("/action/save-verify/{pluginID}", s.handleSaveVerify)
@@ -184,6 +186,31 @@ func (s *Server) handleMarkChapterReadRange(w http.ResponseWriter, r *http.Reque
 	toID := param(r, "toID")
 	if err := s.service.MarkChapterReadRange(pluginID, mangaID, fromID, toID); err != nil {
 		s.logger.Error("mark chapter read range", "pluginID", pluginID, "mangaID", mangaID, "fromID", fromID, "toID", toID, "error", err)
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	s.hxRedirect(w, "/view/manga/"+pluginID+"/"+mangaID)
+}
+
+// handleResetChapterProgress clears a single chapter's read progress.
+func (s *Server) handleResetChapterProgress(w http.ResponseWriter, r *http.Request) {
+	pluginID := param(r, "pluginID")
+	mangaID := param(r, "mangaID")
+	chapterID := param(r, "chapterID")
+	if err := s.service.ResetChapterProgress(pluginID, mangaID, chapterID); err != nil {
+		s.logger.Error("reset chapter progress", "pluginID", pluginID, "mangaID", mangaID, "chapterID", chapterID, "error", err)
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	s.hxRedirect(w, "/view/manga/"+pluginID+"/"+mangaID)
+}
+
+// handleResetMangaProgress clears read progress for every chapter of a manga.
+func (s *Server) handleResetMangaProgress(w http.ResponseWriter, r *http.Request) {
+	pluginID := param(r, "pluginID")
+	mangaID := param(r, "mangaID")
+	if err := s.service.ResetMangaProgress(pluginID, mangaID); err != nil {
+		s.logger.Error("reset manga progress", "pluginID", pluginID, "mangaID", mangaID, "error", err)
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
