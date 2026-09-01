@@ -14,6 +14,7 @@ import (
 	"goisekai/internal/database"
 	"goisekai/internal/hostnet"
 	"goisekai/pkg/types"
+	"strings"
 )
 
 // fsSub returns the embedded frontend subtree (frontend/…) for /static.
@@ -199,10 +200,29 @@ func (s *Server) viewLogs(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	logs := s.service.GetLogs()
+	filter := r.URL.Query().Get("filter") // "", "app" or "plugins"
+	switch filter {
+	case "app":
+		out := logs[:0]
+		for _, l := range logs {
+			if !strings.Contains(l, " plugin=") {
+				out = append(out, l)
+			}
+		}
+		logs = out
+	case "plugins":
+		out := logs[:0]
+		for _, l := range logs {
+			if strings.Contains(l, " plugin=") {
+				out = append(out, l)
+			}
+		}
+		logs = out
+	}
 	if len(logs) > limit {
 		logs = logs[len(logs)-limit:]
 	}
-	s.renderPage(w, "views/logs.jet", "logs", map[string]any{"Logs": logs, "Limit": limit, "Limits": []int{100, 250, 500, 1000, 2000}})
+	s.renderPage(w, "views/logs.jet", "logs", map[string]any{"Logs": logs, "Limit": limit, "Limits": []int{100, 250, 500, 1000, 2000}, "Filter": filter})
 }
 
 // jsonMarshalLogs writes lines as a JSON array.

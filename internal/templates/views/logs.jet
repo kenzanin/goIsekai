@@ -5,6 +5,11 @@
     <h1 class="text-xl font-semibold">Logs <span class="text-xs font-normal text-neutral-500">last {{.Limit}} lines · ring buffer 2000</span></h1>
     <div class="flex items-center gap-2">
         <span id="log-paused" class="hidden text-xs px-2 py-1 rounded-md bg-amber-500/15 text-amber-400">Paused — selecting text</span>
+        <select id="log-filter" class="bg-neutral-800 border border-neutral-700 rounded-md px-2 py-1.5 text-xs">
+            <option value="all"{{if .Filter == "all"}} selected{{end}}>All sources</option>
+            <option value="app"{{if .Filter == "app"}} selected{{end}}>App only</option>
+            <option value="plugins"{{if .Filter == "plugins"}} selected{{end}}>Plugins only</option>
+        </select>
         <select id="log-limit" class="bg-neutral-800 border border-neutral-700 rounded-md px-2 py-1.5 text-xs">
             {{range i, n := .Limits }}
             <option value="{{n}}"{{if n == .Limit}} selected{{end}}>{{n}} lines</option>
@@ -47,7 +52,8 @@
         // would destroy the selection and mid-copy pointer events.
         if (selecting || hasSelection()) return;
         var limit = document.getElementById('log-limit').value;
-        fetch('/view/logs?limit=' + limit + '&partial=1')
+        var filter = document.getElementById('log-filter').value;
+        fetch('/view/logs?limit=' + limit + '&filter=' + filter + '&partial=1')
             .then(function (r) { return r.text(); })
             .then(function (html) {
                 var doc = new DOMParser().parseFromString(html, 'text/html');
@@ -77,6 +83,7 @@
     });
 
     document.getElementById('log-limit').addEventListener('change', function () { refresh(); });
+    document.getElementById('log-filter').addEventListener('change', function () { refresh(); });
 })();
 </script>
 {{ end }}

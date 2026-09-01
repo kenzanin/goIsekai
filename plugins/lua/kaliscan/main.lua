@@ -18,6 +18,7 @@ function search_manga(arg)
     local args = json.decode(arg)
     local query = args.query or ""
     local page = args.page or 1
+    log.debug("search q=" .. query .. " page=" .. tostring(page))
     local resp = util.http_get("https://kaliscan.io/search?q=" .. util.url_encode(query) .. "&page=" .. tostring(page))
     if not resp or resp.status ~= 200 then
         return json.encode({})

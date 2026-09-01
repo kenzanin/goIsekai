@@ -113,6 +113,26 @@ func (m *Manager) loadLua(id, dir string) (*loadedPlugin, error) {
 	}))
 	L.SetGlobal("json", jsonTbl)
 
+	// Register log.debug/info/warn/error(msg, ...) globals. Lines go through
+	// the app slog (so they inherit the -logLevel flag and land in the /view/logs
+	// ring buffer) with the plugin id attached — that "plugin=" attr is also how
+	// the Logs page filters main-app vs plugin lines.
+	logTbl := L.NewTable()
+	for lvlName, logFn := range map[string]func(string, ...any){
+		"debug": logger.Debug,
+		"info":  logger.Info,
+		"warn":  logger.Warn,
+		"error": logger.Error,
+	} {
+		msg := L.NewFunction(func(L *lua.LState) int {
+			msg := L.CheckString(1)
+			logFn(msg, "plugin", id)
+			return 0
+		})
+		L.SetField(logTbl, lvlName, msg)
+	}
+	L.SetGlobal("log", logTbl)
+
 	// Register http_request(req_table) global — mirrors hostHTTPRequest proxy.
 	L.SetGlobal("http_request", L.NewFunction(func(L *lua.LState) int {
 		reqTbl := L.CheckTable(1)
