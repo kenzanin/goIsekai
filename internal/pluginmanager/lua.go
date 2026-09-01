@@ -242,6 +242,11 @@ func callLua(p *loadedPlugin, fnName, inputJSON string) (string, error) {
 
 	ctx, cancel := context.WithTimeout(context.Background(), invokeTimeout)
 	defer cancel()
+	// gopher-lua LState is not goroutine-safe; the reader fires neighbors +
+	// detail + pages concurrently at one VM, which corrupts the stack
+	// ("attempt to index a non-table object(function)" et al). Serialize.
+	p.mu.Lock()
+	defer p.mu.Unlock()
 	L.SetContext(ctx)
 
 	if err := L.CallByParam(lua.P{

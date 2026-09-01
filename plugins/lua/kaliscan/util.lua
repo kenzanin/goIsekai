@@ -51,8 +51,13 @@ function util.parse_search(html)
     -- Pattern: <a title="TITLE" href="/manga/SLUG" ... > ... data-src="COVER"
     -- We iterate all such pairs; book-item links are the ones with data-src covers.
     local seen = {}
+    -- Site emits TWO anchors per manga (cover anchor + title anchor). Only
+    -- the cover anchor has <img ... data-src> directly inside it, so we match
+    -- title/href/cover in ONE anchor (img must follow the opening tag) — the
+    -- old lazy `.-data%-src` crossed `</a>` into the NEXT manga's cover and
+    -- shifted every thumbnail by one card.
     for title, slug, cover in string.gmatch(html,
-        '<a%s+title="([^"]-)"[^>]*href="/manga/([^"]-)"[^>]*>.-data%-src="([^"]-)"')
+        '<a%s+title="([^"]-)"[^>]*href="/manga/([^"]-)"[^>]*>%s*<img[^>]-data%-src="([^"]-)"')
     do
         if not seen[slug] then
             seen[slug] = true
