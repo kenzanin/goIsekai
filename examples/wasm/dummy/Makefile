@@ -5,7 +5,7 @@ DATA_DIR ?= app_data
 
 ## build: compile the dummy plugin to wasip1/wasm
 build:
-	GOOS=wasip1 GOARCH=wasm go build -buildmode=c-shared -o $(WASM) ./main.go
+	GOOS=wasip1 GOARCH=wasm go build -o $(WASM) .
 
 ## install: build and copy into <DATA_DIR>/plugins (default app_data)
 install: build

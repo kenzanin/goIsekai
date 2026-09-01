@@ -20,7 +20,7 @@ flowchart LR
         Bridge[AppService bridge]
         PM[pluginmanager]
         subgraph Sandboxes
-            WASM[wazero WASM<br/>64 MB / 15 s]
+            WASM[Extism WASM<br/>64 MB / 15 s]
             Lua[gopher-lua<br/>safe stdlib]
         end
         HostNet[hostnet proxy]
@@ -156,7 +156,7 @@ make lint-web   # Biome (web sources)
 make clean      # remove binary + generated assets
 ```
 
-Stack: Go 1.27 · chi · CloudyKit/jet · HTMX · Tailwind (static build) · wazero · gopher-lua · tls-client · chromedp · modernc.org/sqlite (via go-jet) · gen2brain/webp.
+Stack: Go 1.27 · chi · CloudyKit/jet · HTMX · Tailwind (static build) · Extism · gopher-lua · goja · tls-client · chromedp · modernc.org/sqlite (via go-jet) · gen2brain/webp.
 
 ## License
 
