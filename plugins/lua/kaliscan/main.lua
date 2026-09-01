@@ -7,7 +7,8 @@ PLUGIN = {
     name = "KaliScan",
     verify_url = "https://kaliscan.io",
     needs_human_verify = false,
-    thumb_ratio = 0.703
+    thumb_ratio = 0.703,
+    search_page_size = 48
 }
 
 local util = require("util")

@@ -265,6 +265,7 @@ type LoadedPlugin struct {
 	NeedsHumanVerify bool
 	ThumbRatio       float64
 	NeedsJS          bool
+	SearchPageSize   int
 }
 
 // LoadedPlugins returns metadata for every plugin currently loaded in memory,
@@ -282,6 +283,7 @@ func (m *Manager) LoadedPlugins() []LoadedPlugin {
 			NeedsHumanVerify: p.meta.NeedsHumanVerify,
 			ThumbRatio:       p.meta.ThumbRatio,
 			NeedsJS:          p.meta.NeedsJS,
+			SearchPageSize:   p.meta.SearchPageSize,
 		})
 	}
 	sort.Slice(out, func(i, j int) bool { return out[i].ID < out[j].ID })

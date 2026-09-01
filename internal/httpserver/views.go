@@ -64,13 +64,17 @@ func (s *Server) viewSearch(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 	}
+	pageSize := s.service.PluginMeta(pluginID).SearchPageSize
+	if pageSize <= 0 {
+		pageSize = 24
+	}
 	s.renderPage(w, "views/search.jet", "search", map[string]any{
 		"Plugins":    plugins,
 		"Q":          q,
 		"PluginID":   pluginID,
 		"Results":    results,
 		"Page":       page,
-		"HasNext":    len(results) == 24,
+		"HasNext":    len(results) == pageSize,
 		"ThumbRatio": s.service.PluginMeta(pluginID).ThumbRatio,
 		"Challenge":  challenge,
 	})

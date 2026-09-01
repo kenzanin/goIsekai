@@ -63,6 +63,10 @@ type PluginMeta struct {
 	// routed through the browser engine (when configured) instead of the fast
 	// path. Analogous to NeedsHumanVerify but for JS-capable engines.
 	NeedsJS bool `json:"needs_js,omitempty"`
+	// SearchPageSize is the number of results a single search page returns.
+	// The host uses it to decide whether a "Next" pagination link should be
+	// shown (a full page implies more results). 0 falls back to 24.
+	SearchPageSize int `json:"search_page_size,omitempty"`
 }
 
 // HTTPRequest is the request payload a plugin passes to the host-imported
