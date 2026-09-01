@@ -8,8 +8,6 @@ import (
 	"net/http"
 	"strconv"
 
-	"github.com/go-chi/chi/v5"
-
 	"goisekai/internal/config"
 	"goisekai/internal/database"
 	"goisekai/internal/hostnet"
@@ -80,8 +78,8 @@ func (s *Server) viewSearch(w http.ResponseWriter, r *http.Request) {
 
 // viewMangaDetail renders a manga's info plus its chapter list.
 func (s *Server) viewMangaDetail(w http.ResponseWriter, r *http.Request) {
-	pluginID := chi.URLParam(r, "pluginID")
-	mangaID := chi.URLParam(r, "mangaID")
+	pluginID := param(r, "pluginID")
+	mangaID := param(r, "mangaID")
 	manga, chapters, err := s.service.GetMangaDetails(pluginID, mangaID)
 	challenge := false
 	if err != nil {

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"net/url"
 	"os/exec"
 
 	"github.com/go-chi/chi/v5"
@@ -42,6 +43,27 @@ func New(host string, port int, assets embed.FS, svc *bridge.AppService, logger 
 	}
 	s.routes()
 	return s
+}
+
+// param returns the named route parameter, percent-decoded. Browsers may
+// percent-encode reserved characters in URL paths (Chrome encodes ":" as %3A
+// during fetch normalization); chi matches on r.URL.RawPath and returns the raw
+// segment to both chi.URLParam and r.PathValue. Decode here so a chapter ID like
+// "slug%3Achapter-97" reaches the plugin as "slug:chapter-97".
+func param(r *http.Request, name string) string {
+	if v := chi.URLParam(r, name); v != "" {
+		if dec, err := url.PathUnescape(v); err == nil {
+			return dec
+		}
+		return v
+	}
+	if v := r.PathValue(name); v != "" {
+		if dec, err := url.PathUnescape(v); err == nil {
+			return dec
+		}
+		return v
+	}
+	return ""
 }
 
 // ListenAndServe starts the HTTP server (blocking).

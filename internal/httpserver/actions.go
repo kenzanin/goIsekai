@@ -82,7 +82,7 @@ func (s *Server) handleInstallPlugin(w http.ResponseWriter, r *http.Request) {
 
 // handleTogglePlugin flips a plugin's active flag.
 func (s *Server) handleTogglePlugin(w http.ResponseWriter, r *http.Request) {
-	pluginID := r.PathValue("pluginID")
+	pluginID := param(r, "pluginID")
 	if err := s.service.TogglePlugin(pluginID); err != nil {
 		s.logger.Error("toggle plugin", "pluginID", pluginID, "error", err)
 		http.Error(w, err.Error(), http.StatusBadRequest)
@@ -93,8 +93,8 @@ func (s *Server) handleTogglePlugin(w http.ResponseWriter, r *http.Request) {
 
 // handleToggleLibrary flips a manga's in-library flag.
 func (s *Server) handleToggleLibrary(w http.ResponseWriter, r *http.Request) {
-	pluginID := r.PathValue("pluginID")
-	mangaID := r.PathValue("mangaID")
+	pluginID := param(r, "pluginID")
+	mangaID := param(r, "mangaID")
 	if err := s.service.ToggleLibraryItem(pluginID, mangaID); err != nil {
 		s.logger.Error("toggle library", "pluginID", pluginID, "mangaID", mangaID, "error", err)
 		http.Error(w, err.Error(), http.StatusBadRequest)
@@ -139,9 +139,9 @@ func (s *Server) handleSetChapterProgress(w http.ResponseWriter, r *http.Request
 
 // handleMarkChapterRead marks a single chapter as read.
 func (s *Server) handleMarkChapterRead(w http.ResponseWriter, r *http.Request) {
-	pluginID := r.PathValue("pluginID")
-	mangaID := r.PathValue("mangaID")
-	chapterID := r.PathValue("chapterID")
+	pluginID := param(r, "pluginID")
+	mangaID := param(r, "mangaID")
+	chapterID := param(r, "chapterID")
 	if err := s.service.MarkChapterRead(pluginID, mangaID, chapterID); err != nil {
 		s.logger.Error("mark chapter read", "pluginID", pluginID, "mangaID", mangaID, "chapterID", chapterID, "error", err)
 		http.Error(w, err.Error(), http.StatusBadRequest)
@@ -178,10 +178,10 @@ func (s *Server) handleMarkChaptersReadBulk(w http.ResponseWriter, r *http.Reque
 // handleMarkChapterReadRange marks every chapter from the first referenced id
 // up to and including the second, in chapter_num order.
 func (s *Server) handleMarkChapterReadRange(w http.ResponseWriter, r *http.Request) {
-	pluginID := r.PathValue("pluginID")
-	mangaID := r.PathValue("mangaID")
-	fromID := r.PathValue("fromID")
-	toID := r.PathValue("toID")
+	pluginID := param(r, "pluginID")
+	mangaID := param(r, "mangaID")
+	fromID := param(r, "fromID")
+	toID := param(r, "toID")
 	if err := s.service.MarkChapterReadRange(pluginID, mangaID, fromID, toID); err != nil {
 		s.logger.Error("mark chapter read range", "pluginID", pluginID, "mangaID", mangaID, "fromID", fromID, "toID", toID, "error", err)
 		http.Error(w, err.Error(), http.StatusBadRequest)
@@ -192,7 +192,7 @@ func (s *Server) handleMarkChapterReadRange(w http.ResponseWriter, r *http.Reque
 
 // handleSaveVerify stores pasted verification cookies/UA for a plugin.
 func (s *Server) handleSaveVerify(w http.ResponseWriter, r *http.Request) {
-	pluginID := r.PathValue("pluginID")
+	pluginID := param(r, "pluginID")
 	if err := r.ParseForm(); err != nil {
 		s.logger.Error("save verify: parse form", "error", err)
 		http.Error(w, err.Error(), http.StatusBadRequest)

@@ -22,7 +22,13 @@ function util.http_get(url, extra_headers)
             req.headers[k] = v
         end
     end
-    return http_request(req)
+    local resp = http_request(req)
+    if not resp then
+        log.error("http_request returned nil for " .. url)
+    elseif resp.status ~= 200 then
+        log.error("http status " .. tostring(resp.status) .. " for " .. url)
+    end
+    return resp
 end
 
 -- ─── Search result parsing ─────────────────────────────────────────────────

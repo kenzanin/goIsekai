@@ -4,8 +4,6 @@ import (
 	"encoding/json"
 	"net/http"
 
-	"github.com/go-chi/chi/v5"
-
 	"goisekai/pkg/types"
 )
 
@@ -36,9 +34,9 @@ func chapterNeighbors(chapters []types.Chapter, chapterID string) (prev, next st
 // viewReader renders the reader shell; page data is fetched as JSON by the
 // inline script from /api/reader-data.
 func (s *Server) viewReader(w http.ResponseWriter, r *http.Request) {
-	pluginID := chi.URLParam(r, "pluginID")
-	mangaID := chi.URLParam(r, "mangaID")
-	chapterID := chi.URLParam(r, "chapterID")
+	pluginID := param(r, "pluginID")
+	mangaID := param(r, "mangaID")
+	chapterID := param(r, "chapterID")
 	if pluginID == "" || mangaID == "" || chapterID == "" {
 		http.Error(w, "missing route params", http.StatusBadRequest)
 		return
@@ -64,9 +62,9 @@ func (s *Server) viewReader(w http.ResponseWriter, r *http.Request) {
 // readerData serves the chapter page list + neighbor chapter IDs as JSON for
 // the reader's inline script.
 func (s *Server) readerData(w http.ResponseWriter, r *http.Request) {
-	pluginID := chi.URLParam(r, "pluginID")
-	mangaID := chi.URLParam(r, "mangaID")
-	chapterID := chi.URLParam(r, "chapterID")
+	pluginID := param(r, "pluginID")
+	mangaID := param(r, "mangaID")
+	chapterID := param(r, "chapterID")
 	if pluginID == "" || mangaID == "" || chapterID == "" {
 		http.Error(w, "missing route params", http.StatusBadRequest)
 		return
