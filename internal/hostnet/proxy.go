@@ -1,7 +1,10 @@
 package hostnet
 
 import (
+	"fmt"
 	"maps"
+	"net/url"
+	"strings"
 	"sync"
 	"time"
 
@@ -104,9 +107,50 @@ func (p *Proxy) needsJSHint(pluginID string) bool {
 	return p.needsJS[pluginID]
 }
 
-// cdpConfig returns a copy of the current CDP settings.
-func (p *Proxy) cdpConfig() CDPConfig {
+// CDPConfig returns a copy of the current CDP settings.
+func (p *Proxy) CDPConfig() CDPConfig {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	return p.cdp
+}
+
+// CDPCookie holds a cookie harvested by the CDP engine.
+type CDPCookie struct {
+	Name     string `json:"name"`
+	Value    string `json:"value"`
+	Domain   string `json:"domain"`
+	Path     string `json:"path"`
+	Secure   bool   `json:"secure"`
+	HTTPOnly bool   `json:"httpOnly"`
+}
+
+// CDPCookies returns cookies from all per-plugin jars matching the domain.
+func (p *Proxy) CDPCookies(domain string) []CDPCookie {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	var out []CDPCookie
+	for _, cli := range p.clients {
+		cookies := cli.GetCookies(&url.URL{Scheme: "https", Host: domain})
+		for _, c := range cookies {
+			if c.Domain == domain || strings.HasSuffix(c.Domain, "."+domain) {
+				out = append(out, CDPCookie{
+					Name: c.Name, Value: c.Value, Domain: c.Domain,
+					Path: c.Path, Secure: c.Secure, HTTPOnly: c.HttpOnly,
+				})
+			}
+		}
+	}
+	return out
+}
+
+// TestCDP runs the configured CDP solver against the given URL and returns the
+// harvested cookies plus browser User-Agent. Intended for sandbox debugging.
+func (p *Proxy) TestCDP(cfg CDPConfig, targetURL string) ([]*http.Cookie, string, error) {
+	p.mu.Lock()
+	solver := p.solveChallenge
+	p.mu.Unlock()
+	if solver == nil {
+		return nil, "", fmt.Errorf("CDP solver not configured")
+	}
+	return solver(cfg, targetURL)
 }

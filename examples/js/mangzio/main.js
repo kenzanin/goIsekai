@@ -132,17 +132,9 @@ function searchManga(arg) {
         }
         results = filtered;
     }
-
-    // Paginate locally
-    var pageSize = PLUGIN.search_page_size;
-    var start = (page - 1) * pageSize;
-    var paged = [];
-    for (var pi = start; pi < Math.min(start + pageSize, results.length); pi++) {
-        paged.push(results[pi]);
-    }
-
-    log.info("mangzio search: found " + results.length + " results (page " + page + ": " + paged.length + ")");
-    return JSON.stringify(paged);
+    // Return ALL filtered results — the host handles pagination via search_page_size.
+    log.info("mangzio search: found " + results.length + " results for query=" + query);
+    return JSON.stringify(results);
 }
 
 function getMangaDetail(arg) {
@@ -197,46 +189,38 @@ function getChapterList(arg) {
 
     var html = resp.body;
     var chunks = extractRSCChunks(html);
+    // Concatenate all chunks — the chapters array may span chunk boundaries
+    var combined = chunks.join("");
 
-    // The detail page embeds allChapters array in RSC data.
-    // Look for "allChapters" or "chapterNumber" in chunks to find the right one.
     var chapters = [];
-    for (var ci = 0; ci < chunks.length; ci++) {
-        var chunk = chunks[ci];
-        var allChIdx = chunk.indexOf("\"allChapters\"");
-        if (allChIdx < 0) continue;
-
-        // Extract the allChapters array
-        var arrStart = chunk.indexOf("[", allChIdx);
-        if (arrStart < 0) continue;
-
-        // Find matching ]
-        var depth = 0;
-        var arrEnd = arrStart;
-        for (var j = arrStart; j < Math.min(arrStart + 200000, chunk.length); j++) {
-            if (chunk[j] === "[") depth++;
-            else if (chunk[j] === "]") depth--;
-            if (depth === 0) { arrEnd = j + 1; break; }
-        }
-
-        try {
-            var arr = JSON.parse(chunk.substring(arrStart, arrEnd));
-            for (var k = 0; k < arr.length; k++) {
-                var ch = arr[k];
-                var chapterURL = "/en/" + slug + "-en-chapter-" + ch.chapterNumber;
-                chapters.push({
-                    id: slug + ":chapter-" + ch.chapterNumber,
-                    manga_id: slug,
-                    title: ch.chapterTitle || "Chapter " + ch.chapterNumber,
-                    chapter_num: ch.chapterNumber,
-                    released_at: ch.releaseDate || "",
-                    url: chapterURL,
-                });
+    var allChIdx = combined.indexOf('\"chapters\":[');
+    if (allChIdx >= 0) {
+        var arrStart = combined.indexOf("[", allChIdx);
+        if (arrStart >= 0) {
+            var depth = 0;
+            var arrEnd = arrStart;
+            for (var j = arrStart; j < combined.length; j++) {
+                if (combined[j] === "[") depth++;
+                else if (combined[j] === "]") depth--;
+                if (depth === 0) { arrEnd = j + 1; break; }
             }
-        } catch (e) {
-            log.error("mangzio chapters: parse error: " + e);
+            try {
+                var arr = JSON.parse(combined.substring(arrStart, arrEnd));
+                for (var k = 0; k < arr.length; k++) {
+                    var ch = arr[k];
+                    chapters.push({
+                        id: slug + ":chapter-" + ch.chapterNumber,
+                        manga_id: slug,
+                        title: ch.chapterTitle || "Chapter " + ch.chapterNumber,
+                        chapter_num: ch.chapterNumber,
+                        released_at: ch.releaseDate || undefined,
+                        url: "/en/" + slug + "-en-chapter-" + ch.chapterNumber,
+                    });
+                }
+            } catch (e) {
+                log.error("mangzio chapters: parse error: " + e);
+            }
         }
-        break;
     }
 
     log.info("mangzio chapters: found " + chapters.length + " chapters");

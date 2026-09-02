@@ -43,6 +43,12 @@ func (s *Server) registerSandboxRoutes() {
 			r.Get("/pages/{chapterID}", sb.handlePages)
 		})
 	})
+
+	s.Router.Route("/api/sandbox/cdp", func(r chi.Router) {
+		r.Get("/status", sb.handleCDPStatus)
+			r.Get("/test", sb.handleCDPTest)
+		r.Get("/cookies", sb.handleCDPCookies)
+	})
 }
 
 // --- plugin lifecycle ---
@@ -154,4 +160,53 @@ func writeErr(w http.ResponseWriter, code int, msg string) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(code)
 	_ = json.NewEncoder(w).Encode(map[string]string{"error": msg})
+}
+
+// --- CDP playground ---
+
+func (s *Sandbox) handleCDPStatus(w http.ResponseWriter, r *http.Request) {
+	cfg := s.svc.CDPStatus()
+	writeJSON(w, map[string]any{
+		"engine":  cfg.Engine,
+		"path":    cfg.Path,
+		"timeout": cfg.Timeout.String(),
+		"enabled": cfg.Engine != "" && cfg.Engine != "off",
+	})
+}
+
+func (s *Sandbox) handleCDPTest(w http.ResponseWriter, r *http.Request) {
+	targetURL := r.URL.Query().Get("url")
+	if targetURL == "" {
+		writeErr(w, http.StatusBadRequest, "missing url param")
+		return
+	}
+	cookies, ua, err := s.svc.TestCDP(targetURL)
+	if err != nil {
+		writeErr(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	var cookieList []map[string]any
+	for _, c := range cookies {
+		cookieList = append(cookieList, map[string]any{
+			"name":   c.Name,
+			"value":  c.Value,
+			"domain": c.Domain,
+			"path":   c.Path,
+		})
+	}
+	writeJSON(w, map[string]any{
+		"ok":      true,
+		"cookies": cookieList,
+		"ua":      ua,
+	})
+}
+
+func (s *Sandbox) handleCDPCookies(w http.ResponseWriter, r *http.Request) {
+	domain := r.URL.Query().Get("domain")
+	if domain == "" {
+		writeErr(w, http.StatusBadRequest, "missing domain param")
+		return
+	}
+	cookies := s.svc.CDPCookies(domain)
+	writeJSON(w, cookies)
 }

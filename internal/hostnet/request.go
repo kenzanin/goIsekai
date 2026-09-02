@@ -24,7 +24,7 @@ import (
 func (p *Proxy) Request(pluginID string, req types.HTTPRequest) (types.HTTPResponse, error) {
 	// needs_js: preemptively solve + seed cookies via the browser engine so the
 	// client-side site is already cleared when the fast path runs.
-	if p.needsJSHint(pluginID) && p.cdpConfig().enabled() {
+	if p.needsJSHint(pluginID) && p.CDPConfig().enabled() {
 		_ = p.solveAndSeed(pluginID, req.URL)
 	}
 
@@ -38,7 +38,7 @@ func (p *Proxy) Request(pluginID string, req types.HTTPRequest) (types.HTTPRespo
 	}
 
 	// Challenge detected. Solve via the engine, seed cookies, and retry once.
-	if p.cdpConfig().enabled() && p.solveAndSeed(pluginID, req.URL) == nil {
+	if p.CDPConfig().enabled() && p.solveAndSeed(pluginID, req.URL) == nil {
 		if retried, rerr := p.doRequest(pluginID, req); rerr == nil && !isChallengeResponse(retried) {
 			return retried, nil
 		}
@@ -111,7 +111,7 @@ func (p *Proxy) solveAndSeed(pluginID, targetURL string) error {
 	if solver == nil {
 		return errors.New("hostnet: no challenge solver installed")
 	}
-	cfg := p.cdpConfig()
+	cfg := p.CDPConfig()
 	cookies, ua, err := solver(cfg, targetURL)
 	if err != nil {
 		return err

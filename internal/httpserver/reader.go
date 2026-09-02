@@ -47,6 +47,12 @@ func (s *Server) viewReader(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "failed to load manga: "+err.Error(), http.StatusBadGateway)
 		return
 	}
+	if len(chapters) == 0 {
+		chapters, err = s.service.GetChapterList(pluginID, mangaID)
+		if err != nil {
+			s.logger.Error("reader chapter list fallback", "error", err, "plugin", pluginID, "manga", mangaID)
+		}
+	}
 	prev, next := chapterNeighbors(chapters, chapterID)
 	var currentChapter types.Chapter
 	for _, c := range chapters {
@@ -93,6 +99,14 @@ func (s *Server) readerData(w http.ResponseWriter, r *http.Request) {
 	_, chapters, err := s.service.GetMangaDetails(pluginID, mangaID)
 	if err != nil {
 		s.logger.Error("reader neighbors", "error", err, "plugin", pluginID, "manga", mangaID)
+	}
+	// If detail response didn't include chapters (e.g. mangzio),
+	// fetch the chapter list separately for neighbor resolution.
+	if len(chapters) == 0 {
+		chapters, err = s.service.GetChapterList(pluginID, mangaID)
+		if err != nil {
+			s.logger.Error("reader chapter list fallback", "error", err, "plugin", pluginID, "manga", mangaID)
+		}
 	}
 	prev, next := chapterNeighbors(chapters, chapterID)
 	w.Header().Set("Content-Type", "application/json")
