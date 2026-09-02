@@ -25,6 +25,11 @@ func (s *AppService) IsInLibrary(pluginID, mangaID string) bool {
 	return ok
 }
 
+// ClearMangaNew resets the library card's [New] badge once the manga is opened.
+func (s *AppService) ClearMangaNew(pluginID, mangaID string) error {
+	return s.db.ClearMangaNew(pluginID, mangaID)
+}
+
 // GetMangaDetails fetches a manga and its chapter list from a plugin, persists
 // both to the database as a side effect (so progress can be tracked later),
 // and returns the original plugin types unchanged.

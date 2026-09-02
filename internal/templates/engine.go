@@ -58,6 +58,7 @@ func New(devMode bool) (*Engine, error) {
 	set.AddGlobal("getInitials", getInitials)
 	set.AddGlobal("add", add)
 	set.AddGlobal("ratioAt", ratioAt)
+	set.AddGlobal("statAt", statAt)
 
 	return &Engine{Set: set}, nil
 }
@@ -135,6 +136,12 @@ func chapterFloat(f float64) string {
 // jet v6 has no map index() at runtime, so the map lookup lives here.
 func ratioAt(ratios map[string]float64, pluginID string) float64 {
 	return ratios[pluginID]
+}
+
+// statAt looks up a manga's library stats by id, returning nil when missing —
+// jet v6 has no map index() at runtime, so the map lookup lives here.
+func statAt(stats map[string]map[string]any, mangaID string) map[string]any {
+	return stats[mangaID]
 }
 
 // getInitials returns the uppercase first letter of the first two words of

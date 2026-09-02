@@ -468,3 +468,64 @@ func TestChapterDoneDerivation(t *testing.T) {
 		}
 	}
 }
+
+// TestNewBadgeLifecycle covers the library card's [New] badge: CountChapters
+// grows when a new chapter is stored, MarkMangaNew stamps the badge, and
+// ClearMangaNew (detail opened) clears it.
+func TestNewBadgeLifecycle(t *testing.T) {
+	db := openTestDB(t)
+
+	if err := db.UpsertManga(Manga{ID: "m1", PluginID: "p1", SourceMangaID: "s1", Title: "B", InLibrary: true}); err != nil {
+		t.Fatalf("upsert manga: %v", err)
+	}
+	if err := db.UpsertChapter(Chapter{ID: "c1", MangaID: "m1", SourceChapterID: "cs1", Title: "Ch1", ChapterNum: 1}); err != nil {
+		t.Fatalf("upsert chapter: %v", err)
+	}
+
+	count := func() int {
+		t.Helper()
+		n, err := db.CountChaptersForManga("m1")
+		if err != nil {
+			t.Fatalf("CountChaptersForManga: %v", err)
+		}
+		return n
+	}
+	stats := func() LibraryMangaStats {
+		t.Helper()
+		rows, err := db.ListLibraryWithProgress()
+		if err != nil || len(rows) != 1 {
+			t.Fatalf("ListLibraryWithProgress: err=%v rows=%d", err, len(rows))
+		}
+		return rows[0]
+	}
+
+	// Freshly synced manga: no badge.
+	if count() != 1 {
+		t.Fatalf("want 1 chapter, got %d", count())
+	}
+	if s := stats(); s.HasNew {
+		t.Fatalf("badge must be off before any sync finds new chapters")
+	}
+
+	// Sync finds a new chapter: count grows, badge goes on.
+	if err := db.UpsertChapter(Chapter{ID: "c2", MangaID: "m1", SourceChapterID: "cs2", Title: "Ch2", ChapterNum: 2}); err != nil {
+		t.Fatalf("upsert new chapter: %v", err)
+	}
+	if err := db.MarkMangaNew("m1"); err != nil {
+		t.Fatalf("MarkMangaNew: %v", err)
+	}
+	if count() != 2 {
+		t.Fatalf("want 2 chapters, got %d", count())
+	}
+	if s := stats(); !s.HasNew || s.TotalChapters != 2 {
+		t.Fatalf("badge must be on after sync found a new chapter: %+v", s)
+	}
+
+	// Opening the manga clears the badge.
+	if err := db.ClearMangaNew("p1", "s1"); err != nil {
+		t.Fatalf("ClearMangaNew: %v", err)
+	}
+	if s := stats(); s.HasNew {
+		t.Fatalf("badge must be off after the manga was opened: %+v", s)
+	}
+}

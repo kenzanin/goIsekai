@@ -9,6 +9,7 @@
 *.out
 /dist/
 /build/
+goIsekai
 
 # Wails
 frontend/dist/

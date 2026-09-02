@@ -1,0 +1,32 @@
+{{extends "/layouts/base.jet"}}
+
+{{ block body() }}
+<h1 class="text-xl font-semibold mb-6">History</h1>
+
+{{if len(.History) == 0}}
+<div class="py-16 text-center text-neutral-500">
+    <p class="mb-2">No reading history yet</p>
+    <a href="/" class="text-indigo-400 hover:text-indigo-300 text-sm">Go to library</a>
+</div>
+{{else}}
+<div class="divide-y divide-neutral-800">
+    {{range i, h := .History }}
+    <a href="/view/manga/{{h.PluginID}}/{{h.SourceMangaID}}" class="flex items-center gap-4 py-4 -mx-2 px-2 rounded hover:bg-neutral-900 transition">
+        {{if h.CoverURL != ""}}
+        <img src="/image?pluginID={{h.PluginID}}&amp;url={{h.CoverURL}}" alt="{{h.Title}}" class="w-12 h-16 object-cover rounded shrink-0" loading="lazy">
+        {{else}}
+        <div class="w-12 h-16 bg-neutral-800 rounded flex items-center justify-center text-neutral-500 text-sm font-semibold shrink-0">{{getInitials(h.Title)}}</div>
+        {{end}}
+        <div class="flex-1 min-w-0">
+            <div class="text-sm font-medium truncate">{{h.Title}}</div>
+            <div class="flex items-center gap-2 mt-1">
+                <span class="text-xs text-neutral-400">{{h.ReadChapters}}/{{h.TotalChapters}} chapters</span>
+                <span class="text-xs px-1.5 py-0.5 rounded bg-neutral-800 text-neutral-500">{{h.PluginName}}</span>
+            </div>
+        </div>
+        <div class="text-xs text-neutral-500 shrink-0">{{formatDate(h.LastReadAt.Format("2006-01-02T15:04:05"))}}</div>
+    </a>
+    {{end}}
+</div>
+{{end}}
+{{ end }}

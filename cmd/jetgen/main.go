@@ -69,6 +69,7 @@ var ddl = []string{
     updated_at INTEGER NOT NULL DEFAULT 0
 );`,
 	`ALTER TABLE plugins ADD COLUMN thumb_ratio REAL DEFAULT 0;`,
+	`ALTER TABLE mangas ADD COLUMN new_since TIMESTAMP;`,
 }
 
 func main() {

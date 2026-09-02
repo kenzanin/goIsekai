@@ -25,9 +25,17 @@ func (s *AppService) SyncLibrary() error {
 			logger.Error("sync chapters failed", "id", manga.ID, "error", chapErr)
 			continue
 		}
-		if persistErr := s.persistMangaDetails(manga.PluginID, m, chapters); persistErr != nil {
-			logger.Error("sync persist failed", "id", manga.ID, "error", persistErr)
+		prevCount, _ := s.db.CountChaptersForManga(manga.ID)
+	if persistErr := s.persistMangaDetails(manga.PluginID, m, chapters); persistErr != nil {
+		logger.Error("sync persist failed", "id", manga.ID, "error", persistErr)
+		continue
+	}
+	// Stamp the [New] badge when this sync discovered chapters we didn't have.
+	if n, cerr := s.db.CountChaptersForManga(manga.ID); cerr == nil && n > prevCount {
+		if nerr := s.db.MarkMangaNew(manga.ID); nerr != nil {
+			logger.Warn("mark manga new", "id", manga.ID, "error", nerr)
 		}
+	}
 	}
 	return nil
 }

@@ -3,7 +3,7 @@
 {{ block body() }}
 <div id="reader" class="relative w-full h-screen" data-plugin-id="{{.PluginID}}" data-manga-id="{{.MangaID}}" data-chapter-id="{{.ChapterID}}" data-manga-title="{{.Manga.Title}}" data-next-chapter-id="{{.NextChapterID}}" data-prev-chapter-id="{{.PrevChapterID}}">
   <!-- Top bar: persistent (back + page counter + controls) -->
-  <div class="absolute top-0 left-0 right-0 z-30 flex items-center gap-2 bg-black/90 px-3 py-2 text-sm">
+  <div id="top-bar" class="absolute top-0 left-0 right-0 z-30 flex items-center gap-2 bg-black/90 px-3 py-2 text-sm transition-transform duration-300 ease-in-out">
     <a href="/view/manga/{{.PluginID}}/{{.MangaID}}" class="border border-neutral-700 hover:bg-neutral-800 rounded-md px-3 py-1.5">← Back</a>
     <span class="text-neutral-500 truncate max-w-[25%]">{{.Manga.Title}}</span>
     <span id="page-counter" class="text-neutral-400">– / –</span>
@@ -50,7 +50,7 @@
   </div>
 
   <!-- Bottom bar: chapter nav + page slider -->
-  <div class="absolute bottom-0 left-0 right-0 z-30 flex items-center gap-3 bg-black/90 px-3 py-2 text-sm">
+  <div id="bottom-bar" class="absolute bottom-0 left-0 right-0 z-30 flex items-center gap-3 bg-black/90 px-3 py-2 text-sm transition-transform duration-300 ease-in-out">
     {{ if .PrevChapterID }}
     <a href="/view/read/{{.PluginID}}/{{.MangaID}}/{{.PrevChapterID}}" class="border border-neutral-700 hover:bg-neutral-800 rounded-md px-3 py-1.5">← Prev ch.</a>
     {{ end }}
@@ -61,6 +61,12 @@
     <a href="/view/read/{{.PluginID}}/{{.MangaID}}/{{.NextChapterID}}" class="border border-neutral-700 hover:bg-neutral-800 rounded-md px-3 py-1.5">Next ch. →</a>
     {{ end }}
   </div>
+
+  <!-- Progress line: visible when bars are hidden -->
+  <div id="progress-line" class="absolute bottom-0 left-0 right-0 z-40 h-[3px] bg-indigo-500 transition-opacity duration-300 ease-in-out opacity-0"></div>
+
+  <!-- Center click zone: toggles bars visibility -->
+  <div id="zone-center" class="absolute top-12 bottom-14 left-[35%] right-[35%] z-5 cursor-pointer" title="Toggle bars"></div>
 </div>
 
 <script>
@@ -88,6 +94,35 @@
   var startPage = parseInt(new URLSearchParams(window.location.search).get('page'), 10);
   var nextChID = root.dataset.nextChapterId || '';
   var prevChID = root.dataset.prevChapterId || '';
+
+  // Auto-hide bars state
+  var barsVisible = true;
+  var topBar = document.getElementById('top-bar');
+  var bottomBar = document.getElementById('bottom-bar');
+  var progressLine = document.getElementById('progress-line');
+  var zoneCenter = document.getElementById('zone-center');
+
+  function setBarsVisible(visible) {
+    barsVisible = visible;
+    if (visible) {
+      topBar.style.transform = 'translateY(0)';
+      bottomBar.style.transform = 'translateY(0)';
+      progressLine.style.opacity = '0';
+    } else {
+      topBar.style.transform = 'translateY(-100%)';
+      bottomBar.style.transform = 'translateY(100%)';
+      progressLine.style.opacity = '1';
+    }
+  }
+
+  function updateProgressLine() {
+    var total = pages.length || 1;
+    var pct = ((current + 1) / total) * 100;
+    progressLine.style.width = pct + '%';
+  }
+
+  // Start with bars hidden
+  setBarsVisible(false);
 
   function imageUrl(p, chapterID) {
     var h = p.headers || {};

@@ -115,3 +115,27 @@ func (s *AppService) TestCDP(targetURL string) ([]hostnet.CDPCookie, string, err
 	}
 	return out, ua, nil
 }
+
+// ListLibraryWithProgress returns per-manga chapter stats for the library grid.
+func (s *AppService) ListLibraryWithProgress() ([]database.LibraryMangaStats, error) {
+	return s.db.ListLibraryWithProgress()
+}
+
+// GetReadHistory returns the reading history enriched with plugin names.
+func (s *AppService) GetReadHistory() ([]database.HistoryEntry, error) {
+	entries, err := s.db.GetReadHistory()
+	if err != nil {
+		return nil, err
+	}
+	return entries, nil
+}
+
+// LastReadChapter returns the most recently read chapter for a manga.
+func (s *AppService) LastReadChapter(mangaRowID string) (sourceChapterID string, pageNum int, ok bool) {
+	return s.db.LastReadChapter(mangaRowID)
+}
+
+// QueryMangaPluginIDs returns (manga_id, plugin_id) pairs for all in-library manga.
+func (s *AppService) QueryMangaPluginIDs() ([]database.MangaPluginIDRow, error) {
+	return s.db.QueryMangaPluginIDs()
+}

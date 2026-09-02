@@ -22,4 +22,5 @@ type Mangas struct {
 	InLibrary     *int64
 	CreatedAt     *time.Time
 	UpdatedAt     *time.Time
+	NewSince      *time.Time
 }

@@ -42,6 +42,7 @@ func (s *Server) registerViewRoutes() {
 	s.Router.Get("/view/plugins", s.viewPlugins)
 	s.Router.Get("/view/settings", s.viewSettings)
 	s.Router.Get("/view/logs", s.viewLogs)
+	s.Router.Get("/view/history", s.viewHistory)
 }
 
 // registerAPIRoutes holds the JSON endpoints.

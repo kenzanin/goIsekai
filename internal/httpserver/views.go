@@ -31,10 +31,60 @@ func (s *Server) viewLibrary(w http.ResponseWriter, r *http.Request) {
 		s.logger.Error("library list", "error", err)
 	}
 	ratios := make(map[string]float64)
-	for id, m := range s.service.PluginMetas() {
+	metas := s.service.PluginMetas()
+	for id, m := range metas {
 		ratios[id] = m.ThumbRatio
 	}
-	s.renderPage(w, "views/library.jet", "library", map[string]any{"Mangas": mangas, "Ratios": ratios})
+	// Enriched per-manga stats: read/total chapters + plugin name + hasNew
+	libStats, err := s.service.ListLibraryWithProgress()
+	if err != nil {
+		s.logger.Warn("library stats", "error", err)
+	}
+	mangaPluginMap := make(map[string]string) // mangaID -> pluginID (from DB)
+	pluginNameMap := make(map[string]string) // pluginID -> display name
+	for pid, m := range metas {
+		pluginNameMap[pid] = pid
+		_ = m
+	}
+	rows, err := s.service.QueryMangaPluginIDs()
+	if err == nil {
+		for _, r := range rows {
+			mangaPluginMap[r.MangaID] = r.PluginID
+		}
+	}
+	statsMap := make(map[string]map[string]any) // mangaID -> {TotalChapters, ReadChapters, PluginName, HasNew}
+	for _, st := range libStats {
+		pluginID := mangaPluginMap[st.MangaID]
+		pluginName := pluginNameMap[pluginID]
+		if pluginName == "" {
+			pluginName = pluginID
+		}
+		statsMap[st.MangaID] = map[string]any{
+			"TotalChapters": st.TotalChapters,
+			"ReadChapters":  st.ReadChapters,
+			"PluginName":    pluginName,
+			"HasNew":        st.HasNew,
+		}
+	}
+	s.renderPage(w, "views/library.jet", "library", map[string]any{
+		"Mangas":      mangas,
+		"Ratios":      ratios,
+		"LibraryStats": statsMap,
+	})
+}
+
+// viewHistory renders the reading history page.
+func (s *Server) viewHistory(w http.ResponseWriter, r *http.Request) {
+	history, err := s.service.GetReadHistory()
+	if err != nil {
+		s.logger.Error("history list", "error", err)
+	}
+	var entries []database.HistoryEntry
+	for _, h := range history {
+		h.PluginName = h.PluginID
+		entries = append(entries, h)
+	}
+	s.renderPage(w, "views/history.jet", "history", map[string]any{"History": entries})
 }
 
 // viewSearch renders the search form and, when q+pluginID are present, results.
@@ -84,6 +134,10 @@ func (s *Server) viewSearch(w http.ResponseWriter, r *http.Request) {
 func (s *Server) viewMangaDetail(w http.ResponseWriter, r *http.Request) {
 	pluginID := param(r, "pluginID")
 	mangaID := param(r, "mangaID")
+	// Opening the detail page clears the library card's [New] badge.
+	if err := s.service.ClearMangaNew(pluginID, mangaID); err != nil {
+		s.logger.Warn("clear new badge", "plugin", pluginID, "manga", mangaID, "error", err)
+	}
 	manga, chapters, err := s.service.GetMangaDetails(pluginID, mangaID)
 	challenge := false
 	if err != nil {
@@ -103,6 +157,10 @@ func (s *Server) viewMangaDetail(w http.ResponseWriter, r *http.Request) {
 		progress = map[string]database.ChapterProgress{}
 	}
 	continueTo := computeContinue(chapters, progress)
+	// Prefer most-recently-read chapter from history if it exists and isn't fully read
+	if lastCont := s.continueFromHistory(pluginID, mangaID, chapters, progress); lastCont != nil {
+		continueTo = lastCont
+	}
 	inLibrary := s.service.IsInLibrary(pluginID, mangaID)
 	s.renderPage(w, "views/detail.jet", "search", map[string]any{
 		"PluginID":  pluginID,
@@ -140,6 +198,26 @@ func computeContinue(chapters []types.Chapter, progress map[string]database.Chap
 		}
 	}
 	return firstUnread
+}
+
+// continueFromHistory checks read_history for the most recently read chapter
+// and returns it as the resume point if it's not fully read yet.
+func (s *Server) continueFromHistory(pluginID, mangaID string, chapters []types.Chapter, progress map[string]database.ChapterProgress) *ContinuePoint {
+	mangaRow := pluginID + "|" + mangaID
+	lastChID, lastPage, ok := s.service.LastReadChapter(mangaRow)
+	if !ok {
+		return nil
+	}
+	for _, c := range chapters {
+		if c.ID == lastChID {
+			p, hasProgress := progress[c.ID]
+			if !hasProgress || p.LastPageRead < p.TotalPages {
+				return &ContinuePoint{ChapterID: c.ID, ChapterN: c.ChapterNum, Page: lastPage}
+			}
+			break
+		}
+	}
+	return nil
 }
 
 // PluginView enriches a database plugin with runtime verify metadata and the
