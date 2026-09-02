@@ -219,6 +219,128 @@ func (m *Manager) Install(wasmPath string) (string, error) {
 	return dest, nil
 }
 
+// LoadPlugin hot-loads a single plugin from a file (.wasm) or folder
+// (containing main.lua or main.js). The plugin is registered immediately.
+func (m *Manager) LoadPlugin(path string) (string, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if m.plugins == nil {
+		m.plugins = make(map[string]*loadedPlugin)
+	}
+
+	// Determine type by probing for entry files
+	mainLua := filepath.Join(path, "main.lua")
+	if info, err := os.Stat(mainLua); err == nil && !info.IsDir() {
+		id := filepath.Base(path)
+		if _, dup := m.plugins[id]; dup {
+			return "", fmt.Errorf("plugin %q already loaded", id)
+		}
+		p, err := m.loadLua(id, path)
+		if err != nil {
+			return "", err
+		}
+		m.plugins[id] = p
+		m.proxy.SetNeedsJS(id, p.meta.NeedsJS)
+		logger.Info("plugin loaded (hot)", "id", id, "kind", "lua")
+		return id, nil
+	}
+
+	mainJS := filepath.Join(path, "main.js")
+	if info, err := os.Stat(mainJS); err == nil && !info.IsDir() {
+		id := filepath.Base(path)
+		if _, dup := m.plugins[id]; dup {
+			return "", fmt.Errorf("plugin %q already loaded", id)
+		}
+		p, err := m.loadJS(id, path)
+		if err != nil {
+			return "", err
+		}
+		m.plugins[id] = p
+		m.proxy.SetNeedsJS(id, p.meta.NeedsJS)
+		logger.Info("plugin loaded (hot)", "id", id, "kind", "js")
+		return id, nil
+	}
+
+	// WASM: path must be a .wasm file
+	if !strings.HasSuffix(path, ".wasm") {
+		return "", fmt.Errorf("no main.lua, main.js, or .wasm found at %s", path)
+	}
+	id := strings.TrimSuffix(filepath.Base(path), ".wasm")
+	if _, dup := m.plugins[id]; dup {
+		return "", fmt.Errorf("plugin %q already loaded", id)
+	}
+	p, err := m.load(id, path)
+	if err != nil {
+		return "", err
+	}
+	m.plugins[id] = p
+	m.proxy.SetNeedsJS(id, p.meta.NeedsJS)
+	logger.Info("plugin loaded (hot)", "id", id, "kind", "wasm")
+	return id, nil
+}
+
+// UnloadPlugin closes a plugin and removes it from the loaded set.
+// The plugin files remain on disk.
+func (m *Manager) UnloadPlugin(id string) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	p, ok := m.plugins[id]
+	if !ok {
+		return fmt.Errorf("plugin %q not loaded", id)
+	}
+	if p.kind == "lua" && p.lua != nil {
+		p.lua.Close()
+	}
+	if p.kind == "wasm" && p.extismPlugin != nil {
+		_ = p.extismPlugin.Close(m.ctx)
+	}
+	if p.kind == "js" && p.js != nil {
+		p.js.Interrupt("unloading")
+	}
+	delete(m.plugins, id)
+	logger.Info("plugin unloaded", "id", id)
+	return nil
+}
+
+// ReloadPlugin unloads a plugin and re-loads it from its current path on disk.
+func (m *Manager) ReloadPlugin(id string) (string, error) {
+	m.mu.Lock()
+	old, ok := m.plugins[id]
+	if !ok {
+		m.mu.Unlock()
+		return "", fmt.Errorf("plugin %q not loaded", id)
+	}
+	// Close the old plugin instance first
+	if old.kind == "lua" && old.lua != nil {
+		old.lua.Close()
+	}
+	if old.kind == "wasm" && old.extismPlugin != nil {
+		_ = old.extismPlugin.Close(m.ctx)
+	}
+	if old.kind == "js" && old.js != nil {
+		old.js.Interrupt("reloading")
+	}
+	delete(m.plugins, id)
+	m.mu.Unlock()
+
+	// Determine reload path from stored wasmPath
+	var path string
+	switch old.kind {
+	case "wasm":
+		path = old.wasmPath
+	case "lua":
+		path = filepath.Dir(old.wasmPath)
+	case "js":
+		path = filepath.Dir(old.wasmPath)
+	}
+	newID, err := m.LoadPlugin(path)
+	if err != nil {
+		return "", fmt.Errorf("reload %s: %w", id, err)
+	}
+	logger.Info("plugin reloaded", "id", newID)
+	return newID, nil
+}
+
 // copyDir recursively copies src dir to dst (lua plugin folders).
 func copyDir(src, dst string) error {
 	entries, err := os.ReadDir(src)

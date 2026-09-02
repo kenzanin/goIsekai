@@ -35,6 +35,21 @@ func (s *AppService) TogglePlugin(id string) error {
 	return s.db.TogglePluginActive(id)
 }
 
+// LoadPluginHot hot-loads a plugin from an external path without restart.
+func (s *AppService) LoadPluginHot(path string) (string, error) {
+	return s.mgr.LoadPlugin(path)
+}
+
+// UnloadPlugin removes a plugin from memory (files stay on disk).
+func (s *AppService) UnloadPlugin(id string) error {
+	return s.mgr.UnloadPlugin(id)
+}
+
+// ReloadPlugin unloads and re-loads a plugin from its current disk path.
+func (s *AppService) ReloadPlugin(id string) (string, error) {
+	return s.mgr.ReloadPlugin(id)
+}
+
 // ListPlugins returns all registered plugins.
 func (s *AppService) ListPlugins() ([]database.Plugin, error) {
 	list, err := s.db.ListPlugins()

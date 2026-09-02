@@ -18,6 +18,7 @@ func (s *Server) routes() {
 	s.registerReaderRoutes()
 	s.registerWSRoutes()
 	s.registerAPIRoutes()
+	s.registerSandboxRoutes()
 }
 
 // registerStaticRoutes serves the embedded frontend dir under /static/.
