@@ -10,8 +10,8 @@ import (
 )
 
 // CDPConfig carries the host-level browser-engine settings for anti-bot
-// challenge solving. Engine is "off", "lightpanda", or "chrome"; the zero
-// value (Engine == "") is treated as "off".
+// challenge solving. Engine is "off", "lightpanda", "obscura", or "chrome";
+// the zero value (Engine == "") is treated as "off".
 type CDPConfig struct {
 	Engine  string
 	Path    string
@@ -57,10 +57,10 @@ func NewProxy() *Proxy {
 			// Empty Referer by default; only injected when a plugin sets one.
 			"Referer": "",
 		},
-		clients:       make(map[string]tls_client.HttpClient),
-		uaOverrides:   make(map[string]string),
-		pendingVerify: make(map[string]verifySeed),
-		needsJS:       make(map[string]bool),
+		clients:        make(map[string]tls_client.HttpClient),
+		uaOverrides:    make(map[string]string),
+		pendingVerify:  make(map[string]verifySeed),
+		needsJS:        make(map[string]bool),
 		solveChallenge: solveChallenge,
 	}
 }

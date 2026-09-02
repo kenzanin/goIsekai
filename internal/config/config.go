@@ -36,10 +36,10 @@ type Config struct {
 	Referer        string
 
 	// [network] — CDP browser engine for solving anti-bot challenges.
-	// CDPEngine is "off" (disabled), "lightpanda", or "chrome".
+	// CDPEngine is "off" (disabled), "lightpanda", "obscura", or "chrome".
 	CDPEngine string
 	// CDPPath locates the browser: a binary path for chrome, or a CDP
-	// websocket URL (ws://...) for lightpanda.
+	// websocket URL (ws://...) for lightpanda and obscura.
 	CDPPath string
 	// CDPSolveTimeout bounds a single challenge solve in seconds.
 	CDPSolveTimeout int
@@ -48,18 +48,18 @@ type Config struct {
 // Default returns the built-in defaults.
 func Default() *Config {
 	c := &Config{
-		DataDir:        "app_data",
-		Title:          "goIsekai",
-		LogLevel:       "info",
-		Width:          1200,
-		Height:         800,
-		Host:           "127.0.0.1",
-		Port:           8080,
-		UserAgent:      "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36",
-		AcceptLanguage: "en-US,en;q=0.9",
-		Referer:        "",
-		CDPEngine:      "off",
-		CDPPath:        "",
+		DataDir:         "app_data",
+		Title:           "goIsekai",
+		LogLevel:        "info",
+		Width:           1200,
+		Height:          800,
+		Host:            "127.0.0.1",
+		Port:            8080,
+		UserAgent:       "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36",
+		AcceptLanguage:  "en-US,en;q=0.9",
+		Referer:         "",
+		CDPEngine:       "off",
+		CDPPath:         "",
 		CDPSolveTimeout: 30,
 	}
 	c.CacheDir = filepath.Join(c.DataDir, "cache")
@@ -174,7 +174,7 @@ func (c *Config) set(section, key, val string) {
 		case "referer":
 			c.Referer = val
 		case "cdp_engine":
-			if val == "off" || val == "lightpanda" || val == "chrome" {
+			if val == "off" || val == "lightpanda" || val == "obscura" || val == "chrome" {
 				c.CDPEngine = val
 			}
 		case "cdp_path":

@@ -210,13 +210,13 @@ func contentRatingQuery(q url.Values) {
 // Extism ABI exports — pdk.Input() / pdk.Output(), return int32
 // ---------------------------------------------------------------------------
 
-//export contract_version
+//go:wasmexport contract_version
 func contractVersion() int32 {
 	pdk.OutputString("1")
 	return 0
 }
 
-//export Init
+//go:wasmexport Init
 func Init() int32 {
 	b, _ := json.Marshal(types.PluginMeta{ThumbRatio: 0.703})
 	pdk.Output(b)
@@ -225,7 +225,7 @@ func Init() int32 {
 
 // Search returns manga matching a query. Empty query returns popular manga.
 //
-//export Search
+//go:wasmexport Search
 func Search() int32 {
 	var f types.SearchFilter
 	_ = json.Unmarshal(pdk.Input(), &f)
@@ -276,7 +276,7 @@ func Search() int32 {
 
 // GetMangaDetail returns full metadata for a single manga by ID.
 //
-//export GetMangaDetail
+//go:wasmexport GetMangaDetail
 func GetMangaDetail() int32 {
 	var mangaID string
 	_ = json.Unmarshal(pdk.Input(), &mangaID)
@@ -311,7 +311,7 @@ func GetMangaDetail() int32 {
 
 // GetChapterList returns all chapters for a manga (paginated feed).
 //
-//export GetChapterList
+//go:wasmexport GetChapterList
 func GetChapterList() int32 {
 	var mangaID string
 	_ = json.Unmarshal(pdk.Input(), &mangaID)
@@ -390,7 +390,7 @@ func GetChapterList() int32 {
 
 // GetPageList returns image URLs for a single chapter via the MangaDex at-home API.
 //
-//export GetPageList
+//go:wasmexport GetPageList
 func GetPageList() int32 {
 	var chapterID string
 	_ = json.Unmarshal(pdk.Input(), &chapterID)

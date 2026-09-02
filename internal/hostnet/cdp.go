@@ -25,6 +25,7 @@ const solveDefaultTimeout = 30 * time.Second
 // The engine and binary/endpoint come from cfg:
 //   - "chrome"     → cfg.Path is the chrome binary path, launched as a subprocess.
 //   - "lightpanda" → cfg.Path is a CDP websocket URL (ws://host:port).
+//   - "obscura"    → cfg.Path is a CDP websocket URL (ws://host:port).
 func solveChallenge(cfg CDPConfig, url string) ([]*http.Cookie, string, error) {
 	timeout := cfg.Timeout
 	if timeout <= 0 {
@@ -36,10 +37,11 @@ func solveChallenge(cfg CDPConfig, url string) ([]*http.Cookie, string, error) {
 	var browserCtx context.Context
 	var browserCancel context.CancelFunc
 
-	if cfg.Engine == "lightpanda" {
-		// lightpanda runs as an external daemon; connect to its CDP endpoint.
+	if cfg.Engine == "lightpanda" || cfg.Engine == "obscura" {
+		// lightpanda/obscura run as an external daemon; connect to their CDP
+		// endpoint.
 		if !strings.HasPrefix(cfg.Path, "ws://") && !strings.HasPrefix(cfg.Path, "wss://") {
-			return nil, "", fmt.Errorf("hostnet: lightpanda cdp_path must be a ws:// URL, got %q", cfg.Path)
+			return nil, "", fmt.Errorf("hostnet: %s cdp_path must be a ws:// URL, got %q", cfg.Engine, cfg.Path)
 		}
 		browserCtx, browserCancel = chromedp.NewRemoteAllocator(ctx, cfg.Path)
 	} else {

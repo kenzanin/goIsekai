@@ -130,13 +130,13 @@ func sanitizeTitle(s string) string {
 
 const thumbRatio = 0.677 // 264×390 posters (MangaFire default)
 
-//export contract_version
+//go:wasmexport contract_version
 func contractVersion() int32 {
 	pdk.OutputString("1")
 	return 0
 }
 
-//export Init
+//go:wasmexport Init
 func Init() int32 {
 	b, _ := json.Marshal(types.PluginMeta{
 		ThumbRatio:     thumbRatio,
@@ -148,7 +148,7 @@ func Init() int32 {
 
 // Search — arg = JSON SearchFilter{Query, Page}. Returns []Manga.
 
-//export Search
+//go:wasmexport Search
 func Search() int32 {
 	var f types.SearchFilter
 	_ = json.Unmarshal(pdk.Input(), &f)
@@ -193,7 +193,7 @@ func Search() int32 {
 
 // GetMangaDetail — arg = JSON mangaID (the hid). Returns Manga.
 
-//export GetMangaDetail
+//go:wasmexport GetMangaDetail
 func GetMangaDetail() int32 {
 	var hid string
 	_ = json.Unmarshal(pdk.Input(), &hid)
@@ -227,7 +227,7 @@ func GetMangaDetail() int32 {
 // GetChapterList — arg = JSON mangaID (the hid). Returns []Chapter.
 // Fetches up to 3 pages (200/page, ~600 chapters). Reversed to oldest-first.
 
-//export GetChapterList
+//go:wasmexport GetChapterList
 func GetChapterList() int32 {
 	var hid string
 	_ = json.Unmarshal(pdk.Input(), &hid)
@@ -284,7 +284,7 @@ func GetChapterList() int32 {
 // GetPageList — arg = JSON chapterID (the numeric string from a chapter id).
 // Returns []Page; each page carries the Referer required by the image CDN.
 
-//export GetPageList
+//go:wasmexport GetPageList
 func GetPageList() int32 {
 	var chapterID string
 	_ = json.Unmarshal(pdk.Input(), &chapterID)

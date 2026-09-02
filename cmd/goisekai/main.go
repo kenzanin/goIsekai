@@ -28,8 +28,8 @@ func main() {
 	port := flag.Int("port", 0, "HTTP server port (overrides goisekai.ini port)")
 	open := flag.Bool("open", false, "open the default browser on startup")
 	genIni := flag.Bool("genini", false, "generate a default goisekai.ini and exit")
-	cdpEngine := flag.String("cdpEngine", "", "CDP browser engine for anti-bot solving: off|lightpanda|chrome (overrides goisekai.ini cdp_engine)")
-	cdpPath := flag.String("cdpPath", "", "browser binary path (chrome) or CDP ws:// URL (lightpanda) (overrides goisekai.ini cdp_path)")
+	cdpEngine := flag.String("cdpEngine", "", "CDP browser engine for anti-bot solving: off|lightpanda|obscura|chrome (overrides goisekai.ini cdp_engine)")
+	cdpPath := flag.String("cdpPath", "", "browser binary path (chrome) or CDP ws:// URL (lightpanda/obscura) (overrides goisekai.ini cdp_path)")
 	flag.Parse()
 
 	// Config file: goisekai.ini in the working directory, overridable via
