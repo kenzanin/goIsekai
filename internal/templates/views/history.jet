@@ -13,9 +13,9 @@
     {{range i, h := .History }}
     <a href="/view/manga/{{h.PluginID}}/{{h.SourceMangaID}}" class="flex items-center gap-4 py-4 -mx-2 px-2 rounded hover:bg-neutral-900 transition">
         {{if h.CoverURL != ""}}
-        <img src="/image?pluginID={{h.PluginID}}&amp;url={{h.CoverURL}}" alt="{{h.Title}}" class="w-12 h-16 object-cover rounded shrink-0" loading="lazy">
+        <img src="/image?pluginID={{h.PluginID}}&amp;url={{h.CoverURL}}" alt="{{h.Title}}" class="w-16 aspect-[2/3] object-cover rounded shrink-0" loading="lazy">
         {{else}}
-        <div class="w-12 h-16 bg-neutral-800 rounded flex items-center justify-center text-neutral-500 text-sm font-semibold shrink-0">{{getInitials(h.Title)}}</div>
+        <div class="w-16 aspect-[2/3] bg-neutral-800 rounded flex items-center justify-center text-neutral-500 text-sm font-semibold shrink-0">{{getInitials(h.Title)}}</div>
         {{end}}
         <div class="flex-1 min-w-0">
             <div class="text-sm font-medium truncate">{{h.Title}}</div>
