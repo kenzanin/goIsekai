@@ -39,6 +39,7 @@ func (d *DB) GetReadHistory() ([]HistoryEntry, error) {
 	readCond := Chapters.IsRead.EQ(Int(1)).OR(
 		Chapters.TotalPages.GT(Int(0)).AND(Chapters.LastPageRead.GT_EQ(Chapters.TotalPages)))
 	lastRead := MAX(ReadHistory.ReadAt)
+	lastID := MAX(ReadHistory.ID)
 	var out []HistoryEntry
 	err := SELECT(
 		Mangas.ID.AS("mangas.manga_id"),
@@ -53,7 +54,7 @@ func (d *DB) GetReadHistory() ([]HistoryEntry, error) {
 		INNER_JOIN(Chapters, Chapters.ID.EQ(ReadHistory.ChapterID)).
 		INNER_JOIN(Mangas, Mangas.ID.EQ(Chapters.MangaID))).
 		GROUP_BY(Mangas.ID).
-		ORDER_BY(lastRead.DESC()).
+		ORDER_BY(lastRead.DESC(), lastID.DESC()).
 		Query(d.db, &out)
 	return out, err
 }
@@ -68,7 +69,7 @@ func (d *DB) LastReadChapter(mangaRowID string) (sourceChapterID string, pageNum
 		FROM(ReadHistory.
 			INNER_JOIN(Chapters, Chapters.ID.EQ(ReadHistory.ChapterID))).
 		WHERE(Chapters.MangaID.EQ(String(mangaRowID))).
-		ORDER_BY(ReadHistory.ReadAt.DESC()).
+		ORDER_BY(ReadHistory.ReadAt.DESC(), ReadHistory.ID.DESC()).
 		LIMIT(1).
 		Query(d.db, &rows)
 	if err != nil || len(rows) == 0 {

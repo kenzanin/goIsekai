@@ -55,6 +55,18 @@ func (d *DB) SetChapterProgress(chapterID string, lastPage int) error {
 		SET(Chapters.LastPageRead.SET(Int(int64(lastPage)))).
 		WHERE(Chapters.ID.EQ(String(chapterID))).
 		Exec(d.db)
+	if err != nil {
+		return err
+	}
+	if lastPage >= 1 {
+		_, err = ReadHistory.INSERT(
+			ReadHistory.ChapterID,
+			ReadHistory.PageNum,
+		).VALUES(
+			chapterID,
+			int64(lastPage),
+		).Exec(d.db)
+	}
 	return err
 }
 

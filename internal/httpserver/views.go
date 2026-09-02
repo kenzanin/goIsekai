@@ -208,13 +208,18 @@ func (s *Server) continueFromHistory(pluginID, mangaID string, chapters []types.
 	if !ok {
 		return nil
 	}
-	for _, c := range chapters {
+	for i, c := range chapters {
 		if c.ID == lastChID {
 			p, hasProgress := progress[c.ID]
 			if !hasProgress || p.LastPageRead < p.TotalPages {
 				return &ContinuePoint{ChapterID: c.ID, ChapterN: c.ChapterNum, Page: lastPage}
 			}
-			break
+			// Fully read — advance to the next chapter (higher number = earlier in the slice).
+			if i > 0 {
+				next := chapters[i-1]
+				return &ContinuePoint{ChapterID: next.ID, ChapterN: next.ChapterNum, Page: 1}
+			}
+			return nil
 		}
 	}
 	return nil

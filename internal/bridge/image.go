@@ -33,6 +33,22 @@ func (s *AppService) EvictImageCache(pluginID, url string, mangaID, chapterID st
 	}
 }
 
+// validateImage checks whether data is a usable image: GIF magic is trusted
+// without decoding, RIFF/WebP is verified with webp.Decode, and everything
+// else must decode via image.Decode (jpeg/png registered above). Undecodable
+// bytes return false so callers can skip/evict them instead of caching.
+func validateImage(data []byte) bool {
+	if len(data) >= 4 && (bytes.HasPrefix(data, []byte("GIF8")) || bytes.HasPrefix(data, []byte("\x89PNG\r\n\x1a\n"))) {
+		return true
+	}
+	if bytes.HasPrefix(data, []byte("RIFF")) {
+		_, err := webp.Decode(bytes.NewReader(data))
+		return err == nil
+	}
+	_, _, err := image.Decode(bytes.NewReader(data))
+	return err == nil
+}
+
 // GetImage fetches image bytes for pluginID from url (with optional per-request
 // headers) through the hostnet proxy. Results are cached in memory (L1) and on
 // disk (L2) so repeat lookups skip the network entirely. mangaID/chapterID scope
@@ -52,10 +68,14 @@ func (s *AppService) GetImage(pluginID, url string, headers map[string]string, m
 	if base := s.diskCachePath(pluginID, mangaID, chapterID, url); base != "" {
 		for _, ext := range []string{".webp", ".img"} {
 			if data, err := os.ReadFile(base + ext); err == nil {
-				s.imageMu.Lock()
-				s.imageCache[url] = data
-				s.imageMu.Unlock()
-				return data, nil
+				if validateImage(data) {
+					s.imageMu.Lock()
+					s.imageCache[url] = data
+					s.imageMu.Unlock()
+					return data, nil
+				}
+				// Invalid cached image: delete stale file and treat as miss.
+				_ = os.Remove(base + ext)
 			}
 		}
 	}
@@ -76,6 +96,7 @@ func (s *AppService) GetImage(pluginID, url string, headers map[string]string, m
 	}()
 	var resp types.HTTPResponse
 	var err error
+	var body []byte
 	for attempt := 0; attempt < 3; attempt++ {
 		if attempt > 0 {
 			time.Sleep(time.Duration(attempt*attempt) * 2500 * time.Millisecond)
@@ -86,10 +107,20 @@ func (s *AppService) GetImage(pluginID, url string, headers map[string]string, m
 			URL:     url,
 			Headers: headers,
 		})
-		if err == nil && resp.Status >= 200 && resp.Status < 300 {
-			break
+		if err != nil || resp.Status < 200 || resp.Status >= 300 {
+			logger.Warn("image fetch retrying", "url", url, "attempt", attempt+1, "status", respStatus(resp, err))
+			continue
 		}
-		logger.Warn("image fetch retrying", "url", url, "attempt", attempt+1, "status", respStatus(resp, err))
+		body = []byte(resp.Body)
+		if !validateImage(body) {
+			logger.Warn("image corrupt", "url", url, "attempt", attempt+1)
+			// Treat as failure to trigger retry.
+			err = fmt.Errorf("invalid image data")
+			continue
+		}
+		// successful fetch and validation
+		err = nil
+		break
 	}
 	<-s.imgSem
 	if err != nil {
@@ -100,8 +131,7 @@ func (s *AppService) GetImage(pluginID, url string, headers map[string]string, m
 		logger.Error("image bad status", "url", url, "status", resp.Status)
 		return nil, fmt.Errorf("bridge: get image %s: unexpected status %d", url, resp.Status)
 	}
-	body := []byte(resp.Body)
-
+	// body already set in loop after validation
 	// L1 cache.
 	s.imageMu.Lock()
 	s.imageCache[url] = body
@@ -132,7 +162,13 @@ func (s *AppService) diskCachePath(pluginID, mangaID, chapterID, url string) str
 	if s.cacheDir == "" {
 		return ""
 	}
-	h := sha256.Sum256([]byte(url))
+	// Strip query parameters to get a stable cache key across signed URLs.
+	key := url
+	if u, err := neturl.Parse(url); err == nil {
+		// Use only the path component for hashing; scheme/host are already scoped.
+		key = u.Path
+	}
+	h := sha256.Sum256([]byte(key))
 	sub := "library"
 	if mangaID != "" && chapterID != "" {
 		sub = filepath.Join(mangaID, chapterID)

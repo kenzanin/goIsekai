@@ -5,7 +5,8 @@ import (
 	"image"
 	"image/color"
 	"image/jpeg"
-	"net/http"
+		"image/png"
+"net/http"
 	"net/http/httptest"
 	"os"
 	"path/filepath"
@@ -96,7 +97,7 @@ func TestImageCacheGIFPassthrough(t *testing.T) {
 	}
 }
 
-func TestImageCacheInvalidBytesFailOpen(t *testing.T) {
+func TestImageCacheInvalidBytesRejected(t *testing.T) {
 	for _, payload := range [][]byte{
 		[]byte("\x00\x01\x02\x03"),        // too small to sniff/decode
 		[]byte("definitely not an image"), // decodable length, but garbage
@@ -104,20 +105,64 @@ func TestImageCacheInvalidBytesFailOpen(t *testing.T) {
 		url := serveImage(t, "application/octet-stream", payload)
 
 		s := newTestServiceWithCache(t)
-		if _, err := s.GetImage("plugin-x", url, nil, "", ""); err != nil {
-			t.Fatalf("GetImage: %v", err)
+		if _, err := s.GetImage("plugin-x", url, nil, "", ""); err == nil {
+			t.Fatalf("GetImage: expected error for invalid bytes")
 		}
 
 		base := s.diskCachePath("plugin-x", "", "", url)
-		data, err := os.ReadFile(base + ".img")
-		if err != nil {
-			t.Fatalf("expected cached .img file: %v", err)
-		}
-		if !bytes.Equal(data, payload) {
-			t.Errorf("invalid bytes changed on disk: got %q, want %q", data, payload)
+		if _, err := os.Stat(base + ".img"); !os.IsNotExist(err) {
+			t.Errorf("expected no .img file for invalid bytes, stat err = %v", err)
 		}
 		if _, err := os.Stat(base + ".webp"); !os.IsNotExist(err) {
 			t.Errorf("expected no .webp file for invalid bytes, stat err = %v", err)
 		}
 	}
+}
+
+func TestImageCacheStableKeyAcrossQuery(t *testing.T) {
+	s := newTestServiceWithCache(t)
+	base := s.diskCachePath("plugin-x", "m1", "c1", "http://cdn.example.com/img/1.png")
+	for _, signed := range []string{
+		"http://cdn.example.com/img/1.png?acc=abc&expires=1",
+		"http://cdn.example.com/img/1.png?acc=xyz&expires=2",
+	} {
+		if got := s.diskCachePath("plugin-x", "m1", "c1", signed); got != base {
+			t.Errorf("diskCachePath(%s) = %s, want stable %s", signed, got, base)
+		}
+	}
+}
+
+func TestImageCacheHealsCorruptEntry(t *testing.T) {
+	// Pre-seed L2 with corrupt bytes (legacy fail-open entry).
+	s := newTestServiceWithCache(t)
+	validURL := serveImage(t, "image/png", validPNG(t))
+	base := s.diskCachePath("plugin-x", "", "", validURL)
+	if err := os.MkdirAll(filepath.Dir(base), 0o755); err != nil {
+		t.Fatalf("mkdir: %v", err)
+	}
+	if err := os.WriteFile(base+".webp", []byte("not a real image"), 0o644); err != nil {
+		t.Fatalf("seed corrupt cache: %v", err)
+	}
+
+	// Reading must heal: corrupt file deleted, valid image fetched and cached.
+	if _, err := s.GetImage("plugin-x", validURL, nil, "", ""); err != nil {
+		t.Fatalf("GetImage: %v", err)
+	}
+	data, err := os.ReadFile(base + ".webp")
+	if err != nil {
+		t.Fatalf("expected healed .webp file: %v", err)
+	}
+	if !validateImage(data) {
+		t.Errorf("healed .webp does not decode")
+	}
+}
+
+func validPNG(t *testing.T) []byte {
+	t.Helper()
+	img := image.NewRGBA(image.Rect(0, 0, 16, 16))
+	var buf bytes.Buffer
+	if err := png.Encode(&buf, img); err != nil {
+		t.Fatalf("png.Encode: %v", err)
+	}
+	return buf.Bytes()
 }
