@@ -164,12 +164,8 @@ function util.parse_chapter_list(html, manga_id)
     -- types.Chapter wants RFC3339 time; add a parser when sorting by date matters.
     end
 
-    -- Reverse: HTML lists newest-first but the reader expects oldest-first
-    -- (chapters[1] = oldest, chapters[N] = newest) for prev/next navigation.
-    local n = #chapters
-    for i = 1, math.floor(n / 2) do
-        chapters[i], chapters[n - i + 1] = chapters[n - i + 1], chapters[i]
-    end
+    -- ABI convention: newest-first (chapters[1] = newest) — the site HTML is
+    -- already newest-first, so no reversal is applied.
 
     return chapters
 end
