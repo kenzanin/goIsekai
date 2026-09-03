@@ -1,6 +1,6 @@
 # goIsekai
 
-A self-hosted manga reader with sandboxed plugins. Two runtimes — hardened **WASM** and zero-toolchain **Lua** — power your sources; one fast server-rendered UI reads them all.
+A self-hosted manga reader with sandboxed plugins. Three runtimes — hardened **WASM**, zero-toolchain **Lua**, and pure-Go **JS** (goja) — power your sources; one fast server-rendered UI reads them all.
 
 goIsekai is a single static Go binary that serves a chi + Jet + HTMX + Tailwind web UI. Manga sources are plugins executed in isolated sandboxes, so a crashing or malicious plugin can never take down the host. All network traffic goes through a Chrome-fingerprinted TLS client, so sites behind Cloudflare just work — with an automatic browser-fallback (CDP) when a challenge appears anyway.
 
@@ -22,6 +22,7 @@ flowchart LR
         subgraph Sandboxes
             WASM[Extism WASM<br/>64 MB / 15 s]
             Lua[gopher-lua<br/>safe stdlib]
+            JS[goja<br/>ES5.1]
         end
         HostNet[hostnet proxy]
         DB[(SQLite<br/>modernc.org)]
@@ -39,8 +40,10 @@ flowchart LR
     Bridge --> PM
     PM --> WASM
     PM --> Lua
+    PM --> JS
     WASM --> HostNet
     Lua --> HostNet
+    JS --> HostNet
     HostNet -->|Chrome_146 TLS| Sites
     HostNet -.->|403/503 challenge| CDP
     CDP -.->|solved cookies| HostNet
