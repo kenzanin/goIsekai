@@ -116,6 +116,26 @@ func stripHTML(s string) string {
 	return strings.TrimSpace(b.String())
 }
 
+// normalizeStatus maps MangaFire's native status codes to human-readable labels.
+// MangaFire returns e.g. "releasing" / "finished" / "on_hold" / "discontinued" /
+// "not_published"; these read awkwardly next to other plugins' "Ongoing" etc.
+func normalizeStatus(s string) string {
+	switch s {
+	case "releasing":
+		return "Ongoing"
+	case "finished":
+		return "Completed"
+	case "on_hold":
+		return "Hiatus"
+	case "discontinued":
+		return "Dropped"
+	case "not_published", "upcoming":
+		return "Upcoming"
+	default:
+		return s
+	}
+}
+
 // sanitizeTitle strips MangaFire's HTML-escaped title entities.
 func sanitizeTitle(s string) string {
 	s = strings.ReplaceAll(s, "&#039;", "'")
@@ -218,14 +238,14 @@ func GetMangaDetail() int32 {
 		Title:       sanitizeTitle(manga.Title),
 		Description: stripHTML(manga.Summary),
 		CoverURL:    manga.Poster.Medium,
-		Status:      manga.Status,
+		Status:      normalizeStatus(manga.Status),
 	})
 	pdk.Output(b)
 	return 0
 }
 
 // GetChapterList — arg = JSON mangaID (the hid). Returns []Chapter.
-// Fetches up to 3 pages (200/page, ~600 chapters). Reversed to oldest-first.
+// Fetches up to 3 pages (200/page, ~600 chapters), newest-first.
 
 //go:wasmexport GetChapterList
 func GetChapterList() int32 {
@@ -272,10 +292,7 @@ func GetChapterList() int32 {
 		}
 		page++
 	}
-	// Descending page order => newest first; reverse to oldest-first.
-	for i, j := 0, len(chapters)-1; i < j; i, j = i+1, j-1 {
-		chapters[i], chapters[j] = chapters[j], chapters[i]
-	}
+	// Descending page order => newest first, matching the host convention.
 	b, _ := json.Marshal(chapters)
 	pdk.Output(b)
 	return 0

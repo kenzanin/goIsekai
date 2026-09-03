@@ -30,14 +30,14 @@
         <p class="text-sm text-neutral-400 mb-4">{{.Manga.Description}}</p>
         {{end}}
         <div class="flex flex-wrap items-center gap-2 mb-4">
+            <form method="post" action="/action/toggle-library/{{.PluginID}}/{{.MangaID}}">
+                {{if .InLibrary}}<button type="submit" class="bg-emerald-600 hover:bg-emerald-500 text-white rounded-md px-4 py-2 text-sm font-medium">✓ In Library</button>{{else}}<button type="submit" class="bg-neutral-700 hover:bg-neutral-600 text-white rounded-md px-4 py-2 text-sm font-medium">+ Add to Library</button>{{end}}
+            </form>
             {{if .Continue}}
             <a href="/view/read/{{.PluginID}}/{{.MangaID}}/{{.Continue.ChapterID}}?page={{.Continue.Page}}" class="bg-indigo-600 hover:bg-indigo-500 text-white rounded-md px-4 py-2 text-sm font-medium">
                 {{if .Continue.Page > 1}}▶ Continue Reading: Ch. {{formatChapterNum(.Continue.ChapterN)}} · p. {{.Continue.Page}}{{else}}▶ Start Reading{{end}}
             </a>
             {{end}}
-            <form method="post" action="/action/toggle-library/{{.PluginID}}/{{.MangaID}}">
-                {{if .InLibrary}}<button type="submit" class="bg-emerald-600 hover:bg-emerald-500 text-white rounded-md px-4 py-2 text-sm font-medium">✓ In Library</button>{{else}}<button type="submit" class="bg-neutral-700 hover:bg-neutral-600 text-white rounded-md px-4 py-2 text-sm font-medium">+ Add to Library</button>{{end}}
-            </form>
         </div>
     </div>
 </div>
@@ -46,17 +46,19 @@
 {{if len(.Chapters) == 0}}
 <div class="py-16 text-center text-neutral-500">No chapters yet</div>
 {{else}}
-<form id="mark-bulk" method="post" action="/action/mark-read-bulk" class="flex items-center gap-2 mb-4">
-    <input type="hidden" name="pluginID" value="{{.PluginID}}">
-    <input type="hidden" name="mangaID" value="{{.MangaID}}">
-    <button type="submit" class="bg-indigo-600 hover:bg-indigo-500 text-white rounded-md px-3 py-1.5 text-sm font-medium">Mark selected as read</button>
-</form>
-<form method="post" action="/action/reset-progress-all/{{.PluginID}}/{{.MangaID}}" class="mb-4">
-    <button type="submit" title="Clear read progress for every chapter" class="bg-neutral-700 hover:bg-neutral-600 text-white rounded-md px-3 py-1.5 text-sm font-medium">↺ Reset all read status</button>
-</form>
-<form method="post" action="/action/clear-cache/{{.PluginID}}/{{.MangaID}}" class="mb-4" onsubmit="return confirm('Clear cached images for this manga?');">
-    <button type="submit" title="Delete cached image files for this manga" class="bg-neutral-700 hover:bg-red-600 text-white rounded-md px-3 py-1.5 text-sm font-medium">🗑 Clear cached images</button>
-</form>
+<div class="flex flex-wrap items-center gap-2 mb-4">
+    <form id="mark-bulk" method="post" action="/action/mark-read-bulk">
+        <input type="hidden" name="pluginID" value="{{.PluginID}}">
+        <input type="hidden" name="mangaID" value="{{.MangaID}}">
+        <button type="submit" class="bg-indigo-600 hover:bg-indigo-500 text-white rounded-md px-3 py-1.5 text-sm font-medium">Mark selected as read</button>
+    </form>
+    <form method="post" action="/action/reset-progress-all/{{.PluginID}}/{{.MangaID}}">
+        <button type="submit" title="Clear read progress for every chapter" class="bg-neutral-700 hover:bg-neutral-600 text-white rounded-md px-3 py-1.5 text-sm font-medium">↺ Reset all read status</button>
+    </form>
+    <form method="post" action="/action/clear-cache/{{.PluginID}}/{{.MangaID}}" onsubmit="return confirm('Clear cached images for this manga?');">
+        <button type="submit" title="Delete cached image files for this manga" class="bg-neutral-700 hover:bg-red-600 text-white rounded-md px-3 py-1.5 text-sm font-medium">🗑 Clear cached images</button>
+    </form>
+</div>
 {{ firstID := "" }}
 <div class="divide-y divide-neutral-800">
     {{range i, c := .Chapters }}
@@ -79,13 +81,13 @@
             </span>
         </a>
         <form method="post" action="/action/mark-read/{{.PluginID}}/{{.MangaID}}/{{c.ID}}">
-            <button type="submit" title="Mark read" class="text-xs text-indigo-400 hover:text-indigo-300 whitespace-nowrap">✓ read</button>
+            <button type="submit" title="Mark read" class="text-xs text-indigo-400 hover:text-indigo-300 whitespace-nowrap">✅</button>
         </form>
         <form method="post" action="/action/reset-progress/{{.PluginID}}/{{.MangaID}}/{{c.ID}}">
-            <button type="submit" title="Clear this chapter's read progress" class="text-xs text-neutral-500 hover:text-neutral-300 whitespace-nowrap">↺ reset</button>
+            <button type="submit" title="Clear this chapter's read progress" class="text-xs text-neutral-500 hover:text-neutral-300 whitespace-nowrap">🔄</button>
         </form>
         <form method="post" action="/action/mark-read-range/{{.PluginID}}/{{.MangaID}}/{{firstID}}/{{c.ID}}">
-            <button type="submit" title="Mark everything up to and including this chapter as read" class="text-xs text-neutral-500 hover:text-neutral-300 whitespace-nowrap">↑ mark up to here</button>
+            <button type="submit" title="Mark everything up to and including this chapter as read" class="text-xs text-neutral-500 hover:text-neutral-300 whitespace-nowrap">📚</button>
         </form>
         <form method="post" action="/action/export-cbz/{{.PluginID}}/{{.MangaID}}/{{c.ID}}">
             <input type="hidden" name="title" value="{{.Manga.Title}} - Ch. {{formatChapterNum(c.ChapterNum)}}">
