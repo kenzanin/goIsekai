@@ -15,16 +15,19 @@ func (s *Server) registerReaderRoutes() {
 
 // chapterNeighbors returns the chapter IDs before/after chapterID in the
 // plugin's chapter list (empty string when at either end).
+// chapterNeighbors resolves prev/next in READING order. Chapters arrive
+// newest-first (desc), so the older chapter (prev) sits at i+1 and the
+// newer chapter (next) at i-1.
 func chapterNeighbors(chapters []types.Chapter, chapterID string) (prev, next string) {
 	for i, c := range chapters {
 		if c.ID != chapterID {
 			continue
 		}
-		if i > 0 {
-			prev = chapters[i-1].ID
-		}
 		if i+1 < len(chapters) {
-			next = chapters[i+1].ID
+			prev = chapters[i+1].ID
+		}
+		if i > 0 {
+			next = chapters[i-1].ID
 		}
 		return prev, next
 	}
