@@ -152,7 +152,7 @@ func TestImageCacheHealsCorruptEntry(t *testing.T) {
 	if err != nil {
 		t.Fatalf("expected healed .webp file: %v", err)
 	}
-	if !validateImage(data) {
+	if !validateImageFull(data) {
 		t.Errorf("healed .webp does not decode")
 	}
 }

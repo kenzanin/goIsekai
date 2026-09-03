@@ -6,8 +6,9 @@ import (
 	"encoding/hex"
 	"fmt"
 	"image"
-	_ "image/jpeg" // register jpeg decoder for image.Decode
-	_ "image/png"  // register png decoder for image.Decode
+	_ "image/gif" // register gif decoder for image.DecodeConfig
+	_ "image/jpeg"
+	_ "image/png"
 	"net/http"
 	neturl "net/url"
 	"os"
@@ -16,6 +17,7 @@ import (
 	"time"
 
 	"github.com/gen2brain/webp"
+	_ "golang.org/x/image/webp" // register webp for image.DecodeConfig
 
 	"goisekai/internal/logger"
 	"goisekai/pkg/types"
@@ -33,11 +35,21 @@ func (s *AppService) EvictImageCache(pluginID, url string, mangaID, chapterID st
 	}
 }
 
-// validateImage checks whether data is a usable image: GIF magic is trusted
-// without decoding, RIFF/WebP is verified with webp.Decode, and everything
-// else must decode via image.Decode (jpeg/png registered above). Undecodable
-// bytes return false so callers can skip/evict them instead of caching.
-func validateImage(data []byte) bool {
+// validateImageFast performs cheap header-only validation. GIFs pass via magic
+// prefix (matching the passthrough path); everything else is checked with
+// image.DecodeConfig which reads only the image header (no pixel decode).
+func validateImageFast(data []byte) bool {
+	if len(data) >= 4 && bytes.HasPrefix(data, []byte("GIF8")) {
+		return true
+	}
+	_, _, err := image.DecodeConfig(bytes.NewReader(data))
+	return err == nil
+}
+
+// validateImageFull performs a full decode: GIF/PNG magic trusted, RIFF/WebP
+// via webp.Decode, everything else via image.Decode. Used at trust boundaries
+// (network fetch) to reject corrupt data before caching.
+func validateImageFull(data []byte) bool {
 	if len(data) >= 4 && (bytes.HasPrefix(data, []byte("GIF8")) || bytes.HasPrefix(data, []byte("\x89PNG\r\n\x1a\n"))) {
 		return true
 	}
@@ -67,8 +79,8 @@ func (s *AppService) GetImage(pluginID, url string, headers map[string]string, m
 	// else (gif/webp passthrough, legacy entries) as <key>.img; try webp first.
 	if base := s.diskCachePath(pluginID, mangaID, chapterID, url); base != "" {
 		for _, ext := range []string{".webp", ".img"} {
-			if data, err := os.ReadFile(base + ext); err == nil {
-				if validateImage(data) {
+		if data, err := os.ReadFile(base + ext); err == nil {
+			if validateImageFast(data) {
 					s.imageMu.Lock()
 					s.imageCache[url] = data
 					s.imageMu.Unlock()
@@ -112,7 +124,7 @@ func (s *AppService) GetImage(pluginID, url string, headers map[string]string, m
 			continue
 		}
 		body = []byte(resp.Body)
-		if !validateImage(body) {
+		if !validateImageFull(body) {
 			logger.Warn("image corrupt", "url", url, "attempt", attempt+1)
 			// Treat as failure to trigger retry.
 			err = fmt.Errorf("invalid image data")

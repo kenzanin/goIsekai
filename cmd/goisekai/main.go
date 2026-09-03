@@ -30,6 +30,7 @@ func main() {
 	genIni := flag.Bool("genini", false, "generate a default goisekai.ini and exit")
 	cdpEngine := flag.String("cdpEngine", "", "CDP browser engine for anti-bot solving: off|lightpanda|obscura|chrome (overrides goisekai.ini cdp_engine)")
 	cdpPath := flag.String("cdpPath", "", "browser binary path (chrome) or CDP ws:// URL (lightpanda/obscura) (overrides goisekai.ini cdp_path)")
+	apiKey := flag.String("apiKey", "", "API key for /api/* endpoints (overrides goisekai.ini api_key)")
 	flag.Parse()
 
 	// Config file: goisekai.ini in the working directory, overridable via
@@ -71,6 +72,9 @@ func main() {
 	}
 	if *cdpPath != "" {
 		cfg.CDPPath = *cdpPath
+	}
+	if *apiKey != "" {
+		cfg.APIKey = *apiKey
 	}
 
 	// Logger level: flag overrides config, config overrides the "info" default.
@@ -146,7 +150,7 @@ func main() {
 		log.Fatalf("init templates: %v", err)
 	}
 
-	srv := httpserver.New(cfg.Host, cfg.Port, assets, svc, slog.Default(), eng)
+	srv := httpserver.New(cfg.Host, cfg.Port, cfg.APIKey, assets, svc, slog.Default(), eng)
 	if *open {
 		srv.OpenBrowser()
 	}

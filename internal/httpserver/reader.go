@@ -4,13 +4,16 @@ import (
 	"encoding/json"
 	"net/http"
 
+	"github.com/go-chi/chi/v5"
+
 	"goisekai/pkg/types"
 )
 
 // registerReaderRoutes mounts the reader page and its JSON data endpoint.
-func (s *Server) registerReaderRoutes() {
+// r is the router for API routes (under /api prefix).
+func (s *Server) registerReaderRoutes(r chi.Router) {
 	s.Router.Get("/view/read/{pluginID}/{mangaID}/{chapterID}", s.viewReader)
-	s.Router.Get("/api/reader-data/{pluginID}/{mangaID}/{chapterID}", s.readerData)
+	r.Get("/reader-data/{pluginID}/{mangaID}/{chapterID}", s.readerData)
 }
 
 // chapterNeighbors returns the chapter IDs before/after chapterID in the

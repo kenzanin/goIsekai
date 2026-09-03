@@ -23,10 +23,11 @@ type Server struct {
 	assets  embed.FS
 	service *bridge.AppService
 	engine  *templates.Engine
+	apiKey  string
 }
 
 // New creates a new Server with Chi middleware and all routes registered.
-func New(host string, port int, assets embed.FS, svc *bridge.AppService, logger *slog.Logger, engine *templates.Engine) *Server {
+func New(host string, port int, apiKey string, assets embed.FS, svc *bridge.AppService, logger *slog.Logger, engine *templates.Engine) *Server {
 	defaultAssets = assets
 
 	r := chi.NewRouter()
@@ -40,7 +41,9 @@ func New(host string, port int, assets embed.FS, svc *bridge.AppService, logger 
 		assets:  assets,
 		service: svc,
 		engine:  engine,
+		apiKey:  apiKey,
 	}
+	warnIfOpenAPI(logger, host, apiKey)
 	s.routes()
 	return s
 }

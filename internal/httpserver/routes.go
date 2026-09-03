@@ -5,6 +5,7 @@ import (
 	"net/http"
 
 	"github.com/CloudyKit/jet/v6"
+	"github.com/go-chi/chi/v5"
 )
 
 // routes registers every HTTP endpoint: static assets, HTML views, actions,
@@ -15,10 +16,14 @@ func (s *Server) routes() {
 	s.registerViewRoutes()
 	s.registerActionRoutes()
 	s.registerImageRoutes()
-	s.registerReaderRoutes()
-	s.registerWSRoutes()
-	s.registerAPIRoutes()
-	s.registerSandboxRoutes()
+	// /api group with optional API-key authentication.
+	s.Router.Route("/api", func(r chi.Router) {
+		r.Use(s.requireAPIKey)
+		s.registerAPIRoutes(r)
+		s.registerReaderRoutes(r)
+		s.registerWSRoutes(r)
+		s.registerSandboxRoutes(r)
+	})
 }
 
 // registerStaticRoutes serves the embedded frontend dir under /static/.
@@ -45,18 +50,6 @@ func (s *Server) registerViewRoutes() {
 	s.Router.Get("/view/history", s.viewHistory)
 }
 
-// registerAPIRoutes holds the JSON endpoints.
-func (s *Server) registerAPIRoutes() {
-	s.Router.Get("/api/health", func(w http.ResponseWriter, _ *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-		_, _ = w.Write([]byte(`{"status":"ok"}`))
-	})
-	s.Router.Get("/api/logs", func(w http.ResponseWriter, _ *http.Request) {
-		lines := s.service.GetLogs()
-		w.Header().Set("Content-Type", "application/json")
-		_ = jsonMarshalLogs(w, lines)
-	})
-}
 
 // renderPage renders a view template with the `active` nav var set. Every
 // view extends /layouts/base.jet, so this is always a full page.

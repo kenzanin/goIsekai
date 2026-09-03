@@ -20,11 +20,11 @@ func NewSandbox(svc *bridge.AppService) *Sandbox {
 	return &Sandbox{svc: svc}
 }
 
-// registerSandboxRoutes adds /api/sandbox/* endpoints for plugin development.
-func (s *Server) registerSandboxRoutes() {
+// registerSandboxRoutes adds sandbox/* endpoints for plugin development.
+func (s *Server) registerSandboxRoutes(r chi.Router) {
 	sb := NewSandbox(s.service)
 
-	s.Router.Route("/api/sandbox/plugins", func(r chi.Router) {
+	r.Route("/sandbox/plugins", func(r chi.Router) {
 		// List loaded plugins
 		r.Get("/", sb.handleList)
 
@@ -44,7 +44,7 @@ func (s *Server) registerSandboxRoutes() {
 		})
 	})
 
-	s.Router.Route("/api/sandbox/cdp", func(r chi.Router) {
+	r.Route("/sandbox/cdp", func(r chi.Router) {
 		r.Get("/status", sb.handleCDPStatus)
 			r.Get("/test", sb.handleCDPTest)
 		r.Get("/cookies", sb.handleCDPCookies)
@@ -55,7 +55,7 @@ func (s *Server) registerSandboxRoutes() {
 
 func (s *Sandbox) handleList(w http.ResponseWriter, r *http.Request) {
 	plugins := s.svc.PluginMetas()
-	writeJSON(w, plugins)
+	writeJSON(w, http.StatusOK, plugins)
 }
 
 type loadRequest struct {
@@ -73,7 +73,7 @@ func (s *Sandbox) handleLoad(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusInternalServerError, err.Error())
 		return
 	}
-	writeJSON(w, map[string]string{"id": id})
+	writeJSON(w, http.StatusOK, map[string]string{"id": id})
 }
 
 func (s *Sandbox) handleUnload(w http.ResponseWriter, r *http.Request) {
@@ -82,7 +82,7 @@ func (s *Sandbox) handleUnload(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusNotFound, err.Error())
 		return
 	}
-	writeJSON(w, map[string]string{"status": "unloaded"})
+	writeJSON(w, http.StatusOK, map[string]string{"status": "unloaded"})
 }
 
 func (s *Sandbox) handleReload(w http.ResponseWriter, r *http.Request) {
@@ -92,7 +92,7 @@ func (s *Sandbox) handleReload(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusInternalServerError, err.Error())
 		return
 	}
-	writeJSON(w, map[string]string{"id": newID})
+	writeJSON(w, http.StatusOK, map[string]string{"id": newID})
 }
 
 // --- plugin API sandbox ---
@@ -110,7 +110,7 @@ func (s *Sandbox) handleSearch(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusInternalServerError, err.Error())
 		return
 	}
-	writeJSON(w, results)
+	writeJSON(w, http.StatusOK, results)
 }
 
 func (s *Sandbox) handleDetail(w http.ResponseWriter, r *http.Request) {
@@ -122,7 +122,7 @@ func (s *Sandbox) handleDetail(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusInternalServerError, err.Error())
 		return
 	}
-	writeJSON(w, manga)
+	writeJSON(w, http.StatusOK, manga)
 }
 
 func (s *Sandbox) handleChapters(w http.ResponseWriter, r *http.Request) {
@@ -134,7 +134,7 @@ func (s *Sandbox) handleChapters(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusInternalServerError, err.Error())
 		return
 	}
-	writeJSON(w, chapters)
+	writeJSON(w, http.StatusOK, chapters)
 }
 
 func (s *Sandbox) handlePages(w http.ResponseWriter, r *http.Request) {
@@ -146,27 +146,17 @@ func (s *Sandbox) handlePages(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusInternalServerError, err.Error())
 		return
 	}
-	writeJSON(w, pages)
+	writeJSON(w, http.StatusOK, pages)
 }
 
 // --- helpers ---
 
-func writeJSON(w http.ResponseWriter, v any) {
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(v)
-}
-
-func writeErr(w http.ResponseWriter, code int, msg string) {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(code)
-	_ = json.NewEncoder(w).Encode(map[string]string{"error": msg})
-}
 
 // --- CDP playground ---
 
 func (s *Sandbox) handleCDPStatus(w http.ResponseWriter, r *http.Request) {
 	cfg := s.svc.CDPStatus()
-	writeJSON(w, map[string]any{
+	writeJSON(w, http.StatusOK, map[string]any{
 		"engine":  cfg.Engine,
 		"path":    cfg.Path,
 		"timeout": cfg.Timeout.String(),
@@ -194,7 +184,7 @@ func (s *Sandbox) handleCDPTest(w http.ResponseWriter, r *http.Request) {
 			"path":   c.Path,
 		})
 	}
-	writeJSON(w, map[string]any{
+	writeJSON(w, http.StatusOK, map[string]any{
 		"ok":      true,
 		"cookies": cookieList,
 		"ua":      ua,
@@ -208,5 +198,5 @@ func (s *Sandbox) handleCDPCookies(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	cookies := s.svc.CDPCookies(domain)
-	writeJSON(w, cookies)
+	writeJSON(w, http.StatusOK, cookies)
 }

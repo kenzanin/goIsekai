@@ -3,12 +3,13 @@ package httpserver
 import (
 	"time"
 
+	"github.com/go-chi/chi/v5"
 	"golang.org/x/net/websocket"
 )
 
-// registerWSRoutes mounts the live log stream endpoint.
-func (s *Server) registerWSRoutes() {
-	s.Router.Handle("/api/logs/ws", websocket.Handler(s.streamLogs))
+// registerWSRoutes mounts the live log stream endpoint on the given router.
+func (s *Server) registerWSRoutes(r chi.Router) {
+	r.Handle("/logs/ws", websocket.Handler(s.streamLogs))
 }
 
 // streamLogs pushes every buffered line, then follows the ring buffer for new

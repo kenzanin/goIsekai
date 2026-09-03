@@ -30,6 +30,9 @@ type Config struct {
 	Host string
 	Port int
 
+	// APIKey is the optional bearer key for /api/* endpoints.
+	APIKey string
+
 	// [network] — default headers injected into plugin HTTP requests.
 	UserAgent      string
 	AcceptLanguage string
@@ -61,6 +64,7 @@ func Default() *Config {
 		CDPEngine:       "off",
 		CDPPath:         "",
 		CDPSolveTimeout: 30,
+		APIKey:          "",
 	}
 	c.CacheDir = filepath.Join(c.DataDir, "cache")
 	return c
@@ -119,6 +123,7 @@ func (c *Config) Save(path string) error {
 	fmt.Fprintf(&b, "cache_dir = %s\n", c.CacheDir)
 	fmt.Fprintf(&b, "host = %s\n", c.Host)
 	fmt.Fprintf(&b, "port = %d\n", c.Port)
+	fmt.Fprintf(&b, "api_key = %s\n", c.APIKey)
 	fmt.Fprintf(&b, "\n[network]\n")
 	fmt.Fprintf(&b, "user_agent = %s\n", c.UserAgent)
 	fmt.Fprintf(&b, "accept_language = %s\n", c.AcceptLanguage)
@@ -160,6 +165,8 @@ func (c *Config) set(section, key, val string) {
 			c.CacheDir = val
 		case "host":
 			c.Host = val
+		case "api_key":
+			c.APIKey = val
 		case "port":
 			if n, err := strconv.Atoi(val); err == nil {
 				c.Port = n
