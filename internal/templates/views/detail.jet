@@ -15,6 +15,7 @@
     <div class="md:col-span-3">
         <h1 class="text-2xl font-semibold mb-2">{{.Manga.Title}}</h1>
         <div class="flex flex-wrap gap-2 mb-3">
+            <span class="text-xs px-2 py-0.5 rounded-full bg-neutral-800 text-neutral-500">{{.PluginID}}</span>
             {{if .Manga.Status != ""}}
             <span class="text-xs px-2 py-0.5 rounded-full bg-neutral-700/50 text-neutral-400">{{.Manga.Status}}</span>
             {{end}}

@@ -173,6 +173,20 @@ func firstTitle(attrs mangaAttrs) string {
 	return ""
 }
 
+// firstLang returns the first non-empty value from a localized string map,
+// preferring English, mirroring firstTitle.
+func firstLang(m map[string]string) string {
+	if v, ok := m[lang]; ok && v != "" {
+		return v
+	}
+	for _, v := range m {
+		if v != "" {
+			return v
+		}
+	}
+	return ""
+}
+
 func coverURL(md mangaData) string {
 	for _, r := range md.Relationships {
 		if r.Type == "cover_art" && r.Attributes != nil {
@@ -183,10 +197,19 @@ func coverURL(md mangaData) string {
 }
 
 func toManga(md mangaData) types.Manga {
+	tags := make([]string, 0, len(md.Attributes.Tags))
+	for _, t := range md.Attributes.Tags {
+		if n := firstLang(t.Attributes.Name); n != "" {
+			tags = append(tags, n)
+		}
+	}
 	return types.Manga{
-		ID:       md.ID,
-		Title:    firstTitle(md.Attributes),
-		CoverURL: coverURL(md),
+		ID:          md.ID,
+		Title:       firstTitle(md.Attributes),
+		CoverURL:    coverURL(md),
+		Description: firstLang(md.Attributes.Description),
+		Status:      md.Attributes.Status,
+		Genres:      tags,
 	}
 }
 
