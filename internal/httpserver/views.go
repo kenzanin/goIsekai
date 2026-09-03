@@ -118,13 +118,25 @@ func (s *Server) viewSearch(w http.ResponseWriter, r *http.Request) {
 	if pageSize <= 0 {
 		pageSize = 24
 	}
+	// Host-side pagination: plugins return ALL matching results (the search
+	// contract per plugin metadata search_page_size); slice out the requested
+	// page here so the template never renders more than one page.
+	total := len(results)
+	start := (page - 1) * pageSize
+	if start > total {
+		start = total
+	}
+	end := start + pageSize
+	if end > total {
+		end = total
+	}
 	s.renderPage(w, "views/search.jet", "search", map[string]any{
 		"Plugins":    plugins,
 		"Q":          q,
 		"PluginID":   pluginID,
-		"Results":    results,
+		"Results":    results[start:end],
 		"Page":       page,
-		"HasNext":    len(results) == pageSize,
+		"HasNext":    end < total,
 		"ThumbRatio": s.service.PluginMeta(pluginID).ThumbRatio,
 		"Challenge":  challenge,
 	})
