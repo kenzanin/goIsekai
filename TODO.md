@@ -18,6 +18,8 @@ All user-facing logic lives here — handlers, views, actions, API, sandbox, rea
 
 **Approach:** httptest.NewServer + chi router, mock bridge service interface, table-driven tests per handler.
 
+**OpenSpec:** `httpserver-test-coverage` — planning complete, ready for `/opsx-apply`
+
 ---
 
 ### 2. Config File Persistence
@@ -28,6 +30,8 @@ Settings (CDP engine, API key, port, host, log level, user-agent, referer) are C
 - CLI flags override file values (flag > file > default)
 - Settings page "Save" writes config file
 - Hot-reload for safe subset (log level, user-agent) without restart
+
+**OpenSpec:** `config-file-persistence` — planning complete, ready for `/opsx-apply`
 
 ---
 
@@ -41,6 +45,8 @@ Reader.js (~360 lines vanilla JS) has no try-catch on critical paths. If `/api/r
 - Error toast / overlay on reader canvas (network error, parse error, plugin error)
 - Consistent error display across HTMX views (htmx:responseError event handler)
 
+**OpenSpec:** `frontend-error-boundary` — planning complete, ready for `/opsx-apply`
+
 ---
 
 ### 4. Plugin Error Reporting in UI
@@ -51,6 +57,8 @@ Plugin failure → host logs error → user sees "No chapters yet" or empty page
 - Retry button on transient errors (network timeout, 502)
 - Consistent ChallengeError handling across all views (some handle it, some don't)
 - Plugin health indicator on plugins page (last successful call, error count)
+
+**OpenSpec:** `plugin-error-reporting` — planning complete, ready for `/opsx-apply`
 
 ---
 
@@ -64,6 +72,8 @@ Plugin failure → host logs error → user sees "No chapters yet" or empty page
 - Retry original request with new cookies
 - Configurable: auto-fallback vs manual-only
 
+**OpenSpec:** `cdp-fallback-chain` — planning complete, ready for `/opsx-apply`
+
 ---
 
 ### 6. Graceful Shutdown
@@ -74,6 +84,8 @@ Server is killed via `pkill`. No signal handler for SIGTERM/SIGINT to drain in-f
 - `http.Server.Shutdown(ctx)` with timeout
 - DB close, plugin manager close, log flush
 - PID file for clean stop (`goisekai stop`)
+
+**OpenSpec:** `graceful-shutdown` — planning complete, ready for `/opsx-apply`
 
 ---
 
@@ -86,6 +98,8 @@ No request logging middleware. Cannot diagnose slow requests, error rates, or tr
 - Skip health-check and static asset noise
 - Optional request ID for tracing
 
+**OpenSpec:** `http-access-logging` — planning complete, ready for `/opsx-apply`
+
 ---
 
 ### 8. Unified Plugin Build
@@ -97,12 +111,16 @@ No request logging middleware. Cannot diagnose slow requests, error rates, or tr
 - Optional: `make install-plugins` copies to app_data/plugins/
 - CI-friendly: exit non-zero on any plugin build failure
 
+**OpenSpec:** `unified-plugin-build` — planning complete, ready for `/opsx-apply`
+
 ---
 
 ## 🟢 Low Priority
 
 ### 9. Reader Keyboard Shortcuts
 Reader has no keyboard navigation. Arrow keys for prev/next page, space for next page, escape to go back to detail — standard manga reader UX.
+
+**OpenSpec:** `reader-keyboard-shortcuts` — planning complete, ready for `/opsx-apply`
 
 ---
 
@@ -113,10 +131,6 @@ Binary + embedded assets + 4 WASM plugins = large. No compression or lazy-load f
 - `go:embed` with gzip for WASM files (decompress on load)
 - Or: lazy-load WASM on first plugin call instead of startup
 - Binary size audit (strip debug symbols, UPX)
-
-**OpenSpec:** `lazy-load-plugins` — scan-only boot + load-on-first-call (planning complete, ready for `/opsx-apply`)
-
-**OpenSpec:** `lazy-load-plugins` — scan-only boot + load-on-first-call (planning complete, ready for `/opsx-apply`)
 
 **OpenSpec:** `lazy-load-plugins` — scan-only boot + load-on-first-call (planning complete, ready for `/opsx-apply`)
 
