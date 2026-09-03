@@ -114,6 +114,12 @@ Binary + embedded assets + 4 WASM plugins = large. No compression or lazy-load f
 - Or: lazy-load WASM on first plugin call instead of startup
 - Binary size audit (strip debug symbols, UPX)
 
+**OpenSpec:** `lazy-load-plugins` — scan-only boot + load-on-first-call (planning complete, ready for `/opsx-apply`)
+
+**OpenSpec:** `lazy-load-plugins` — scan-only boot + load-on-first-call (planning complete, ready for `/opsx-apply`)
+
+**OpenSpec:** `lazy-load-plugins` — scan-only boot + load-on-first-call (planning complete, ready for `/opsx-apply`)
+
 ---
 
 ## Deferred to v1.0
