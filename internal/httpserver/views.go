@@ -205,9 +205,9 @@ func computeContinue(chapters []types.Chapter, progress map[string]database.Chap
 			}
 			continue // fully read
 		}
-		if firstUnread == nil {
-			firstUnread = &ContinuePoint{ChapterID: c.ID, ChapterN: c.ChapterNum, Page: 1}
-		}
+		// Chapters arrive newest-first; keep the LAST unread seen so the
+		// fallback start point is the numerically lowest chapter.
+		firstUnread = &ContinuePoint{ChapterID: c.ID, ChapterN: c.ChapterNum, Page: 1}
 	}
 	return firstUnread
 }
