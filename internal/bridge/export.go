@@ -3,12 +3,14 @@ package bridge
 import (
 	"archive/zip"
 	"bytes"
+	"encoding/csv"
 	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
 
 	"goisekai/internal/logger"
+	"goisekai/pkg/types"
 )
 
 // imageExt sniffs an image's magic bytes and returns a filename extension.
@@ -41,11 +43,157 @@ func (s *AppService) exportDir() string {
 	return filepath.Join(s.cacheDir, "exports")
 }
 
+// completeCSVName is the marker file written into a chapter's cache dir once
+// every page is cached on disk, enabling a fully-offline CBZ export.
+const completeCSVName = "complete.csv"
+
+// chapterCacheDir returns the on-disk cache directory for a chapter's pages.
+func (s *AppService) chapterCacheDir(pluginID, mangaID, chapterID string) string {
+	return filepath.Join(s.cacheDir, "images", pluginID, mangaID, chapterID)
+}
+
+// writeCompleteCSV records a chapter's ordered page URLs so an offline export
+// can rebuild the CBZ from the disk cache alone (no plugin/network call).
+func (s *AppService) writeCompleteCSV(pluginID, mangaID, chapterID string, pages []types.Page) error {
+	dir := s.chapterCacheDir(pluginID, mangaID, chapterID)
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		return err
+	}
+	f, err := os.Create(filepath.Join(dir, completeCSVName))
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+	w := csv.NewWriter(f)
+	for _, p := range pages {
+		_ = w.Write([]string{p.URL})
+	}
+	w.Flush()
+	return w.Error()
+}
+
+// readCompleteCSV returns the ordered page URLs recorded in complete.csv, or
+// nil when the marker is absent or unreadable.
+func (s *AppService) readCompleteCSV(pluginID, mangaID, chapterID string) []string {
+	f, err := os.Open(filepath.Join(s.chapterCacheDir(pluginID, mangaID, chapterID), completeCSVName))
+	if err != nil {
+		return nil
+	}
+	defer f.Close()
+	recs, err := csv.NewReader(f).ReadAll()
+	if err != nil {
+		return nil
+	}
+	urls := make([]string, 0, len(recs))
+	for _, r := range recs {
+		if len(r) > 0 && r[0] != "" {
+			urls = append(urls, r[0])
+		}
+	}
+	return urls
+}
+
+// readCachedImage reads a page's bytes from the L2 disk cache only — it never
+// touches the network. ok is false when the page is not cached on disk.
+func (s *AppService) readCachedImage(pluginID, mangaID, chapterID, url string) ([]byte, bool) {
+	base := s.diskCachePath(pluginID, mangaID, chapterID, url)
+	if base == "" {
+		return nil, false
+	}
+	for _, ext := range []string{".webp", ".img"} {
+		if data, err := os.ReadFile(base + ext); err == nil && validateImageFast(data) {
+			return data, true
+		}
+	}
+	return nil, false
+}
+
+// zipImages writes ordered image byte slices into a .cbz at path. Entries are
+// zero-padded to 4 digits so lexicographic order == reading order.
+func zipImages(path string, images [][]byte) (int, error) {
+	out, err := os.Create(path)
+	if err != nil {
+		return 0, err
+	}
+	zw := zip.NewWriter(out)
+	n := 0
+	for i, data := range images {
+		entry := fmt.Sprintf("%04d%s", i+1, imageExt(data))
+		w, werr := zw.Create(entry)
+		if werr != nil {
+			_ = zw.Close()
+			_ = out.Close()
+			return 0, fmt.Errorf("zip entry %s: %w", entry, werr)
+		}
+		if _, werr = w.Write(data); werr != nil {
+			_ = zw.Close()
+			_ = out.Close()
+			return 0, fmt.Errorf("write %s: %w", entry, werr)
+		}
+		n++
+	}
+	if err := zw.Close(); err != nil {
+		_ = out.Close()
+		return 0, err
+	}
+	if err := out.Close(); err != nil {
+		return 0, err
+	}
+	return n, nil
+}
+
+// MarkChapterComplete writes complete.csv when a chapter is fully cached. It
+// is best-effort: called once the last page has been read (all pages fetched).
+func (s *AppService) MarkChapterComplete(pluginID, mangaID, chapterID string) error {
+	pages, err := s.GetPageList(pluginID, chapterID)
+	if err != nil {
+		return err
+	}
+	if len(pages) == 0 {
+		return nil
+	}
+	if s.countCachedPages(pluginID, mangaID, chapterID) < len(pages) {
+		return nil // not fully cached yet
+	}
+	return s.writeCompleteCSV(pluginID, mangaID, chapterID, pages)
+}
+
 // ExportCBZ builds a .cbz archive of one chapter's pages in reading order and
-// returns the path to the written file. Images come from the cache first
-// (GetImage), so an already-read chapter exports with no network traffic; any
-// missing page is fetched and cached on the way.
+// returns the path to the written file. It prefers an offline path — when
+// complete.csv exists and every page is still on disk, no plugin/network call
+// is made. Otherwise it fetches (cache-first) via the plugin and records
+// complete.csv for future offline exports.
 func (s *AppService) ExportCBZ(pluginID, mangaID, chapterID, title string) (string, error) {
+	dir := filepath.Join(s.exportDir(), pluginID, mangaID)
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		return "", fmt.Errorf("bridge: export cbz: mkdir: %w", err)
+	}
+	name := sanitizeFilename(title) + ".cbz"
+	path := filepath.Join(dir, name)
+
+	// Offline path: complete.csv + disk cache, no plugin/network needed.
+	if urls := s.readCompleteCSV(pluginID, mangaID, chapterID); len(urls) > 0 {
+		images := make([][]byte, 0, len(urls))
+		all := true
+		for _, u := range urls {
+			data, ok := s.readCachedImage(pluginID, mangaID, chapterID, u)
+			if !ok {
+				all = false
+				break
+			}
+			images = append(images, data)
+		}
+		if all {
+			n, err := zipImages(path, images)
+			if err != nil {
+				return "", fmt.Errorf("bridge: export cbz (offline): %w", err)
+			}
+			logger.Info("exported cbz (offline)", "path", path, "pages", n)
+			return path, nil
+		}
+		// Cache incomplete — fall through to the online path.
+	}
+
 	pages, err := s.GetPageList(pluginID, chapterID)
 	if err != nil {
 		return "", err
@@ -54,53 +202,29 @@ func (s *AppService) ExportCBZ(pluginID, mangaID, chapterID, title string) (stri
 		return "", fmt.Errorf("bridge: export cbz: no pages for chapter %s", chapterID)
 	}
 
-	dir := filepath.Join(s.exportDir(), pluginID, mangaID)
-	if err := os.MkdirAll(dir, 0o755); err != nil {
-		return "", fmt.Errorf("bridge: export cbz: mkdir: %w", err)
-	}
-	name := sanitizeFilename(title) + ".cbz"
-	path := filepath.Join(dir, name)
-
-	out, err := os.Create(path)
-	if err != nil {
-		return "", fmt.Errorf("bridge: export cbz: create: %w", err)
-	}
-	zw := zip.NewWriter(out)
-
+	images := make([][]byte, 0, len(pages))
 	failed := 0
-	for i, p := range pages {
+	for _, p := range pages {
 		data, imgErr := s.GetImage(pluginID, p.URL, p.Headers, mangaID, chapterID)
 		if imgErr != nil {
-			logger.Warn("export cbz: skip page", "page", i+1, "error", imgErr)
+			logger.Warn("export cbz: skip page", "error", imgErr)
 			failed++
 			continue
 		}
-		// Zero-padded to 4 digits so lexicographic order == reading order.
-		entry := fmt.Sprintf("%04d%s", i+1, imageExt(data))
-		w, werr := zw.Create(entry)
-		if werr != nil {
-			_ = zw.Close()
-			_ = out.Close()
-			return "", fmt.Errorf("bridge: export cbz: zip entry %s: %w", entry, werr)
-		}
-		if _, werr = w.Write(data); werr != nil {
-			_ = zw.Close()
-			_ = out.Close()
-			return "", fmt.Errorf("bridge: export cbz: write %s: %w", entry, werr)
-		}
+		images = append(images, data)
 	}
-	if err := zw.Close(); err != nil {
-		_ = out.Close()
-		return "", fmt.Errorf("bridge: export cbz: close zip: %w", err)
-	}
-	if err := out.Close(); err != nil {
-		return "", fmt.Errorf("bridge: export cbz: close file: %w", err)
-	}
-	if failed == len(pages) {
-		_ = os.Remove(path)
+	if len(images) == 0 {
 		return "", fmt.Errorf("bridge: export cbz: all %d pages failed", failed)
 	}
-	logger.Info("exported cbz", "path", path, "pages", len(pages), "skipped", failed)
+	if _, err := zipImages(path, images); err != nil {
+		return "", fmt.Errorf("bridge: export cbz: %w", err)
+	}
+	if failed == 0 {
+		if werr := s.writeCompleteCSV(pluginID, mangaID, chapterID, pages); werr != nil {
+			logger.Warn("export cbz: write complete.csv", "error", werr)
+		}
+	}
+	logger.Info("exported cbz", "path", path, "pages", len(images), "skipped", failed)
 	return path, nil
 }
 

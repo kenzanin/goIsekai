@@ -80,6 +80,19 @@ func (d *DB) SetChapterTotalPages(chapterID string, total int) error {
 	return err
 }
 
+// GetChapterTotalPages returns a chapter's recorded page count (0 when absent).
+func (d *DB) GetChapterTotalPages(chapterID string) (int, error) {
+	var out []struct{ TotalPages int64 }
+	err := SELECT(Chapters.TotalPages.AS("total_pages")).
+		FROM(Chapters).
+		WHERE(Chapters.ID.EQ(String(chapterID))).
+		Query(d.db, &out)
+	if err != nil || len(out) == 0 {
+		return 0, err
+	}
+	return int(out[0].TotalPages), nil
+}
+
 // MarkChapterRead marks a single chapter as read without touching its page.
 func (d *DB) MarkChapterRead(chapterRowID string) error {
 	_, err := Chapters.UPDATE().

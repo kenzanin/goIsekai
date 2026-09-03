@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 
 	"goisekai/internal/database"
+	"goisekai/internal/logger"
 )
 
 // countCachedPages returns the number of page-image files already on disk for
@@ -25,7 +26,7 @@ func (s *AppService) countCachedPages(pluginID, mangaID, chapterID string) int {
 	}
 	n := 0
 	for _, e := range entries {
-		if !e.IsDir() {
+		if !e.IsDir() && e.Name() != completeCSVName {
 			n++
 		}
 	}
@@ -46,6 +47,15 @@ func (s *AppService) RecordRead(pluginID, mangaID, chapterID string, pageNum int
 func (s *AppService) SetChapterProgress(pluginID, mangaID, chapterID string, lastPage int) error {
 	if err := s.db.SetChapterProgress(chapterRowID(pluginID, mangaID, chapterID), lastPage); err != nil {
 		return fmt.Errorf("bridge: set chapter progress: %w", err)
+	}
+	// Reaching the final page means the whole chapter is cached — write
+	// complete.csv so a later CBZ export can run fully offline. Best-effort.
+	if total, err := s.db.GetChapterTotalPages(chapterRowID(pluginID, mangaID, chapterID)); err == nil && total > 0 && lastPage >= total {
+		go func() {
+			if err := s.MarkChapterComplete(pluginID, mangaID, chapterID); err != nil {
+				logger.Warn("mark chapter complete", "error", err, "chapter", chapterID)
+			}
+		}()
 	}
 	return nil
 }
