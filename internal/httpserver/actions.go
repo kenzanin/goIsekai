@@ -4,6 +4,7 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"path/filepath"
 	"strconv"
 
 	"goisekai/internal/config"
@@ -27,6 +28,9 @@ func (s *Server) registerActionRoutes() {
 	s.Router.Post("/action/clear-logs", s.handleClearLogs)
 	s.Router.Post("/action/save-settings", s.handleSaveSettings)
 	s.Router.Post("/action/save-verify/{pluginID}", s.handleSaveVerify)
+	s.Router.Post("/action/export-cbz/{pluginID}/{mangaID}/{chapterID}", s.handleExportCBZ)
+	s.Router.Post("/action/clear-cache/{pluginID}/{mangaID}", s.handleClearMangaCache)
+	s.Router.Post("/action/clear-cache-all", s.handleClearAllCache)
 }
 
 // hxRedirect answers a successful action with a 303 See Other redirect —
@@ -289,4 +293,52 @@ func (s *Server) handleClearLogs(w http.ResponseWriter, _ *http.Request) {
 	s.service.ClearLogs()
 	w.Header().Set("Location", "/view/logs")
 	w.WriteHeader(303)
+}
+
+// handleExportCBZ builds a .cbz archive for one chapter and serves it as a
+// file download. The title for the filename is taken from the form.
+func (s *Server) handleExportCBZ(w http.ResponseWriter, r *http.Request) {
+	pluginID := param(r, "pluginID")
+	mangaID := param(r, "mangaID")
+	chapterID := param(r, "chapterID")
+	if err := r.ParseForm(); err != nil {
+		s.logger.Error("export cbz: parse form", "error", err)
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	title := r.FormValue("title")
+	if title == "" {
+		title = chapterID
+	}
+	path, err := s.service.ExportCBZ(pluginID, mangaID, chapterID, title)
+	if err != nil {
+		s.logger.Error("export cbz", "pluginID", pluginID, "mangaID", mangaID, "chapterID", chapterID, "error", err)
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	w.Header().Set("Content-Disposition", "attachment; filename=\""+filepath.Base(path)+"\"")
+	w.Header().Set("Content-Type", "application/vnd.comicbook+zip")
+	http.ServeFile(w, r, path)
+}
+
+// handleClearMangaCache removes every cached image for one manga.
+func (s *Server) handleClearMangaCache(w http.ResponseWriter, r *http.Request) {
+	pluginID := param(r, "pluginID")
+	mangaID := param(r, "mangaID")
+	if err := s.service.ClearMangaCache(pluginID, mangaID); err != nil {
+		s.logger.Error("clear manga cache", "pluginID", pluginID, "mangaID", mangaID, "error", err)
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	s.hxRedirect(w, "/view/manga/"+pluginID+"/"+mangaID)
+}
+
+// handleClearAllCache removes the entire image cache directory.
+func (s *Server) handleClearAllCache(w http.ResponseWriter, _ *http.Request) {
+	if err := s.service.ClearAllCache(); err != nil {
+		s.logger.Error("clear all cache", "error", err)
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	s.hxRedirect(w, "/view/settings")
 }

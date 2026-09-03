@@ -279,9 +279,11 @@ func (s *Server) viewSettings(w http.ResponseWriter, _ *http.Request) {
 	if err != nil {
 		s.logger.Error("config load", "error", err, "path", path)
 	}
+	cacheBytes, _ := s.service.CacheSize()
 	s.renderPage(w, "views/settings.jet", "settings", map[string]any{
-		"Config": cfg,
-		"Path":   path,
+		"Config":     cfg,
+		"Path":       path,
+		"CacheBytes": cacheBytes,
 	})
 }
 

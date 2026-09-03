@@ -59,6 +59,7 @@ func New(devMode bool) (*Engine, error) {
 	set.AddGlobal("add", add)
 	set.AddGlobal("ratioAt", ratioAt)
 	set.AddGlobal("statAt", statAt)
+	set.AddGlobal("formatBytes", formatBytes)
 
 	return &Engine{Set: set}, nil
 }
@@ -166,4 +167,18 @@ func getInitials(title string) string {
 // {{range $i, $x := .Items}}{{add $i 1}}{{end}}.
 func add(a, b int) int {
 	return a + b
+}
+
+// formatBytes renders a byte count in human-readable units (B, KB, MB, GB).
+func formatBytes(n int64) string {
+	const unit = 1024
+	if n < unit {
+		return strconv.FormatInt(n, 10) + " B"
+	}
+	div, exp := int64(unit), 0
+	for m := n / unit; m >= unit && exp < 3; m /= unit {
+		div *= unit
+		exp++
+	}
+	return strconv.FormatFloat(float64(n)/float64(div), 'f', 1, 64) + " " + string("KMG"[exp]) + "B"
 }

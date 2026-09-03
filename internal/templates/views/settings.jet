@@ -46,6 +46,14 @@
     </div>
     <button type="submit" class="bg-indigo-600 hover:bg-indigo-500 text-white rounded-md px-4 py-2 text-sm font-medium">Save</button>
 </form>
+
+<div class="max-w-xl mt-10 p-4 border border-neutral-800 rounded-lg">
+    <h2 class="text-sm font-semibold mb-1">Image Cache</h2>
+    <p class="text-xs text-neutral-400 mb-3">Cached images: {{formatBytes(.CacheBytes)}}</p>
+    <form method="post" action="/action/clear-cache-all" onsubmit="return confirm('Delete ALL cached images?');">
+        <button type="submit" class="bg-neutral-700 hover:bg-red-600 text-white rounded-md px-4 py-2 text-sm font-medium">🗑 Clear all cached images</button>
+    </form>
+</div>
 <script>
 (function () {
   var ra = document.getElementById('read_ahead');

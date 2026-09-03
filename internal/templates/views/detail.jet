@@ -54,6 +54,9 @@
 <form method="post" action="/action/reset-progress-all/{{.PluginID}}/{{.MangaID}}" class="mb-4">
     <button type="submit" title="Clear read progress for every chapter" class="bg-neutral-700 hover:bg-neutral-600 text-white rounded-md px-3 py-1.5 text-sm font-medium">↺ Reset all read status</button>
 </form>
+<form method="post" action="/action/clear-cache/{{.PluginID}}/{{.MangaID}}" class="mb-4" onsubmit="return confirm('Clear cached images for this manga?');">
+    <button type="submit" title="Delete cached image files for this manga" class="bg-neutral-700 hover:bg-red-600 text-white rounded-md px-3 py-1.5 text-sm font-medium">🗑 Clear cached images</button>
+</form>
 {{ firstID := "" }}
 <div class="divide-y divide-neutral-800">
     {{range i, c := .Chapters }}
@@ -83,6 +86,10 @@
         </form>
         <form method="post" action="/action/mark-read-range/{{.PluginID}}/{{.MangaID}}/{{firstID}}/{{c.ID}}">
             <button type="submit" title="Mark everything up to and including this chapter as read" class="text-xs text-neutral-500 hover:text-neutral-300 whitespace-nowrap">↑ mark up to here</button>
+        </form>
+        <form method="post" action="/action/export-cbz/{{.PluginID}}/{{.MangaID}}/{{c.ID}}">
+            <input type="hidden" name="title" value="{{.Manga.Title}} - Ch. {{formatChapterNum(c.ChapterNum)}}">
+            <button type="submit" title="Download this chapter as .cbz" class="text-xs text-sky-400 hover:text-sky-300 whitespace-nowrap">⬇ cbz</button>
         </form>
     </div>
     {{end}}
