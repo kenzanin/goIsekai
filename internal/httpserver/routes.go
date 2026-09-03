@@ -33,7 +33,7 @@ func (s *Server) registerStaticRoutes() {
 		s.logger.Error("static assets unavailable", "error", err)
 		return
 	}
-	fileServer := http.FileServer(http.FS(staticFS))
+	fileServer := brHandler(http.FS(staticFS))
 	s.Router.Handle("/static/*", http.StripPrefix("/static/", fileServer))
 }
 

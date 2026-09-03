@@ -3,11 +3,18 @@
 BINARY := goisekai
 PKGS   := ./internal/... ./pkg/... ./cmd/...
 
-.PHONY: build dev devrun run open check fmt fmt-web test race modernize lint lint-web clean
+.PHONY: build dev devrun run open check fmt fmt-web test race modernize lint lint-web br clean
 
 ## build: compile the server binary (pure Go, CGO-free, cross-compilable).
-build:
+build: br
 	CGO_ENABLED=0 go build -o $(BINARY) ./cmd/goisekai
+
+## br: pre-compress frontend JS/CSS to .br (brotli) for embedded serving.
+## Requires the `brotli` CLI. Run automatically before every build.
+br:
+	@for f in cmd/goisekai/frontend/lib/*.js cmd/goisekai/frontend/lib/*.css; do \
+		brotli -f -q 11 "$$f" -o "$$f.br"; \
+	done
 
 ## dev: build at debug log level default (nothing special needed anymore).
 dev: build
