@@ -253,6 +253,7 @@
     current = i;
     showError(false);
     updateCounter();
+    updateProgressLine();
     reportProgress();
     prefetch();
     var url = imageUrl(pages[i]);
