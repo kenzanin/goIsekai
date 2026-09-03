@@ -204,19 +204,21 @@ function getChapterList(arg) {
                 else if (combined[j] === "]") depth--;
                 if (depth === 0) { arrEnd = j + 1; break; }
             }
-            try {
-                var arr = JSON.parse(combined.substring(arrStart, arrEnd));
-                for (var k = 0; k < arr.length; k++) {
-                    var ch = arr[k];
-                    chapters.push({
-                        id: slug + ":chapter-" + ch.chapterNumber,
-                        manga_id: slug,
-                        title: ch.chapterTitle || "Chapter " + ch.chapterNumber,
-                        chapter_num: ch.chapterNumber,
-                        released_at: ch.releaseDate || undefined,
-                        url: "/en/" + slug + "-en-chapter-" + ch.chapterNumber,
-                    });
-                }
+                try {
+                    var arr = JSON.parse(combined.substring(arrStart, arrEnd));
+                    for (var k = 0; k < arr.length; k++) {
+                        var ch = arr[k];
+                        chapters.push({
+                            id: slug + ":chapter-" + ch.chapterNumber,
+                            manga_id: slug,
+                            title: ch.chapterTitle || "Chapter " + ch.chapterNumber,
+                            chapter_num: ch.chapterNumber,
+                            released_at: ch.releaseDate || undefined,
+                            url: "/en/" + slug + "-en-chapter-" + ch.chapterNumber,
+                        });
+                    }
+                    // ABI convention: newest chapter first (site order is ascending).
+                    chapters.sort(function (a, b) { return b.chapter_num - a.chapter_num; });
             } catch (e) {
                 log.error("mangzio chapters: parse error: " + e);
             }

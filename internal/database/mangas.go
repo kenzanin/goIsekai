@@ -60,7 +60,7 @@ func (d *DB) IsInLibrary(mangaID string) (bool, error) {
 	var rows []struct {
 		InLibrary int
 	}
-	err := Mangas.SELECT(Mangas.InLibrary).
+	err := Mangas.SELECT(Mangas.InLibrary.AS("in_library")).
 		WHERE(Mangas.ID.EQ(String(mangaID))).
 		Query(d.db, &rows)
 	if len(rows) == 0 {
