@@ -115,6 +115,15 @@ func (s *Server) readerData(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	prev, next := chapterNeighbors(chapters, chapterID)
+	var chapterNum float64
+	var chapterTitle string
+	for _, c := range chapters {
+		if c.ID == chapterID {
+			chapterNum = c.ChapterNum
+			chapterTitle = c.Title
+			break
+		}
+	}
 	w.Header().Set("Content-Type", "application/json")
 	_ = json.NewEncoder(w).Encode(map[string]any{
 		"pages":         pages,
@@ -123,5 +132,7 @@ func (s *Server) readerData(w http.ResponseWriter, r *http.Request) {
 		"chapterID":     chapterID,
 		"prevChapterID": prev,
 		"nextChapterID": next,
+		"chapterNum":    chapterNum,
+		"chapterTitle":  chapterTitle,
 	})
 }
