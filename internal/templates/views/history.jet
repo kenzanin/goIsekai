@@ -20,12 +20,12 @@
         <div class="flex-1 min-w-0">
           <div class="flex items-center justify-between">
             <div class="text-sm font-medium truncate">{{h.Title}}</div>
-            <div class="text-xs text-neutral-500 shrink-0 hidden sm:block" data-ts="{{h.LastReadAt.Format \"2006-01-02T15:04:05\"}}" title="{{formatDate(h.LastReadAt.Format \"2006-01-02T15:04:05\")}}">{{formatDate(h.LastReadAt.Format \"2006-01-02T15:04:05\")}}</div>
+            <div class="text-xs text-neutral-500 shrink-0 hidden sm:block" data-ts="{{h.LastReadAt.Format(`2006-01-02T15:04:05`)}}" title="{{formatDate(h.LastReadAt.Format(`2006-01-02T15:04:05`))}}">{{formatDate(h.LastReadAt.Format(`2006-01-02T15:04:05`))}}</div>
           </div>
           <div class="flex items-center gap-2 mt-1">
             <span class="text-xs text-neutral-400">{{h.ReadChapters}}/{{h.TotalChapters}} chapters</span>
             <span class="text-xs px-1.5 py-0.5 rounded bg-neutral-800 text-neutral-500">{{h.PluginName}}</span>
-            <div class="text-xs text-neutral-500 sm:hidden" data-ts="{{h.LastReadAt.Format \"2006-01-02T15:04:05\"}}" title="{{formatDate(h.LastReadAt.Format \"2006-01-02T15:04:05\")}}">{{formatDate(h.LastReadAt.Format \"2006-01-02T15:04:05\")}}</div>
+            <div class="text-xs text-neutral-500 sm:hidden" data-ts="{{h.LastReadAt.Format(`2006-01-02T15:04:05`)}}" title="{{formatDate(h.LastReadAt.Format(`2006-01-02T15:04:05`))}}">{{formatDate(h.LastReadAt.Format(`2006-01-02T15:04:05`))}}</div>
           </div>
         </div>
     {{end}}
