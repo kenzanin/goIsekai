@@ -12,6 +12,7 @@ import (
 // the image proxy, and the API. Registration order does not matter (exact
 // patterns win over prefixes).
 func (s *Server) routes() {
+	s.Router.Use(s.loggingMiddleware)
 	s.registerStaticRoutes()
 	s.registerViewRoutes()
 	s.registerActionRoutes()
