@@ -4,7 +4,8 @@
 <div class="flex items-center justify-between mb-6">
     <h1 class="text-xl font-semibold">Plugins</h1>
     <form method="post" action="/action/install-plugin" enctype="multipart/form-data" class="flex items-center gap-2">
-        <input type="file" name="file" accept=".wasm" class="text-xs text-neutral-400 file:mr-2 file:bg-neutral-800 file:border-0 file:rounded-md file:px-3 file:py-1.5 file:text-sm file:text-neutral-200">
+        <label for="plugin-file" class="cursor-pointer border border-dashed border-neutral-700 rounded-md px-3 py-2 text-sm text-neutral-400 hover:border-indigo-500">Choose .wasm…</label>
+        <input type="file" id="plugin-file" name="file" accept=".wasm" class="sr-only">
         <button type="submit" class="bg-indigo-600 hover:bg-indigo-500 text-white rounded-md px-4 py-2 text-sm font-medium">Install</button>
     </form>
 </div>
@@ -14,7 +15,7 @@
 {{else}}
 <div class="space-y-3">
     {{range i, p := .Plugins }}
-    <div class="bg-neutral-900 rounded-lg p-4 flex items-center justify-between gap-4">
+    <div class="bg-neutral-900 rounded-lg p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div class="flex items-center gap-3 min-w-0">
             {{if p.IconURL != ""}}
             <img src="{{p.IconURL}}" alt="" class="h-10 w-10 rounded-md object-cover bg-neutral-800">
@@ -24,7 +25,7 @@
                 <div class="text-xs font-mono text-neutral-500 truncate">{{p.ID}}</div>
             </div>
         </div>
-        <div class="flex items-center gap-2 shrink-0">
+            <div class="flex items-center gap-2 shrink-0 flex-wrap">
             {{if p.Version != ""}}
             <span class="text-xs px-2 py-0.5 rounded-full bg-neutral-700/50 text-neutral-400">v{{p.Version}}</span>
             {{end}}
@@ -34,7 +35,7 @@
             <span class="text-xs px-2 py-0.5 rounded-full bg-neutral-700/50 text-neutral-400">Inactive</span>
             {{end}}
             <form method="post" action="/action/toggle-plugin/{{p.ID}}">
-                <button type="submit" class="border border-neutral-700 hover:bg-neutral-800 rounded-md px-3 py-1.5 text-sm">
+                <button type="submit" class="border border-neutral-700 text-neutral-400 hover:text-neutral-200 rounded-md px-3 py-1.5 text-sm">
                     {{if p.IsActive}}Deactivate{{else}}Activate{{end}}
                 </button>
             </form>
@@ -73,4 +74,13 @@
     {{end}}
 </div>
 {{end}}
+
+<script>
+document.querySelectorAll('input[type=file]').forEach(inp => {
+  inp.addEventListener('change', function() {
+    var label = this.previousElementSibling;
+    if (label) label.textContent = this.files[0] ? this.files[0].name : 'Choose .wasm…';
+  });
+});
+</script>
 {{ end }}

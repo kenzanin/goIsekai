@@ -5,12 +5,12 @@
     <h1 class="text-xl font-semibold">Logs <span class="text-xs font-normal text-neutral-500">last {{.Limit}} lines · ring buffer 2000</span></h1>
     <div class="flex items-center gap-2">
         <span id="log-paused" class="hidden text-xs px-2 py-1 rounded-md bg-amber-500/15 text-amber-400">Paused — selecting text</span>
-        <select id="log-filter" class="bg-neutral-800 border border-neutral-700 rounded-md px-2 py-1.5 text-xs">
+        <select id="log-filter" class="bg-neutral-900 border border-neutral-700 rounded-md px-2 py-1.5 text-xs">
             <option value="all"{{if .Filter == "all"}} selected{{end}}>All sources</option>
             <option value="app"{{if .Filter == "app"}} selected{{end}}>App only</option>
             <option value="plugins"{{if .Filter == "plugins"}} selected{{end}}>Plugins only</option>
         </select>
-        <select id="log-limit" class="bg-neutral-800 border border-neutral-700 rounded-md px-2 py-1.5 text-xs">
+        <select id="log-limit" class="bg-neutral-900 border border-neutral-700 rounded-md px-2 py-1.5 text-xs">
             {{range i, n := .Limits }}
             <option value="{{n}}"{{if n == .Limit}} selected{{end}}>{{n}} lines</option>
             {{end}}
@@ -47,6 +47,18 @@
         pausedBadge.classList.toggle('hidden', !selecting);
     });
 
+    function colorLogLines() {
+        view.querySelectorAll('pre').forEach(function(el) {
+            var t = el.textContent;
+            el.classList.remove('text-neutral-300', 'text-amber-400', 'text-red-400', 'text-neutral-500');
+            if (t.indexOf('WARN') !== -1) el.classList.add('text-amber-400');
+            else if (t.indexOf('ERROR') !== -1) el.classList.add('text-red-400');
+            else if (t.indexOf('DEBUG') !== -1) el.classList.add('text-neutral-500');
+            else el.classList.add('text-neutral-300');
+        });
+    }
+    colorLogLines();
+
     function refresh() {
         // Skip the swap while the user is selecting/copying — outerHTML replace
         // would destroy the selection and mid-copy pointer events.
@@ -58,7 +70,7 @@
             .then(function (html) {
                 var doc = new DOMParser().parseFromString(html, 'text/html');
                 var fresh = doc.getElementById('logview');
-                if (fresh) view.innerHTML = fresh.innerHTML;
+                if (fresh) { view.innerHTML = fresh.innerHTML; colorLogLines(); }
             })
             .catch(function () {});
     }
