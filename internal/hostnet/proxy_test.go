@@ -129,7 +129,7 @@ func TestSetVerifyCookiesSeedsJar(t *testing.T) {
 		t.Fatalf("SetVerifyCookies: %v", err)
 	}
 
-	for i := 0; i < 2; i++ {
+	for i := range 2 {
 		resp, err := p.Request("plugin-1", types.HTTPRequest{Method: "GET", URL: srv.URL + "/check"})
 		if err != nil {
 			t.Fatalf("Request %d failed: %v", i, err)

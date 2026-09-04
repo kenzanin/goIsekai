@@ -49,7 +49,7 @@ func TestZipImagesOrdering(t *testing.T) {
 	if err != nil {
 		t.Fatalf("open cbz: %v", err)
 	}
-	defer r.Close()
+	defer func() { _ = r.Close() }()
 	names := make([]string, 0, len(r.File))
 	for _, f := range r.File {
 		names = append(names, f.Name)

@@ -79,8 +79,8 @@ func (s *AppService) GetImage(pluginID, url string, headers map[string]string, m
 	// else (gif/webp passthrough, legacy entries) as <key>.img; try webp first.
 	if base := s.diskCachePath(pluginID, mangaID, chapterID, url); base != "" {
 		for _, ext := range []string{".webp", ".img"} {
-		if data, err := os.ReadFile(base + ext); err == nil {
-			if validateImageFast(data) {
+			if data, err := os.ReadFile(base + ext); err == nil {
+				if validateImageFast(data) {
 					s.imageMu.Lock()
 					s.imageCache[url] = data
 					s.imageMu.Unlock()
@@ -109,7 +109,7 @@ func (s *AppService) GetImage(pluginID, url string, headers map[string]string, m
 	var resp types.HTTPResponse
 	var err error
 	var body []byte
-	for attempt := 0; attempt < 3; attempt++ {
+	for attempt := range 3 {
 		if attempt > 0 {
 			time.Sleep(time.Duration(attempt*attempt) * 2500 * time.Millisecond)
 		}

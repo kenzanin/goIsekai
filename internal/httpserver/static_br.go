@@ -29,7 +29,7 @@ func brHandler(fsys http.FileSystem) http.Handler {
 			fileServer.ServeHTTP(w, r)
 			return
 		}
-		defer f.Close()
+		defer func() { _ = f.Close() }()
 		st, err := f.Stat()
 		if err != nil || st.IsDir() {
 			fileServer.ServeHTTP(w, r)
@@ -48,7 +48,7 @@ func brHandler(fsys http.FileSystem) http.Handler {
 // explicit br (with or without a q-value) both count; `br;q=0` is treated as
 // accepted — the extra complexity of honoring q=0 is not worth it here.
 func acceptsBrotli(r *http.Request) bool {
-	for _, enc := range strings.Split(r.Header.Get("Accept-Encoding"), ",") {
+	for enc := range strings.SplitSeq(r.Header.Get("Accept-Encoding"), ",") {
 		if strings.TrimSpace(strings.SplitN(enc, ";", 2)[0]) == "br" {
 			return true
 		}

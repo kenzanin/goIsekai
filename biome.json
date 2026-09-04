@@ -4,6 +4,7 @@
     "includes": [
       "cmd/goisekai/frontend/**",
       "!cmd/goisekai/frontend/lib/alpine.min.js",
+      "!cmd/goisekai/frontend/lib/htmx.min.js",
       "!cmd/goisekai/frontend/lib/tailwind.css",
       "!cmd/goisekai/frontend/lib/input.css"
     ]

@@ -5,8 +5,8 @@ import (
 	"image"
 	"image/color"
 	"image/jpeg"
-		"image/png"
-"net/http"
+	"image/png"
+	"net/http"
 	"net/http/httptest"
 	"os"
 	"path/filepath"
@@ -42,8 +42,8 @@ func serveImage(t *testing.T, contentType string, payload []byte) string {
 
 func TestImageCacheConvertsJPEGToWebP(t *testing.T) {
 	img := image.NewRGBA(image.Rect(0, 0, 64, 64))
-	for x := 0; x < 64; x++ {
-		for y := 0; y < 64; y++ {
+	for x := range 64 {
+		for y := range 64 {
 			img.Set(x, y, color.RGBA{uint8(x * 4), uint8(y * 4), 200, 255})
 		}
 	}

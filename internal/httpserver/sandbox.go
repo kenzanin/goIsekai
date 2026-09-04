@@ -46,7 +46,7 @@ func (s *Server) registerSandboxRoutes(r chi.Router) {
 
 	r.Route("/sandbox/cdp", func(r chi.Router) {
 		r.Get("/status", sb.handleCDPStatus)
-			r.Get("/test", sb.handleCDPTest)
+		r.Get("/test", sb.handleCDPTest)
 		r.Get("/cookies", sb.handleCDPCookies)
 	})
 }
@@ -150,7 +150,6 @@ func (s *Sandbox) handlePages(w http.ResponseWriter, r *http.Request) {
 }
 
 // --- helpers ---
-
 
 // --- CDP playground ---
 

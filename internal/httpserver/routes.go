@@ -50,7 +50,6 @@ func (s *Server) registerViewRoutes() {
 	s.Router.Get("/view/history", s.viewHistory)
 }
 
-
 // renderPage renders a view template with the `active` nav var set. Every
 // view extends /layouts/base.jet, so this is always a full page.
 func (s *Server) renderPage(w http.ResponseWriter, name, active string, data any) {

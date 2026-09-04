@@ -86,7 +86,7 @@ func formatRecord(r slog.Record) string {
 		b.WriteByte(' ')
 		b.WriteString(a.Key)
 		b.WriteByte('=')
-		b.WriteString(fmt.Sprint(a.Value.Any()))
+		fmt.Fprint(&b, a.Value.Any())
 		return true
 	})
 	return b.String()

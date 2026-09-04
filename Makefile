@@ -49,7 +49,7 @@ test:
 	CGO_ENABLED=0 go test $(PKGS)
 
 race:
-	CGO_ENABLED=0 go test -race $(PKGS)
+	CGO_ENABLED=1 go test -race $(PKGS)
 
 modernize:
 	CGO_ENABLED=0 modernize -fix $(PKGS)

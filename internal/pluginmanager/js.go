@@ -77,7 +77,7 @@ func (m *Manager) loadJS(id, dir string) (*loadedPlugin, error) {
 		input := call.Arguments[0].String()
 		result, err := m.proxy.HandleRequest(id, input)
 		if err != nil {
-			return vm.ToValue(map[string]interface{}{"status": 0, "body": err.Error()})
+			return vm.ToValue(map[string]any{"status": 0, "body": err.Error()})
 		}
 		return vm.ToValue(result)
 	}); err != nil {
@@ -223,7 +223,7 @@ func (c *jsConsole) Error(args ...goja.Value) { c.log("error", args...) }
 func (c *jsConsole) Debug(args ...goja.Value) { c.log("debug", args...) }
 
 func (c *jsConsole) log(level string, args ...goja.Value) {
-	parts := make([]interface{}, len(args))
+	parts := make([]any, len(args))
 	for i, a := range args {
 		parts[i] = a.Export()
 	}

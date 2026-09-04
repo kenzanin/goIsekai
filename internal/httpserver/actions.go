@@ -55,7 +55,7 @@ func (s *Server) handleInstallPlugin(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "missing 'file' field", http.StatusBadRequest)
 		return
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 
 	tmp, err := os.CreateTemp("", "goisekai-plugin-*.wasm")
 	if err != nil {
@@ -64,7 +64,7 @@ func (s *Server) handleInstallPlugin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	tmpPath := tmp.Name()
-	defer os.Remove(tmpPath) // bridge copies the wasm into its own dir
+	defer func() { _ = os.Remove(tmpPath) }() // bridge copies the wasm into its own dir
 
 	if _, err := io.Copy(tmp, file); err != nil {
 		_ = tmp.Close()

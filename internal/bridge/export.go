@@ -63,7 +63,7 @@ func (s *AppService) writeCompleteCSV(pluginID, mangaID, chapterID string, pages
 	if err != nil {
 		return err
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 	w := csv.NewWriter(f)
 	for _, p := range pages {
 		_ = w.Write([]string{p.URL})
@@ -79,7 +79,7 @@ func (s *AppService) readCompleteCSV(pluginID, mangaID, chapterID string) []stri
 	if err != nil {
 		return nil
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 	recs, err := csv.NewReader(f).ReadAll()
 	if err != nil {
 		return nil

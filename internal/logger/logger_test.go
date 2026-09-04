@@ -112,7 +112,7 @@ func TestCaptureBufferEviction(t *testing.T) {
 	mu.Unlock()
 
 	// Log bufSize+1 records; the oldest must be evicted.
-	for i := 0; i < bufSize+1; i++ {
+	for i := range bufSize + 1 {
 		Info("line", "n", i)
 	}
 	got := GetLines()

@@ -89,14 +89,14 @@ func (s *Server) registerAPIRoutes(r chi.Router) {
 
 // apiLibraryItem is the JSON shape for GET /library.
 type apiLibraryItem struct {
-	Title          string  `json:"title"`
-	PluginID       string  `json:"plugin_id"`
-	SourceMangaID  string  `json:"source_manga_id"`
-	CoverURL       string  `json:"cover_url"`
-	TotalChapters  int     `json:"total_chapters"`
-	ReadChapters   int     `json:"read_chapters"`
-	HasNew         bool    `json:"has_new"`
-	NewSince       *string `json:"new_since"`
+	Title         string  `json:"title"`
+	PluginID      string  `json:"plugin_id"`
+	SourceMangaID string  `json:"source_manga_id"`
+	CoverURL      string  `json:"cover_url"`
+	TotalChapters int     `json:"total_chapters"`
+	ReadChapters  int     `json:"read_chapters"`
+	HasNew        bool    `json:"has_new"`
+	NewSince      *string `json:"new_since"`
 }
 
 // apiLibrary mirrors viewLibrary: returns enriched library items with progress.
@@ -158,8 +158,7 @@ func (s *Server) apiSearch(w http.ResponseWriter, r *http.Request) {
 	}
 	results, err := s.service.SearchManga(pluginID, types.SearchFilter{Query: q, Page: page})
 	if err != nil {
-		var ch *hostnet.ChallengeError
-		if errors.As(err, &ch) {
+		if _, ok := errors.AsType[*hostnet.ChallengeError](err); ok {
 			writeErr(w, http.StatusForbidden, "source requires verification")
 			return
 		}
@@ -172,14 +171,8 @@ func (s *Server) apiSearch(w http.ResponseWriter, r *http.Request) {
 		pageSize = 24
 	}
 	total := len(results)
-	start := (page - 1) * pageSize
-	if start > total {
-		start = total
-	}
-	end := start + pageSize
-	if end > total {
-		end = total
-	}
+	start := min((page-1)*pageSize, total)
+	end := min(start+pageSize, total)
 	writeJSON(w, http.StatusOK, apiSearchResponse{
 		Results: results[start:end],
 		HasNext: end < total,
@@ -189,13 +182,13 @@ func (s *Server) apiSearch(w http.ResponseWriter, r *http.Request) {
 
 // apiMangaDetailResponse is the JSON shape for GET /manga/{pluginID}/{mangaID}.
 type apiMangaDetailResponse struct {
-	Title        string            `json:"title"`
-	Status       string            `json:"status"`
-	Description  string            `json:"description"`
-	CoverURL     string            `json:"cover_url"`
-	InLibrary    bool              `json:"in_library"`
-	Chapters     []apiChapterItem  `json:"chapters"`
-	Continue     *apiContinuePoint `json:"continue"`
+	Title       string            `json:"title"`
+	Status      string            `json:"status"`
+	Description string            `json:"description"`
+	CoverURL    string            `json:"cover_url"`
+	InLibrary   bool              `json:"in_library"`
+	Chapters    []apiChapterItem  `json:"chapters"`
+	Continue    *apiContinuePoint `json:"continue"`
 }
 
 // apiChapterItem is the per-chapter JSON shape inside manga detail.
@@ -223,8 +216,7 @@ func (s *Server) apiMangaDetail(w http.ResponseWriter, r *http.Request) {
 	_ = s.service.ClearMangaNew(pluginID, mangaID)
 	manga, chapters, err := s.service.GetMangaDetails(pluginID, mangaID)
 	if err != nil {
-		var ch *hostnet.ChallengeError
-		if errors.As(err, &ch) {
+		if _, ok := errors.AsType[*hostnet.ChallengeError](err); ok {
 			writeErr(w, http.StatusForbidden, "source requires verification")
 			return
 		}

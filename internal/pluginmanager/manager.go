@@ -27,9 +27,6 @@ const (
 	memoryLimitPages = 1024
 	// invokeTimeout bounds a single plugin invocation (5.3: 15 s).
 	invokeTimeout = 15 * time.Second
-	// hostModuleName is no longer used after Extism migration.
-	hostModuleName = "env" // ponytail: remove when no other legacy code uses this const
-
 )
 
 // loadedPlugin is a compiled and instantiated plugin and its resolved ABI

@@ -1,10 +1,8 @@
 package httpserver
 
 import (
-	"embed"
 	"encoding/json"
 	"errors"
-	"io/fs"
 	"net/http"
 	"strconv"
 
@@ -14,15 +12,6 @@ import (
 	"goisekai/pkg/types"
 	"strings"
 )
-
-// fsSub returns the embedded frontend subtree (frontend/…) for /static.
-func fsSub() (fs.FS, error) {
-	return fs.Sub(defaultAssets, "frontend")
-}
-
-// defaultAssets holds the assets FS injected by New so view helpers can
-// reach it without threading it through every handler.
-var defaultAssets embed.FS
 
 // viewLibrary renders the library grid (also the home page).
 func (s *Server) viewLibrary(w http.ResponseWriter, r *http.Request) {
@@ -41,7 +30,7 @@ func (s *Server) viewLibrary(w http.ResponseWriter, r *http.Request) {
 		s.logger.Warn("library stats", "error", err)
 	}
 	mangaPluginMap := make(map[string]string) // mangaID -> pluginID (from DB)
-	pluginNameMap := make(map[string]string) // pluginID -> display name
+	pluginNameMap := make(map[string]string)  // pluginID -> display name
 	for pid, m := range metas {
 		pluginNameMap[pid] = pid
 		_ = m
@@ -67,8 +56,8 @@ func (s *Server) viewLibrary(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	s.renderPage(w, "views/library.jet", "library", map[string]any{
-		"Mangas":      mangas,
-		"Ratios":      ratios,
+		"Mangas":       mangas,
+		"Ratios":       ratios,
 		"LibraryStats": statsMap,
 	})
 }
@@ -104,8 +93,7 @@ func (s *Server) viewSearch(w http.ResponseWriter, r *http.Request) {
 	if q != "" && pluginID != "" {
 		results, err = s.service.SearchManga(pluginID, types.SearchFilter{Query: q, Page: page})
 		if err != nil {
-			var ch *hostnet.ChallengeError
-			if errors.As(err, &ch) {
+			if _, ok := errors.AsType[*hostnet.ChallengeError](err); ok {
 				challenge = true
 				results = nil
 				s.logger.Warn("search blocked by challenge", "plugin", pluginID, "q", q)
@@ -122,14 +110,8 @@ func (s *Server) viewSearch(w http.ResponseWriter, r *http.Request) {
 	// contract per plugin metadata search_page_size); slice out the requested
 	// page here so the template never renders more than one page.
 	total := len(results)
-	start := (page - 1) * pageSize
-	if start > total {
-		start = total
-	}
-	end := start + pageSize
-	if end > total {
-		end = total
-	}
+	start := min((page-1)*pageSize, total)
+	end := min(start+pageSize, total)
 	s.renderPage(w, "views/search.jet", "search", map[string]any{
 		"Plugins":    plugins,
 		"Q":          q,
@@ -153,8 +135,7 @@ func (s *Server) viewMangaDetail(w http.ResponseWriter, r *http.Request) {
 	manga, chapters, err := s.service.GetMangaDetails(pluginID, mangaID)
 	challenge := false
 	if err != nil {
-		var ch *hostnet.ChallengeError
-		if errors.As(err, &ch) {
+		if _, ok := errors.AsType[*hostnet.ChallengeError](err); ok {
 			challenge = true
 			s.logger.Warn("manga detail blocked by challenge", "plugin", pluginID, "manga", mangaID)
 		} else {
@@ -292,10 +273,7 @@ func (s *Server) viewLogs(w http.ResponseWriter, r *http.Request) {
 	limit := 500
 	if v := r.URL.Query().Get("limit"); v != "" {
 		if n, err := strconv.Atoi(v); err == nil && n > 0 {
-			limit = n
-			if limit > 2000 {
-				limit = 2000
-			}
+			limit = min(n, 2000)
 		}
 	}
 	logs := s.service.GetLogs()

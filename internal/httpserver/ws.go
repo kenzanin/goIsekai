@@ -15,7 +15,7 @@ func (s *Server) registerWSRoutes(r chi.Router) {
 // streamLogs pushes every buffered line, then follows the ring buffer for new
 // entries until the client disconnects.
 func (s *Server) streamLogs(ws *websocket.Conn) {
-	defer ws.Close()
+	defer func() { _ = ws.Close() }()
 	sent := 0
 	buf := make([]byte, 0, 4096)
 	for {

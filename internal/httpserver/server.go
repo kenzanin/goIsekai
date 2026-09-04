@@ -28,7 +28,6 @@ type Server struct {
 
 // New creates a new Server with Chi middleware and all routes registered.
 func New(host string, port int, apiKey string, assets embed.FS, svc *bridge.AppService, logger *slog.Logger, engine *templates.Engine) *Server {
-	defaultAssets = assets
 
 	r := chi.NewRouter()
 	r.Use(middleware.Recoverer)

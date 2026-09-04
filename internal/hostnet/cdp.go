@@ -78,7 +78,7 @@ func solveChallenge(cfg CDPConfig, url string) ([]*http.Cookie, string, error) {
 	// is non-empty (or the budget is exhausted) before giving up.
 	host := hostOf(url)
 	var cookies []*network.Cookie
-	for attempt := 0; attempt < 5; attempt++ {
+	for attempt := range 5 {
 		if attempt > 0 {
 			select {
 			case <-ctx.Done():

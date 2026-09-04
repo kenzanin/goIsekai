@@ -1,0 +1,13 @@
+version: "2"
+
+linters:
+  enable:
+    - staticcheck
+    - unused
+  exclusions:
+    rules:
+      # go-jet uses dot imports by convention for DSL readability
+      - path: internal/database/
+        linters:
+          - staticcheck
+        text: "ST1001"
