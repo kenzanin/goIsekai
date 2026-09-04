@@ -41,13 +41,17 @@
             </div>
             {{end}}
         </div>
-        </div>
     </a>
     {{end}}
 </div>
-{{if .HasNext}}
-<a href="?page={{.Page + 1}}" class="border border-neutral-700 hover:bg-neutral-800 rounded-md px-3 py-1.5 text-sm">Next →</a>
-{{end}}
+<div class="flex items-center justify-center gap-4 mt-8">
+    {{if .HasPrev}}
+    <a href="?page={{.Page - 1}}" class="border border-neutral-700 hover:bg-neutral-800 rounded-md px-3 py-1.5 text-sm">← Prev</a>
+    {{end}}
+    <span class="text-neutral-400 text-sm">Page {{.Page}} of {{.TotalPages}}</span>
+    {{if .HasNext}}
+    <a href="?page={{.Page + 1}}" class="border border-neutral-700 hover:bg-neutral-800 rounded-md px-3 py-1.5 text-sm">Next →</a>
+    {{end}}
 </div>
 {{end}}
 {{ end }}

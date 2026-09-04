@@ -169,15 +169,29 @@ func (s *Server) viewMangaDetail(w http.ResponseWriter, r *http.Request) {
 		continueTo = lastCont
 	}
 	inLibrary := s.service.IsInLibrary(pluginID, mangaID)
+	// Host-side chapter pagination: slice the full chapter list (newest-first)
+	// so the detail page renders one page of chapters at a time.
+	const chapterPageSize = 50
+	chPage, _ := strconv.Atoi(r.URL.Query().Get("ChPage"))
+	if chPage < 1 {
+		chPage = 1
+	}
+	chTotal := len(chapters)
+	chStart := min((chPage-1)*chapterPageSize, chTotal)
+	chEnd := min(chStart+chapterPageSize, chTotal)
 	s.renderPage(w, "views/detail.jet", "search", map[string]any{
-		"PluginID":  pluginID,
-		"MangaID":   mangaID,
-		"Manga":     manga,
-		"Chapters":  chapters,
-		"Progress":  progress,
-		"Continue":  continueTo,
-		"InLibrary": inLibrary,
-		"Challenge": challenge,
+		"PluginID":      pluginID,
+		"MangaID":       mangaID,
+		"Manga":         manga,
+		"Chapters":      chapters[chStart:chEnd],
+		"Progress":      progress,
+		"Continue":      continueTo,
+		"InLibrary":     inLibrary,
+		"Challenge":     challenge,
+		"ChCurrentPage": chPage,
+		"ChTotalPages":  max((chTotal+chapterPageSize-1)/chapterPageSize, 1),
+		"ChHasNext":     chEnd < chTotal,
+		"ChHasPrev":     chPage > 1,
 	})
 }
 
