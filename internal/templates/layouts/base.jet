@@ -6,6 +6,9 @@
     <title>goIsekai</title>
     <link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
     <link rel="stylesheet" href="/static/lib/tailwind.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
         :where(a, button, input, select, textarea, summary):focus-visible {
             outline: 2px solid #6366f1;
@@ -13,7 +16,21 @@
             border-radius: 4px;
         }
         a, button, input, select, textarea {
+        a, button, input, select, textarea {
             transition: color .15s, background-color .15s, border-color .15s;
+        }
+        h1, h2, h3 {
+            font-family: 'Space Grotesk', system-ui, sans-serif;
+            letter-spacing: -0.02em;
+        }
+        #toast {
+            background: #065f46;
+            color: #d1fae5;
+            padding: 0.75rem 1rem;
+            border-radius: 0.5rem;
+            font-size: 0.875rem;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+            transition: opacity 0.3s;
         }
     </style>
 </head>
@@ -23,5 +40,21 @@
         {{block body()}}{{end}}
     </main>
     <script src="/static/lib/htmx.min.js" defer></script>
+    <div id="toast" class="fixed bottom-4 left-4 z-50 hidden"></div>
+    <script>
+      (function() {
+        const url = new URL(window.location);
+        const msg = url.searchParams.get('msg');
+        if (msg) {
+          const toast = document.getElementById('toast');
+          toast.textContent = msg;
+          toast.classList.remove('hidden');
+          toast.addEventListener('click', () => toast.classList.add('hidden'));
+          setTimeout(() => toast.classList.add('hidden'), 3000);
+          url.searchParams.delete('msg');
+          history.replaceState(null, '', url);
+        }
+      })();
+    </script>
 </body>
 </html>
