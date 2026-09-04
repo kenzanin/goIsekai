@@ -40,17 +40,10 @@
     </a>
     {{end}}
 </div>
-<div class="flex items-center justify-center gap-4 mt-8">
-    {{if .Page}}
-    {{if .Page > 1}}
-    <a href="/view/search?q={{.Q}}&pluginID={{.PluginID}}&page={{.Page - 1}}" class="border border-neutral-700 hover:bg-neutral-800 rounded-md px-3 py-1.5 text-sm">← Prev</a>
-    {{end}}
-    <span class="text-neutral-400 text-sm">Page {{.Page}}</span>
-    {{if .HasNext}}
-    <a href="/view/search?q={{.Q}}&pluginID={{.PluginID}}&page={{.Page + 1}}" class="border border-neutral-700 hover:bg-neutral-800 rounded-md px-3 py-1.5 text-sm">Next →</a>
-    {{end}}
-    {{end}}
-</div>
+{{if .Page}}
+{{p := pagination(`/view/search`, `page`, .Page, .TotalPages, `q`, .Q, `pluginID`, .PluginID)}}
+{{include "/partials/pagination.jet" p}}
+{{end}}
 {{else}}
 {{if .Q != ""}}
 <div class="py-16 text-center text-neutral-500">No results for "{{.Q}}"</div>

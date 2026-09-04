@@ -416,7 +416,8 @@ func tableToGoMap(tbl *lua.Table) (any, error) {
 	}
 
 	if len(entries) == 0 {
-		return map[string]any{}, nil
+		// Empty Lua table is ambiguous; ABI results are arrays, so emit [].
+		return []any{}, nil
 	}
 
 	// If all keys are sequential integers 1..n, return a slice.

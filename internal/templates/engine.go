@@ -6,6 +6,7 @@ import (
 	"embed"
 	"io"
 	"io/fs"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -60,6 +61,9 @@ func New(devMode bool) (*Engine, error) {
 	set.AddGlobal("ratioAt", ratioAt)
 	set.AddGlobal("statAt", statAt)
 	set.AddGlobal("formatBytes", formatBytes)
+	set.AddGlobal("pageWindow", pageWindow)
+	set.AddGlobal("pageURL", pageURL)
+	set.AddGlobal("pagination", newPagination)
 
 	return &Engine{Set: set}, nil
 }
@@ -181,4 +185,81 @@ func formatBytes(n int64) string {
 		exp++
 	}
 	return strconv.FormatFloat(float64(n)/float64(div), 'f', 1, 64) + " " + string("KMG"[exp]) + "B"
+}
+
+// Pagination carries the state the pagination.jet partial renders: the URL
+// base (path + any fixed query prefix), the page query-param name, the current
+// page, and the total page count. Extra holds alternating key/value pairs to
+// preserve on every generated link (e.g. q and pluginID on the search page).
+type Pagination struct {
+	Base    string
+	Param   string
+	Current int
+	Total   int
+	Extra   []string
+}
+
+// URL returns the href for the given page number.
+func (p Pagination) URL(page int) string {
+	q := make([]string, 0, len(p.Extra)/2+1)
+	for i := 0; i+1 < len(p.Extra); i += 2 {
+		q = append(q, p.Extra[i]+"="+p.Extra[i+1])
+	}
+	q = append(q, p.Param+"="+strconv.Itoa(page))
+	sep := "?"
+	if strings.Contains(p.Base, "?") {
+		sep = "&"
+	}
+	return p.Base + sep + strings.Join(q, "&")
+}
+
+// newPagination builds a Pagination for templates. Extra alternates key,
+// value, ... pairs that every page link must preserve.
+func newPagination(base, param string, current, total int, extra ...string) Pagination {
+	return Pagination{Base: base, Param: param, Current: current, Total: total, Extra: extra}
+}
+
+// pageURL is a global helper so Jet templates can build page URLs from a
+// local Pagination variable: {{ pageURL(p, pageNum) }}.
+func pageURL(p Pagination, page int) string {
+	return p.URL(page)
+}
+
+// pageWindow returns the page numbers to render for numbered pagination.
+// Gaps between the always-included first/last/current-neighbour pages are
+// represented by 0, which the template renders as an ellipsis. Result is
+// deduped and ascending. E.g. current=5,total=100 -> [1 0 4 5 6 0 100].
+func pageWindow(current, total int) []int {
+	if total <= 0 {
+		return nil
+	}
+	if total <= 7 {
+		pages := make([]int, total)
+		for i := range pages {
+			pages[i] = i + 1
+		}
+		return pages
+	}
+	seen := map[int]bool{1: true, total: true}
+	for _, p := range []int{current - 1, current, current + 1} {
+		if p >= 1 && p <= total {
+			seen[p] = true
+		}
+	}
+	sorted := make([]int, 0, len(seen))
+	for p := range seen {
+		sorted = append(sorted, p)
+	}
+	sort.Ints(sorted)
+	out := make([]int, 0, len(sorted)+2)
+	prev := sorted[0]
+	out = append(out, prev)
+	for _, p := range sorted[1:] {
+		if p != prev+1 {
+			out = append(out, 0)
+		}
+		out = append(out, p)
+		prev = p
+	}
+	return out
 }

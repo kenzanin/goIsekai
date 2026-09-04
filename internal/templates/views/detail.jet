@@ -60,15 +60,8 @@
     </form>
 </div>
 {{ firstID := "" }}
-<div class="flex items-center justify-center gap-4 mb-4">
-    {{if .ChHasPrev}}
-    <a href="?ChPage={{.ChCurrentPage - 1}}" class="border border-neutral-700 hover:bg-neutral-800 rounded-md px-3 py-1.5 text-sm">← Prev</a>
-    {{end}}
-    <span class="text-neutral-400 text-sm">Page {{.ChCurrentPage}} of {{.ChTotalPages}}</span>
-    {{if .ChHasNext}}
-    <a href="?ChPage={{.ChCurrentPage + 1}}" class="border border-neutral-700 hover:bg-neutral-800 rounded-md px-3 py-1.5 text-sm">Next →</a>
-    {{end}}
-</div>
+{{cp := pagination(``, `ChPage`, .ChCurrentPage, .ChTotalPages)}}
+{{include "/partials/pagination.jet" cp}}
 <div class="divide-y divide-neutral-800">
     {{range i, c := .Chapters }}
     {{if i == 0}}{{ firstID = c.ID }}{{end}}
@@ -109,14 +102,7 @@
     </div>
     {{end}}
 </div>
-<div class="flex items-center justify-center gap-4 mt-4">
-    {{if .ChHasPrev}}
-    <a href="?ChPage={{.ChCurrentPage - 1}}" class="border border-neutral-700 hover:bg-neutral-800 rounded-md px-3 py-1.5 text-sm">← Prev</a>
-    {{end}}
-    <span class="text-neutral-400 text-sm">Page {{.ChCurrentPage}} of {{.ChTotalPages}}</span>
-    {{if .ChHasNext}}
-    <a href="?ChPage={{.ChCurrentPage + 1}}" class="border border-neutral-700 hover:bg-neutral-800 rounded-md px-3 py-1.5 text-sm">Next →</a>
-    {{end}}
-</div>
+{{cp2 := pagination(``, `ChPage`, .ChCurrentPage, .ChTotalPages)}}
+{{include "/partials/pagination.jet" cp2}}
 {{end}}
 {{ end }}
