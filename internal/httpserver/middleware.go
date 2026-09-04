@@ -1,8 +1,11 @@
 package httpserver
 
 import (
+	"bufio"
 	"crypto/rand"
 	"encoding/hex"
+	"errors"
+	"net"
 	"net/http"
 	"strings"
 	"time"
@@ -30,6 +33,23 @@ func (w *statusWriter) Write(b []byte) (int, error) {
 	n, err := w.ResponseWriter.Write(b)
 	w.size += n
 	return n, err
+}
+
+// Hijack forwards to the wrapped writer so WebSocket upgrades (which need
+// connection hijacking) survive this wrapper.
+func (w *statusWriter) Hijack() (net.Conn, *bufio.ReadWriter, error) {
+	h, ok := w.ResponseWriter.(http.Hijacker)
+	if !ok {
+		return nil, nil, errors.New("wrapped writer does not support Hijack")
+	}
+	return h.Hijack()
+}
+
+// Flush forwards so streaming responses keep working through the wrapper.
+func (w *statusWriter) Flush() {
+	if f, ok := w.ResponseWriter.(http.Flusher); ok {
+		f.Flush()
+	}
 }
 
 // requestID generates a random 8-char hex ID.

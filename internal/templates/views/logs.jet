@@ -74,7 +74,49 @@
             })
             .catch(function () {});
     }
-    setInterval(refresh, 2000);
+    var intervalId = setInterval(refresh, 2000);
+
+    // WebSocket live stream
+    var ws;
+    function startWebSocket() {
+        var protocol = (location.protocol === 'https:' ? 'wss://' : 'ws://');
+        var wsUrl = protocol + location.host + '/api/logs/ws';
+        ws = new WebSocket(wsUrl);
+        ws.addEventListener('open', function () {
+            // Stop polling when WS is active
+            clearInterval(intervalId); intervalId = null;
+        });
+        ws.addEventListener('message', function (ev) {
+            var line = ev.data;
+            var filter = document.getElementById('log-filter').value;
+            if (filter === 'app' && line.indexOf(' plugin=') !== -1) return;
+            if (filter === 'plugins' && line.indexOf(' plugin=') === -1) return;
+            var pre = document.createElement('pre');
+            pre.className = 'text-xs font-mono whitespace-pre-wrap break-all border-b border-neutral-900 py-0.5 select-text';
+            pre.textContent = line;
+            view.appendChild(pre);
+            colorLogLines();
+            // Trim to limit
+            var limit = parseInt(document.getElementById('log-limit').value, 10);
+            while (view.children.length > limit) {
+                view.removeChild(view.firstChild);
+            }
+        });
+        ws.addEventListener('error', function () {
+            fallbackToPolling();
+        });
+        ws.addEventListener('close', function () {
+            fallbackToPolling();
+        });
+    }
+    function fallbackToPolling() {
+        if (ws) { ws = null; }
+        // Ensure polling interval is running
+        if (!intervalId) {
+            intervalId = setInterval(refresh, 2000);
+        }
+    }
+    startWebSocket();
 
     document.getElementById('log-copy').addEventListener('click', function () {
         var text = view.innerText;

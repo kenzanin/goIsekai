@@ -59,6 +59,7 @@ func testServerFull(t *testing.T, apiKey string, registerViews bool) *Server {
 		sub.Use(s.requireAPIKey)
 		s.registerAPIRoutes(sub)
 		s.registerReaderRoutes(sub)
+		s.registerWSRoutes(sub)
 		s.registerSandboxRoutes(sub)
 	})
 	if registerViews {
