@@ -132,6 +132,7 @@ func (s *Server) viewSearch(w http.ResponseWriter, r *http.Request) {
 		"PluginID":   pluginID,
 		"Results":    results[start:end],
 		"Page":       page,
+		"TotalPages": max((total+pageSize-1)/pageSize, 1),
 		"HasNext":    end < total,
 		"ThumbRatio": s.service.PluginMeta(pluginID).ThumbRatio,
 		"Challenge":  challenge,
