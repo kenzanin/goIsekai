@@ -8,7 +8,6 @@ import (
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
-	"os"
 	"path/filepath"
 	"testing"
 
@@ -17,29 +16,56 @@ import (
 	"goisekai/internal/bridge"
 	"goisekai/internal/database"
 	"goisekai/internal/hostnet"
+	"goisekai/internal/pluginmanager"
+	"goisekai/internal/templates"
 )
 
 // testServer builds a minimal Server wired to a temp DB and cache dir.
 func testServer(t *testing.T, apiKey string) *Server {
+	t.Helper()
+	return testServerFull(t, apiKey, false)
+}
+
+// testServerFull builds a Server with all routes registered.
+// If registerViews is true, view/action/static routes are included.
+func testServerFull(t *testing.T, apiKey string, registerViews bool) *Server {
 	t.Helper()
 	db, err := database.Open(filepath.Join(t.TempDir(), "test.db"))
 	if err != nil {
 		t.Fatalf("open db: %v", err)
 	}
 	t.Cleanup(func() { _ = db.Close() })
-	svc := bridge.NewAppService(db, nil, hostnet.NewProxy(), "", t.TempDir())
+	proxy := hostnet.NewProxy()
+	pmgr := pluginmanager.NewManager(proxy, t.TempDir())
+	svc := bridge.NewAppService(db, pmgr, proxy, "", t.TempDir())
 	r := chi.NewRouter()
 	logger := slog.New(slog.NewTextHandler(&bytes.Buffer{}, nil))
+
 	s := &Server{
 		Router:  r,
 		logger:  logger,
 		service: svc,
 		apiKey:  apiKey,
 	}
+	if registerViews {
+		engine, engErr := templates.New(false)
+		if engErr != nil {
+			t.Fatalf("new engine: %v", engErr)
+		}
+		s.engine = engine
+	}
+
 	s.Router.Route("/api", func(sub chi.Router) {
 		sub.Use(s.requireAPIKey)
 		s.registerAPIRoutes(sub)
+		s.registerReaderRoutes(sub)
+		s.registerSandboxRoutes(sub)
 	})
+	if registerViews {
+		s.registerStaticRoutes()
+		s.registerViewRoutes()
+		s.registerActionRoutes()
+	}
 	return s
 }
 
@@ -261,5 +287,136 @@ func TestAPIImageEmptyMangaIDChapterID(t *testing.T) {
 	}
 }
 
-// Silence unused import warnings for helper packages.
-var _ = os.Stat
+// ── GET /api/library ────────────────────────────────────────────────────────
+
+func TestAPILibraryEmpty(t *testing.T) {
+	s := testServer(t, "")
+	req := httptest.NewRequest("GET", "/api/library", nil)
+	rec := httptest.NewRecorder()
+	s.Router.ServeHTTP(rec, req)
+	if rec.Code != 200 {
+		t.Fatalf("status = %d, want 200", rec.Code)
+	}
+	var body []any
+	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
+		t.Fatalf("invalid JSON: %v", err)
+	}
+}
+
+// ── GET /api/search ─────────────────────────────────────────────────────────
+
+func TestAPISearchEmptyQuery(t *testing.T) {
+	s := testServer(t, "")
+	req := httptest.NewRequest("GET", "/api/search", nil)
+	rec := httptest.NewRecorder()
+	s.Router.ServeHTTP(rec, req)
+	// Missing required params should 400.
+	if rec.Code != 400 {
+		t.Fatalf("status = %d, want 400", rec.Code)
+	}
+}
+
+func TestAPISearchWithQuery(t *testing.T) {
+	s := testServer(t, "")
+	req := httptest.NewRequest("GET", "/api/search?q=naruto&pluginID=dummy", nil)
+	rec := httptest.NewRecorder()
+	s.Router.ServeHTTP(rec, req)
+	// Plugin not loaded → 502.
+	if rec.Code != 502 {
+		t.Fatalf("status = %d, want 502; body: %s", rec.Code, rec.Body.String())
+	}
+}
+
+// ── GET /api/manga/{pluginID}/{mangaID} ─────────────────────────────────────
+
+func TestAPIMangaDetailNonexistent(t *testing.T) {
+	s := testServer(t, "")
+	req := httptest.NewRequest("GET", "/api/manga/nonexistent/manga1", nil)
+	rec := httptest.NewRecorder()
+	s.Router.ServeHTTP(rec, req)
+	// Plugin not loaded — may 500 or return error JSON, but should not panic.
+	if rec.Code == 0 {
+		t.Fatal("expected a valid HTTP status code")
+	}
+}
+
+// ── GET /api/history ────────────────────────────────────────────────────────
+
+func TestAPIHistoryEmpty(t *testing.T) {
+	s := testServer(t, "")
+	req := httptest.NewRequest("GET", "/api/history", nil)
+	rec := httptest.NewRecorder()
+	s.Router.ServeHTTP(rec, req)
+	if rec.Code != 200 {
+		t.Fatalf("status = %d, want 200", rec.Code)
+	}
+	var body []any
+	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
+		t.Fatalf("invalid JSON: %v", err)
+	}
+}
+
+// ── GET /api/health ─────────────────────────────────────────────────────────
+
+func TestAPIHealth(t *testing.T) {
+	s := testServer(t, "")
+	req := httptest.NewRequest("GET", "/api/health", nil)
+	rec := httptest.NewRecorder()
+	s.Router.ServeHTTP(rec, req)
+	if rec.Code != 200 {
+		t.Fatalf("status = %d, want 200", rec.Code)
+	}
+}
+
+// ── GET /api/plugins ────────────────────────────────────────────────────────
+
+func TestAPIPluginsEmpty(t *testing.T) {
+	s := testServer(t, "")
+	req := httptest.NewRequest("GET", "/api/plugins", nil)
+	rec := httptest.NewRecorder()
+	s.Router.ServeHTTP(rec, req)
+	// No /api/plugins route registered — expect 404.
+	if rec.Code != 404 {
+		t.Fatalf("status = %d, want 404", rec.Code)
+	}
+}
+
+// ── POST /api/toggle-library ────────────────────────────────────────────────
+
+func TestAPIToggleLibraryNoBody(t *testing.T) {
+	s := testServer(t, "")
+	req := httptest.NewRequest("POST", "/api/toggle-library", nil)
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+	s.Router.ServeHTTP(rec, req)
+	// Empty body should be handled gracefully.
+	if rec.Code == 500 {
+		t.Fatal("expected non-500 for empty body")
+	}
+}
+
+// ── POST /api/mark-read ─────────────────────────────────────────────────────
+
+func TestAPIMarkReadNoBody(t *testing.T) {
+	s := testServer(t, "")
+	req := httptest.NewRequest("POST", "/api/mark-read", nil)
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+	s.Router.ServeHTTP(rec, req)
+	if rec.Code == 500 {
+		t.Fatal("expected non-500 for empty body")
+	}
+}
+
+// ── POST /api/set-progress ──────────────────────────────────────────────────
+
+func TestAPISetProgressNoBody(t *testing.T) {
+	s := testServer(t, "")
+	req := httptest.NewRequest("POST", "/api/set-progress", nil)
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+	s.Router.ServeHTTP(rec, req)
+	if rec.Code == 500 {
+		t.Fatal("expected non-500 for empty body")
+	}
+}
