@@ -166,18 +166,14 @@ func Init() int32 {
 	return 0
 }
 
-// Search — arg = JSON SearchFilter{Query, Page}. Returns []Manga.
+// Search — returns ALL results across all upstream pages.
+// The host handles host-side pagination via search_page_size.
 
 //go:wasmexport Search
 func Search() int32 {
 	var f types.SearchFilter
 	_ = json.Unmarshal(pdk.Input(), &f)
 
-	params := map[string]string{
-		"keyword": f.Query,
-		"limit":   "50",
-		"page":    strconv.Itoa(f.Page),
-	}
 	type poster struct {
 		Small  string `json:"small"`
 		Medium string `json:"medium"`
@@ -189,24 +185,38 @@ func Search() int32 {
 		Title  string `json:"title"`
 		Poster poster `json:"poster"`
 	}
-	var resp struct {
-		Items []item `json:"items"`
+	var all []types.Manga
+	page := 1
+	for {
+		params := map[string]string{
+			"keyword": f.Query,
+			"limit":   "50",
+			"page":    strconv.Itoa(page),
+		}
+		var resp struct {
+			Items []item `json:"items"`
+			Meta  struct {
+				LastPage int  `json:"last_page"`
+				HasNext  bool `json:"has_next"`
+			} `json:"meta"`
+		}
+		u := vrfURL("/titles", params)
+		if err := fetchJSON(u, &resp); err != nil || len(resp.Items) == 0 {
+			break
+		}
+		for _, it := range resp.Items {
+			all = append(all, types.Manga{
+				ID:       it.HID,
+				Title:    sanitizeTitle(it.Title),
+				CoverURL: it.Poster.Medium,
+			})
+		}
+		if !resp.Meta.HasNext || page >= resp.Meta.LastPage {
+			break
+		}
+		page++
 	}
-	u := vrfURL("/titles", params)
-	if err := fetchJSON(u, &resp); err != nil {
-		b, _ := json.Marshal([]types.Manga{})
-		pdk.Output(b)
-		return 0
-	}
-	out := make([]types.Manga, 0, len(resp.Items))
-	for _, it := range resp.Items {
-		out = append(out, types.Manga{
-			ID:       it.HID,
-			Title:    sanitizeTitle(it.Title),
-			CoverURL: it.Poster.Medium,
-		})
-	}
-	b, _ := json.Marshal(out)
+	b, _ := json.Marshal(all)
 	pdk.Output(b)
 	return 0
 }

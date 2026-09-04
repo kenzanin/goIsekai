@@ -18,15 +18,33 @@ local util = require("util")
 function search_manga(arg)
     local args = json.decode(arg)
     local query = args.query or ""
-    local page = args.page or 1
-    log.debug("search q=" .. query .. " page=" .. tostring(page))
-    local resp = util.http_get("https://kaliscan.io/search?q=" .. util.url_encode(query) .. "&page=" .. tostring(page))
+    log.debug("search q=" .. query)
+
+    -- Fetch page 1 to discover total pages, then loop all pages.
+    local resp = util.http_get("https://kaliscan.io/search?q=" .. util.url_encode(query) .. "&page=1")
     if not resp or resp.status ~= 200 then
         return json.encode({})
     end
-    -- ABI: plain JSON array of manga ({id,title,cover_url}) — pagination is
-    -- host-driven (?page=N), total is not part of the contract.
-    return json.encode(util.parse_search(resp.body).results)
+    local first = util.parse_search(resp.body)
+    local all = first.results
+    local max_page = first.total or 1
+
+    for p = 2, max_page do
+        local presp = util.http_get("https://kaliscan.io/search?q=" .. util.url_encode(query) .. "&page=" .. tostring(p))
+        if not presp or presp.status ~= 200 then
+            break
+        end
+        local page_results = util.parse_search(presp.body).results
+        if #page_results == 0 then
+            break
+        end
+        for _, r in ipairs(page_results) do
+            all[#all + 1] = r
+        end
+    end
+
+    log.debug("search: found " .. #all .. " results for q=" .. query .. " (pages=" .. max_page .. ")")
+    return json.encode(all)
 end
 
 -- get_manga_detail(arg) — arg is a JSON-encoded plain string (e.g. '"104-love-shuttle"')
