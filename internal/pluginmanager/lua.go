@@ -204,6 +204,14 @@ func (m *Manager) loadLua(id, dir string) (*loadedPlugin, error) {
 		if err != nil {
 			return frame.ReturnValue(errorTable(state, "http_request encode error: "+err.Error()))
 		}
+		// Empty Lua tables encode as [] (ABI array convention), but the
+		// proxy expects headers to be an object — normalize before sending.
+		if req, ok := goVal.(map[string]any); ok {
+			switch req["headers"].(type) {
+			case []any, nil:
+				req["headers"] = map[string]any{}
+			}
+		}
 		reqJSON, err := json.Marshal(goVal)
 		if err != nil {
 			return frame.ReturnValue(errorTable(state, "http_request marshal: "+err.Error()))
