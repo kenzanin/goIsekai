@@ -6,6 +6,16 @@
     <title>goIsekai</title>
     <link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
     <link rel="stylesheet" href="/static/lib/tailwind.css">
+    <style>
+        :where(a, button, input, select, textarea, summary):focus-visible {
+            outline: 2px solid #6366f1;
+            outline-offset: 2px;
+            border-radius: 4px;
+        }
+        a, button, input, select, textarea {
+            transition: color .15s, background-color .15s, border-color .15s;
+        }
+    </style>
 </head>
 <body class="bg-neutral-950 text-neutral-100 min-h-full">
     {{include "/partials/nav.jet" .}}

@@ -3,9 +3,9 @@
 {{ block body() }}
 <h1 class="text-xl font-semibold mb-6">Search</h1>
 
-<form method="get" action="/view/search" class="flex flex-wrap items-end gap-3 mb-8">
+<form method="get" action="/view/search" class="flex gap-2 items-end mb-8">
     <div>
-        <label for="pluginID" class="block text-sm font-medium mb-1">Plugin</label>
+        <label for="pluginID" class="block text-xs text-neutral-400 mb-1">Plugin</label>
         <select id="pluginID" name="pluginID" class="bg-neutral-900 border border-neutral-700 rounded-md px-3 py-2 text-sm">
             {{range i, p := .Plugins }}
             {{if p.IsActive}}
@@ -14,8 +14,8 @@
             {{end}}
         </select>
     </div>
-    <div class="flex-1 min-w-[200px]">
-        <label for="q" class="block text-sm font-medium mb-1">Query</label>
+    <div class="flex-1 max-w-md">
+        <label for="q" class="block text-xs text-neutral-400 mb-1">Query</label>
         <input id="q" name="q" type="text" value="{{.Q}}" placeholder="Manga title..." class="w-full bg-neutral-900 border border-neutral-700 rounded-md px-3 py-2 text-sm">
     </div>
     <button type="submit" class="bg-indigo-600 hover:bg-indigo-500 text-white rounded-md px-4 py-2 text-sm font-medium">Search</button>
@@ -24,7 +24,7 @@
 {{if .Results}}
 <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-4">
     {{range i, r := .Results }}
-    <a href="/view/manga/{{.PluginID}}/{{r.ID}}" class="bg-neutral-900 rounded-lg overflow-hidden hover:ring-1 hover:ring-indigo-500 transition">
+    <a href="/view/manga/{{.PluginID}}/{{r.ID}}" class="bg-neutral-900 rounded-lg overflow-hidden hover:-translate-y-0.5 hover:shadow-lg hover:shadow-black/40 hover:ring-1 hover:ring-indigo-500 transition">
         {{if r.CoverURL != ""}}
         {{if .ThumbRatio > 0}}
         <img src="/image?pluginID={{.PluginID}}&amp;url={{r.CoverURL}}" alt="{{r.Title}}" style="aspect-ratio: {{.ThumbRatio}}" class="w-full object-cover" loading="lazy">
@@ -40,17 +40,14 @@
     </a>
     {{end}}
 </div>
-<div class="flex items-center justify-between mt-6">
+<div class="flex items-center justify-center gap-4 mt-8">
     {{if .Page}}
     {{if .Page > 1}}
-    <a href="/view/search?q={{.Q}}&pluginID={{.PluginID}}&page={{.Page - 1}}" class="text-indigo-400 hover:text-indigo-300 text-sm">← Prev</a>
-    {{else}}
-    <span></span>
+    <a href="/view/search?q={{.Q}}&pluginID={{.PluginID}}&page={{.Page - 1}}" class="border border-neutral-700 hover:bg-neutral-800 rounded-md px-3 py-1.5 text-sm">← Prev</a>
     {{end}}
+    <span class="text-neutral-400 text-sm">Page {{.Page}}</span>
     {{if .HasNext}}
-    <a href="/view/search?q={{.Q}}&pluginID={{.PluginID}}&page={{.Page + 1}}" class="text-indigo-400 hover:text-indigo-300 text-sm">Next →</a>
-    {{else}}
-    <span></span>
+    <a href="/view/search?q={{.Q}}&pluginID={{.PluginID}}&page={{.Page + 1}}" class="border border-neutral-700 hover:bg-neutral-800 rounded-md px-3 py-1.5 text-sm">Next →</a>
     {{end}}
     {{end}}
 </div>
@@ -60,6 +57,6 @@
 {{end}}
 {{end}}
 {{if .Challenge}}
-<div class="bg-amber-500/15 border border-amber-500/40 text-amber-300 rounded-lg p-4 mb-6">This site needs human verification — go to <a href="/view/plugins" class="underline">Plugins &rarr; Human Verification</a> to paste your session cookies.</div>
+<div class="bg-amber-500/15 border border-amber-500/40 text-amber-300 rounded-lg p-4 mb-6">⚠ This site needs human verification — go to <a href="/view/plugins" class="underline">Plugins &rarr; Human Verification</a> to paste your session cookies.</div>
 {{end}}
 {{ end }}

@@ -17,7 +17,7 @@
 <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-4">
     {{range i, m := .Mangas }}
     {{ stats := statAt(.LibraryStats, m.ID) }}
-    <a href="/view/manga/{{m.PluginID}}/{{m.SourceMangaID}}" class="bg-neutral-900 rounded-lg overflow-hidden hover:ring-1 hover:ring-indigo-500 transition">
+    <a href="/view/manga/{{m.PluginID}}/{{m.SourceMangaID}}" class="bg-neutral-900 rounded-lg overflow-hidden relative hover:-translate-y-0.5 hover:shadow-lg hover:shadow-black/40 transition">
         {{if m.CoverURL != ""}}
         {{if ratioAt(.Ratios, m.PluginID) > 0}}
         <img src="/image?pluginID={{m.PluginID}}&amp;url={{m.CoverURL}}" alt="{{m.Title}}" style="aspect-ratio: {{ratioAt(.Ratios, m.PluginID)}}" class="w-full object-cover" loading="lazy">
@@ -27,20 +27,20 @@
         {{else}}
         <div class="w-full aspect-[2/3] bg-neutral-800 flex items-center justify-center text-neutral-500 text-2xl font-semibold">{{getInitials(m.Title)}}</div>
         {{end}}
+        {{if m.Status != ""}}
+        <span class="absolute top-2 left-2 bg-black/60 backdrop-blur rounded-full px-2 py-0.5 text-[10px] text-neutral-200">{{m.Status}}</span>
+        {{end}}
         <div class="p-3">
             <div class="text-sm font-medium line-clamp-2" title="{{m.Title}}">{{m.Title}}</div>
             {{if stats}}
             <div class="flex items-center gap-2 mt-1">
-                <span class="text-xs text-neutral-400">{{stats.ReadChapters}}/{{stats.TotalChapters}}</span>
-                <span class="text-xs px-1.5 py-0.5 rounded bg-neutral-800 text-neutral-500">{{stats.PluginName}}</span>
+                <span class="rounded-full text-[11px] px-2 py-0.5 bg-neutral-800 text-neutral-400"><span class="text-indigo-400 font-medium">{{stats.TotalChapters - stats.ReadChapters}} unread</span> of {{stats.TotalChapters}} · {{stats.PluginName}}</span>
                 {{if stats.HasNew}}
-                <span class="text-xs px-1.5 py-0.5 rounded-full bg-red-500/20 text-red-400 font-medium">New</span>
+                <span class="text-[10px] px-1.5 py-0.5 rounded-full bg-red-500 text-white font-medium">New</span>
                 {{end}}
             </div>
             {{end}}
-            {{if m.Status != ""}}
-            <span class="text-xs px-2 py-0.5 rounded-full bg-neutral-700/50 text-neutral-400">{{m.Status}}</span>
-            {{end}}
+        </div>
         </div>
     </a>
     {{end}}
