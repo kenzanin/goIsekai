@@ -45,5 +45,9 @@
     </a>
     {{end}}
 </div>
+{{if .HasNext}}
+<a href="?page={{.Page + 1}}" class="border border-neutral-700 hover:bg-neutral-800 rounded-md px-3 py-1.5 text-sm">Next →</a>
+{{end}}
+</div>
 {{end}}
 {{ end }}

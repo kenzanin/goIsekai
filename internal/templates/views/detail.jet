@@ -60,6 +60,15 @@
     </form>
 </div>
 {{ firstID := "" }}
+<div class="flex items-center justify-center gap-4 mb-4">
+    {{if .ChHasPrev}}
+    <a href="?ChPage={{.ChCurrentPage - 1}}" class="border border-neutral-700 hover:bg-neutral-800 rounded-md px-3 py-1.5 text-sm">← Prev</a>
+    {{end}}
+    <span class="text-neutral-400 text-sm">Page {{.ChCurrentPage}} of {{.ChTotalPages}}</span>
+    {{if .ChHasNext}}
+    <a href="?ChPage={{.ChCurrentPage + 1}}" class="border border-neutral-700 hover:bg-neutral-800 rounded-md px-3 py-1.5 text-sm">Next →</a>
+    {{end}}
+</div>
 <div class="divide-y divide-neutral-800">
     {{range i, c := .Chapters }}
     {{if i == 0}}{{ firstID = c.ID }}{{end}}
@@ -94,6 +103,15 @@
             <button type="submit" title="Download this chapter as .cbz" class="h-7 px-2 inline-flex items-center justify-center rounded-md border border-transparent hover:border-neutral-700 hover:bg-neutral-800 text-sm whitespace-nowrap">⬇ cbz</button>
         </form>
     </div>
+    {{end}}
+</div>
+<div class="flex items-center justify-center gap-4 mt-4">
+    {{if .ChHasPrev}}
+    <a href="?ChPage={{.ChCurrentPage - 1}}" class="border border-neutral-700 hover:bg-neutral-800 rounded-md px-3 py-1.5 text-sm">← Prev</a>
+    {{end}}
+    <span class="text-neutral-400 text-sm">Page {{.ChCurrentPage}} of {{.ChTotalPages}}</span>
+    {{if .ChHasNext}}
+    <a href="?ChPage={{.ChCurrentPage + 1}}" class="border border-neutral-700 hover:bg-neutral-800 rounded-md px-3 py-1.5 text-sm">Next →</a>
     {{end}}
 </div>
 {{end}}
