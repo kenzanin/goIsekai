@@ -82,6 +82,8 @@
             <span class="flex items-center gap-2 shrink-0">
                 {{if .Progress[c.ID].TotalPages > 0}}
                 <span class="text-xs px-2 py-0.5 rounded-full bg-neutral-800 text-neutral-400">{{.Progress[c.ID].LastPageRead}}/{{.Progress[c.ID].TotalPages}} read{{if .Progress[c.ID].CachedPages > 0}} · {{.Progress[c.ID].CachedPages}} cached{{end}}</span>
+                {{else if .Progress[c.ID].CachedPages > 0}}
+                <span class="text-xs px-2 py-0.5 rounded-full bg-neutral-800 text-neutral-400">{{.Progress[c.ID].CachedPages}} cached</span>
                 {{end}}
                 {{if .Progress[c.ID].Done}}
                 <span class="text-emerald-400 text-xs">✓</span>

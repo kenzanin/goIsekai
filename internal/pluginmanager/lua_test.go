@@ -7,8 +7,7 @@ import (
 	"testing"
 	"time"
 
-	lua "github.com/yuin/gopher-lua"
-
+	
 	"goisekai/internal/hostnet"
 	"goisekai/pkg/types"
 )
@@ -131,18 +130,24 @@ func TestLuaPluginNoUnsafeGlobals(t *testing.T) {
 	}
 
 	p := mgr.plugins["luatest"]
-	L := p.lua
-	if v := L.GetGlobal("io"); v.Type().String() != "nil" {
-		t.Fatalf("io must be nil, got %v", v)
+	L := p.lunar
+	// Check that io is not available (sandboxed out).
+	ioVal, _ := L.RawGlobal("io")
+	if !ioVal.IsNil() {
+		t.Fatalf("io must be nil, got %v", ioVal)
 	}
-	osTbl, ok := L.GetGlobal("os").(*lua.LTable)
+	// Check that os is available but restricted.
+	osVal, _ := L.RawGlobal("os")
+	osTbl, ok := osVal.AsTable()
 	if !ok {
 		t.Fatalf("os is not a table")
 	}
-	if v := osTbl.RawGetString("execute"); v.Type().String() != "nil" {
+	execVal := osTbl.RawGetString("execute")
+	if !execVal.IsNil() {
 		t.Fatalf("os.execute must be nil")
 	}
-	if v := osTbl.RawGetString("time"); v.Type().String() == "nil" {
+	timeVal := osTbl.RawGetString("time")
+	if timeVal.IsNil() {
 		t.Fatal("os.time must exist")
 	}
 }

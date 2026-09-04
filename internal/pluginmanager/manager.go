@@ -6,6 +6,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"plugin"
 	"sort"
 	"strconv"
 	"strings"
@@ -15,7 +16,7 @@ import (
 	"github.com/dop251/goja"
 	"github.com/extism/go-sdk"
 
-	lua "github.com/yuin/gopher-lua"
+	lunar "github.com/mmcdole/lunar"
 
 	"goisekai/internal/hostnet"
 	"goisekai/internal/logger"
@@ -38,8 +39,12 @@ type loadedPlugin struct {
 	loaded   bool   // true after the runtime has been instantiated
 	// extismPlugin holds the Extism plugin instance for wasm-kind plugins (nil otherwise).
 	extismPlugin *extism.Plugin
-	// lua holds the Lua VM for lua-kind plugins (nil for wasm/js).
-	lua *lua.LState
+	// lunar holds the Lunar VM for lua-kind plugins (nil for wasm/js).
+	lunar *lunar.State
+	// goPlugin holds the opened .so handle for go-kind plugins (nil otherwise).
+	goPlugin *plugin.Plugin
+	// goFns caches resolved ABI symbols for go-kind plugins.
+	goFns map[string]any
 	// js holds the goja VM for js-kind plugins (nil otherwise).
 	js *goja.Runtime
 	// contractVersion is the plugin's resolved contract_version.
@@ -74,15 +79,19 @@ func (m *Manager) ensureLoaded(id string) error {
 		loaded, err = m.loadLua(p.id, p.wasmPath)
 	case "js":
 		loaded, err = m.loadJS(p.id, p.wasmPath)
+	case "go":
+		loaded, err = m.loadGo(p.id, p.wasmPath)
 	default:
 		return fmt.Errorf("plugin %q: unknown kind %q", id, p.kind)
 	}
 	if err != nil {
 		return fmt.Errorf("lazy-load plugin %s: %w", id, err)
 	}
-	p.extismPlugin = loaded.extismPlugin
-	p.lua = loaded.lua
-	p.js = loaded.js
+		p.extismPlugin = loaded.extismPlugin
+		p.lunar = loaded.lunar
+		p.js = loaded.js
+		p.goPlugin = loaded.goPlugin
+		p.goFns = loaded.goFns
 	p.contractVersion = loaded.contractVersion
 	p.meta = loaded.meta
 	p.loaded = true
@@ -181,6 +190,11 @@ func (m *Manager) Discover() error {
 			kind:     "js",
 		}
 		logger.Debug("js plugin registered", "id", id, "path", path)
+	}
+
+	// Go native plugins: one .so file per plugin, filename (minus .so) = id.
+	if err := m.discoverGo(); err != nil {
+		return err
 	}
 	return nil
 }
@@ -333,8 +347,8 @@ func (m *Manager) UnloadPlugin(id string) error {
 	if !p.loaded {
 		return nil
 	}
-	if p.kind == "lua" && p.lua != nil {
-		p.lua.Close()
+	if p.kind == "lua" && p.lunar != nil {
+		p.lunar.Close()
 	}
 	if p.kind == "wasm" && p.extismPlugin != nil {
 		_ = p.extismPlugin.Close(m.ctx)
@@ -343,8 +357,10 @@ func (m *Manager) UnloadPlugin(id string) error {
 		p.js.Interrupt("unloading")
 	}
 	p.extismPlugin = nil
-	p.lua = nil
+	p.lunar = nil
 	p.js = nil
+	p.goPlugin = nil
+	p.goFns = nil
 	p.contractVersion = 0
 	p.meta = types.PluginMeta{}
 	p.loaded = false
@@ -361,8 +377,8 @@ func (m *Manager) ReloadPlugin(id string) (string, error) {
 		return "", fmt.Errorf("plugin %q not loaded", id)
 	}
 	// Close the old plugin instance first
-	if old.kind == "lua" && old.lua != nil {
-		old.lua.Close()
+	if old.kind == "lua" && old.lunar != nil {
+		old.lunar.Close()
 	}
 	if old.kind == "wasm" && old.extismPlugin != nil {
 		_ = old.extismPlugin.Close(m.ctx)
@@ -370,6 +386,8 @@ func (m *Manager) ReloadPlugin(id string) (string, error) {
 	if old.kind == "js" && old.js != nil {
 		old.js.Interrupt("reloading")
 	}
+	// Go native plugins have no explicit unload in pkg/plugin; dropping the
+	// handle leaks the mapped .so until process exit (acceptable on reload).
 	delete(m.plugins, id)
 	m.mu.Unlock()
 
@@ -425,8 +443,8 @@ func (m *Manager) Close() error {
 		if !p.loaded {
 			continue
 		}
-		if p.kind == "lua" && p.lua != nil {
-			p.lua.Close()
+		if p.kind == "lua" && p.lunar != nil {
+			p.lunar.Close()
 		}
 		if p.kind == "wasm" && p.extismPlugin != nil {
 			_ = p.extismPlugin.Close(m.ctx)

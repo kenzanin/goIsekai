@@ -31,6 +31,9 @@ func (m *Manager) call(p *loadedPlugin, fnName, inputJSON string) (string, error
 	if p.kind == "js" {
 		return callJS(p, fnName, inputJSON)
 	}
+	if p.kind == "go" {
+		return callGo(p, fnName, inputJSON)
+	}
 	p.mu.Lock()
 	defer p.mu.Unlock()
 
