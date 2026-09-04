@@ -3,7 +3,7 @@
 BINARY := goisekai
 PKGS   := ./internal/... ./pkg/... ./cmd/...
 
-.PHONY: build dev devrun run open check fmt fmt-web test race modernize lint lint-web br clean
+.PHONY: build dev devrun run open check fmt fmt-web test race modernize lint lint-web br clean build-plugins install-plugins all
 
 ## build: compile the server binary (pure Go, CGO-free, cross-compilable).
 build: br
@@ -60,6 +60,30 @@ lint:
 ## clean: remove the server binary.
 clean:
 	rm -f $(BINARY)
+
+## all: build plugins then host binary.
+all: build-plugins build
+
+WASM_PLUGINS := mangadex mangafire dummy
+
+## build-plugins: compile all WASM plugins via each plugin's Makefile.
+build-plugins:
+	@for p in $(WASM_PLUGINS); do \
+		echo "building plugin $$p..."; \
+		$(MAKE) -C examples/wasm/$$p build || { echo "FAILED: $$p"; exit 1; }; \
+	done
+	@echo "all WASM plugins built"
+
+## install-plugins: copy built .wasm files to $(PLUGINS_DIR).
+install-plugins: build-plugins
+	@mkdir -p $(PLUGINS_DIR)
+	@for p in $(WASM_PLUGINS); do \
+		src="examples/wasm/$$p/$$p.wasm"; \
+		test -f "$$src" || src="examples/wasm/$$p/dist/$$p.wasm"; \
+		test -f "$$src" || { echo "no .wasm found for $$p"; exit 1; }; \
+		cp "$$src" $(PLUGINS_DIR)/$$p.wasm; \
+		echo "installed: $$p.wasm"; \
+	done
 
 ## install-lua: copy a Lua plugin folder into the configured plugins dir.
 ## Usage: make install-lua PLUGIN=kaliscan
