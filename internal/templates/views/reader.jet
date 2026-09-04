@@ -4,7 +4,8 @@
 <div id="reader" class="relative w-full h-screen" data-plugin-id="{{.PluginID}}" data-manga-id="{{.MangaID}}" data-chapter-id="{{.ChapterID}}" data-manga-title="{{.Manga.Title}}" data-next-chapter-id="{{.NextChapterID}}" data-prev-chapter-id="{{.PrevChapterID}}">
   <!-- Top bar: persistent (back + page counter + controls) -->
   <div id="top-bar" class="absolute top-0 left-0 right-0 z-30 flex flex-wrap items-center gap-2 bg-neutral-950/85 backdrop-blur-sm px-3 py-2 text-sm transition-transform duration-300 ease-in-out">
-    <a href="/view/manga/{{.PluginID}}/{{.MangaID}}" class="border border-neutral-700 hover:bg-neutral-800 active:scale-95 transition rounded-md px-3 py-1.5">← Back</a>
+  <a href="/view/manga/{{.PluginID}}/{{.MangaID}}" class="border border-neutral-700 hover:bg-neutral-800 active:scale-95 transition rounded-md px-3 py-1.5">← Back</a>
+  <span class="ml-2 text-xs cursor-default" title="← → navigate · Space next · Esc back">⌨</span>
     <span class="text-neutral-500 truncate max-w-[25%]">{{.Manga.Title}}</span>
     <span id="page-counter" class="text-neutral-400">– / –</span>
     <div class="flex-1 flex justify-center min-w-0">

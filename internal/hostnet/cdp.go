@@ -5,17 +5,70 @@ import (
 	"fmt"
 	"net"
 	"strings"
+	"sync"
 	"time"
 
+	"github.com/bogdanfinn/fhttp"
 	"github.com/chromedp/cdproto/network"
 	"github.com/chromedp/chromedp"
 
-	http "github.com/bogdanfinn/fhttp"
+	"goisekai/internal/logger"
 )
 
 // solveDefaultTimeout bounds a single challenge solve when the caller did not
 // configure a timeout.
 const solveDefaultTimeout = 30 * time.Second
+
+// engineCoolDown is the circuit-breaker window: an engine that failed within
+// the last engineCoolDown is skipped by the fallback chain so a dead daemon
+// isn't re-tried on every challenge.
+const engineCoolDown = 30 * time.Second
+
+// engineHealth tracks the last failure time per CDP engine. A successful solve
+// clears the entry (reset on success).
+var engineHealth = struct {
+	sync.Mutex
+	lastFail map[string]time.Time
+}{lastFail: make(map[string]time.Time)}
+
+func engineFailed(engine string) {
+	engineHealth.Lock()
+	defer engineHealth.Unlock()
+	engineHealth.lastFail[engine] = time.Now()
+}
+
+func engineSucceeded(engine string) {
+	engineHealth.Lock()
+	defer engineHealth.Unlock()
+	delete(engineHealth.lastFail, engine)
+}
+
+// engineTripped reports whether engine failed within the last engineCoolDown.
+func engineTripped(engine string) bool {
+	engineHealth.Lock()
+	defer engineHealth.Unlock()
+	t, ok := engineHealth.lastFail[engine]
+	return ok && time.Since(t) < engineCoolDown
+}
+
+// cdpFallbackChain returns the ordered engine names to attempt for a solve:
+// the configured engine first, then the "obscura" and "lightpanda" daemon
+// engines as fallbacks. Duplicates are removed (the configured engine is not
+// repeated when it is already one of the fallbacks) and disabled engines
+// ("", "off") are dropped.
+func cdpFallbackChain(configured string) []string {
+	candidates := []string{configured, "obscura", "lightpanda"}
+	chain := make([]string, 0, len(candidates))
+	seen := make(map[string]bool, len(candidates))
+	for _, e := range candidates {
+		if e == "" || e == "off" || seen[e] {
+			continue
+		}
+		seen[e] = true
+		chain = append(chain, e)
+	}
+	return chain
+}
 
 // solveChallenge launches a CDP browser engine, navigates it to url, waits for
 // the anti-bot interstitial to clear, and harvests the resulting cookies plus
@@ -26,7 +79,45 @@ const solveDefaultTimeout = 30 * time.Second
 //   - "chrome"     → cfg.Path is the chrome binary path, launched as a subprocess.
 //   - "lightpanda" → cfg.Path is a CDP websocket URL (ws://host:port).
 //   - "obscura"    → cfg.Path is a CDP websocket URL (ws://host:port).
+//
+// Engines are attempted in fallback-chain order (see cdpFallbackChain): the
+// configured engine first, then the "obscura" and "lightpanda" alternatives.
+// At most one fallback engine is tried after the primary fails, and engines
+// that failed within engineCoolDown are skipped (circuit breaker). A fallback
+// attempt is logged at WARN.
 func solveChallenge(cfg CDPConfig, url string) ([]*http.Cookie, string, error) {
+	var lastErr error
+	tried := 0
+	for _, engine := range cdpFallbackChain(cfg.Engine) {
+		if tried >= 2 {
+			break // primary + max 1 retry
+		}
+		if engineTripped(engine) {
+			logger.Warn("cdp: skipping engine (recent failure)", "engine", engine, "url", url)
+			continue
+		}
+		tried++
+		attempt := cfg
+		attempt.Engine = engine
+		cookies, ua, err := solveWithEngine(attempt, url)
+		if err == nil {
+			engineSucceeded(engine)
+			return cookies, ua, nil
+		}
+		engineFailed(engine)
+		lastErr = err
+		logger.Warn("cdp: engine failed, trying next", "engine", engine, "error", err, "url", url)
+	}
+	if lastErr == nil {
+		lastErr = fmt.Errorf("hostnet: no CDP engine available (all engines skipped)")
+	}
+	return nil, "", lastErr
+}
+
+// solveWithEngine runs a single challenge solve against one engine. cfg.Engine
+// names the engine and cfg.Path locates it (a binary path for "chrome", a
+// ws:// URL for "lightpanda" and "obscura").
+func solveWithEngine(cfg CDPConfig, url string) ([]*http.Cookie, string, error) {
 	timeout := cfg.Timeout
 	if timeout <= 0 {
 		timeout = solveDefaultTimeout

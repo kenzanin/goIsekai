@@ -14,7 +14,8 @@
   var pages = [],
     current = 0,
     img = null,
-    loading = false;
+    loading = false,
+    _lastFailedRetry = null;
   var viewMode = localStorage.getItem('gi_viewMode') || 'fitWidth';
   var direction = localStorage.getItem('gi_direction') || 'ltr';
   var smoothing = (localStorage.getItem('gi_renderMode') || 'smooth') === 'smooth';
@@ -138,6 +139,22 @@
   function showError(v) {
     errPanel.style.display = v ? 'flex' : 'none';
   }
+  function showReaderError(msg) {
+    errPanel.querySelector('p').textContent = msg;
+    showError(true);
+  }
+  function hideReaderError() {
+    showError(false);
+  }
+
+  // ponytail: classify fetch errors into user-friendly text
+  function friendlyError(err) {
+    if (err instanceof TypeError) return 'Network error — check your connection';
+    if (err instanceof SyntaxError) return 'Server returned invalid data';
+    var m = err.message || String(err);
+    if (/^HTTP \d+$/.test(m)) return 'Server error (' + m.slice(5) + ')';
+    return m;
+  }
 
   function showNotice(msg) {
     errPanel.querySelector('p').textContent = msg;
@@ -237,7 +254,7 @@
       showSpinner(false);
       imgFails++;
       if (imgFails >= 4) {
-        showError(true);
+        showReaderError('Failed to load image — try Retry');
         return;
       } // give up — manual Retry still available
       // At-home nodes flake transiently: retry the same URL once, then
@@ -326,17 +343,21 @@
   function switchChapter(targetCID, targetPage) {
     if (loading) return;
     showSpinner(true);
+    _lastFailedRetry = function() { switchChapter(targetCID, targetPage); };
     fetch(`/api/reader-data/${[pid, mid, targetCID].map(encodeURIComponent).join('/')}`)
       .then((r) => {
         if (!r.ok) throw new Error(`HTTP ${r.status}`);
         return r.json();
       })
       .then((data) => {
+        if (data.error) {
+          showReaderError(data.error);
+          showSpinner(false);
+          return;
+        }
         var newPages = data.pages || [];
         if (!newPages.length) {
-          errPanel.querySelector('p').textContent =
-            'Empty chapter (plugin failed to fetch pages) — try Retry';
-          showError(true);
+          showReaderError('Empty chapter (plugin failed to fetch pages) — try Retry');
           showSpinner(false);
           return;
         }
@@ -351,6 +372,7 @@
         img = null;
         panX = 0;
         panY = 0;
+        _lastFailedRetry = null;
         syncChapterNav(data);
         // Update the URL without a reload; back/forward still work.
         var url = `/view/read/${[pid, mid, targetCID].map(encodeURIComponent).join('/')}`;
@@ -360,8 +382,7 @@
         drawPage(initial);
       })
       .catch((err) => {
-        errPanel.querySelector('p').textContent = `Failed to load chapter: ${err.message}`;
-        showError(true);
+        showReaderError(friendlyError(err));
         showSpinner(false);
       });
   }
@@ -499,7 +520,9 @@
   document.getElementById('btn-next-page').addEventListener('click', next);
   document.getElementById('btn-retry').addEventListener('click', () => {
     imgFails = 0;
-    loadChapter(true);
+    hideReaderError();
+    if (_lastFailedRetry) _lastFailedRetry();
+    else loadChapter(true);
   });
   document.getElementById('btn-skip').addEventListener('click', next);
   document.getElementById('btn-zoom-in').addEventListener('click', () => {
@@ -549,6 +572,9 @@
     } else if (e.key === ' ') {
       e.preventDefault();
       next();
+    } else if (e.key === 'Escape') {
+      e.preventDefault();
+      window.location.href = `/view/manga/${encodeURIComponent(pid)}/${encodeURIComponent(mid)}`;
     } else if (e.key === 'Home') {
       e.preventDefault();
       goToPage(0);
@@ -580,19 +606,23 @@
   // Boot: fetch page data, then first draw after the canvas is visible.
   function loadChapter(resume) {
     preloaded = {}; // stale at-home URLs 404 — drop cached Image objects
+    _lastFailedRetry = function() { loadChapter(resume); };
     fetch(`/api/reader-data/${[pid, mid, cid].map(encodeURIComponent).join('/')}`)
       .then((r) => {
         if (!r.ok) throw new Error(`HTTP ${r.status}`);
         return r.json();
       })
       .then((data) => {
-        pages = data.pages || [];
-        if (!pages.length) {
-          errPanel.querySelector('p').textContent =
-            'Empty chapter (plugin failed to fetch pages) — try Retry';
-          showError(true);
+        if (data.error) {
+          showReaderError(data.error);
           return;
         }
+        pages = data.pages || [];
+        if (!pages.length) {
+          showReaderError('Empty chapter (plugin failed to fetch pages) — try Retry');
+          return;
+        }
+        _lastFailedRetry = null;
         nextFrame(() => {
           // Honor ?page=N (or ?page=last from chapter advance); a retry keeps
           // the page the reader was already on.
@@ -603,8 +633,7 @@
         });
       })
       .catch((err) => {
-        errPanel.querySelector('p').textContent = `Failed to load chapter: ${err.message}`;
-        showError(true);
+        showReaderError(friendlyError(err));
       });
   }
   loadChapter();
