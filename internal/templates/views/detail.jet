@@ -7,7 +7,7 @@
 <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
     <div class="md:col-span-1">
         {{if .Manga.CoverURL != ""}}
-        <img src="/image?pluginID={{.PluginID}}&amp;url={{.Manga.CoverURL}}" alt="{{.Manga.Title}}" class="w-full rounded-lg object-cover">
+        <img src="/image?pluginID={{.PluginID}}&amp;url={{.Manga.CoverURL}}" alt="{{.Manga.Title}}" class="w-full aspect-[2/3] rounded-lg object-cover">
         {{else}}
         <div class="w-full aspect-[2/3] bg-neutral-800 rounded-lg flex items-center justify-center text-neutral-500 text-4xl font-semibold">{{getInitials(.Manga.Title)}}</div>
         {{end}}
@@ -86,21 +86,23 @@
                 {{if .Progress[c.ID].Done}}
                 <span class="text-emerald-400 text-xs">✓</span>
                 {{end}}
+                {{if c.ReleasedAt.Format("2006") != "0001"}}
                 <span class="text-xs text-neutral-500">{{formatDate(c.ReleasedAt.Format("2006-01-02T15:04:05"))}}</span>
+                {{end}}
             </span>
         </a>
         <form method="post" action="/action/mark-read/{{.PluginID}}/{{.MangaID}}/{{c.ID}}">
-            <button type="submit" title="Mark read" class="size-7 inline-flex items-center justify-center rounded-md border border-transparent hover:border-neutral-700 hover:bg-neutral-800 text-sm">✅</button>
+            <button type="submit" title="Mark read" class="size-7 inline-flex items-center justify-center rounded-md border border-neutral-700 hover:bg-neutral-800 text-sm">✅</button>
         </form>
         <form method="post" action="/action/reset-progress/{{.PluginID}}/{{.MangaID}}/{{c.ID}}">
-            <button type="submit" title="Reset progress" class="size-7 inline-flex items-center justify-center rounded-md border border-transparent hover:border-neutral-700 hover:bg-neutral-800 text-sm" onclick="return confirm('Are you sure?')">🔄</button>
+            <button type="submit" title="Reset progress" class="size-7 inline-flex items-center justify-center rounded-md border border-neutral-700 hover:bg-neutral-800 text-sm" onclick="return confirm('Are you sure?')">🔄</button>
         </form>
         <form method="post" action="/action/mark-read-range/{{.PluginID}}/{{.MangaID}}/{{firstID}}/{{c.ID}}">
-            <button type="submit" title="Mark up to here" class="size-7 inline-flex items-center justify-center rounded-md border border-transparent hover:border-neutral-700 hover:bg-neutral-800 text-sm">📚</button>
+            <button type="submit" title="Mark up to here" class="size-7 inline-flex items-center justify-center rounded-md border border-neutral-700 hover:bg-neutral-800 text-sm">📚</button>
         </form>
         <form method="post" action="/action/export-cbz/{{.PluginID}}/{{.MangaID}}/{{c.ID}}">
             <input type="hidden" name="title" value="{{.Manga.Title}} - Ch. {{formatChapterNum(c.ChapterNum)}}">
-            <button type="submit" title="Download this chapter as .cbz" class="h-7 px-2 inline-flex items-center justify-center rounded-md border border-transparent hover:border-neutral-700 hover:bg-neutral-800 text-sm whitespace-nowrap">⬇ cbz</button>
+            <button type="submit" title="Download this chapter as .cbz" class="h-7 px-2 inline-flex items-center justify-center rounded-md border border-neutral-700 hover:bg-neutral-800 text-sm whitespace-nowrap">⬇ cbz</button>
         </form>
     </div>
     {{end}}

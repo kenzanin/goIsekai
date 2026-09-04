@@ -31,14 +31,18 @@
     {{end}}
 </div>
 <script>
-document.querySelectorAll('[data-ts]').forEach(el => {
-  const d = new Date(el.dataset.ts);
-  const diff = Date.now() - d.getTime();
-  const mins = Math.floor(diff/60000);
-  if (mins < 60) el.textContent = mins + 'm ago';
-  else if (mins < 1440) el.textContent = Math.floor(mins/60) + 'h ago';
-  else el.textContent = Math.floor(mins/1440) + 'd ago';
-});
+function refreshRelativeTimes() {
+  document.querySelectorAll('[data-ts]').forEach(el => {
+    const d = new Date(el.dataset.ts);
+    const diff = Date.now() - d.getTime();
+    const mins = Math.floor(diff/60000);
+    if (mins < 60) el.textContent = mins + 'm ago';
+    else if (mins < 1440) el.textContent = Math.floor(mins/60) + 'h ago';
+    else el.textContent = Math.floor(mins/1440) + 'd ago';
+  });
+}
+refreshRelativeTimes();
+setInterval(refreshRelativeTimes, 60000);
 </script>
 {{end}}
 {{ end }}

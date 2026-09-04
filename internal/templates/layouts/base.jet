@@ -32,6 +32,12 @@
             box-shadow: 0 4px 12px rgba(0,0,0,0.4);
             transition: opacity 0.3s;
         }
+        @media (prefers-reduced-motion: reduce) {
+            *, ::before, ::after {
+                transition-duration: 0.01ms !important;
+                animation-duration: 0.01ms !important;
+            }
+        }
     </style>
 </head>
 <body class="bg-neutral-950 text-neutral-100 min-h-full">

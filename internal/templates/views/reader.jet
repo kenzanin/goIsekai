@@ -55,13 +55,13 @@
   <div id="bottom-bar" class="absolute bottom-0 left-0 right-0 z-30 flex items-center gap-3 bg-neutral-950/85 backdrop-blur-sm px-3 py-2 text-sm transition-transform duration-300 ease-in-out">
     <a id="btn-prev-ch" href="/view/read/{{.PluginID}}/{{.MangaID}}/{{.PrevChapterID}}" class="border border-neutral-700 hover:bg-neutral-800 active:scale-95 transition rounded-md px-3 py-1.5" style="{{ if not .PrevChapterID }}display:none{{ end }}">← Prev ch.</a>
     <button id="btn-prev-page" class="border border-neutral-700 hover:bg-neutral-800 active:scale-95 transition rounded-md px-3 py-1.5">‹</button>
-    <input id="page-slider" type="range" min="1" value="1" class="h-1 flex-1 accent-indigo-500" />
+    <input id="page-slider" type="range" min="1" value="1" class="h-2 flex-1 accent-indigo-500" />
     <button id="btn-next-page" class="border border-neutral-700 hover:bg-neutral-800 active:scale-95 transition rounded-md px-3 py-1.5">›</button>
     <a id="btn-next-ch" href="/view/read/{{.PluginID}}/{{.MangaID}}/{{.NextChapterID}}" class="border border-neutral-700 hover:bg-neutral-800 active:scale-95 transition rounded-md px-3 py-1.5" style="{{ if not .NextChapterID }}display:none{{ end }}">Next ch. →</a>
   </div>
 
   <!-- Progress line: visible when bars are hidden -->
-  <div id="progress-line" class="absolute bottom-0 left-0 right-0 z-40 h-1.5 bg-indigo-500 transition-opacity duration-300 ease-in-out opacity-0"></div>
+  <div id="progress-line" class="absolute bottom-0 left-0 right-0 z-40 h-2 bg-indigo-500 shadow-[0_0_8px_2px_rgba(99,102,241,0.55)] transition-opacity duration-300 ease-in-out opacity-0"></div>
 </div>
 
 <script src="/static/lib/reader.js" defer></script>
