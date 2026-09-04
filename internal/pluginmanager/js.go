@@ -151,6 +151,7 @@ func (m *Manager) loadJS(id, dir string) (*loadedPlugin, error) {
 		id:              id,
 		wasmPath:        filepath.Join(dir, "main.js"),
 		kind:            "js",
+		loaded:          true,
 		js:              vm,
 		contractVersion: contractVer,
 		meta:            meta,

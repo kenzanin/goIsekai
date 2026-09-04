@@ -34,6 +34,11 @@
             {{else}}
             <span class="text-xs px-2 py-0.5 rounded-full bg-neutral-700/50 text-neutral-400">Inactive</span>
             {{end}}
+            {{if p.Loaded}}
+            <span class="text-xs px-2 py-0.5 rounded-full bg-sky-500/15 text-sky-400">Loaded</span>
+            {{else}}
+            <span class="text-xs px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-400">Deferred</span>
+            {{end}}
             <form method="post" action="/action/toggle-plugin/{{p.ID}}">
                 <button type="submit" class="border border-neutral-700 text-neutral-400 hover:text-neutral-200 rounded-md px-3 py-1.5 text-sm">
                     {{if p.IsActive}}Deactivate{{else}}Activate{{end}}

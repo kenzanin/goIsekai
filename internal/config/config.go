@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"time"
 
 	"goisekai/internal/logger"
 )
@@ -132,6 +133,42 @@ func (c *Config) Save(path string) error {
 	fmt.Fprintf(&b, "cdp_path = %s\n", c.CDPPath)
 	fmt.Fprintf(&b, "cdp_solve_timeout = %d\n", c.CDPSolveTimeout)
 	return os.WriteFile(path, []byte(b.String()), 0o644)
+}
+
+// Watch polls path's mtime every interval. When the file changes it re-reads
+// the config and calls onChange with the fresh value. It returns a stop
+// function that terminates the background goroutine.
+func Watch(path string, interval time.Duration, onChange func(*Config)) (stop func()) {
+	done := make(chan struct{})
+	var lastMod time.Time
+	if fi, err := os.Stat(path); err == nil {
+		lastMod = fi.ModTime()
+	}
+	go func() {
+		ticker := time.NewTicker(interval)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-done:
+				return
+			case <-ticker.C:
+				fi, err := os.Stat(path)
+				if err != nil {
+					continue
+				}
+				if !fi.ModTime().After(lastMod) {
+					continue
+				}
+				lastMod = fi.ModTime()
+				cfg, err := Load(path)
+				if err != nil {
+					continue
+				}
+				onChange(cfg)
+			}
+		}
+	}()
+	return func() { close(done) }
 }
 
 // set applies a single key=value pair under a section, normalizing the key to

@@ -225,6 +225,7 @@ func (m *Manager) loadLua(id, dir string) (*loadedPlugin, error) {
 		id:              id,
 		wasmPath:        mainPath,
 		kind:            "lua",
+		loaded:          true,
 		lua:             L,
 		contractVersion: contractVer,
 		meta:            meta,

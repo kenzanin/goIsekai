@@ -3,7 +3,9 @@ package config
 import (
 	"os"
 	"path/filepath"
+	"sync"
 	"testing"
+	"time"
 )
 
 func TestLoadMissingFileReturnsDefaults(t *testing.T) {
@@ -111,5 +113,49 @@ func TestMissingOrUnknownLogLevelKeepsDefault(t *testing.T) {
 	}
 	if got.LogLevel != "info" {
 		t.Fatalf("unknown log_level: got %q want %q", got.LogLevel, "info")
+	}
+}
+
+func TestWatchDetectsFileChange(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "watch.ini")
+	c := Default()
+	c.UserAgent = "InitialAgent/1.0"
+	if err := c.Save(path); err != nil {
+		t.Fatalf("Save: %v", err)
+	}
+
+	var mu sync.Mutex
+	var got *Config
+	done := make(chan struct{})
+	stop := Watch(path, 10*time.Millisecond, func(cfg *Config) {
+		mu.Lock()
+		got = cfg
+		mu.Unlock()
+		select {
+		case <-done:
+		default:
+			close(done)
+		}
+	})
+	defer stop()
+
+	// Wait for the first poll cycle to register the initial mtime.
+	time.Sleep(50 * time.Millisecond)
+
+	// Modify the file.
+	c.UserAgent = "UpdatedAgent/2.0"
+	if err := c.Save(path); err != nil {
+		t.Fatalf("Save: %v", err)
+	}
+
+	select {
+	case <-done:
+		mu.Lock()
+		if got == nil || got.UserAgent != "UpdatedAgent/2.0" {
+			t.Fatalf("watcher did not pick up change: %+v", got)
+		}
+		mu.Unlock()
+	case <-time.After(2 * time.Second):
+		t.Fatal("watcher did not fire within timeout")
 	}
 }

@@ -35,6 +35,7 @@ type loadedPlugin struct {
 	id       string
 	wasmPath string
 	kind     string // "wasm", "lua", or "js"
+	loaded   bool   // true after the runtime has been instantiated
 	// extismPlugin holds the Extism plugin instance for wasm-kind plugins (nil otherwise).
 	extismPlugin *extism.Plugin
 	// lua holds the Lua VM for lua-kind plugins (nil for wasm/js).
@@ -47,6 +48,47 @@ type loadedPlugin struct {
 	meta types.PluginMeta
 	// mu serializes invocations: concurrent calls to the same plugin must not interleave.
 	mu sync.Mutex
+}
+
+// ensureLoaded lazily instantiates the plugin runtime on first use.
+// It is safe to call concurrently; the per-plugin mutex serializes
+// multiple callers, and only the first one performs the actual load.
+func (m *Manager) ensureLoaded(id string) error {
+	m.mu.RLock()
+	p, ok := m.plugins[id]
+	m.mu.RUnlock()
+	if !ok {
+		return fmt.Errorf("plugin %q not registered", id)
+	}
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	if p.loaded {
+		return nil
+	}
+	var loaded *loadedPlugin
+	var err error
+	switch p.kind {
+	case "wasm":
+		loaded, err = m.load(p.id, p.wasmPath)
+	case "lua":
+		loaded, err = m.loadLua(p.id, p.wasmPath)
+	case "js":
+		loaded, err = m.loadJS(p.id, p.wasmPath)
+	default:
+		return fmt.Errorf("plugin %q: unknown kind %q", id, p.kind)
+	}
+	if err != nil {
+		return fmt.Errorf("lazy-load plugin %s: %w", id, err)
+	}
+	p.extismPlugin = loaded.extismPlugin
+	p.lua = loaded.lua
+	p.js = loaded.js
+	p.contractVersion = loaded.contractVersion
+	p.meta = loaded.meta
+	p.loaded = true
+	m.proxy.SetNeedsJS(id, p.meta.NeedsJS)
+	logger.Debug("plugin loaded (lazy)", "id", id, "version", p.contractVersion)
+	return nil
 }
 
 // Manager loads WASM source plugins and exposes their search/detail operations
@@ -72,9 +114,11 @@ func NewManager(proxy *hostnet.Proxy, pluginsDir string) *Manager {
 	}
 }
 
-// Discover loads
-// every *.wasm file in pluginsDir. A plugin that fails its contract-version
-// check or instantiation aborts the whole discovery with a descriptive error.
+// Discover scans pluginsDir and registers every *.wasm file and every
+// folder containing main.lua or main.js, WITHOUT instantiating any runtime.
+// Plugins are lazily instantiated on first use via ensureLoaded. A folder
+// that collides with an already-registered id is logged and skipped rather
+// than aborting discovery.
 func (m *Manager) Discover() error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -89,15 +133,16 @@ func (m *Manager) Discover() error {
 
 	for _, path := range matches {
 		id := strings.TrimSuffix(filepath.Base(path), ".wasm")
-		logger.Debug("loading plugin", "id", id, "path", path)
-		p, err := m.load(id, path)
-		if err != nil {
-			logger.Error("plugin load failed", "id", id, "error", err)
-			return fmt.Errorf("load plugin %s: %w", id, err)
+		if _, dup := m.plugins[id]; dup {
+			logger.Error("plugin id collision, skipping", "id", id, "kind", "wasm")
+			continue
 		}
-		m.plugins[id] = p
-		m.proxy.SetNeedsJS(id, p.meta.NeedsJS)
-		logger.Debug("plugin loaded", "id", id, "version", p.contractVersion)
+		m.plugins[id] = &loadedPlugin{
+			id:       id,
+			wasmPath: path,
+			kind:     "wasm",
+		}
+		logger.Debug("plugin registered", "id", id, "path", path)
 	}
 
 	// Lua plugins: one folder per plugin, main.lua entry, folder name = id.
@@ -108,18 +153,17 @@ func (m *Manager) Discover() error {
 	for _, path := range luaMatches {
 		id := filepath.Base(filepath.Dir(path))
 		if _, dup := m.plugins[id]; dup {
-			return fmt.Errorf("plugin id collision: %q (wasm and lua)", id)
+			logger.Error("plugin id collision, skipping", "id", id, "kind", "lua")
+			continue
 		}
-		logger.Debug("loading lua plugin", "id", id, "path", path)
-		p, err := m.loadLua(id, filepath.Dir(path))
-		if err != nil {
-			logger.Error("lua plugin load failed", "id", id, "error", err)
-			return fmt.Errorf("load lua plugin %s: %w", id, err)
+		m.plugins[id] = &loadedPlugin{
+			id:       id,
+			wasmPath: filepath.Dir(path),
+			kind:     "lua",
 		}
-		m.plugins[id] = p
-		m.proxy.SetNeedsJS(id, p.meta.NeedsJS)
-		logger.Debug("lua plugin loaded", "id", id, "version", p.contractVersion)
+		logger.Debug("lua plugin registered", "id", id, "path", path)
 	}
+
 	// JS plugins: one folder per plugin, main.js entry, folder name = id.
 	jsMatches, err := filepath.Glob(filepath.Join(m.pluginsDir, "*", "main.js"))
 	if err != nil {
@@ -128,17 +172,15 @@ func (m *Manager) Discover() error {
 	for _, path := range jsMatches {
 		id := filepath.Base(filepath.Dir(path))
 		if _, dup := m.plugins[id]; dup {
-			return fmt.Errorf("plugin id collision: %q (wasm/lua and js)", id)
+			logger.Error("plugin id collision, skipping", "id", id, "kind", "js")
+			continue
 		}
-		logger.Debug("loading js plugin", "id", id, "path", path)
-		p, err := m.loadJS(id, filepath.Dir(path))
-		if err != nil {
-			logger.Error("js plugin load failed", "id", id, "error", err)
-			return fmt.Errorf("load js plugin %s: %w", id, err)
+		m.plugins[id] = &loadedPlugin{
+			id:       id,
+			wasmPath: filepath.Dir(path),
+			kind:     "js",
 		}
-		m.plugins[id] = p
-		m.proxy.SetNeedsJS(id, p.meta.NeedsJS)
-		logger.Debug("js plugin loaded", "id", id, "version", p.contractVersion)
+		logger.Debug("js plugin registered", "id", id, "path", path)
 	}
 	return nil
 }
@@ -276,14 +318,20 @@ func (m *Manager) LoadPlugin(path string) (string, error) {
 	return id, nil
 }
 
-// UnloadPlugin closes a plugin and removes it from the loaded set.
-// The plugin files remain on disk.
+// UnloadPlugin releases the runtime for a plugin, reverting it to the
+// registered-only state. The plugin stays in the manager and database so
+// it will be lazily reloaded on next use.
 func (m *Manager) UnloadPlugin(id string) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	p, ok := m.plugins[id]
 	if !ok {
 		return fmt.Errorf("plugin %q not loaded", id)
+	}
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	if !p.loaded {
+		return nil
 	}
 	if p.kind == "lua" && p.lua != nil {
 		p.lua.Close()
@@ -294,7 +342,12 @@ func (m *Manager) UnloadPlugin(id string) error {
 	if p.kind == "js" && p.js != nil {
 		p.js.Interrupt("unloading")
 	}
-	delete(m.plugins, id)
+	p.extismPlugin = nil
+	p.lua = nil
+	p.js = nil
+	p.contractVersion = 0
+	p.meta = types.PluginMeta{}
+	p.loaded = false
 	logger.Info("plugin unloaded", "id", id)
 	return nil
 }
@@ -363,11 +416,15 @@ func copyDir(src, dst string) error {
 	return nil
 }
 
-// Close releases the runtime and all instantiated plugins.
+// Close releases the runtime of every instantiated plugin. Registered-only
+// (deferred) plugins have no runtime to release and are skipped.
 func (m *Manager) Close() error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	for _, p := range m.plugins {
+		if !p.loaded {
+			continue
+		}
 		if p.kind == "lua" && p.lua != nil {
 			p.lua.Close()
 		}
@@ -396,10 +453,11 @@ func copyFile(src, dst string) error {
 	return out.Close()
 }
 
-// LoadedPlugin is metadata about a currently-loaded plugin.
+// LoadedPlugin is metadata about a currently-registered plugin.
 type LoadedPlugin struct {
 	ID               string
 	Version          string // ABI contract version (e.g. "1")
+	Loaded           bool   // true when the runtime is instantiated
 	WasmPath         string
 	VerifyURL        string // from the plugin's optional Init metadata
 	NeedsHumanVerify bool
@@ -408,7 +466,7 @@ type LoadedPlugin struct {
 	SearchPageSize   int
 }
 
-// LoadedPlugins returns metadata for every plugin currently loaded in memory,
+// LoadedPlugins returns metadata for every plugin currently registered,
 // sorted by id.
 func (m *Manager) LoadedPlugins() []LoadedPlugin {
 	m.mu.RLock()
@@ -418,6 +476,7 @@ func (m *Manager) LoadedPlugins() []LoadedPlugin {
 		out = append(out, LoadedPlugin{
 			ID:               p.id,
 			Version:          strconv.Itoa(int(p.contractVersion)),
+			Loaded:           p.loaded,
 			WasmPath:         p.wasmPath,
 			VerifyURL:        p.meta.VerifyURL,
 			NeedsHumanVerify: p.meta.NeedsHumanVerify,

@@ -19,6 +19,16 @@ func (s *Server) viewLibrary(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		s.logger.Error("library list", "error", err)
 	}
+	// Host-side pagination: slice the full library (newest-updated first)
+	// so the grid renders one page at a time.
+	const pageSize = 24
+	page, _ := strconv.Atoi(r.URL.Query().Get("page"))
+	if page < 1 {
+		page = 1
+	}
+	total := len(mangas)
+	start := min((page-1)*pageSize, total)
+	end := min(start+pageSize, total)
 	ratios := make(map[string]float64)
 	metas := s.service.PluginMetas()
 	for id, m := range metas {
@@ -56,9 +66,13 @@ func (s *Server) viewLibrary(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	s.renderPage(w, "views/library.jet", "library", map[string]any{
-		"Mangas":       mangas,
+		"Mangas":       mangas[start:end],
 		"Ratios":       ratios,
 		"LibraryStats": statsMap,
+		"Page":         page,
+		"TotalPages":   max((total+pageSize-1)/pageSize, 1),
+		"HasNext":      end < total,
+		"HasPrev":      page > 1,
 	})
 }
 
@@ -222,6 +236,7 @@ func (s *Server) continueFromHistory(pluginID, mangaID string, chapters []types.
 // declared thumbnail ratio for the plugins page.
 type PluginView struct {
 	database.Plugin
+	Loaded           bool // true once the runtime has been instantiated
 	VerifyURL        string
 	NeedsHumanVerify bool
 	VerifyCookies    string
@@ -240,6 +255,7 @@ func (s *Server) viewPlugins(w http.ResponseWriter, _ *http.Request) {
 	for _, p := range plugins {
 		v := PluginView{Plugin: p}
 		if m, ok := metas[p.ID]; ok {
+			v.Loaded = m.Loaded
 			v.VerifyURL = m.VerifyURL
 			v.NeedsHumanVerify = m.NeedsHumanVerify
 			v.ThumbRatio = m.ThumbRatio

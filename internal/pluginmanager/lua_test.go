@@ -82,7 +82,7 @@ func TestLuaPluginDiscoveryAndSearch(t *testing.T) {
 
 func TestLuaPluginRequireSandbox(t *testing.T) {
 	dir := t.TempDir()
-	// main.lua escapes its folder via a relative require — must fail to load.
+	// main.lua escapes its folder via a relative require — must fail at load time.
 	src := `PLUGIN = {contract_version = 1}
 function search_manga(a) return "[]" end
 function get_manga_detail(a) return "{}" end
@@ -102,10 +102,15 @@ local x = require("../evil")
 	}
 
 	mgr := NewManager(hostnet.NewProxy(), dir)
-	err := mgr.Discover()
+	if err := mgr.Discover(); err != nil {
+		t.Fatalf("Discover: %v", err)
+	}
+	defer func() { _ = mgr.Close() }()
+
+	// The error surfaces at lazy-load time, not during Discover.
+	_, err := mgr.Search("luatest", types.SearchFilter{Query: "test"})
 	if err == nil {
-		_ = mgr.Close()
-		t.Fatal("Discover must fail when main.lua requires outside its folder")
+		t.Fatal("Search must fail when main.lua requires outside its folder")
 	}
 	if !strings.Contains(err.Error(), "evil") && !strings.Contains(err.Error(), "require") {
 		t.Logf("error was: %v", err)
@@ -119,6 +124,11 @@ func TestLuaPluginNoUnsafeGlobals(t *testing.T) {
 		t.Fatalf("Discover: %v", err)
 	}
 	defer func() { _ = mgr.Close() }()
+
+	// Trigger lazy load via a search call.
+	if _, err := mgr.Search("luatest", types.SearchFilter{Query: "test"}); err != nil {
+		t.Fatalf("Search (trigger load): %v", err)
+	}
 
 	p := mgr.plugins["luatest"]
 	L := p.lua
@@ -142,7 +152,7 @@ func TestLuaPluginMissingGlobalsRejected(t *testing.T) {
 	if err := copyDir("testdata/luatest", filepath.Join(dir, "luatest")); err != nil {
 		t.Fatal(err)
 	}
-	// Drop one ABI global — load must fail.
+	// Drop one ABI global — load must fail at lazy-load time.
 	src := `PLUGIN = {contract_version = 1}
 function search_manga(a) return "[]" end
 function get_manga_detail(a) return "{}" end
@@ -152,10 +162,15 @@ function get_chapter_list(a) return "[]" end
 		t.Fatal(err)
 	}
 	mgr := NewManager(hostnet.NewProxy(), dir)
-	err := mgr.Discover()
+	if err := mgr.Discover(); err != nil {
+		t.Fatalf("Discover: %v", err)
+	}
+	defer func() { _ = mgr.Close() }()
+
+	// The error surfaces when the plugin is first used.
+	_, err := mgr.Search("luatest", types.SearchFilter{Query: "test"})
 	if err == nil {
-		_ = mgr.Close()
-		t.Fatal("Discover must fail when an ABI global is missing")
+		t.Fatal("Search must fail when an ABI global is missing")
 	}
 	if !strings.Contains(err.Error(), "get_page_list") {
 		t.Fatalf("error should name the missing global, got: %v", err)
@@ -198,20 +213,20 @@ function get_page_list(a) return "[]" end
 }
 
 func TestLuaPluginIDCollisionWithWasm(t *testing.T) {
-	// A wasm file and lua folder with the same id must fail discovery.
+	// A wasm file and lua folder with the same id — discover logs and skips the duplicate.
 	dir := luaPluginsDir(t)
 	wasmPath := buildFixture(t, "plugin") // plugin.wasm
 	if err := copyFile(wasmPath, filepath.Join(dir, "luatest.wasm")); err != nil {
 		t.Fatal(err)
 	}
 	mgr := NewManager(hostnet.NewProxy(), dir)
-	err := mgr.Discover()
-	if err == nil {
-		_ = mgr.Close()
-		t.Fatal("Discover must fail on id collision")
+	if err := mgr.Discover(); err != nil {
+		t.Fatalf("Discover: %v", err)
 	}
-	if !strings.Contains(err.Error(), "collision") {
-		t.Fatalf("error should mention collision, got: %v", err)
+	defer func() { _ = mgr.Close() }()
+	// Only one of the two should be registered (wasm wins, lua skipped).
+	if _, ok := mgr.plugins["luatest"]; !ok {
+		t.Fatal("wasm plugin should be registered")
 	}
 }
 

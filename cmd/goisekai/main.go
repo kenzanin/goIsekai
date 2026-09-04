@@ -1,12 +1,18 @@
 package main
 
 import (
+	"context"
 	"embed"
 	"flag"
+	"fmt"
 	"log"
 	"log/slog"
 	"os"
+	"os/signal"
 	"path/filepath"
+	"strconv"
+	"strings"
+	"syscall"
 	"time"
 
 	"goisekai/internal/bridge"
@@ -23,6 +29,12 @@ import (
 var assets embed.FS
 
 func main() {
+	// Handle "stop" subcommand before flag parsing.
+	if len(os.Args) > 1 && os.Args[1] == "stop" {
+		runStop()
+		return
+	}
+
 	logLevel := flag.String("logLevel", "", "log level: debug|info|warning (overrides goisekai.ini log_level)")
 	host := flag.String("host", "", "HTTP server bind address (overrides goisekai.ini host)")
 	port := flag.Int("port", 0, "HTTP server port (overrides goisekai.ini port)")
@@ -102,13 +114,21 @@ func main() {
 		logger.Fatal("mkdir cache dir", "error", err)
 	}
 
+	// PID file — written after dataDir exists, removed on shutdown.
+	pidPath := filepath.Join(dataDir, "goisekai.pid")
+	if err := os.WriteFile(pidPath, []byte(strconv.Itoa(os.Getpid())+"\n"), 0o644); err != nil {
+		logger.Warn("write PID file", "error", err)
+	} else {
+		defer func() {
+			logger.Info("removing PID file", "path", pidPath)
+			os.Remove(pidPath)
+		}()
+	}
+
 	db, err := database.Open(filepath.Join(dataDir, "goisekai.db"))
 	if err != nil {
 		logger.Fatal("open database", "error", err)
 	}
-	defer func() {
-		_ = db.Close()
-	}()
 
 	proxy := hostnet.NewProxy()
 	proxy.SetDefaultHeader("User-Agent", cfg.UserAgent)
@@ -120,13 +140,21 @@ func main() {
 		Timeout: time.Duration(cfg.CDPSolveTimeout) * time.Second,
 	})
 
+	// Hot-reload: poll goisekai.ini every 5s and apply the safe subset
+	// (log level, user-agent, referer) live. Unsafe fields like host/port/
+	// cdp_engine need a restart, so they are deliberately not applied here.
+	_ = config.Watch(cfgPath, 5*time.Second, func(updated *config.Config) {
+		if err := logger.Init(updated.LogLevel); err == nil {
+			logger.Info("config reloaded", "log_level", updated.LogLevel)
+		}
+		proxy.SetDefaultHeader("User-Agent", updated.UserAgent)
+		proxy.SetDefaultHeader("Referer", updated.Referer)
+	})
+
 	mgr := pluginmanager.NewManager(proxy, pluginsDir)
 	if err := mgr.Discover(); err != nil {
 		logger.Fatal("discover plugins", "error", err)
 	}
-	defer func() {
-		_ = mgr.Close()
-	}()
 
 	// Register plugins loaded from the plugins dir so they appear in
 	// ListPlugins (Discover only loads them into memory).
@@ -154,7 +182,76 @@ func main() {
 	if *open {
 		srv.OpenBrowser()
 	}
-	if err := srv.ListenAndServe(); err != nil {
+
+	// Signal handling: wait for SIGTERM/SIGINT, then shut down gracefully.
+	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGTERM, syscall.SIGINT)
+	defer stop()
+
+	errCh := make(chan error, 1)
+	go func() {
+		errCh <- srv.ListenAndServe()
+	}()
+
+	select {
+	case <-ctx.Done():
+		logger.Info("received shutdown signal", "signal", ctx.Err())
+	case err := <-errCh:
+		// Server exited on its own (port bind failure, etc.).
 		logger.Fatal("http server", "error", err)
 	}
+
+	// Ordered shutdown: HTTP → plugins → DB → logs → PID file (PID is deferred).
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	logger.Info("shutting down HTTP server")
+	if err := srv.Shutdown(shutdownCtx); err != nil {
+		logger.Error("http server shutdown", "error", err)
+	}
+
+	logger.Info("closing plugins")
+	if err := mgr.Close(); err != nil {
+		logger.Error("plugin manager close", "error", err)
+	}
+
+	logger.Info("closing database")
+	if err := db.Close(); err != nil {
+		logger.Error("database close", "error", err)
+	}
+
+	logger.Info("shutdown complete")
+}
+
+// runStop reads the PID file from the data directory and sends SIGTERM.
+func runStop() {
+	cfgPath := os.Getenv("GOISEKAI_CONFIG")
+	if cfgPath == "" {
+		cfgPath = "goisekai.ini"
+	}
+	cfg, err := config.Load(cfgPath)
+	if err != nil {
+		log.Fatalf("load config: %v", err)
+	}
+
+	pidPath := filepath.Join(cfg.DataDir, "goisekai.pid")
+	data, err := os.ReadFile(pidPath)
+	if err != nil {
+		log.Fatalf("read PID file: %v", err)
+	}
+
+	pidStr := strings.TrimSpace(string(data))
+	pid, err := strconv.Atoi(pidStr)
+	if err != nil {
+		log.Fatalf("invalid PID %q: %v", pidStr, err)
+	}
+
+	proc, err := os.FindProcess(pid)
+	if err != nil {
+		log.Fatalf("find process %d: %v", pid, err)
+	}
+	if err := proc.Signal(syscall.SIGTERM); err != nil {
+		log.Fatalf("send SIGTERM to %d: %v", pid, err)
+	}
+
+	fmt.Printf("sent SIGTERM to process %d\n", pid)
 }

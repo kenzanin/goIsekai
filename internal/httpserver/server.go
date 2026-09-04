@@ -1,6 +1,7 @@
 package httpserver
 
 import (
+	"context"
 	"embed"
 	"fmt"
 	"log/slog"
@@ -18,7 +19,7 @@ import (
 // Server wraps a Chi router and HTTP server.
 type Server struct {
 	Router  *chi.Mux
-	addr    string
+	http    *http.Server
 	logger  *slog.Logger
 	assets  embed.FS
 	service *bridge.AppService
@@ -33,9 +34,10 @@ func New(host string, port int, apiKey string, assets embed.FS, svc *bridge.AppS
 	r.Use(middleware.Recoverer)
 	r.Use(middleware.Compress(5))
 
+	addr := fmt.Sprintf("%s:%d", host, port)
 	s := &Server{
 		Router:  r,
-		addr:    fmt.Sprintf("%s:%d", host, port),
+		http:    &http.Server{Addr: addr, Handler: r},
 		logger:  logger,
 		assets:  assets,
 		service: svc,
@@ -70,13 +72,19 @@ func param(r *http.Request, name string) string {
 
 // ListenAndServe starts the HTTP server (blocking).
 func (s *Server) ListenAndServe() error {
-	s.logger.Info("starting HTTP server", "addr", "http://"+s.addr)
-	return http.ListenAndServe(s.addr, s.Router)
+	s.logger.Info("starting HTTP server", "addr", "http://"+s.http.Addr)
+	return s.http.ListenAndServe()
+}
+
+// Shutdown gracefully shuts down the HTTP server.
+func (s *Server) Shutdown(ctx context.Context) error {
+	s.logger.Info("shutting down HTTP server")
+	return s.http.Shutdown(ctx)
 }
 
 // OpenBrowser launches the default browser pointing at the server address.
 func (s *Server) OpenBrowser() {
-	url := "http://" + s.addr
+	url := "http://" + s.http.Addr
 	go func() {
 		// ponytail: xdg-open covers Linux; extend map for windows/darwin when
 		// cross-platform builds actually ship.

@@ -61,6 +61,7 @@ func (m *Manager) load(id, wasmPath string) (*loadedPlugin, error) {
 		id:              id,
 		wasmPath:        wasmPath,
 		kind:            "wasm",
+		loaded:          true,
 		extismPlugin:    plugin,
 		contractVersion: int32(ver),
 	}
