@@ -353,4 +353,65 @@ Jet templates don't do mixins, so this is either copy-paste consistency (current
 
 ---
 
-*End of document — generated from template source review + live rendered verification on 2026-09-04.*
+## 11. Post-Fix Recommendations (2026-09-04)
+
+### What was fixed
+
+| Batch | Commit | Items |
+|-------|--------|-------|
+| 1 | `f6bee32` | G1 focus-visible rings, G2 global transitions, D1 ghost-icon action buttons, D5 button hierarchy (In Library → outlined), D7 destructive quiet-red styling, D8 zero-date hidden, D9 shorter Continue label, L1 status overlay on cover + unified pills, L2 unread highlight (indigo), L3 card hover lift, S1 inline search form, S3 centered bordered pagination |
+| 2 | `cfb5aa6` | H1 responsive date layout, H2 relative time (Xm/Xh/Xd ago), ST1 grouped fieldsets (Server/HTTP/Reader), ST4 danger zone quiet-red, ST5 config path styled |
+| 3 | `0cbe736` | R1 flex-wrap top bar, R2 normalized button padding + active:scale-95, R6 bars bg-neutral-950/85 + backdrop-blur, R7 dynamic document.title |
+| 4 | `2f11d6f` | PL1 styled file input (sr-only + dashed label), PL2 mobile flex-col layout, PL3 ghost toggle button, LG1 color-coded log lines, LG2 toolbar selects normalized |
+| 5 | `bc8ab7e` | G4 Space Grotesk headings via Google Fonts, G6 nav brand (favicon SVG + wordmark) + indigo active state, G9 toast feedback system (?msg= query param) |
+
+### Remaining items (prioritized)
+
+| ID | Item | Priority | Effort | Notes |
+|----|------|----------|--------|-------|
+| G3 | Dead tailwind.config.js palette | P1 | M | Config defines accent/surface/muted tokens but zero appear in generated CSS. Either delete the config block (honest) or migrate templates to use custom tokens. Build pipeline must include `-c tailwind.config.js`. |
+| G5 | Shared header pattern | P1 | S | Each page hand-rolls its own header. Add `{{block header()}}{{end}}` in base.jet with `text-2xl font-semibold tracking-tight` + consistent bottom margin. |
+| G7 | main min-height + wider max-width | P2 | S | Add `min-h-[calc(100vh-8rem)]` on main. Consider `max-w-5xl` or `6xl` for library/search grids. |
+| G8 | Submit spinner on slow actions | P2 | S | 5-line inline script: on form submit, disable button + swap label to spinning character. Prevents double-click on sync. |
+| D2 | Chapter list virtualization / collapsible ranges | P0 | L | 100+ flat rows unusable. Options: (a) JS sort toggle, (b) `<details>` grouping by tens, (c) sticky "↑ Top" affordance. Needs handler or JS change. |
+| D3 | Read-progress chip noise | P1 | S | Drop to `7/25` + mini 3px progress bar. Move cached count to row `title` tooltip. |
+| D4 | Detail cover aspect ratio | P1 | S | Wrap in `aspect-[2/3] overflow-hidden bg-neutral-800`. Add `loading="eager" fetchpriority="high"` for LCP. |
+| D6 | Genre pill soup | P1 | S | Cap at ~8 with `+N more` expand, or reduce pill weight to `text-[11px] text-neutral-400 bg-neutral-800/60`. |
+| S2 | Search loading state | P2 | S | Covered by G8 submit-spinner. Optionally add `hx-boost="true"` on search form. |
+| S4 | Search result meta line | P2 | S | Only if plugin payload has year/status cheaply. |
+| S5 | Challenge banner position | P2 | S | Move amber banner above results (before h1). Add dismiss ✕. |
+| H3 | Resume button on history rows | P2 | M | Needs backend to expose chapter/page in history payload. Ghost `▶ Resume` button on right. |
+| H4 | History day-grouping | P2 | M | Group by "Today" / "Yesterday" / "Earlier" headers. Dedupe same-title rows. |
+| ST2 | Save confirmation | P2 | S | Server redirects with `?saved=1`; toast system (G9) already handles display. |
+| ST3 | Read Ahead input clamp | P2 | S | Add `oninput` clamp or range slider. Label "(stored in this browser)" for clarity. |
+| PL4 | Verify card containment | P2 | S | Nest verify panel inside plugin card with `border-l-2 border-amber-500/40 pl-4`. |
+| R3 | Pinch-zoom on touch | P1 | M | `touch-action: none` + 2-pointer gesture handler in reader.js (~20 lines). Real gap for manga reader on phones. |
+| R4 | Progress line always visible | P2 | S | Keep 3px line visible even when bars show, or style slider track to match. |
+| R5 | Error panel styling | P2 | S | Add ⚠ icon, distinguish errors (red) from notices (neutral). ~6 lines. |
+| L4 | [New] badge pop | P2 | S | Change to `bg-red-500 text-white` solid + `shadow-red-500/30` glow. |
+| L5 | Library empty state | P2 | S | Add 📚 glyph + bordered CTA button for "Search manga". |
+
+### New observations from the fixes
+
+1. **Inconsistent transition timing.** G2 added global `transition: color .15s, background-color .15s, border-color .15s` but the reader bars already use `transition-[transform,opacity] duration-300`. Cards use `duration-150` via hover-lift. Consider standardizing on `duration-200` globally.
+2. **Toast system underutilized.** G9 added the `?msg=` toast but no server handlers currently redirect with it. ST2 (settings save) is the lowest-hanging fruit to wire up. Actions.go handlers for mark-read, reset, library-toggle should incrementally adopt `?msg=` redirects.
+3. **Font loading latency.** Space Grotesk loads from Google Fonts (external dependency). Consider self-hosting the variable `.woff2` in `cmd/goisekai/frontend/lib/` and embedding it with go:embed for offline-first and zero external requests.
+4. **Nav brand + wordmark takes horizontal space.** On narrow screens the brand + tabs may compete. The `overflow-x-auto` handles it, but test at 360px to confirm the brand doesn't push tabs off-screen.
+5. **D1 ghost-icon buttons work but emoji rendering varies.** The current ✅/🔄/📚/⬇ emoji still render differently per OS inside the button shells. Consider replacing with inline SVG icons (check, rotate-ccw, layers, download) for consistent rendering across platforms.
+6. **Dead config tokens (G3) become more visible now.** With the rest of the UI polished, the gap between the aspirational tailwind.config.js palette and the actual indigo/neutral classes is more noticeable. Either commit to the custom palette or clean up the config.
+
+### Recommended next batch
+
+**Priority: D2 + D3 + D4 + D6 + R3** (detail page completeness + reader touch)
+
+These five items address the two most-used pages (detail and reader) and have the highest user-facing impact among remaining work:
+
+- **D2** (chapter list scale) is the single biggest remaining usability blocker — 100+ flat rows with no grouping or sort. A JS sort toggle is the cheapest fix (~15 lines in reader.js or an inline script in detail.jet).
+- **D3 + D4 + D6** are all detail.jet template edits that can be done in one pass — progress chip simplification, cover aspect ratio, and genre pill cap.
+- **R3** (pinch-zoom) fills a real gap for phone users — the primary manga reading device.
+
+Estimated total effort: ~2 hours. All are template/JS edits with no backend changes.
+
+---
+
+*End of document — generated from template source review + live rendered verification on 2026-09-04. Post-fix recommendations appended 2026-09-04.*
