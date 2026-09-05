@@ -281,23 +281,34 @@ type ContinuePoint struct {
 	ChapterID string
 	ChapterN  float64
 	Page      int
+	Started   bool // manga already has read history: label "Continue", not "Start Reading"
 }
 
 // computeContinue picks the resume target: the first in-progress chapter,
 // else the first unread chapter, else nil when everything is finished.
 func computeContinue(chapters []types.Chapter, progress map[string]database.ChapterProgress) *ContinuePoint {
+	started := false
+	for _, p := range progress {
+		if p.LastPageRead > 0 || p.IsRead || p.Done {
+			started = true
+			break
+		}
+	}
 	var firstUnread *ContinuePoint
 	for _, c := range chapters {
 		p, ok := progress[c.ID]
 		if ok && p.LastPageRead > 0 {
 			if p.TotalPages == 0 || p.LastPageRead < p.TotalPages {
-				return &ContinuePoint{ChapterID: c.ID, ChapterN: c.ChapterNum, Page: p.LastPageRead}
+				return &ContinuePoint{ChapterID: c.ID, ChapterN: c.ChapterNum, Page: p.LastPageRead, Started: true}
 			}
 			continue // fully read
 		}
 		// Chapters arrive newest-first; keep the LAST unread seen so the
 		// fallback start point is the numerically lowest chapter.
 		firstUnread = &ContinuePoint{ChapterID: c.ID, ChapterN: c.ChapterNum, Page: 1}
+	}
+	if firstUnread != nil {
+		firstUnread.Started = started
 	}
 	return firstUnread
 }
@@ -314,12 +325,12 @@ func (s *Server) continueFromHistory(pluginID, mangaID string, chapters []types.
 		if c.ID == lastChID {
 			p, hasProgress := progress[c.ID]
 			if !hasProgress || p.LastPageRead < p.TotalPages {
-				return &ContinuePoint{ChapterID: c.ID, ChapterN: c.ChapterNum, Page: lastPage}
+				return &ContinuePoint{ChapterID: c.ID, ChapterN: c.ChapterNum, Page: lastPage, Started: true}
 			}
 			// Fully read — advance to the next chapter (higher number = earlier in the slice).
 			if i > 0 {
 				next := chapters[i-1]
-				return &ContinuePoint{ChapterID: next.ID, ChapterN: next.ChapterNum, Page: 1}
+				return &ContinuePoint{ChapterID: next.ID, ChapterN: next.ChapterNum, Page: 1, Started: true}
 			}
 			return nil
 		}

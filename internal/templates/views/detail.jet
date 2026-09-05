@@ -83,8 +83,8 @@
                 {{if .InLibrary}}<button type="submit" class="border border-emerald-600/50 text-emerald-400 bg-emerald-500/10 hover:bg-emerald-500/20 rounded-md px-4 py-2 text-sm">✓ In Library</button>{{else}}<button type="submit" class="bg-indigo-600 hover:bg-indigo-500 text-white rounded-md px-4 py-2 text-sm font-medium">+ Add to Library</button>{{end}}
             </form>
             {{if .Continue}}
-            <a href="/view/read/{{.PluginID}}/{{.MangaID}}/{{.Continue.ChapterID}}?page={{.Continue.Page}}" class="bg-indigo-600 hover:bg-indigo-500 text-white rounded-md px-4 py-2 text-sm font-medium" title="{{if .Continue.Page > 1}}Continue: Ch. {{formatChapterNum(.Continue.ChapterN)}}, page {{.Continue.Page}}{{else}}Start Reading{{end}}">
-                {{if .Continue.Page > 1}}▶ Continue · Ch.{{formatChapterNum(.Continue.ChapterN)}}{{else}}▶ Start Reading{{end}}
+            <a href="/view/read/{{.PluginID}}/{{.MangaID}}/{{.Continue.ChapterID}}?page={{.Continue.Page}}" class="bg-indigo-600 hover:bg-indigo-500 text-white rounded-md px-4 py-2 text-sm font-medium" title="{{if .Continue.Page > 1}}Continue: Ch. {{formatChapterNum(.Continue.ChapterN)}}, page {{.Continue.Page}}{{else if .Continue.Started}}Continue: Ch. {{formatChapterNum(.Continue.ChapterN)}}{{else}}Start Reading{{end}}">
+                {{if .Continue.Page > 1}}▶ Continue · Ch.{{formatChapterNum(.Continue.ChapterN)}}{{else if .Continue.Started}}▶ Continue · Ch.{{formatChapterNum(.Continue.ChapterN)}}{{else}}▶ Start Reading{{end}}
             </a>
             {{end}}
         </div>

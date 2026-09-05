@@ -36,6 +36,7 @@ type apiContinuePoint struct {
 	ChapterID string  `json:"chapter_id"`
 	ChapterN  float64 `json:"chapter_num"`
 	Page      int     `json:"page"`
+	Started   bool    `json:"started"` // any read history: label "Continue", not "Start Reading"
 }
 
 // apiMangaDetail mirrors viewMangaDetail: manga metadata + chapters with progress.
@@ -90,16 +91,26 @@ func (s *Server) apiMangaDetail(w http.ResponseWriter, r *http.Request) {
 
 // computeContinueAPI picks the resume target for the JSON API.
 func computeContinueAPI(chapters []types.Chapter, progress map[string]database.ChapterProgress) *apiContinuePoint {
+	started := false
+	for _, p := range progress {
+		if p.LastPageRead > 0 || p.IsRead || p.Done {
+			started = true
+			break
+		}
+	}
 	var firstUnread *apiContinuePoint
 	for _, c := range chapters {
 		p, ok := progress[c.ID]
 		if ok && p.LastPageRead > 0 {
 			if p.TotalPages == 0 || p.LastPageRead < p.TotalPages {
-				return &apiContinuePoint{ChapterID: c.ID, ChapterN: c.ChapterNum, Page: p.LastPageRead}
+				return &apiContinuePoint{ChapterID: c.ID, ChapterN: c.ChapterNum, Page: p.LastPageRead, Started: true}
 			}
 			continue
 		}
 		firstUnread = &apiContinuePoint{ChapterID: c.ID, ChapterN: c.ChapterNum, Page: 1}
+	}
+	if firstUnread != nil {
+		firstUnread.Started = started
 	}
 	return firstUnread
 }
