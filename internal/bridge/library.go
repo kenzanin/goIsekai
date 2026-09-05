@@ -45,6 +45,10 @@ func (s *AppService) GetMangaDetails(pluginID, mangaID string) (types.Manga, []t
 	if err := s.persistMangaDetails(pluginID, manga, chapters); err != nil {
 		return types.Manga{}, nil, fmt.Errorf("bridge: persist manga details: %w", err)
 	}
+	// A user-set main title wins over the plugin-sourced one.
+	if dbTitle, custom, err := s.db.MangaTitleIfCustom(pluginID, mangaID); err == nil && custom {
+		manga.Title = dbTitle
+	}
 	return manga, chapters, nil
 }
 

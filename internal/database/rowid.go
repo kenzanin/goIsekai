@@ -13,8 +13,17 @@ func (d *DB) MangaRowID(pluginID, sourceMangaID string) (string, error) {
 	return id, nil
 }
 
-// MangaTitle returns the current main title for a manga, or an error when
-// the manga is not found.
+// MangaTitleIfCustom returns the stored main title and whether it is a
+// user-set (custom) title that must override the plugin-sourced one.
+func (d *DB) MangaTitleIfCustom(pluginID, sourceMangaID string) (string, bool, error) {
+	var title string
+	var custom bool
+	err := d.db.QueryRow(`SELECT title, custom_title FROM mangas WHERE plugin_id = ? AND source_manga_id = ?`, pluginID, sourceMangaID).Scan(&title, &custom)
+	if err != nil {
+		return "", false, fmt.Errorf("manga custom title: %w", err)
+	}
+	return title, custom, nil
+}
 func (d *DB) MangaTitle(pluginID, sourceMangaID string) (string, error) {
 	var title string
 	err := d.db.QueryRow(`SELECT title FROM mangas WHERE plugin_id = ? AND source_manga_id = ?`, pluginID, sourceMangaID).Scan(&title)
