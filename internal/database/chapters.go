@@ -199,5 +199,3 @@ func (d *DB) resetProgress(where BoolExpression) error {
 		Exec(d.db)
 	return err
 }
-
-

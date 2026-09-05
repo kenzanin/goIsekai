@@ -52,8 +52,6 @@ func (d *DB) ListPlugins() ([]Plugin, error) {
 	return result, nil
 }
 
-
-
 // TogglePluginActive flips the is_active flag for a plugin.
 func (d *DB) TogglePluginActive(id string) error {
 	_, err := Plugins.UPDATE().

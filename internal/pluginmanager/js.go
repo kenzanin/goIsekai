@@ -21,7 +21,7 @@ var jsFnNames = map[string]string{
 	types.GetMangaDetailFunc: "getMangaDetail",
 	types.GetChapterListFunc: "getChapterList",
 	types.GetPageListFunc:    "getPageList",
-	types.GetAltTitlesFunc:  "getAltTitles",
+	types.GetAltTitlesFunc:   "getAltTitles",
 }
 
 // loadJS creates a sandboxed JavaScript VM via goja, loads <dir>/main.js,

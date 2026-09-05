@@ -7,7 +7,6 @@ import (
 	"testing"
 	"time"
 
-	
 	"goisekai/internal/hostnet"
 	"goisekai/pkg/types"
 )

@@ -23,8 +23,6 @@ import (
 	"goisekai/pkg/types"
 )
 
-
-
 // validateImageFast performs cheap header-only validation. GIFs pass via magic
 // prefix (matching the passthrough path); everything else is checked with
 // image.DecodeConfig which reads only the image header (no pixel decode).

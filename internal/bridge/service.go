@@ -5,11 +5,11 @@
 package bridge
 
 import (
-		"fmt"
+	"fmt"
 	"sync"
 	"time"
 
-		"goisekai/internal/database"
+	"goisekai/internal/database"
 	"goisekai/internal/hostnet"
 	"goisekai/internal/logger"
 	"goisekai/internal/pluginmanager"
@@ -55,8 +55,6 @@ func (s *AppService) Log(level string, msg string) {
 		logger.Debug("[ui] " + msg)
 	}
 }
-
-
 
 // GetConfigPath returns the path to goisekai.ini.
 func (s *AppService) GetConfigPath() string {

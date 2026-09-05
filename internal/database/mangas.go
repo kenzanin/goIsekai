@@ -264,8 +264,6 @@ func (d *DB) LibraryOverview() (LibraryOverview, error) {
 	return ov, nil
 }
 
-
-
 // GetAltTitles returns the stored alt titles as the JSON payload
 // {"source": first row's source, "titles": [...]}, or "" when absent.
 func (d *DB) GetAltTitles(pluginID, sourceMangaID string) (string, error) {
@@ -316,4 +314,3 @@ func (d *DB) mangaRowID(pluginID, sourceMangaID string) (string, error) {
 	}
 	return id, nil
 }
-

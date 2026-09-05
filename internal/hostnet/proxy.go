@@ -67,8 +67,6 @@ func NewProxy() *Proxy {
 	}
 }
 
-
-
 // SetDefaultHeader overrides a default header applied to every request.
 func (p *Proxy) SetDefaultHeader(key, value string) {
 	p.mu.Lock()

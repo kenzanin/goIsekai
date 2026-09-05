@@ -27,7 +27,7 @@ func (s *Server) viewLibrary(w http.ResponseWriter, r *http.Request) {
 	if q != "" {
 		hits, hitErr := s.service.SearchLibrary(q)
 		if hitErr != nil {
-		s.logger.Warn("library search", "error", hitErr)
+			s.logger.Warn("library search", "error", hitErr)
 		} else if len(hits) > 0 {
 			// Build an index for fast lookup: (pluginID:sourceMangaID) -> manga
 			libIdx := make(map[string]database.Manga, len(mangas))
@@ -258,21 +258,21 @@ func (s *Server) viewMangaDetail(w http.ResponseWriter, r *http.Request) {
 	chStart := min((chPage-1)*chapterPageSize, chTotal)
 	chEnd := min(chStart+chapterPageSize, chTotal)
 	s.renderPage(w, "views/detail.jet", "search", map[string]any{
-		"PluginID":         pluginID,
-		"MangaID":          mangaID,
-		"Manga":            manga,
-		"AltTitles":        altTitles,
-		"CurrentTitle":     manga.Title,
-		"AltTitleServers":  altTitleServers,
-		"Chapters":         chapters[chStart:chEnd],
-		"Progress":         progress,
-		"Continue":         continueTo,
-		"InLibrary":        inLibrary,
-		"Challenge":        challenge,
-		"ChCurrentPage":    chPage,
-		"ChTotalPages":     max((chTotal+chapterPageSize-1)/chapterPageSize, 1),
-		"ChHasNext":        chEnd < chTotal,
-		"ChHasPrev":        chPage > 1,
+		"PluginID":        pluginID,
+		"MangaID":         mangaID,
+		"Manga":           manga,
+		"AltTitles":       altTitles,
+		"CurrentTitle":    manga.Title,
+		"AltTitleServers": altTitleServers,
+		"Chapters":        chapters[chStart:chEnd],
+		"Progress":        progress,
+		"Continue":        continueTo,
+		"InLibrary":       inLibrary,
+		"Challenge":       challenge,
+		"ChCurrentPage":   chPage,
+		"ChTotalPages":    max((chTotal+chapterPageSize-1)/chapterPageSize, 1),
+		"ChHasNext":       chEnd < chTotal,
+		"ChHasPrev":       chPage > 1,
 	})
 }
 

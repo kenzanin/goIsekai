@@ -1,7 +1,6 @@
 package httpserver
 
 import (
-	"strings"
 	"context"
 	"embed"
 	"fmt"
@@ -9,6 +8,7 @@ import (
 	"net/http"
 	"net/url"
 	"os/exec"
+	"strings"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
@@ -31,19 +31,19 @@ type Server struct {
 // New creates a new Server with Chi middleware and all routes registered.
 func New(host string, port int, apiKey string, assets embed.FS, svc *bridge.AppService, logger *slog.Logger, engine *templates.Engine) *Server {
 
- r := chi.NewRouter()
- r.Use(middleware.Recoverer)
- // Compress must not wrap WebSocket upgrades (it buffers and kills the 101
- // handshake) — skip requests asking for Connection: Upgrade.
- r.Use(func(next http.Handler) http.Handler {
-  return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-   if strings.EqualFold(r.Header.Get("Connection"), "Upgrade") {
-    next.ServeHTTP(w, r)
-    return
-   }
-   middleware.Compress(5)(next).ServeHTTP(w, r)
-  })
- })
+	r := chi.NewRouter()
+	r.Use(middleware.Recoverer)
+	// Compress must not wrap WebSocket upgrades (it buffers and kills the 101
+	// handshake) — skip requests asking for Connection: Upgrade.
+	r.Use(func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if strings.EqualFold(r.Header.Get("Connection"), "Upgrade") {
+				next.ServeHTTP(w, r)
+				return
+			}
+			middleware.Compress(5)(next).ServeHTTP(w, r)
+		})
+	})
 
 	addr := fmt.Sprintf("%s:%d", host, port)
 	s := &Server{
