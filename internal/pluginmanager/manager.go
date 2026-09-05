@@ -31,11 +31,12 @@ const (
 )
 
 // loadedPlugin is a compiled and instantiated plugin and its resolved ABI
-// entry points. kind is "wasm" or "lua"; only the relevant fields are set.
+// entry points. kind is "wasm", "lua", "js", "go", or "scriggo"; only the
+// relevant fields are set.
 type loadedPlugin struct {
 	id       string
 	wasmPath string
-	kind     string // "wasm", "lua", or "js"
+	kind     string // "wasm", "lua", "js", "go", or "scriggo"
 	loaded   bool   // true after the runtime has been instantiated
 	// extismPlugin holds the Extism plugin instance for wasm-kind plugins (nil otherwise).
 	extismPlugin *extism.Plugin
@@ -47,6 +48,8 @@ type loadedPlugin struct {
 	goFns map[string]any
 	// js holds the goja VM for js-kind plugins (nil otherwise).
 	js *goja.Runtime
+	// scriggo holds the compiled Scriggo program for scriggo-kind plugins (nil otherwise).
+	scriggo *scriggoPlugin
 	// contractVersion is the plugin's resolved contract_version.
 	contractVersion int32
 	// meta is the metadata the plugin declared in its optional Init export.
@@ -81,17 +84,20 @@ func (m *Manager) ensureLoaded(id string) error {
 		loaded, err = m.loadJS(p.id, p.wasmPath)
 	case "go":
 		loaded, err = m.loadGo(p.id, p.wasmPath)
+	case "scriggo":
+		loaded, err = m.loadScriggo(p.id, p.wasmPath)
 	default:
 		return fmt.Errorf("plugin %q: unknown kind %q", id, p.kind)
 	}
 	if err != nil {
 		return fmt.Errorf("lazy-load plugin %s: %w", id, err)
 	}
-		p.extismPlugin = loaded.extismPlugin
-		p.lunar = loaded.lunar
-		p.js = loaded.js
-		p.goPlugin = loaded.goPlugin
-		p.goFns = loaded.goFns
+	p.extismPlugin = loaded.extismPlugin
+	p.lunar = loaded.lunar
+	p.js = loaded.js
+	p.goPlugin = loaded.goPlugin
+	p.goFns = loaded.goFns
+	p.scriggo = loaded.scriggo
 	p.contractVersion = loaded.contractVersion
 	p.meta = loaded.meta
 	p.loaded = true
@@ -192,6 +198,25 @@ func (m *Manager) Discover() error {
 		logger.Debug("js plugin registered", "id", id, "path", path)
 	}
 
+	// Scriggo plugins: one folder per plugin, main.go entry, folder name = id.
+	scriggoMatches, err := filepath.Glob(filepath.Join(m.pluginsDir, "*", "main.go"))
+	if err != nil {
+		return err
+	}
+	for _, path := range scriggoMatches {
+		id := filepath.Base(filepath.Dir(path))
+		if _, dup := m.plugins[id]; dup {
+			logger.Error("plugin id collision, skipping", "id", id, "kind", "scriggo")
+			continue
+		}
+		m.plugins[id] = &loadedPlugin{
+			id:       id,
+			wasmPath: filepath.Dir(path),
+			kind:     "scriggo",
+		}
+		logger.Debug("scriggo plugin registered", "id", id, "path", path)
+	}
+
 	// Go native plugins: one .so file per plugin, filename (minus .so) = id.
 	if err := m.discoverGo(); err != nil {
 		return err
@@ -254,6 +279,28 @@ func (m *Manager) Install(wasmPath string) (string, error) {
 		return filepath.Join(destDir, "main.js"), nil
 	}
 
+	// Scriggo plugin: source is a folder containing main.go; copy it recursively.
+	mainGo := filepath.Join(wasmPath, "main.go")
+	if info, err := os.Stat(mainGo); err == nil && !info.IsDir() {
+		id = filepath.Base(wasmPath)
+		destDir := filepath.Join(m.pluginsDir, id)
+		logger.Debug("installing scriggo plugin", "source", wasmPath, "dest", destDir)
+		if filepath.Clean(wasmPath) != filepath.Clean(destDir) {
+			if err := copyDir(wasmPath, destDir); err != nil {
+				return "", fmt.Errorf("copy scriggo plugin %s: %w", id, err)
+			}
+		}
+		p, err := m.loadScriggo(id, destDir)
+		if err != nil {
+			logger.Error("scriggo plugin install failed", "id", id, "error", err)
+			return "", fmt.Errorf("install scriggo plugin %s: %w", id, err)
+		}
+		m.plugins[id] = p
+		m.proxy.SetNeedsJS(id, p.meta.NeedsJS)
+		logger.Debug("scriggo plugin installed", "id", id)
+		return filepath.Join(destDir, "main.go"), nil
+	}
+
 	dest := filepath.Join(m.pluginsDir, id+".wasm")
 	logger.Debug("installing plugin", "source", wasmPath, "dest", dest)
 	if filepath.Clean(wasmPath) != filepath.Clean(dest) {
@@ -314,9 +361,25 @@ func (m *Manager) LoadPlugin(path string) (string, error) {
 		return id, nil
 	}
 
+	mainGo := filepath.Join(path, "main.go")
+	if info, err := os.Stat(mainGo); err == nil && !info.IsDir() {
+		id := filepath.Base(path)
+		if _, dup := m.plugins[id]; dup {
+			return "", fmt.Errorf("plugin %q already loaded", id)
+		}
+		p, err := m.loadScriggo(id, path)
+		if err != nil {
+			return "", err
+		}
+		m.plugins[id] = p
+		m.proxy.SetNeedsJS(id, p.meta.NeedsJS)
+		logger.Info("plugin loaded (hot)", "id", id, "kind", "scriggo")
+		return id, nil
+	}
+
 	// WASM: path must be a .wasm file
 	if !strings.HasSuffix(path, ".wasm") {
-		return "", fmt.Errorf("no main.lua, main.js, or .wasm found at %s", path)
+		return "", fmt.Errorf("no main.lua, main.js, main.go, or .wasm found at %s", path)
 	}
 	id := strings.TrimSuffix(filepath.Base(path), ".wasm")
 	if _, dup := m.plugins[id]; dup {
@@ -361,6 +424,7 @@ func (m *Manager) UnloadPlugin(id string) error {
 	p.js = nil
 	p.goPlugin = nil
 	p.goFns = nil
+	p.scriggo = nil
 	p.contractVersion = 0
 	p.meta = types.PluginMeta{}
 	p.loaded = false
@@ -400,6 +464,8 @@ func (m *Manager) ReloadPlugin(id string) (string, error) {
 		path = filepath.Dir(old.wasmPath)
 	case "js":
 		path = filepath.Dir(old.wasmPath)
+	case "scriggo":
+		path = old.wasmPath
 	}
 	newID, err := m.LoadPlugin(path)
 	if err != nil {

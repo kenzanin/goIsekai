@@ -1,9 +1,9 @@
 package pluginmanager
 
 import (
-	"goisekai/internal/logger"
 	"encoding/json"
 	"fmt"
+	"goisekai/internal/logger"
 	"sort"
 
 	"goisekai/pkg/types"
@@ -35,6 +35,9 @@ func (m *Manager) call(p *loadedPlugin, fnName, inputJSON string) (string, error
 	}
 	if p.kind == "go" {
 		return callGo(p, fnName, inputJSON)
+	}
+	if p.kind == "scriggo" {
+		return callScriggo(p, fnName, inputJSON)
 	}
 	p.mu.Lock()
 	defer p.mu.Unlock()
@@ -225,5 +228,3 @@ func (m *Manager) GetAltTitles(title, server string) (types.AltTitlesResult, err
 	}
 	return res, nil
 }
-
-
