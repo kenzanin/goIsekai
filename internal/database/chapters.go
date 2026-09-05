@@ -181,24 +181,21 @@ func (d *DB) CountChaptersForManga(mangaRowID string) (int, error) {
 // to 0 and is_read off. total_pages is left intact (page-count metadata, not
 // read state).
 func (d *DB) ResetChapterProgress(chapterRowID string) error {
-	_, err := Chapters.UPDATE().
-		SET(
-			Chapters.LastPageRead.SET(Int(0)),
-			Chapters.IsRead.SET(Int(0)),
-		).
-		WHERE(Chapters.ID.EQ(String(chapterRowID))).
-		Exec(d.db)
-	return err
+	return d.resetProgress(Chapters.ID.EQ(String(chapterRowID)))
 }
 
 // ResetMangaProgress clears read progress for every chapter of a manga.
 func (d *DB) ResetMangaProgress(mangaRowID string) error {
+	return d.resetProgress(Chapters.MangaID.EQ(String(mangaRowID)))
+}
+
+func (d *DB) resetProgress(where BoolExpression) error {
 	_, err := Chapters.UPDATE().
 		SET(
 			Chapters.LastPageRead.SET(Int(0)),
 			Chapters.IsRead.SET(Int(0)),
 		).
-		WHERE(Chapters.MangaID.EQ(String(mangaRowID))).
+		WHERE(where).
 		Exec(d.db)
 	return err
 }
