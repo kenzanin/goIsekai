@@ -5,13 +5,11 @@
 package bridge
 
 import (
-	"encoding/json"
-	"fmt"
+		"fmt"
 	"sync"
 	"time"
 
-	"goisekai/internal/config"
-	"goisekai/internal/database"
+		"goisekai/internal/database"
 	"goisekai/internal/hostnet"
 	"goisekai/internal/logger"
 	"goisekai/internal/pluginmanager"
@@ -58,18 +56,7 @@ func (s *AppService) Log(level string, msg string) {
 	}
 }
 
-// ReloadConfig re-reads goisekai.ini and returns the new config as JSON.
-func (s *AppService) ReloadConfig() (string, error) {
-	if s.cfgPath == "" {
-		return "", fmt.Errorf("bridge: no config path set")
-	}
-	cfg, err := config.Load(s.cfgPath)
-	if err != nil {
-		return "", fmt.Errorf("bridge: reload config: %w", err)
-	}
-	b, _ := json.Marshal(cfg)
-	return string(b), nil
-}
+
 
 // GetConfigPath returns the path to goisekai.ini.
 func (s *AppService) GetConfigPath() string {

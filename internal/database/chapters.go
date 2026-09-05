@@ -203,11 +203,4 @@ func (d *DB) ResetMangaProgress(mangaRowID string) error {
 	return err
 }
 
-// SetDownloadStatus records the download status of a chapter.
-func (d *DB) SetDownloadStatus(chapterID string, status string) error {
-	_, err := Chapters.UPDATE().
-		SET(Chapters.DownloadStatus.SET(String(status))).
-		WHERE(Chapters.ID.EQ(String(chapterID))).
-		Exec(d.db)
-	return err
-}
+

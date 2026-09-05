@@ -2,7 +2,6 @@ package hostnet
 
 import (
 	"fmt"
-	"maps"
 	"net/url"
 	"strings"
 	"sync"
@@ -68,13 +67,7 @@ func NewProxy() *Proxy {
 	}
 }
 
-// DefaultHeaders returns a copy of the default header set applied to every
-// request.
-func (p *Proxy) DefaultHeaders() map[string]string {
-	out := make(map[string]string, len(p.defaultHeaders))
-	maps.Copy(out, p.defaultHeaders)
-	return out
-}
+
 
 // SetDefaultHeader overrides a default header applied to every request.
 func (p *Proxy) SetDefaultHeader(key, value string) {

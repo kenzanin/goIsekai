@@ -23,17 +23,7 @@ import (
 	"goisekai/pkg/types"
 )
 
-// EvictImageCache removes a URL from both L1 (memory) and L2 (disk) cache.
-// Called when the user wants to force re-fetch a corrupt/stale image.
-func (s *AppService) EvictImageCache(pluginID, url string, mangaID, chapterID string) {
-	s.imageMu.Lock()
-	delete(s.imageCache, url)
-	s.imageMu.Unlock()
-	if base := s.diskCachePath(pluginID, mangaID, chapterID, url); base != "" {
-		_ = os.Remove(base + ".webp")
-		_ = os.Remove(base + ".img")
-	}
-}
+
 
 // validateImageFast performs cheap header-only validation. GIFs pass via magic
 // prefix (matching the passthrough path); everything else is checked with

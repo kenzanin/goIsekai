@@ -23,7 +23,7 @@ func (e *ChallengeError) Error() string {
 	return fmt.Sprintf("hostnet: challenge at %s: %v", e.VerifyURL, ErrChallenge)
 }
 
-func (e *ChallengeError) Unwrap() error { return ErrChallenge }
+
 
 // IsChallengeResponse reports whether a response is an anti-bot challenge
 // (Cloudflare "Just a moment" interstitial). A response is a challenge when its
