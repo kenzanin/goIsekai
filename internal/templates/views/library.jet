@@ -5,7 +5,7 @@
     <h1 class="text-xl font-semibold shrink-0">Library</h1>
     <form method="get" action="/view/library" class="flex-1 max-w-md" role="search">
         <div class="flex gap-2">
-            <input type="search" name="q" value="{{.Q}}" placeholder="Search library…" class="w-full bg-neutral-900 border border-neutral-700 rounded-md px-3 py-1.5 text-sm placeholder-neutral-500 focus:outline-none focus:border-indigo-500">
+            <input type="search" name="q" value="{{if isset(.Q)}}{{.Q}}{{end}}" placeholder="Search library…" class="w-full bg-neutral-900 border border-neutral-700 rounded-md px-3 py-1.5 text-sm placeholder-neutral-500 focus:outline-none focus:border-indigo-500">
             <button type="submit" class="border border-neutral-700 hover:bg-neutral-800 rounded-md px-3 py-1.5 text-sm font-medium">Search</button>
         </div>
     </form>

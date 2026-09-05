@@ -35,6 +35,10 @@
             </div>
             {{if len(.AltTitles) > 0}}
             <div class="flex flex-wrap gap-1.5 mb-2">
+                <span class="inline-flex items-center gap-1.5 rounded-full bg-neutral-800 border border-indigo-700/60 pl-2.5 pr-1 py-0.5 text-xs">
+                    <span class="text-indigo-300" title="Current main title">{{.CurrentTitle}}</span>
+                    <span class="text-[10px] px-1.5 py-0.5 rounded-full bg-indigo-900/40 text-indigo-300">via {{.PluginID}}</span>
+                </span>
                 {{range _, t := .AltTitles }}
                 <span class="inline-flex items-center gap-1.5 rounded-full bg-neutral-800 border border-neutral-700/60 pl-2.5 pr-1 py-0.5 text-xs">
                     <form method="post" action="/action/set-title/{{.PluginID}}/{{.MangaID}}" class="inline">

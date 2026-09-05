@@ -64,4 +64,6 @@ var migrations = []string{
 	// Index 9: alt_titles migration — handled by migrateAltTitles() in db.go
 	// (CREATE TABLE alt_titles, JSON→table copy, DROP COLUMN, CREATE FTS5, backfill).
 	`/* alt_titles: see migrateAltTitles */`,
+	// Index 10: user-chosen main title lock — UpsertManga must not overwrite it.
+	`ALTER TABLE mangas ADD COLUMN custom_title INTEGER NOT NULL DEFAULT 0;`,
 }

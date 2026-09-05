@@ -76,10 +76,10 @@ func (d *DB) SwapMainTitle(pluginID, sourceMangaID, newTitle string) error {
 	if _, err := tx.Exec(`DELETE FROM alt_titles WHERE manga_row_id = ? AND title = ?`, rowID, newTitle); err != nil {
 		return err
 	}
-	if _, err := tx.Exec(`INSERT OR IGNORE INTO alt_titles (manga_row_id, title, source) VALUES (?, ?, 'user')`, rowID, oldTitle); err != nil {
+	if _, err := tx.Exec(`INSERT OR IGNORE INTO alt_titles (manga_row_id, title, source) VALUES (?, ?, ?)`, rowID, oldTitle, pluginID); err != nil {
 		return err
 	}
-	if _, err := tx.Exec(`UPDATE mangas SET title = ? WHERE id = ?`, newTitle, rowID); err != nil {
+	if _, err := tx.Exec(`UPDATE mangas SET title = ?, custom_title = 1 WHERE id = ?`, newTitle, rowID); err != nil {
 		return err
 	}
 	if _, err := tx.Exec(`UPDATE library_fts SET title = ?, alt = COALESCE((SELECT group_concat(title, ' ') FROM alt_titles WHERE manga_row_id = ?), '') WHERE manga_row_id = ?`, newTitle, rowID, rowID); err != nil {

@@ -2,6 +2,7 @@ package httpserver
 
 import (
 	"net/http/httptest"
+	"strings"
 	"testing"
 )
 
@@ -95,5 +96,49 @@ func TestViewMangaDetailNonexistent(t *testing.T) {
 	// Plugin not loaded — handler returns502 for missing plugin.
 	if rec.Code != 502 {
 		t.Fatalf("status = %d, want 502; body: %s", rec.Code, rec.Body.String())
+	}
+}
+
+// ── Library search (FTS) ─────────────────────────────────────────────────
+
+func TestViewLibrarySearchFiltersNonMatching(t *testing.T) {
+	s, db := testServerFullDB(t, "", true)
+
+	seedManga(t, db, "s1|a", "s1", "a", "Solo Leveling")
+	seedManga(t, db, "s2|b", "s2", "b", "Berserk")
+
+	req := httptest.NewRequest("GET", "/view/library?q=Solo", nil)
+	rec := httptest.NewRecorder()
+	s.Router.ServeHTTP(rec, req)
+
+	if rec.Code != 200 {
+		t.Fatalf("status = %d, want 200; body: %s", rec.Code, rec.Body.String())
+	}
+	body := rec.Body.String()
+	if !strings.Contains(body, "Solo Leveling") {
+		t.Fatalf("expected 'Solo Leveling' in response")
+	}
+	if strings.Contains(body, "Berserk") {
+		t.Fatalf("'Berserk' should be filtered out")
+	}
+}
+
+func TestViewLibrarySearchHidesStatsRow(t *testing.T) {
+	s, db := testServerFullDB(t, "", true)
+
+	seedManga(t, db, "s1|a", "s1", "a", "Solo Leveling")
+
+	req := httptest.NewRequest("GET", "/view/library?q=Solo", nil)
+	rec := httptest.NewRecorder()
+	s.Router.ServeHTTP(rec, req)
+
+	if rec.Code != 200 {
+		t.Fatalf("status = %d, want 200", rec.Code)
+	}
+	body := rec.Body.String()
+	// The stats block renders the marker "titles" inside the stat card div.
+	// When ?q= is set the stats block is hidden ({{if .Q == ""}}).
+	if strings.Contains(body, `text-neutral-400">titles</div>`) {
+		t.Fatalf("stats row should be hidden when ?q= is set")
 	}
 }

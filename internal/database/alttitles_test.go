@@ -107,8 +107,8 @@ func TestSwapMainTitle(t *testing.T) {
 	if byTitle["Other Alt"] != "mal" {
 		t.Fatalf("expected Other Alt source mal, got %q", byTitle["Other Alt"])
 	}
-	if byTitle["Old Main"] != "user" {
-		t.Fatalf("expected Old Main source user, got %q", byTitle["Old Main"])
+	if byTitle["Old Main"] != "p1" {
+		t.Fatalf("expected Old Main source = plugin id, got %q", byTitle["Old Main"])
 	}
 	if _, dup := byTitle["New Main"]; dup {
 		t.Fatalf("New Main must not remain in alt_titles, got %+v", alts)

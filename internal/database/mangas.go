@@ -38,7 +38,7 @@ func (d *DB) UpsertManga(m Manga) error {
 		RawTimestamp("CURRENT_TIMESTAMP"),
 	).ON_CONFLICT(Mangas.PluginID, Mangas.SourceMangaID).DO_UPDATE(
 		SET(
-			Mangas.Title.SET(Mangas.EXCLUDED.Title),
+			Mangas.Title.SET(RawString("CASE WHEN mangas.custom_title = 1 THEN mangas.title ELSE excluded.title END")),
 			Mangas.CoverURL.SET(Mangas.EXCLUDED.CoverURL),
 			Mangas.Description.SET(Mangas.EXCLUDED.Description),
 			Mangas.Status.SET(Mangas.EXCLUDED.Status),

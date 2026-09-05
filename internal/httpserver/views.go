@@ -262,6 +262,7 @@ func (s *Server) viewMangaDetail(w http.ResponseWriter, r *http.Request) {
 		"MangaID":          mangaID,
 		"Manga":            manga,
 		"AltTitles":        altTitles,
+		"CurrentTitle":     manga.Title,
 		"AltTitleServers":  altTitleServers,
 		"Chapters":         chapters[chStart:chEnd],
 		"Progress":         progress,
