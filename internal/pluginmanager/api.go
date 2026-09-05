@@ -2,8 +2,11 @@ package pluginmanager
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
+	"strings"
 
+	"github.com/dop251/goja"
 	"goisekai/pkg/types"
 )
 
@@ -126,4 +129,74 @@ func (m *Manager) GetPageList(pluginID, chapterID string) ([]types.Page, error) 
 		return nil, fmt.Errorf("plugin %s: invalid GetPageList result: %w", pluginID, err)
 	}
 	return result, nil
+}
+
+// AltTitlesResult is what a GetAltTitles provider returns: the provider's own
+// display name (reported by the plugin, never hardcoded by the host) plus the
+// alternative title list.
+type AltTitlesResult struct {
+	Source string   `json:"source"`
+	Titles []string `json:"titles"`
+}
+
+// AltTitlesProvider returns the plugin id that exposes GetAltTitlesFunc, or "".
+// The host picks whichever plugin declares the capability — provider selection
+// lives in plugin metadata, not in host code.
+func (m *Manager) AltTitlesProvider() string {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	for id := range m.plugins {
+		if m.pluginHasFunc(id, types.GetAltTitlesFunc) {
+			return id
+		}
+	}
+	return ""
+}
+
+// GetAltTitles calls the provider plugin to resolve alternative titles.
+func (m *Manager) GetAltTitles(title string) (AltTitlesResult, error) {
+	provider := m.AltTitlesProvider()
+	if provider == "" {
+		return AltTitlesResult{}, errors.New("no alt-titles provider plugin")
+	}
+	p, err := m.get(provider)
+	if err != nil {
+		return AltTitlesResult{}, err
+	}
+	out, err := m.call(p, types.GetAltTitlesFunc, `"`+strings.ReplaceAll(title, `"`, `\"`)+`"`)
+	if err != nil {
+		return AltTitlesResult{}, err
+	}
+	var res AltTitlesResult
+	if err := json.Unmarshal([]byte(out), &res); err != nil {
+		return AltTitlesResult{}, fmt.Errorf("alt-titles decode: %w", err)
+	}
+	if res.Source == "" {
+		res.Source = provider
+	}
+	return res, nil
+}
+
+// pluginHasFunc reports whether a plugin's runtime exposes the given ABI
+// function. It never triggers lazy instantiation for deferred plugins; an
+// unloaded plugin is checked by looking at its declared runtime later — for
+// now we conservatively load it (alt-titles is a rare, user-triggered path).
+func (m *Manager) pluginHasFunc(id, fnName string) bool {
+	p, err := m.get(id)
+	if err != nil {
+		return false
+	}
+	switch p.kind {
+	case "js":
+		jsName, ok := jsFnNames[fnName]
+		if !ok {
+			return false
+		}
+		if err := m.ensureLoaded(id); err != nil {
+			return false
+		}
+		v := p.js.Get(jsName)
+		return v != nil && !goja.IsUndefined(v)
+	}
+	return false
 }

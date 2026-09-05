@@ -218,6 +218,7 @@ func (s *Server) viewMangaDetail(w http.ResponseWriter, r *http.Request) {
 		continueTo = lastCont
 	}
 	inLibrary := s.service.IsInLibrary(pluginID, mangaID)
+	altTitles := s.service.StoredAltTitles(pluginID, mangaID)
 	// Host-side chapter pagination: slice the full chapter list (newest-first)
 	// so the detail page renders one page of chapters at a time.
 	const chapterPageSize = 50
@@ -232,6 +233,7 @@ func (s *Server) viewMangaDetail(w http.ResponseWriter, r *http.Request) {
 		"PluginID":      pluginID,
 		"MangaID":       mangaID,
 		"Manga":         manga,
+		"AltTitles":     altTitles,
 		"Chapters":      chapters[chStart:chEnd],
 		"Progress":      progress,
 		"Continue":      continueTo,

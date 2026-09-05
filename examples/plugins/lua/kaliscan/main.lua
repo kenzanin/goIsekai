@@ -53,7 +53,8 @@ function get_manga_detail(arg)
     local manga_id = json.decode(arg) -- yields a plain string
     local resp = util.http_get("https://kaliscan.io/manga/" .. manga_id)
     if not resp or resp.status ~= 200 then
-        return json.encode({})
+        -- empty table encodes as []; detail must stay an OBJECT — emit {id} only
+        return json.encode({id = manga_id})
     end
     return json.encode(util.parse_manga_detail(resp.body, manga_id))
 end

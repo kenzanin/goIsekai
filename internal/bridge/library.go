@@ -1,6 +1,7 @@
 package bridge
 
 import (
+	"encoding/json"
 	"fmt"
 
 	"goisekai/internal/database"
@@ -75,4 +76,46 @@ func (s *AppService) ListLibrary() ([]database.Manga, error) {
 		return nil, fmt.Errorf("bridge: list library: %w", err)
 	}
 	return list, nil
+}
+
+// FetchAltTitles resolves alternative titles via the alt-titles provider
+// plugin (capability-discovered, never hardcoded) and persists them on the
+// manga. Returns the stored payload {source, titles}.
+func (s *AppService) FetchAltTitles(pluginID, mangaID string) (map[string]any, error) {
+	manga, _, err := s.GetMangaDetails(pluginID, mangaID)
+	if err != nil {
+		return nil, err
+	}
+	res, err := s.mgr.GetAltTitles(manga.Title)
+	if err != nil {
+		return nil, err
+	}
+	payload, err := json.Marshal(res)
+	if err != nil {
+		return nil, err
+	}
+	if err := s.db.SaveAltTitles(pluginID, mangaID, string(payload)); err != nil {
+		return nil, err
+	}
+	out := map[string]any{"source": res.Source, "titles": res.Titles}
+	if out["titles"] == nil {
+		out["titles"] = []string{}
+	}
+	return out, nil
+}
+
+// StoredAltTitles returns the persisted alt-titles payload for a manga, or nil.
+func (s *AppService) StoredAltTitles(pluginID, mangaID string) map[string]any {
+	raw, err := s.db.GetAltTitles(pluginID, mangaID)
+	if err != nil || raw == "" {
+		return nil
+	}
+	var out map[string]any
+	if err := json.Unmarshal([]byte(raw), &out); err != nil {
+		return nil
+	}
+	if out["titles"] == nil {
+		out["titles"] = []string{}
+	}
+	return out
 }

@@ -278,3 +278,32 @@ function getPageList(arg) {
     log.info("mangadex pages: found " + pages.length + " pages for " + chapterID);
     return JSON.stringify(pages);
 }
+
+// Optional enricher export: resolve alternative titles for ANY manga title.
+// Returns {source, titles} — the host uses `source` as the "via X" badge.
+function getAltTitles(arg) {
+    var title = JSON.parse(arg);
+    var qs = "title=" + encodeURIComponent(title) + "&limit=5&includes[]=manga";
+    var resp = httpGet(API_URL + "/manga?" + qs);
+    var body = typeof resp === "string" ? JSON.parse(resp) : JSON.parse(resp.body);
+    var data = body && body.data;
+    if (!data || data.length === 0) {
+        return JSON.stringify({ source: "MangaDex", titles: [] });
+    }
+    var attrs = data[0].attributes;
+    var out = [];
+    var seen = {};
+    var keepLangs = { "en": true, "ja": true, "ja-ro": true, "ko": true, "ko-ro": true };
+    for (var i = 0; i < attrs.altTitles.length; i++) {
+        var alt = attrs.altTitles[i];
+        var keys = Object.keys(alt);
+        for (var j = 0; j < keys.length; j++) {
+            var lang = keys[j];
+            if (keepLangs[lang] && alt[lang] && !seen[alt[lang]]) {
+                seen[alt[lang]] = true;
+                out.push(alt[lang]);
+            }
+        }
+    }
+    return JSON.stringify({ source: "MangaDex", titles: out });
+}

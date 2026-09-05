@@ -343,7 +343,9 @@
   function switchChapter(targetCID, targetPage) {
     if (loading) return;
     showSpinner(true);
-    _lastFailedRetry = function() { switchChapter(targetCID, targetPage); };
+    _lastFailedRetry = () => {
+      switchChapter(targetCID, targetPage);
+    };
     fetch(`/api/reader-data/${[pid, mid, targetCID].map(encodeURIComponent).join('/')}`)
       .then((r) => {
         if (!r.ok) throw new Error(`HTTP ${r.status}`);
@@ -606,7 +608,9 @@
   // Boot: fetch page data, then first draw after the canvas is visible.
   function loadChapter(resume) {
     preloaded = {}; // stale at-home URLs 404 — drop cached Image objects
-    _lastFailedRetry = function() { loadChapter(resume); };
+    _lastFailedRetry = () => {
+      loadChapter(resume);
+    };
     fetch(`/api/reader-data/${[pid, mid, cid].map(encodeURIComponent).join('/')}`)
       .then((r) => {
         if (!r.ok) throw new Error(`HTTP ${r.status}`);

@@ -70,6 +70,7 @@ var ddl = []string{
 );`,
 	`ALTER TABLE plugins ADD COLUMN thumb_ratio REAL DEFAULT 0;`,
 	`ALTER TABLE mangas ADD COLUMN new_since TIMESTAMP;`,
+	`ALTER TABLE mangas ADD COLUMN alt_titles TEXT DEFAULT '';`,
 }
 
 func main() {

@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"strconv"
 
+	"github.com/go-chi/chi/v5"
 	"goisekai/internal/config"
 )
 
@@ -19,6 +20,7 @@ func (s *Server) registerActionRoutes() {
 	s.Router.Post("/action/toggle-plugin/{pluginID}", s.handleTogglePlugin)
 	s.Router.Post("/action/toggle-library/{pluginID}/{mangaID}", s.handleToggleLibrary)
 	s.Router.Post("/action/sync", s.handleSync)
+	s.Router.Post("/action/fetch-alt-titles/{pluginID}/{mangaID}", s.handleFetchAltTitles)
 	s.Router.Post("/action/set-chapter-progress", s.handleSetChapterProgress)
 	s.Router.Post("/action/mark-read/{pluginID}/{mangaID}/{chapterID}", s.handleMarkChapterRead)
 	s.Router.Post("/action/mark-read-bulk", s.handleMarkChaptersReadBulk)
@@ -341,4 +343,17 @@ func (s *Server) handleClearAllCache(w http.ResponseWriter, _ *http.Request) {
 		return
 	}
 	s.hxRedirect(w, "/view/settings")
+}
+
+// handleFetchAltTitles resolves alternative titles via the provider plugin
+// and redirects back to the manga detail page.
+func (s *Server) handleFetchAltTitles(w http.ResponseWriter, r *http.Request) {
+	pluginID := chi.URLParam(r, "pluginID")
+	mangaID := chi.URLParam(r, "mangaID")
+	if _, err := s.service.FetchAltTitles(pluginID, mangaID); err != nil {
+		s.logger.Error("fetch alt titles", "error", err)
+		http.Error(w, err.Error(), http.StatusBadGateway)
+		return
+	}
+	s.hxRedirect(w, "/view/manga/"+pluginID+"/"+mangaID)
 }

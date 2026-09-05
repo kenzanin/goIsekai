@@ -22,6 +22,12 @@ const (
 	// InitFunc is an optional export. When present, the host calls it once at
 	// load time with no arguments; it returns a PluginMeta JSON object.
 	InitFunc = "Init"
+	// GetAltTitlesFunc is an OPTIONAL enrichment export. When present, the
+	// plugin can resolve alternative titles for any manga title string.
+	// Input: a title string. Output: JSON {"source":string,"titles":[]}.
+	// Plugins declaring it act as alt-title providers (e.g. MangaDex, MAL,
+	// or even an AI backend) — the host never hardcodes a provider.
+	GetAltTitlesFunc = "GetAltTitles"
 )
 
 // HostHTTPRequestFunc is the host-imported function available to plugins for

@@ -29,6 +29,25 @@
         {{if .Manga.Description != ""}}
         <p class="text-sm text-neutral-400 mb-4">{{.Manga.Description}}</p>
         {{end}}
+        {{if .AltTitles}}
+        <div class="mb-4">
+            <div class="flex items-center gap-2 mb-1">
+                <span class="text-xs font-semibold text-neutral-300 uppercase tracking-wide">Alternative titles</span>
+                <span class="text-[10px] px-1.5 py-0.5 rounded-full bg-neutral-800 text-neutral-400">via {{.AltTitles.source}}</span>
+            </div>
+            <div class="flex flex-wrap gap-1.5">
+                {{range _, t := .AltTitles.titles}}
+                <span class="text-xs px-2 py-0.5 rounded-full bg-neutral-800 text-neutral-300">{{t}}</span>
+                {{end}}
+            </div>
+        </div>
+        {{end}}
+        <form method="post" action="/action/fetch-alt-titles/{{.PluginID}}/{{.MangaID}}" class="mb-4">
+            <button type="submit" class="border border-neutral-700 hover:bg-neutral-800 rounded-md px-3 py-1.5 text-xs font-medium inline-flex items-center gap-1.5">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="size-3.5"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+                Get alternative titles
+            </button>
+        </form>
         <div class="flex flex-wrap items-center gap-2 mb-4">
             <form method="post" action="/action/toggle-library/{{.PluginID}}/{{.MangaID}}">
                 {{if .InLibrary}}<button type="submit" class="border border-emerald-600/50 text-emerald-400 bg-emerald-500/10 hover:bg-emerald-500/20 rounded-md px-4 py-2 text-sm">✓ In Library</button>{{else}}<button type="submit" class="bg-indigo-600 hover:bg-indigo-500 text-white rounded-md px-4 py-2 text-sm font-medium">+ Add to Library</button>{{end}}

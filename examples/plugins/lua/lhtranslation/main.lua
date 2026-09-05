@@ -112,7 +112,8 @@ end
 function get_manga_detail(arg)
     local slug = json.decode(arg)
     local body = http_get(BASE .. "/manga/" .. slug .. "/")
-    if not body then return json.encode({}) end
+    -- empty table encodes as []; detail must stay an OBJECT — emit {id} only
+    if not body then return json.encode({id = slug}) end
 
     local detail = { id = slug, title = "", author = "", description = "",
         cover_url = "", genres = {}, status = "" }

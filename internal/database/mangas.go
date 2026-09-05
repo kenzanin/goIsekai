@@ -261,3 +261,27 @@ func (d *DB) LibraryOverview() (LibraryOverview, error) {
 	}
 	return ov, nil
 }
+
+// SaveAltTitles stores the alt-titles JSON payload {source, titles} on a manga.
+func (d *DB) SaveAltTitles(pluginID, sourceMangaID, payload string) error {
+	_, err := Mangas.UPDATE().
+		SET(Mangas.AltTitles.SET(String(payload))).
+		WHERE(Mangas.PluginID.EQ(String(pluginID)).AND(Mangas.SourceMangaID.EQ(String(sourceMangaID)))).
+		Exec(d.db)
+	return err
+}
+
+// GetAltTitles returns the stored alt-titles JSON payload, or "" when absent.
+func (d *DB) GetAltTitles(pluginID, sourceMangaID string) (string, error) {
+	var out []struct {
+		AltTitles string `sql:"alt_titles"`
+	}
+	err := SELECT(Mangas.AltTitles.AS("alt_titles")).
+		FROM(Mangas).
+		WHERE(Mangas.PluginID.EQ(String(pluginID)).AND(Mangas.SourceMangaID.EQ(String(sourceMangaID)))).
+		Query(d.db, &out)
+	if err != nil || len(out) == 0 {
+		return "", err
+	}
+	return out[0].AltTitles, nil
+}
