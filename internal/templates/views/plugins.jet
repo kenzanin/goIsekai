@@ -4,8 +4,8 @@
 <div class="flex items-center justify-between mb-6">
     <h1 class="text-xl font-semibold">Plugins</h1>
     <form method="post" action="/action/install-plugin" enctype="multipart/form-data" class="flex items-center gap-2">
-        <label for="plugin-file" class="cursor-pointer border border-dashed border-neutral-700 rounded-md px-3 py-2 text-sm text-neutral-400 hover:border-indigo-500">Choose .wasm…</label>
-        <input type="file" id="plugin-file" name="file" accept=".wasm" class="sr-only">
+        <label for="plugin-file" class="cursor-pointer border border-dashed border-neutral-700 rounded-md px-3 py-2 text-sm text-neutral-400 hover:border-indigo-500">Choose plugin…</label>
+        <input type="file" id="plugin-file" name="file" accept=".wasm,.js,.lua,.so" class="sr-only">
         <button type="submit" class="bg-indigo-600 hover:bg-indigo-500 text-white rounded-md px-4 py-2 text-sm font-medium">Install</button>
     </form>
 </div>
@@ -19,10 +19,15 @@
         <div class="flex items-center gap-3 min-w-0">
             {{if p.IconURL != ""}}
             <img src="{{p.IconURL}}" alt="" class="h-10 w-10 rounded-md object-cover bg-neutral-800">
+            {{else}}
+            <div class="h-10 w-10 rounded-md bg-neutral-800 flex items-center justify-center text-sm font-semibold text-neutral-400 shrink-0">{{p.Name[:1]}}</div>
             {{end}}
             <div class="min-w-0">
                 <div class="font-medium text-sm">{{p.Name}}</div>
                 <div class="text-xs font-mono text-neutral-500 truncate">{{p.ID}}</div>
+                {{if p.SiteURL != ""}}
+                <a href="{{p.SiteURL}}" target="_blank" rel="noopener" class="text-xs text-indigo-400 hover:text-indigo-300 truncate">{{p.SiteURL}}</a>
+                {{end}}
             </div>
         </div>
             <div class="flex items-center gap-2 shrink-0 flex-wrap">

@@ -52,6 +52,18 @@ func (d *DB) ListPlugins() ([]Plugin, error) {
 	return result, nil
 }
 
+// UpdatePluginIdentity refreshes the display name and logo for a plugin row.
+func (d *DB) UpdatePluginIdentity(id, name, iconURL string) error {
+	_, err := Plugins.UPDATE().
+		SET(
+			Plugins.Name.SET(String(name)),
+			Plugins.IconURL.SET(String(iconURL)),
+		).
+		WHERE(Plugins.ID.EQ(String(id))).
+		Exec(d.db)
+	return err
+}
+
 // TogglePluginActive flips the is_active flag for a plugin.
 func (d *DB) TogglePluginActive(id string) error {
 	_, err := Plugins.UPDATE().

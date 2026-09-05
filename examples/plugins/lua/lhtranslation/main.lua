@@ -5,6 +5,8 @@
 PLUGIN = {
     contract_version = 1,
     name = "LHTranslation",
+    site_url = "https://lhtranslation.net",
+    logo = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ctext y='28' font-size='28'%3E🌐%3C/text%3E%3C/svg%3E",
     verify_url = "https://lhtranslation.net",
     needs_human_verify = false,
     thumb_ratio = 0.703,

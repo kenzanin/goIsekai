@@ -10,6 +10,7 @@
 /dist/
 /build/
 goIsekai
+extension-source
 
 # Wails
 frontend/dist/

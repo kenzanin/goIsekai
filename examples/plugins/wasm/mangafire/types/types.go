@@ -47,6 +47,9 @@ type SearchFilter struct {
 
 // PluginMeta is the metadata a plugin optionally declares in its Init response.
 type PluginMeta struct {
+	Name             string  `json:"name,omitempty"`
+	SiteURL          string  `json:"site_url,omitempty"`
+	Logo             string  `json:"logo,omitempty"`
 	VerifyURL        string  `json:"verify_url,omitempty"`
 	NeedsHumanVerify bool    `json:"needs_human_verify,omitempty"`
 	ThumbRatio       float64 `json:"thumb_ratio,omitempty"`

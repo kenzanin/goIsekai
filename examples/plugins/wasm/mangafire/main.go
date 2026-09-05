@@ -159,6 +159,9 @@ func contractVersion() int32 {
 //go:wasmexport Init
 func Init() int32 {
 	b, _ := json.Marshal(types.PluginMeta{
+		Name:           "MangaFire",
+		SiteURL:        "https://mangafire.to",
+		Logo:           "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ctext y='28' font-size='28'%3E🔥%3C/text%3E%3C/svg%3E",
 		ThumbRatio:     thumbRatio,
 		SearchPageSize: 50,
 	})

@@ -9,7 +9,9 @@
 
 var PLUGIN = {
     contract_version: 1,
-    name: "Dummy JS",
+    name: "Dummy",
+    site_url: "https://example.com",
+    logo: "",
     verify_url: "https://example.com",
     needs_human_verify: false,
     thumb_ratio: 0.703,

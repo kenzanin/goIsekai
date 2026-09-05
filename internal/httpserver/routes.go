@@ -14,6 +14,7 @@ import (
 func (s *Server) routes() {
 	s.Router.Use(s.loggingMiddleware)
 	s.registerStaticRoutes()
+	s.registerPluginStaticRoutes()
 	s.registerViewRoutes()
 	s.registerActionRoutes()
 	s.registerImageRoutes()

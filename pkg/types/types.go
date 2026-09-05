@@ -85,6 +85,16 @@ type PluginMeta struct {
 	// alternative-title resolution. A non-empty list signals enricher
 	// capability — the host also expects a GetAltTitles export.
 	AltTitleServers []AltTitleServer `json:"alt_title_servers,omitempty"`
+	// Name is the human-readable site name (e.g. "MangaDex"). Falls back to the
+	// plugin ID when empty.
+	Name string `json:"name,omitempty"`
+	// SiteURL is the homepage URL of the source site.
+	SiteURL string `json:"site_url,omitempty"`
+	// Logo identifies the plugin's logo image. It can be:
+	//   - an absolute URL ("https://...") — passed through as-is
+	//   - a data URI ("data:image/png;base64,...") — passed through as-is
+	//   - a bare filename ("logo.png") — resolved to /plugin-static/{id}/{file}
+	Logo string `json:"logo,omitempty"`
 }
 
 // HTTPRequest is the request payload a plugin passes to the host-imported

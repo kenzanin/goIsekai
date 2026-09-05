@@ -348,6 +348,7 @@ type PluginView struct {
 	VerifyCookies    string
 	VerifyUserAgent  string
 	ThumbRatio       float64 // runtime meta; shadows database.Plugin.ThumbRatio (0 for bridge-installed plugins)
+	SiteURL          string
 }
 
 // viewPlugins renders the plugin manager page.
@@ -365,6 +366,13 @@ func (s *Server) viewPlugins(w http.ResponseWriter, _ *http.Request) {
 			v.VerifyURL = m.VerifyURL
 			v.NeedsHumanVerify = m.NeedsHumanVerify
 			v.ThumbRatio = m.ThumbRatio
+			v.SiteURL = m.SiteURL
+			if m.Name != "" {
+				v.Name = m.Name // override DB name if plugin declares one
+			}
+			if m.Logo != "" {
+				v.IconURL = resolveLogoURL(m.Logo, p.ID)
+			}
 		}
 		if row, ok, err := s.service.GetPluginVerifyState(p.ID); err == nil && ok {
 			v.VerifyCookies = row.Cookies
@@ -388,6 +396,15 @@ func (s *Server) viewSettings(w http.ResponseWriter, _ *http.Request) {
 		"Path":       path,
 		"CacheBytes": cacheBytes,
 	})
+}
+
+// resolveLogoURL maps a plugin's Logo field to a URL. Bare filenames become
+// /plugin-static/{id}/{file}; absolute URLs and data URIs pass through as-is.
+func resolveLogoURL(logo, pluginID string) string {
+	if strings.HasPrefix(logo, "http://") || strings.HasPrefix(logo, "https://") || strings.HasPrefix(logo, "data:") {
+		return logo
+	}
+	return "/plugin-static/" + pluginID + "/" + logo
 }
 
 // viewLogs renders the in-memory log buffer with a 2s HTMX poll.

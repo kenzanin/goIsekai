@@ -170,6 +170,7 @@ func (s *Server) apiSearch(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusBadGateway, "search failed: "+err.Error())
 		return
 	}
+	s.service.SyncPluginMeta(pluginID)
 	pageSize := s.service.PluginMeta(pluginID).SearchPageSize
 	if pageSize <= 0 {
 		pageSize = 24

@@ -150,7 +150,7 @@ func (m *Manager) loadJS(id, dir string) (*loadedPlugin, error) {
 		}
 	}
 
-	logger.Info("js plugin loaded", "id", id, "name", meta.VerifyURL)
+	logger.Info("js plugin loaded", "id", id, "name", meta.Name)
 
 	return &loadedPlugin{
 		id:              id,

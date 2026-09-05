@@ -6,6 +6,9 @@ package bridge
 
 import (
 	"fmt"
+	"os"
+	"path/filepath"
+	"strings"
 	"sync"
 	"time"
 
@@ -128,4 +131,36 @@ func (s *AppService) LastReadChapter(mangaRowID string) (sourceChapterID string,
 // QueryMangaPluginIDs returns (manga_id, plugin_id) pairs for all in-library manga.
 func (s *AppService) QueryMangaPluginIDs() ([]database.MangaPluginIDRow, error) {
 	return s.db.QueryMangaPluginIDs()
+}
+
+// PluginDir returns the directory containing the plugin's main file, or "" if
+// not found. Folder-based plugins (lua/js/scriggo) have WasmPath pointing at
+// the folder itself; wasm plugins have it pointing at the .wasm file.
+func (s *AppService) PluginDir(pluginID string) string {
+	for _, p := range s.mgr.LoadedPlugins() {
+		if p.ID != pluginID || p.WasmPath == "" {
+			continue
+		}
+		if fi, err := os.Stat(p.WasmPath); err == nil && fi.IsDir() {
+			return p.WasmPath
+		}
+		return filepath.Dir(p.WasmPath)
+	}
+	return ""
+}
+
+// SyncPluginMeta persists a loaded plugin's identity metadata (name, logo)
+// to the database so deferred plugins show correct data on the next page view.
+func (s *AppService) SyncPluginMeta(id string) {
+	meta := s.PluginMeta(id)
+	if meta.Name == "" && meta.Logo == "" {
+		return
+	}
+	iconURL := meta.Logo
+	if iconURL != "" && !strings.HasPrefix(iconURL, "http") && !strings.HasPrefix(iconURL, "data:") {
+		iconURL = "/plugin-static/" + id + "/" + iconURL
+	}
+	if err := s.db.UpdatePluginIdentity(id, meta.Name, iconURL); err != nil {
+		logger.Warn("sync plugin meta", "id", id, "error", err)
+	}
 }

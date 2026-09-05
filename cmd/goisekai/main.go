@@ -172,6 +172,7 @@ func main() {
 	}
 
 	svc := bridge.NewAppService(db, mgr, proxy, cfgPath, cacheDir)
+	mgr.SetOnLoad(svc.SyncPluginMeta)
 
 	eng, err := templates.New(false)
 	if err != nil {

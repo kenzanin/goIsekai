@@ -103,6 +103,9 @@ func (m *Manager) ensureLoaded(id string) error {
 	p.loaded = true
 	m.proxy.SetNeedsJS(id, p.meta.NeedsJS)
 	logger.Debug("plugin loaded (lazy)", "id", id, "version", p.contractVersion)
+	if m.onLoad != nil {
+		go m.onLoad(id)
+	}
 	return nil
 }
 
@@ -116,6 +119,15 @@ type Manager struct {
 
 	mu      sync.RWMutex
 	plugins map[string]*loadedPlugin
+	onLoad  func(id string) // called after first successful load
+}
+
+// SetOnLoad registers a callback that fires once per plugin after its first
+// successful lazy-load. The callback receives the plugin id.
+func (m *Manager) SetOnLoad(fn func(id string)) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.onLoad = fn
 }
 
 // NewManager returns a Manager that will load plugins from pluginsDir and route
@@ -548,6 +560,9 @@ type LoadedPlugin struct {
 	ThumbRatio       float64
 	NeedsJS          bool
 	SearchPageSize   int
+	Name             string
+	SiteURL          string
+	Logo             string
 }
 
 // LoadedPlugins returns metadata for every plugin currently registered,
@@ -567,6 +582,9 @@ func (m *Manager) LoadedPlugins() []LoadedPlugin {
 			ThumbRatio:       p.meta.ThumbRatio,
 			NeedsJS:          p.meta.NeedsJS,
 			SearchPageSize:   p.meta.SearchPageSize,
+			Name:             p.meta.Name,
+			SiteURL:          p.meta.SiteURL,
+			Logo:             p.meta.Logo,
 		})
 	}
 	sort.Slice(out, func(i, j int) bool { return out[i].ID < out[j].ID })

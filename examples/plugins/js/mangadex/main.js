@@ -5,6 +5,8 @@
 var PLUGIN = {
     contract_version: 1,
     name: "MangaDex",
+    site_url: "https://mangadex.org",
+    logo: "https://mangadex.org/favicon.ico",
     thumb_ratio: 0.703,
     alt_title_servers: [{ id: "mangadex", name: "MangaDex" }],
 };

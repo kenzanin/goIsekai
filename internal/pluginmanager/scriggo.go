@@ -154,8 +154,7 @@ func callScriggo(p *loadedPlugin, fnName, inputJSON string) (string, error) {
 	runErr := p.scriggo.prog.Run(&scriggo.RunOptions{Context: ctx})
 
 	if runErr != nil {
-		var panicErr *scriggo.PanicError
-		if errors.As(runErr, &panicErr) {
+		if panicErr, ok := errors.AsType[*scriggo.PanicError](runErr); ok {
 			return "", fmt.Errorf("scriggo plugin %s %s: panic: %v", p.id, fnName, panicErr.Message())
 		}
 		if ctx.Err() == context.DeadlineExceeded {
