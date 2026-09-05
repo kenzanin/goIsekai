@@ -70,7 +70,15 @@ var ddl = []string{
 );`,
 	`ALTER TABLE plugins ADD COLUMN thumb_ratio REAL DEFAULT 0;`,
 	`ALTER TABLE mangas ADD COLUMN new_since TIMESTAMP;`,
-	`ALTER TABLE mangas ADD COLUMN alt_titles TEXT DEFAULT '';`,
+	// alt_titles column was added then dropped; the replacement table is below.
+	`CREATE TABLE IF NOT EXISTS alt_titles (
+		id INTEGER PRIMARY KEY AUTOINCREMENT,
+		manga_row_id TEXT NOT NULL REFERENCES mangas(id) ON DELETE CASCADE,
+		title TEXT NOT NULL,
+		source TEXT NOT NULL,
+		UNIQUE(manga_row_id, title)
+	);`,
+	`CREATE VIRTUAL TABLE IF NOT EXISTS library_fts USING fts5(title, alt, plugin_id UNINDEXED, manga_row_id UNINDEXED);`,
 }
 
 func main() {

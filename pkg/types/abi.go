@@ -23,8 +23,9 @@ const (
 	// load time with no arguments; it returns a PluginMeta JSON object.
 	InitFunc = "Init"
 	// GetAltTitlesFunc is an OPTIONAL enrichment export. When present, the
-	// plugin can resolve alternative titles for any manga title string.
-	// Input: a title string. Output: JSON {"source":string,"titles":[]}.
+	// plugin can resolve alternative titles for a manga title via one of its
+	// declared alt-title servers. Input: JSON {"title":string,"server":string}.
+	// Output: JSON {"source":string,"titles":[]}.
 	// Plugins declaring it act as alt-title providers (e.g. MangaDex, MAL,
 	// or even an AI backend) — the host never hardcodes a provider.
 	GetAltTitlesFunc = "GetAltTitles"

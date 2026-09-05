@@ -1,6 +1,8 @@
 package database
 
 import (
+	"encoding/json"
+	"fmt"
 	"strings"
 	"time"
 
@@ -262,26 +264,84 @@ func (d *DB) LibraryOverview() (LibraryOverview, error) {
 	return ov, nil
 }
 
-// SaveAltTitles stores the alt-titles JSON payload {source, titles} on a manga.
+// SaveAltTitles stores the alt-titles JSON payload {source, titles} on a manga
+// by replacing its rows in the alt_titles table.
 func (d *DB) SaveAltTitles(pluginID, sourceMangaID, payload string) error {
-	_, err := Mangas.UPDATE().
-		SET(Mangas.AltTitles.SET(String(payload))).
-		WHERE(Mangas.PluginID.EQ(String(pluginID)).AND(Mangas.SourceMangaID.EQ(String(sourceMangaID)))).
-		Exec(d.db)
-	return err
+	var parsed struct {
+		Source string   `json:"source"`
+		Titles []string `json:"titles"`
+	}
+	if err := json.Unmarshal([]byte(payload), &parsed); err != nil {
+		return fmt.Errorf("parse alt titles payload: %w", err)
+	}
+	rowID, err := d.mangaRowID(pluginID, sourceMangaID)
+	if err != nil {
+		return err
+	}
+	tx, err := d.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	if _, err := tx.Exec(`DELETE FROM alt_titles WHERE manga_row_id = ?`, rowID); err != nil {
+		return err
+	}
+	for _, t := range parsed.Titles {
+		if _, err := tx.Exec(`INSERT OR IGNORE INTO alt_titles (manga_row_id, title, source) VALUES (?, ?, ?)`, rowID, t, parsed.Source); err != nil {
+			return err
+		}
+	}
+	return tx.Commit()
 }
 
-// GetAltTitles returns the stored alt-titles JSON payload, or "" when absent.
+// GetAltTitles returns the stored alt titles as the JSON payload
+// {"source": first row's source, "titles": [...]}, or "" when absent.
 func (d *DB) GetAltTitles(pluginID, sourceMangaID string) (string, error) {
-	var out []struct {
-		AltTitles string `sql:"alt_titles"`
-	}
-	err := SELECT(Mangas.AltTitles.AS("alt_titles")).
-		FROM(Mangas).
-		WHERE(Mangas.PluginID.EQ(String(pluginID)).AND(Mangas.SourceMangaID.EQ(String(sourceMangaID)))).
-		Query(d.db, &out)
-	if err != nil || len(out) == 0 {
+	rowID, err := d.mangaRowID(pluginID, sourceMangaID)
+	if err != nil {
 		return "", err
 	}
-	return out[0].AltTitles, nil
+	rows, err := d.db.Query(`SELECT title, source FROM alt_titles WHERE manga_row_id = ?`, rowID)
+	if err != nil {
+		return "", err
+	}
+	defer rows.Close()
+	type alt struct {
+		Title  string `json:"title"`
+		Source string `json:"source"`
+	}
+	var alts []alt
+	for rows.Next() {
+		var a alt
+		if err := rows.Scan(&a.Title, &a.Source); err != nil {
+			return "", err
+		}
+		alts = append(alts, a)
+	}
+	if len(alts) == 0 {
+		return "", rows.Err()
+	}
+	payload := struct {
+		Source string   `json:"source"`
+		Titles []string `json:"titles"`
+	}{Source: alts[0].Source, Titles: []string{}}
+	for _, a := range alts {
+		payload.Titles = append(payload.Titles, a.Title)
+	}
+	b, err := json.Marshal(payload)
+	if err != nil {
+		return "", err
+	}
+	return string(b), nil
 }
+
+// mangaRowID resolves the mangas.id PK from (plugin_id, source_manga_id).
+func (d *DB) mangaRowID(pluginID, sourceMangaID string) (string, error) {
+	var id string
+	err := d.db.QueryRow(`SELECT id FROM mangas WHERE plugin_id = ? AND source_manga_id = ?`, pluginID, sourceMangaID).Scan(&id)
+	if err != nil {
+		return "", fmt.Errorf("manga row: %w", err)
+	}
+	return id, nil
+}
+

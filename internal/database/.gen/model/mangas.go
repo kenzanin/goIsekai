@@ -23,5 +23,4 @@ type Mangas struct {
 	CreatedAt     *time.Time
 	UpdatedAt     *time.Time
 	NewSince      *time.Time
-	AltTitles     *string
 }

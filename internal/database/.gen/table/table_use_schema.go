@@ -10,7 +10,14 @@ package table
 // UseSchema sets a new schema name for all generated table SQL builder types. It is recommended to invoke
 // this method only once at the beginning of the program.
 func UseSchema(schema string) {
+	AltTitles = AltTitles.FromSchema(schema)
 	Chapters = Chapters.FromSchema(schema)
+	LibraryFts = LibraryFts.FromSchema(schema)
+	LibraryFtsConfig = LibraryFtsConfig.FromSchema(schema)
+	LibraryFtsContent = LibraryFtsContent.FromSchema(schema)
+	LibraryFtsData = LibraryFtsData.FromSchema(schema)
+	LibraryFtsDocsize = LibraryFtsDocsize.FromSchema(schema)
+	LibraryFtsIdx = LibraryFtsIdx.FromSchema(schema)
 	Mangas = Mangas.FromSchema(schema)
 	PluginVerify = PluginVerify.FromSchema(schema)
 	Plugins = Plugins.FromSchema(schema)

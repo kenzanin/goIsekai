@@ -1,5 +1,10 @@
 package database
 
+// altTitlesMigration is the index in the migrations slice that is handled by
+// migrateAltTitles() (Go-side JSON→table copy, DROP COLUMN, FTS5) rather than
+// a plain DDL Exec.
+const altTitlesMigration = 9
+
 // migrations is an ordered list of DDL statements applied in sequence.
 // Version is tracked via PRAGMA user_version; migrations[i] is applied when
 // user_version < len(migrations) so partial upgrades resume correctly.
@@ -56,4 +61,7 @@ var migrations = []string{
 	`ALTER TABLE plugins ADD COLUMN thumb_ratio REAL DEFAULT 0;`,
 	`ALTER TABLE mangas ADD COLUMN new_since TIMESTAMP;`,
 	`ALTER TABLE mangas ADD COLUMN alt_titles TEXT DEFAULT '';`,
+	// Index 9: alt_titles migration — handled by migrateAltTitles() in db.go
+	// (CREATE TABLE alt_titles, JSON→table copy, DROP COLUMN, CREATE FTS5, backfill).
+	`/* alt_titles: see migrateAltTitles */`,
 }

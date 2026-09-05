@@ -1,12 +1,11 @@
 package pluginmanager
 
 import (
+	"goisekai/internal/logger"
 	"encoding/json"
-	"errors"
 	"fmt"
-	"strings"
+	"sort"
 
-	"github.com/dop251/goja"
 	"goisekai/pkg/types"
 )
 
@@ -131,72 +130,100 @@ func (m *Manager) GetPageList(pluginID, chapterID string) ([]types.Page, error) 
 	return result, nil
 }
 
-// AltTitlesResult is what a GetAltTitles provider returns: the provider's own
-// display name (reported by the plugin, never hardcoded by the host) plus the
-// alternative title list.
-type AltTitlesResult struct {
-	Source string   `json:"source"`
-	Titles []string `json:"titles"`
+// AltTitleServerEntry is one row in the aggregated server list: the plugin
+// that provides the server, the server id, and the human-readable name.
+type AltTitleServerEntry struct {
+	ProviderPluginID string
+	ServerID         string
+	Name             string
 }
 
-// AltTitlesProvider returns the plugin id that exposes GetAltTitlesFunc, or "".
-// The host picks whichever plugin declares the capability — provider selection
-// lives in plugin metadata, not in host code.
-func (m *Manager) AltTitlesProvider() string {
+// AltTitleServers iterates all discovered plugins and returns every declared
+// alt-title server. JS plugins are cheap to load (goja VM, no multi-MB
+// runtime), so a deferred JS plugin is loaded on demand to read its metadata;
+// WASM/Lua plugins contribute only when already loaded.
+func (m *Manager) AltTitleServers() []AltTitleServerEntry {
+	// Ensure JS plugins expose their metadata.
 	m.mu.RLock()
-	defer m.mu.RUnlock()
-	for id := range m.plugins {
-		if m.pluginHasFunc(id, types.GetAltTitlesFunc) {
-			return id
+	var jsIDs []string
+	for id, p := range m.plugins {
+		if p.kind == "js" && !p.loaded {
+			jsIDs = append(jsIDs, id)
 		}
 	}
-	return ""
+	m.mu.RUnlock()
+	for _, id := range jsIDs {
+		if err := m.ensureLoaded(id); err != nil {
+			logger.Warn("alt-title meta load", "id", id, "error", err)
+		}
+	}
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	var out []AltTitleServerEntry
+	for id, p := range m.plugins {
+		for _, s := range p.meta.AltTitleServers {
+			out = append(out, AltTitleServerEntry{
+				ProviderPluginID: id,
+				ServerID:         s.ID,
+				Name:             s.Name,
+			})
+		}
+	}
+	sort.Slice(out, func(i, j int) bool {
+		if out[i].ProviderPluginID != out[j].ProviderPluginID {
+			return out[i].ProviderPluginID < out[j].ProviderPluginID
+		}
+		return out[i].ServerID < out[j].ServerID
+	})
+	return out
 }
 
-// GetAltTitles calls the provider plugin to resolve alternative titles.
-func (m *Manager) GetAltTitles(title string) (AltTitlesResult, error) {
-	provider := m.AltTitlesProvider()
-	if provider == "" {
-		return AltTitlesResult{}, errors.New("no alt-titles provider plugin")
+// GetAltTitles calls the provider plugin that advertises the given server to
+// resolve alternative titles. The input JSON sent to the plugin is
+// {"title":..., "server":...} per the ABI contract.
+func (m *Manager) GetAltTitles(title, server string) (types.AltTitlesResult, error) {
+	// Find the provider plugin for this server.
+	m.mu.RLock()
+	var providerID string
+	for id, p := range m.plugins {
+		for _, s := range p.meta.AltTitleServers {
+			if s.ID == server {
+				providerID = id
+				break
+			}
+		}
+		if providerID != "" {
+			break
+		}
 	}
-	p, err := m.get(provider)
+	m.mu.RUnlock()
+
+	if providerID == "" {
+		return types.AltTitlesResult{}, fmt.Errorf("server %q not found in any provider", server)
+	}
+
+	p, err := m.get(providerID)
 	if err != nil {
-		return AltTitlesResult{}, err
+		return types.AltTitlesResult{}, err
 	}
-	out, err := m.call(p, types.GetAltTitlesFunc, `"`+strings.ReplaceAll(title, `"`, `\"`)+`"`)
+
+	input, err := json.Marshal(map[string]string{"title": title, "server": server})
 	if err != nil {
-		return AltTitlesResult{}, err
+		return types.AltTitlesResult{}, err
 	}
-	var res AltTitlesResult
+	out, err := m.call(p, types.GetAltTitlesFunc, string(input))
+	if err != nil {
+		return types.AltTitlesResult{}, err
+	}
+
+	var res types.AltTitlesResult
 	if err := json.Unmarshal([]byte(out), &res); err != nil {
-		return AltTitlesResult{}, fmt.Errorf("alt-titles decode: %w", err)
+		return types.AltTitlesResult{}, fmt.Errorf("alt-titles decode: %w", err)
 	}
 	if res.Source == "" {
-		res.Source = provider
+		res.Source = providerID
 	}
 	return res, nil
 }
 
-// pluginHasFunc reports whether a plugin's runtime exposes the given ABI
-// function. It never triggers lazy instantiation for deferred plugins; an
-// unloaded plugin is checked by looking at its declared runtime later — for
-// now we conservatively load it (alt-titles is a rare, user-triggered path).
-func (m *Manager) pluginHasFunc(id, fnName string) bool {
-	p, err := m.get(id)
-	if err != nil {
-		return false
-	}
-	switch p.kind {
-	case "js":
-		jsName, ok := jsFnNames[fnName]
-		if !ok {
-			return false
-		}
-		if err := m.ensureLoaded(id); err != nil {
-			return false
-		}
-		v := p.js.Get(jsName)
-		return v != nil && !goja.IsUndefined(v)
-	}
-	return false
-}
+

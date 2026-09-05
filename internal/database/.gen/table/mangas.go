@@ -28,7 +28,6 @@ type mangasTable struct {
 	CreatedAt     sqlite.ColumnTimestamp
 	UpdatedAt     sqlite.ColumnTimestamp
 	NewSince      sqlite.ColumnTimestamp
-	AltTitles     sqlite.ColumnString
 
 	AllColumns     sqlite.ColumnList
 	MutableColumns sqlite.ColumnList
@@ -81,10 +80,9 @@ func newMangasTableImpl(schemaName, tableName, alias string) mangasTable {
 		CreatedAtColumn     = sqlite.TimestampColumn("created_at")
 		UpdatedAtColumn     = sqlite.TimestampColumn("updated_at")
 		NewSinceColumn      = sqlite.TimestampColumn("new_since")
-		AltTitlesColumn     = sqlite.StringColumn("alt_titles")
-		allColumns          = sqlite.ColumnList{IDColumn, PluginIDColumn, SourceMangaIDColumn, TitleColumn, CoverURLColumn, DescriptionColumn, StatusColumn, InLibraryColumn, CreatedAtColumn, UpdatedAtColumn, NewSinceColumn, AltTitlesColumn}
-		mutableColumns      = sqlite.ColumnList{PluginIDColumn, SourceMangaIDColumn, TitleColumn, CoverURLColumn, DescriptionColumn, StatusColumn, InLibraryColumn, CreatedAtColumn, UpdatedAtColumn, NewSinceColumn, AltTitlesColumn}
-		defaultColumns      = sqlite.ColumnList{InLibraryColumn, CreatedAtColumn, UpdatedAtColumn, AltTitlesColumn}
+		allColumns          = sqlite.ColumnList{IDColumn, PluginIDColumn, SourceMangaIDColumn, TitleColumn, CoverURLColumn, DescriptionColumn, StatusColumn, InLibraryColumn, CreatedAtColumn, UpdatedAtColumn, NewSinceColumn}
+		mutableColumns      = sqlite.ColumnList{PluginIDColumn, SourceMangaIDColumn, TitleColumn, CoverURLColumn, DescriptionColumn, StatusColumn, InLibraryColumn, CreatedAtColumn, UpdatedAtColumn, NewSinceColumn}
+		defaultColumns      = sqlite.ColumnList{InLibraryColumn, CreatedAtColumn, UpdatedAtColumn}
 	)
 
 	return mangasTable{
@@ -102,7 +100,6 @@ func newMangasTableImpl(schemaName, tableName, alias string) mangasTable {
 		CreatedAt:     CreatedAtColumn,
 		UpdatedAt:     UpdatedAtColumn,
 		NewSince:      NewSinceColumn,
-		AltTitles:     AltTitlesColumn,
 
 		AllColumns:     allColumns,
 		MutableColumns: mutableColumns,

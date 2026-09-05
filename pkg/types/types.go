@@ -46,6 +46,20 @@ type SearchFilter struct {
 	SortBy string   `json:"sort_by,omitempty"`
 }
 
+// AltTitleServer describes a single lookup server offered by a plugin.
+type AltTitleServer struct {
+	ID   string `json:"id"`
+	Name string `json:"name"`
+}
+
+// AltTitlesResult is what a GetAltTitles provider returns: the provider's own
+// display name (reported by the plugin, never hardcoded by the host) plus the
+// alternative title list.
+type AltTitlesResult struct {
+	Source string   `json:"source"`
+	Titles []string `json:"titles"`
+}
+
 // PluginMeta is the metadata a plugin optionally declares in its Init response.
 // All fields are optional; plugins without Init (or an empty response)
 // contribute zero values and the host falls back to defaults (0 thumb_ratio →
@@ -67,6 +81,10 @@ type PluginMeta struct {
 	// The host uses it to decide whether a "Next" pagination link should be
 	// shown (a full page implies more results). 0 falls back to 24.
 	SearchPageSize int `json:"search_page_size,omitempty"`
+	// AltTitleServers lists the lookup servers this plugin provides for
+	// alternative-title resolution. A non-empty list signals enricher
+	// capability — the host also expects a GetAltTitles export.
+	AltTitleServers []AltTitleServer `json:"alt_title_servers,omitempty"`
 }
 
 // HTTPRequest is the request payload a plugin passes to the host-imported

@@ -7,7 +7,6 @@ import (
 	"path/filepath"
 	"strconv"
 
-	"github.com/go-chi/chi/v5"
 	"goisekai/internal/config"
 )
 
@@ -21,6 +20,8 @@ func (s *Server) registerActionRoutes() {
 	s.Router.Post("/action/toggle-library/{pluginID}/{mangaID}", s.handleToggleLibrary)
 	s.Router.Post("/action/sync", s.handleSync)
 	s.Router.Post("/action/fetch-alt-titles/{pluginID}/{mangaID}", s.handleFetchAltTitles)
+	s.Router.Post("/action/set-title/{pluginID}/{mangaID}", s.handleSetTitle)
+	s.Router.Post("/action/remove-alt-title/{pluginID}/{mangaID}", s.handleRemoveAltTitle)
 	s.Router.Post("/action/set-chapter-progress", s.handleSetChapterProgress)
 	s.Router.Post("/action/mark-read/{pluginID}/{mangaID}/{chapterID}", s.handleMarkChapterRead)
 	s.Router.Post("/action/mark-read-bulk", s.handleMarkChaptersReadBulk)
@@ -346,13 +347,56 @@ func (s *Server) handleClearAllCache(w http.ResponseWriter, _ *http.Request) {
 }
 
 // handleFetchAltTitles resolves alternative titles via the provider plugin
-// and redirects back to the manga detail page.
+// and redirects back to the manga detail page. The server is taken from the
+// form (browser flow).
 func (s *Server) handleFetchAltTitles(w http.ResponseWriter, r *http.Request) {
-	pluginID := chi.URLParam(r, "pluginID")
-	mangaID := chi.URLParam(r, "mangaID")
-	if _, err := s.service.FetchAltTitles(pluginID, mangaID); err != nil {
-		s.logger.Error("fetch alt titles", "error", err)
+	pluginID := param(r, "pluginID")
+	mangaID := param(r, "mangaID")
+	if err := r.ParseForm(); err != nil {
+		s.logger.Error("fetch alt titles: parse form", "error", err)
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	server := r.FormValue("server")
+	if _, err := s.service.FetchAltTitles(pluginID, mangaID, server); err != nil {
+		s.logger.Error("fetch alt titles", "pluginID", pluginID, "mangaID", mangaID, "server", server, "error", err)
 		http.Error(w, err.Error(), http.StatusBadGateway)
+		return
+	}
+	s.hxRedirect(w, "/view/manga/"+pluginID+"/"+mangaID)
+}
+
+// handleSetTitle promotes the submitted title to be the manga's main title.
+func (s *Server) handleSetTitle(w http.ResponseWriter, r *http.Request) {
+	pluginID := param(r, "pluginID")
+	mangaID := param(r, "mangaID")
+	if err := r.ParseForm(); err != nil {
+		s.logger.Error("set title: parse form", "error", err)
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	title := r.FormValue("title")
+	if err := s.service.SetMainTitle(pluginID, mangaID, title); err != nil {
+		s.logger.Error("set title", "pluginID", pluginID, "mangaID", mangaID, "title", title, "error", err)
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	s.hxRedirect(w, "/view/manga/"+pluginID+"/"+mangaID)
+}
+
+// handleRemoveAltTitle removes the submitted alternative title.
+func (s *Server) handleRemoveAltTitle(w http.ResponseWriter, r *http.Request) {
+	pluginID := param(r, "pluginID")
+	mangaID := param(r, "mangaID")
+	if err := r.ParseForm(); err != nil {
+		s.logger.Error("remove alt title: parse form", "error", err)
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	title := r.FormValue("title")
+	if err := s.service.RemoveAltTitle(pluginID, mangaID, title); err != nil {
+		s.logger.Error("remove alt title", "pluginID", pluginID, "mangaID", mangaID, "title", title, "error", err)
+		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 	s.hxRedirect(w, "/view/manga/"+pluginID+"/"+mangaID)

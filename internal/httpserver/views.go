@@ -20,6 +20,28 @@ func (s *Server) viewLibrary(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		s.logger.Error("library list", "error", err)
 	}
+
+	// When a search query is provided, filter the library via FTS.
+	q := strings.TrimSpace(r.URL.Query().Get("q"))
+	var filtered []database.Manga
+	if q != "" {
+		hits, hitErr := s.service.SearchLibrary(q)
+		if hitErr != nil {
+		s.logger.Warn("library search", "error", hitErr)
+		} else if len(hits) > 0 {
+			// Build an index for fast lookup: (pluginID:sourceMangaID) -> manga
+			libIdx := make(map[string]database.Manga, len(mangas))
+			for _, m := range mangas {
+				libIdx[m.PluginID+":"+m.SourceMangaID] = m
+			}
+			for _, h := range hits {
+				if m, ok := libIdx[h.PluginID+":"+h.SourceMangaID]; ok {
+					filtered = append(filtered, m)
+				}
+			}
+		}
+		mangas = filtered
+	}
 	// Host-side pagination: slice the full library (newest-updated first)
 	// so the grid renders one page at a time.
 	const pageSize = 24
@@ -105,6 +127,7 @@ func (s *Server) viewLibrary(w http.ResponseWriter, r *http.Request) {
 	}
 	s.renderPage(w, "views/library.jet", "library", map[string]any{
 		"Mangas":       mangas[start:end],
+		"Q":            q,
 		"Ratios":       ratios,
 		"LibraryStats": statsMap,
 		"Page":         page,
@@ -218,7 +241,12 @@ func (s *Server) viewMangaDetail(w http.ResponseWriter, r *http.Request) {
 		continueTo = lastCont
 	}
 	inLibrary := s.service.IsInLibrary(pluginID, mangaID)
-	altTitles := s.service.StoredAltTitles(pluginID, mangaID)
+	altTitles, altErr := s.service.ListAltTitles(pluginID, mangaID)
+	if altErr != nil {
+		s.logger.Warn("alt titles", "error", altErr, "manga", mangaID)
+		altTitles = nil
+	}
+	altTitleServers := s.service.AltTitleServers()
 	// Host-side chapter pagination: slice the full chapter list (newest-first)
 	// so the detail page renders one page of chapters at a time.
 	const chapterPageSize = 50
@@ -230,19 +258,20 @@ func (s *Server) viewMangaDetail(w http.ResponseWriter, r *http.Request) {
 	chStart := min((chPage-1)*chapterPageSize, chTotal)
 	chEnd := min(chStart+chapterPageSize, chTotal)
 	s.renderPage(w, "views/detail.jet", "search", map[string]any{
-		"PluginID":      pluginID,
-		"MangaID":       mangaID,
-		"Manga":         manga,
-		"AltTitles":     altTitles,
-		"Chapters":      chapters[chStart:chEnd],
-		"Progress":      progress,
-		"Continue":      continueTo,
-		"InLibrary":     inLibrary,
-		"Challenge":     challenge,
-		"ChCurrentPage": chPage,
-		"ChTotalPages":  max((chTotal+chapterPageSize-1)/chapterPageSize, 1),
-		"ChHasNext":     chEnd < chTotal,
-		"ChHasPrev":     chPage > 1,
+		"PluginID":         pluginID,
+		"MangaID":          mangaID,
+		"Manga":            manga,
+		"AltTitles":        altTitles,
+		"AltTitleServers":  altTitleServers,
+		"Chapters":         chapters[chStart:chEnd],
+		"Progress":         progress,
+		"Continue":         continueTo,
+		"InLibrary":        inLibrary,
+		"Challenge":        challenge,
+		"ChCurrentPage":    chPage,
+		"ChTotalPages":     max((chTotal+chapterPageSize-1)/chapterPageSize, 1),
+		"ChHasNext":        chEnd < chTotal,
+		"ChHasPrev":        chPage > 1,
 	})
 }
 

@@ -6,6 +6,7 @@ var PLUGIN = {
     contract_version: 1,
     name: "MangaDex",
     thumb_ratio: 0.703,
+    alt_title_servers: [{ id: "mangadex", name: "MangaDex" }],
 };
 
 var API_URL = "https://api.mangadex.org";
@@ -281,8 +282,10 @@ function getPageList(arg) {
 
 // Optional enricher export: resolve alternative titles for ANY manga title.
 // Returns {source, titles} — the host uses `source` as the "via X" badge.
+// arg is JSON {"title": string, "server": string}.
 function getAltTitles(arg) {
-    var title = JSON.parse(arg);
+    var input = JSON.parse(arg);
+    var title = input.title || "";
     var qs = "title=" + encodeURIComponent(title) + "&limit=5&includes[]=manga";
     var resp = httpGet(API_URL + "/manga?" + qs);
     var body = typeof resp === "string" ? JSON.parse(resp) : JSON.parse(resp.body);

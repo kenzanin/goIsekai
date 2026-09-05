@@ -2,6 +2,7 @@ package database
 
 import (
 	"database/sql"
+	"encoding/json"
 	"fmt"
 	"time"
 
@@ -83,6 +84,71 @@ func Open(path string) (*DB, error) {
 	return d, nil
 }
 
+// altTitleJSON mirrors the {source, titles} JSON shape stored in the legacy
+// mangas.alt_titles column.
+type altTitleJSON struct {
+	Source string   `json:"source"`
+	Titles []string `json:"titles"`
+}
+
+// migrateAltTitles is the special-cased runner for altTitlesMigration.
+// It creates the alt_titles table, copies JSON data out of mangas.alt_titles,
+// drops the column, creates library_fts, and backfills the FTS index.
+func migrateAltTitles(tx *sql.Tx) error {
+	// 1. Create alt_titles table.
+	if _, err := tx.Exec(`CREATE TABLE alt_titles (
+		id INTEGER PRIMARY KEY AUTOINCREMENT,
+		manga_row_id TEXT NOT NULL REFERENCES mangas(id) ON DELETE CASCADE,
+		title TEXT NOT NULL,
+		source TEXT NOT NULL,
+		UNIQUE(manga_row_id, title)
+	)`); err != nil {
+		return fmt.Errorf("create alt_titles: %w", err)
+	}
+
+	// 2. Copy JSON rows into the new table.
+	rows, err := tx.Query(`SELECT id, alt_titles FROM mangas WHERE alt_titles IS NOT NULL AND alt_titles != ''`)
+	if err != nil {
+		return fmt.Errorf("query alt_titles JSON: %w", err)
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var mangaID, payload string
+		if err := rows.Scan(&mangaID, &payload); err != nil {
+			return fmt.Errorf("scan alt_titles: %w", err)
+		}
+		var at altTitleJSON
+		if err := json.Unmarshal([]byte(payload), &at); err != nil {
+			continue // skip malformed JSON
+		}
+		for _, t := range at.Titles {
+			if _, err := tx.Exec(`INSERT OR IGNORE INTO alt_titles (manga_row_id, title, source) VALUES (?, ?, ?)`, mangaID, t, at.Source); err != nil {
+				return fmt.Errorf("insert alt_title: %w", err)
+			}
+		}
+	}
+	if err := rows.Err(); err != nil {
+		return err
+	}
+
+	// 3. Drop the legacy alt_titles column from mangas.
+	if _, err := tx.Exec(`ALTER TABLE mangas DROP COLUMN alt_titles`); err != nil {
+		return fmt.Errorf("drop alt_titles column: %w", err)
+	}
+
+	// 4. Create the FTS5 virtual table for library search.
+	if _, err := tx.Exec(`CREATE VIRTUAL TABLE library_fts USING fts5(title, alt, plugin_id UNINDEXED, manga_row_id UNINDEXED)`); err != nil {
+		return fmt.Errorf("create library_fts: %w", err)
+	}
+
+	// 5. Backfill library_fts from existing in-library manga rows.
+	if _, err := tx.Exec(`INSERT INTO library_fts (title, alt, plugin_id, manga_row_id) SELECT title, '', plugin_id, id FROM mangas WHERE in_library = 1`); err != nil {
+		return fmt.Errorf("backfill library_fts: %w", err)
+	}
+
+	return nil
+}
+
 // Close closes the underlying database handle.
 func (d *DB) Close() error { return d.db.Close() }
 
@@ -102,6 +168,12 @@ func (d *DB) runMigrations() error {
 		return err
 	}
 	for i := v; i < len(migrations); i++ {
+		if i == altTitlesMigration {
+			if err := migrateAltTitles(tx); err != nil {
+				return fmt.Errorf("applying migration %d: %w", i, err)
+			}
+			continue
+		}
 		if _, err := tx.Exec(migrations[i]); err != nil {
 			return fmt.Errorf("applying migration %d: %w", i, err)
 		}
