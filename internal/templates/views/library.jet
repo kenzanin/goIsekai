@@ -8,6 +8,45 @@
     </form>
 </div>
 
+{{if len(.Mangas) > 0}}
+<div class="flex flex-wrap gap-3 mb-6">
+    <div class="bg-neutral-900 border border-neutral-700 rounded-lg px-4 py-3">
+        <div class="text-xl font-semibold">{{.Stats.TotalTitles}}</div>
+        <div class="text-xs text-neutral-400">titles</div>
+    </div>
+    <div class="bg-neutral-900 border border-neutral-700 rounded-lg px-4 py-3">
+        <div class="text-xl font-semibold">{{.Stats.StatusLine}}</div>
+        <div class="text-xs text-neutral-400">status</div>
+    </div>
+    <div class="bg-neutral-900 border border-neutral-700 rounded-lg px-4 py-3">
+        <div class="text-xl font-semibold">{{.Stats.ReadLine}}</div>
+        <div class="text-xs text-neutral-400">read</div>
+    </div>
+    {{if .Stats.HasUpdates > 0}}
+    <div class="bg-neutral-900 border border-neutral-700 rounded-lg px-4 py-3">
+        <div class="text-xl font-semibold text-indigo-400">{{.Stats.HasUpdates}}</div>
+        <div class="text-xs text-neutral-400">updates</div>
+    </div>
+    {{end}}
+    <div class="bg-neutral-900 border border-neutral-700 rounded-lg px-4 py-3">
+        <div class="text-xl font-semibold">{{.Stats.ReadingTime}}</div>
+        <div class="text-xs text-neutral-400">reading time</div>
+    </div>
+    {{if .Stats.MostLine != ""}}
+    <div class="bg-neutral-900 border border-neutral-700 rounded-lg px-4 py-3">
+        <div class="text-xl font-semibold">{{.Stats.MostLine}}</div>
+        <div class="text-xs text-neutral-400">most chapters</div>
+    </div>
+    {{end}}
+    {{if .Stats.HasFewest}}
+    <div class="bg-neutral-900 border border-neutral-700 rounded-lg px-4 py-3">
+        <div class="text-xl font-semibold">{{.Stats.FewestLine}}</div>
+        <div class="text-xs text-neutral-400">fewest chapters</div>
+    </div>
+    {{end}}
+</div>
+{{end}}
+
 {{if len(.Mangas) == 0}}
 <div class="py-16 text-center text-neutral-500">
     <p class="mb-2">Your library is empty — search for manga first</p>

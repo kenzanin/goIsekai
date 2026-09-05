@@ -121,6 +121,11 @@ func (s *AppService) ListLibraryWithProgress() ([]database.LibraryMangaStats, er
 	return s.db.ListLibraryWithProgress()
 }
 
+// LibraryOverview returns aggregated library-wide stats for the stats row.
+func (s *AppService) LibraryOverview() (database.LibraryOverview, error) {
+	return s.db.LibraryOverview()
+}
+
 // GetReadHistory returns the reading history enriched with plugin names.
 func (s *AppService) GetReadHistory() ([]database.HistoryEntry, error) {
 	entries, err := s.db.GetReadHistory()
