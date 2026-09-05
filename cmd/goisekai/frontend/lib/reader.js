@@ -583,6 +583,16 @@
     } else if (e.key === 'End') {
       e.preventDefault();
       goToPage(pages.length - 1);
+    } else if (e.key === 'ArrowUp' || e.key === 'PageUp') {
+      e.preventDefault();
+      panY += e.key === 'PageUp' ? canvas.clientHeight * 0.8 : 80;
+      clampPan();
+      render();
+    } else if (e.key === 'ArrowDown' || e.key === 'PageDown') {
+      e.preventDefault();
+      panY -= e.key === 'PageDown' ? canvas.clientHeight * 0.8 : 80;
+      clampPan();
+      render();
     } else if (e.key === 'r' || e.key === 'R') {
       e.preventDefault();
       resetZoom();
