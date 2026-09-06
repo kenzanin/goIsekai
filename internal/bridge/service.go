@@ -114,6 +114,12 @@ func (s *AppService) LibraryOverview() (database.LibraryOverview, error) {
 	return s.db.LibraryOverview()
 }
 
+// FindPotentialDuplicates returns groups of in-library manga that share a
+// normalised title or alternative title.
+func (s *AppService) FindPotentialDuplicates() ([]database.DuplicateGroup, error) {
+	return s.db.FindPotentialDuplicates()
+}
+
 // GetReadHistory returns the reading history enriched with plugin names.
 func (s *AppService) GetReadHistory() ([]database.HistoryEntry, error) {
 	entries, err := s.db.GetReadHistory()

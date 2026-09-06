@@ -16,42 +16,71 @@
 
 {{if len(.Mangas) > 0}}
 {{if .Q == ""}}
-<div class="flex flex-wrap gap-3 mb-6">
-    <div class="bg-neutral-900 border border-neutral-700 rounded-lg px-4 py-3">
-        <div class="text-xl font-semibold">{{.Stats.TotalTitles}}</div>
-        <div class="text-xs text-neutral-400">titles</div>
-    </div>
-    <div class="bg-neutral-900 border border-neutral-700 rounded-lg px-4 py-3">
-        <div class="text-xl font-semibold">{{.Stats.StatusLine}}</div>
-        <div class="text-xs text-neutral-400">status</div>
-    </div>
-    <div class="bg-neutral-900 border border-neutral-700 rounded-lg px-4 py-3">
-        <div class="text-xl font-semibold">{{.Stats.ReadLine}}</div>
-        <div class="text-xs text-neutral-400">read</div>
-    </div>
-    {{if .Stats.HasUpdates > 0}}
-    <div class="bg-neutral-900 border border-neutral-700 rounded-lg px-4 py-3">
-        <div class="text-xl font-semibold text-indigo-400">{{.Stats.HasUpdates}}</div>
-        <div class="text-xs text-neutral-400">updates</div>
-    </div>
-    {{end}}
-    <div class="bg-neutral-900 border border-neutral-700 rounded-lg px-4 py-3">
-        <div class="text-xl font-semibold">{{.Stats.ReadingTime}}</div>
-        <div class="text-xs text-neutral-400">reading time</div>
-    </div>
-    {{if .Stats.MostLine != ""}}
-    <div class="bg-neutral-900 border border-neutral-700 rounded-lg px-4 py-3">
-        <div class="text-xl font-semibold">{{.Stats.MostLine}}</div>
-        <div class="text-xs text-neutral-400">most chapters</div>
-    </div>
-    {{end}}
-    {{if .Stats.HasFewest}}
-    <div class="bg-neutral-900 border border-neutral-700 rounded-lg px-4 py-3">
-        <div class="text-xl font-semibold">{{.Stats.FewestLine}}</div>
-        <div class="text-xs text-neutral-400">fewest chapters</div>
-    </div>
-    {{end}}
-</div>
+<div class="flex flex-col lg:flex-row gap-6">
+    <aside class="lg:w-56 shrink-0 flex flex-col gap-3">
+        <div class="bg-neutral-900 border border-neutral-700 rounded-lg px-4 py-3">
+            <div class="text-xl font-semibold">{{.Stats.TotalTitles}}</div>
+            <div class="text-xs text-neutral-400">titles</div>
+        </div>
+        <div class="bg-neutral-900 border border-neutral-700 rounded-lg px-4 py-3">
+            <div class="text-xl font-semibold">{{.Stats.StatusLine}}</div>
+            <div class="text-xs text-neutral-400">status</div>
+        </div>
+        <div class="bg-neutral-900 border border-neutral-700 rounded-lg px-4 py-3">
+            <div class="text-xl font-semibold">{{.Stats.ReadLine}}</div>
+            <div class="text-xs text-neutral-400">read</div>
+        </div>
+        {{if .Stats.HasUpdates > 0}}
+        <div class="bg-neutral-900 border border-neutral-700 rounded-lg px-4 py-3">
+            <div class="text-xl font-semibold text-indigo-400">{{.Stats.HasUpdates}}</div>
+            <div class="text-xs text-neutral-400">updates</div>
+        </div>
+        {{end}}
+        <div class="bg-neutral-900 border border-neutral-700 rounded-lg px-4 py-3">
+            <div class="text-xl font-semibold">{{.Stats.ReadingTime}}</div>
+            <div class="text-xs text-neutral-400">reading time</div>
+        </div>
+        {{if .Stats.MostLine != ""}}
+        <div class="bg-neutral-900 border border-neutral-700 rounded-lg px-4 py-3">
+            <div class="text-xl font-semibold">{{.Stats.MostLine}}</div>
+            <div class="text-xs text-neutral-400">most chapters</div>
+        </div>
+        {{end}}
+        {{if .Stats.HasFewest}}
+        <div class="bg-neutral-900 border border-neutral-700 rounded-lg px-4 py-3">
+            <div class="text-xl font-semibold">{{.Stats.FewestLine}}</div>
+            <div class="text-xs text-neutral-400">fewest chapters</div>
+        </div>
+        {{end}}
+        {{if isset(.Duplicates) && .Duplicates > 0}}
+        <details class="bg-neutral-900 border border-neutral-700 rounded-lg overflow-hidden">
+            <summary class="px-4 py-3 cursor-pointer select-none text-sm font-medium text-neutral-200 hover:bg-neutral-800/60 transition list-none flex items-center justify-between gap-2">
+                <span>Duplicate <span class="text-indigo-400 font-semibold">{{.Duplicates}}</span></span>
+                <svg class="w-4 h-4 text-neutral-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+            </summary>
+            <div class="border-t border-neutral-800 px-3 py-3 flex flex-col gap-4">
+                {{range gi, g := .DuplicateGroups}}
+                <div class="flex flex-col gap-2">
+                    <div class="text-xs font-medium text-neutral-300 line-clamp-2" title="{{g.Title}}">{{g.Title}}</div>
+                    <div class="flex flex-col gap-1.5">
+                        {{range mi, m := g.Members}}
+                        <a href="/view/manga/{{m.PluginID}}/{{m.SourceMangaID}}" class="flex items-center gap-2 rounded-md px-2 py-1.5 hover:bg-neutral-800/60 transition group">
+                            {{if m.CoverURL != ""}}
+                            <img src="/image?pluginID={{m.PluginID}}&amp;url={{m.CoverURL}}" alt="{{m.Title}}" class="w-8 h-11 object-cover rounded shrink-0" loading="lazy">
+                            {{else}}
+                            <div class="w-8 h-11 rounded bg-neutral-800 flex items-center justify-center text-[10px] text-neutral-500 font-semibold shrink-0">{{getInitials(m.Title)}}</div>
+                            {{end}}
+                            <span class="text-xs text-neutral-300 line-clamp-2 group-hover:text-neutral-100">{{m.Title}}</span>
+                        </a>
+                        {{end}}
+                    </div>
+                </div>
+                {{end}}
+            </div>
+        </details>
+        {{end}}
+    </aside>
+    <div class="flex-1 min-w-0">
 {{end}}
 {{end}}
 
@@ -61,7 +90,7 @@
     <a href="/view/search" class="text-indigo-400 hover:text-indigo-300 text-sm">Search manga</a>
 </div>
 {{else}}
-<div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-4">
+<div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
     {{range i, m := .Mangas }}
     {{ stats := statAt(.LibraryStats, m.ID) }}
     <a href="/view/manga/{{m.PluginID}}/{{m.SourceMangaID}}" class="bg-neutral-900 rounded-lg overflow-hidden relative hover:-translate-y-0.5 hover:shadow-lg hover:shadow-black/40 transition">
@@ -93,5 +122,11 @@
 </div>
 {{ p := pagination(`/`, `page`, .Page, .TotalPages) }}
 {{ include "/partials/pagination.jet" p }}
+{{end}}
+{{if len(.Mangas) > 0}}
+{{if .Q == ""}}
+    </div>
+</div>
+{{end}}
 {{end}}
 {{ end }}

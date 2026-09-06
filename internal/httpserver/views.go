@@ -126,15 +126,37 @@ func (s *Server) viewLibrary(w http.ResponseWriter, r *http.Request) {
 	} else if overview.FewestTitle != "" {
 		fewestLine = fmt.Sprintf("%s · %d ch", overview.FewestTitle, overview.FewestCount)
 	}
+	// Duplicate detection is skipped on search (keeps it cheap on filter);
+	// keys are still passed (empty) so the template always has them.
+	var (
+		duplicateCount  int
+		duplicateGroups []database.DuplicateGroup
+	)
+	if q == "" {
+		groups, dupErr := s.service.FindPotentialDuplicates()
+		if dupErr != nil {
+			s.logger.Warn("library duplicates", "error", dupErr)
+		}
+		duplicateGroups = groups
+		seen := make(map[string]struct{}, len(groups)*2)
+		for _, g := range groups {
+			for _, m := range g.Members {
+				seen[m.ID] = struct{}{}
+			}
+		}
+		duplicateCount = len(seen)
+	}
 	s.renderPage(w, "views/library.jet", "library", map[string]any{
-		"Mangas":       mangas[start:end],
-		"Q":            q,
-		"Ratios":       ratios,
-		"LibraryStats": statsMap,
-		"Page":         page,
-		"TotalPages":   max((total+pageSize-1)/pageSize, 1),
-		"HasNext":      end < total,
-		"HasPrev":      page > 1,
+		"Mangas":          mangas[start:end],
+		"Q":               q,
+		"Ratios":          ratios,
+		"LibraryStats":    statsMap,
+		"Page":            page,
+		"TotalPages":      max((total+pageSize-1)/pageSize, 1),
+		"HasNext":         end < total,
+		"HasPrev":         page > 1,
+		"DuplicateCount":  duplicateCount,
+		"DuplicateGroups": duplicateGroups,
 		"Stats": map[string]any{
 			"TotalTitles": overview.TotalTitles,
 			"StatusLine":  statusLine,
@@ -242,6 +264,18 @@ func (s *Server) viewMangaDetail(w http.ResponseWriter, r *http.Request) {
 		continueTo = lastCont
 	}
 	inLibrary := s.service.IsInLibrary(pluginID, mangaID)
+
+	// Plugin identity for the header badge: display name + small logo.
+	pluginName := pluginID
+	pluginIcon := ""
+	if m, ok := s.service.PluginMetas()[pluginID]; ok {
+		if m.Name != "" {
+			pluginName = m.Name
+		}
+		if m.Logo != "" {
+			pluginIcon = resolveLogoURL(m.Logo, pluginID)
+		}
+	}
 	altTitles, altErr := s.service.ListAltTitles(pluginID, mangaID)
 	if altErr != nil {
 		s.logger.Warn("alt titles", "error", altErr, "manga", mangaID)
@@ -266,6 +300,8 @@ func (s *Server) viewMangaDetail(w http.ResponseWriter, r *http.Request) {
 	chEnd := min(chStart+chapterPageSize, chTotal)
 	s.renderPage(w, "views/detail.jet", "search", map[string]any{
 		"PluginID":        pluginID,
+		"PluginName":      pluginName,
+		"PluginIcon":      pluginIcon,
 		"MangaID":         mangaID,
 		"Manga":           manga,
 		"AltTitles":       altTitles,
