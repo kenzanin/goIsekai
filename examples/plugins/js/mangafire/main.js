@@ -215,7 +215,8 @@ function normalizeStatus(s) {
     if (s === "on_hold") return "Hiatus";
     if (s === "discontinued") return "Dropped";
     if (s === "not_published" || s === "upcoming") return "Upcoming";
-    return s || "";
+    if (s) return s;
+    return "unknown";
 }
 
 function sanitizeTitle(s) {
