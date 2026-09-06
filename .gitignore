@@ -39,3 +39,6 @@ cmd/goisekai/frontend/index.html
 
 # Private session notes (EchoesVault)
 EchoesVault/
+
+# Go binary
+cmd/goisekai/goisekai
