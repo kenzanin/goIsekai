@@ -140,11 +140,27 @@
     errPanel.style.display = v ? 'flex' : 'none';
   }
   function showReaderError(msg) {
-    errPanel.querySelector('p').textContent = msg;
+    var p = errPanel.querySelector('p');
+    p.textContent = msg;
+    p.classList.add('text-red-400');
+    p.classList.remove('text-neutral-200');
+    var btnRow = errPanel.querySelector('.flex.gap-2');
+    if (btnRow) btnRow.style.display = '';
     showError(true);
   }
   function hideReaderError() {
     showError(false);
+  }
+
+  // End-of-series: friendly, persistent, no retry/skip (there's nothing to retry).
+  function showEndOfSeries() {
+    var p = errPanel.querySelector('p');
+    p.textContent = "You've reached the end — no more chapters.";
+    p.classList.remove('text-red-400');
+    p.classList.add('text-neutral-200');
+    var btnRow = errPanel.querySelector('.flex.gap-2');
+    if (btnRow) btnRow.style.display = 'none';
+    showError(true);
   }
 
   // ponytail: classify fetch errors into user-friendly text
@@ -319,12 +335,13 @@
       goToPage(current + 1);
       return;
     }
-    // Last page → auto-advance to next chapter
-    if (nextChID) {
+    // Last page → auto-advance to next chapter, unless we're at the end of the
+    // series (no next chapter, or backend returned the current chapter as next).
+    if (nextChID && nextChID !== cid) {
       switchChapter(nextChID, 1);
       return;
     }
-    showNotice('Last page');
+    showEndOfSeries();
   }
   function prev() {
     if (current > 0) {

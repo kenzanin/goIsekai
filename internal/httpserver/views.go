@@ -10,6 +10,7 @@ import (
 	"goisekai/internal/config"
 	"goisekai/internal/database"
 	"goisekai/internal/hostnet"
+	"goisekai/internal/pluginmanager"
 	"goisekai/pkg/types"
 	"strings"
 )
@@ -246,7 +247,13 @@ func (s *Server) viewMangaDetail(w http.ResponseWriter, r *http.Request) {
 		s.logger.Warn("alt titles", "error", altErr, "manga", mangaID)
 		altTitles = nil
 	}
-	altTitleServers := s.service.AltTitleServers()
+	allServers := s.service.AltTitleServers()
+	var altTitleServers []pluginmanager.AltTitleServerEntry
+	for _, srv := range allServers {
+		if srv.ProviderPluginID == pluginID {
+			altTitleServers = append(altTitleServers, srv)
+		}
+	}
 	// Host-side chapter pagination: slice the full chapter list (newest-first)
 	// so the detail page renders one page of chapters at a time.
 	const chapterPageSize = 50
