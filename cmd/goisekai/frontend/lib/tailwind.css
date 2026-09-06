@@ -870,12 +870,12 @@ video {
   min-width: 0px;
 }
 
-.max-w-4xl {
-  max-width: 56rem;
-}
-
 .max-w-\[25\%\] {
   max-width: 25%;
+}
+
+.max-w-\[95rem\] {
+  max-width: 95rem;
 }
 
 .max-w-md {
