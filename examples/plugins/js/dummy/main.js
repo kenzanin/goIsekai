@@ -40,7 +40,7 @@ function getMangaDetail(arg) {
         description: "A dummy JS plugin for testing the goja runtime.",
         cover_url: "https://example.com/cover1.jpg",
         genres: ["action", "adventure"],
-        status: "ongoing",
+        status: "Ongoing",
     });
 }
 

@@ -26,6 +26,19 @@ PLUGIN = {
 BASE = "https://valirscans.org"
 MEDIA = "https://media.valirscans.org"
 
+-- normalizeStatus maps a raw status string to a canonical host value.
+-- Canonical set: Ongoing, Completed, Hiatus, Dropped, Upcoming.
+-- Unknown values pass through as-is.
+local function normalizeStatus(s)
+    local raw = (s or ""):lower()
+    if raw:find("ongo") or raw:find("releas") or raw:find("publish") then return "Ongoing" end
+    if raw:find("complet") or raw:find("finish") then return "Completed" end
+    if raw:find("hiatus") or raw:find("on.?hold") or raw:find("onhold") then return "Hiatus" end
+    if raw:find("drop") or raw:find("cancel") then return "Dropped" end
+    if raw:find("upcom") or raw:find("not.?publish") then return "Upcoming" end
+    return s or ""
+end
+
 -- ─── helpers ───────────────────────────────────────────────────────────────
 
 function url_encode(s)
@@ -160,7 +173,7 @@ function get_manga_detail(arg)
         end
         -- status: anchor on the cover path (relative) in the flight payload
         local status = flight_status(html, img)
-        if status ~= "" then detail.status = titlecase(status) end
+        if status ~= "" then detail.status = normalizeStatus(titlecase(status)) end
     end
 
     -- Fallbacks for anything JSON-LD missed (or if the block was absent)
@@ -175,7 +188,7 @@ function get_manga_detail(arg)
     if detail.status == "" then
         local st = flight_status(html, string.match(detail.cover_url,
             '(https?://[^/]+)?(/uploads/series/[^"]+)') or detail.cover_url)
-        if st ~= "" then detail.status = titlecase(st) end
+        if st ~= "" then detail.status = normalizeStatus(titlecase(st)) end
     end
 
     log.debug("detail: " .. detail.title .. " | " .. detail.status)

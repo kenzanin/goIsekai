@@ -42,7 +42,7 @@ func (d *DB) ListAltTitles(mangaRowID string) ([]AltTitleRow, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	var out []AltTitleRow
 	for rows.Next() {
 		var r AltTitleRow
@@ -137,7 +137,7 @@ func (d *DB) SearchLibraryFTS(q string) ([]CandidateRow, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	var out []CandidateRow
 	for rows.Next() {
 		var c CandidateRow

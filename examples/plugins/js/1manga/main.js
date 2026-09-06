@@ -127,6 +127,18 @@ function _toISO(dateVal) {
     return new Date(ms).toISOString();
 }
 
+// Normalize a source status string to the host's canonical vocabulary
+// (Ongoing/Completed/Hiatus/Dropped/Upcoming). Unrecognized values pass through.
+function normalizeStatus(s) {
+    var raw = (s || "").toLowerCase().replace(/-/g, "");
+    if (raw.indexOf("ongo") === 0 || raw.indexOf("releas") === 0 || raw.indexOf("publish") === 0) return "Ongoing";
+    if (raw.indexOf("complet") === 0 || raw.indexOf("finish") === 0) return "Completed";
+    if (raw.indexOf("hiatus") === 0 || raw.indexOf("onhold") === 0) return "Hiatus";
+    if (raw.indexOf("drop") === 0 || raw.indexOf("cancel") === 0) return "Dropped";
+    if (raw.indexOf("upcom") === 0) return "Upcoming";
+    return s || "";
+}
+
 // ---------------------------------------------------------------------------
 // ABI functions
 // ---------------------------------------------------------------------------
@@ -200,7 +212,7 @@ function getMangaDetail(arg) {
         cover_url: cover,
         author: m.author || "",
         description: m.description || "",
-        status: status || "",
+        status: normalizeStatus(status) || "",
         genres: m.genres || [],
     });
 }

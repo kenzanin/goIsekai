@@ -52,19 +52,19 @@ func (m *Manager) loadLua(id, dir string) (*loadedPlugin, error) {
 	osTime, _ := state.NewNativeFunction(func(frame lua.Frame) lua.Outcome {
 		return frame.ReturnNumber(float64(time.Now().Unix()))
 	})
-	osTable.RawSetString("time", osTime.Value())
+	_ = osTable.RawSetString("time", osTime.Value())
 
 	osDate, _ := state.NewNativeFunction(func(frame lua.Frame) lua.Outcome {
 		return frame.ReturnString(time.Now().Format(time.RFC3339))
 	})
-	osTable.RawSetString("date", osDate.Value())
+	_ = osTable.RawSetString("date", osDate.Value())
 
 	osClock, _ := state.NewNativeFunction(func(frame lua.Frame) lua.Outcome {
 		return frame.ReturnNumber(float64(time.Now().UnixNano()) / 1e9)
 	})
-	osTable.RawSetString("clock", osClock.Value())
+	_ = osTable.RawSetString("clock", osClock.Value())
 
-	state.RawSetGlobal("os", osTable.Value())
+	_ = state.RawSetGlobal("os", osTable.Value())
 
 	// Custom require(name): loads sibling .lua modules from the plugin folder
 	// only — no package lib, no path search, no cpath, no ".." escapes.
@@ -90,7 +90,7 @@ func (m *Manager) loadLua(id, dir string) (*loadedPlugin, error) {
 		if err != nil {
 			return err
 		}
-		var ret lua.Value = lua.Nil()
+		ret := lua.Nil()
 		if len(results) > 0 {
 			ret = results[0]
 		}
@@ -111,7 +111,7 @@ func (m *Manager) loadLua(id, dir string) (*loadedPlugin, error) {
 		sort.Strings(names)
 		for _, n := range names {
 			if err := preload(n); err != nil {
-				state.Close()
+				_ = state.Close()
 				return nil, fmt.Errorf("lua plugin %s: preload %s: %w", id, n, err)
 			}
 		}
@@ -139,11 +139,11 @@ func (m *Manager) loadLua(id, dir string) (*loadedPlugin, error) {
 		}
 		return frame.ReturnValue(moduleCache[name])
 	})
-	state.RawSetGlobal("require", reqFn.Value())
+	_ = state.RawSetGlobal("require", reqFn.Value())
 
 	// Harden base: strip file-reading entry points.
-	state.RawSetGlobal("dofile", lua.Nil())
-	state.RawSetGlobal("loadfile", lua.Nil())
+	_ = state.RawSetGlobal("dofile", lua.Nil())
+	_ = state.RawSetGlobal("loadfile", lua.Nil())
 
 	// Register json.encode / json.decode as a global table.
 	jsonTbl, _ := state.NewTable()
@@ -160,7 +160,7 @@ func (m *Manager) loadLua(id, dir string) (*loadedPlugin, error) {
 		}
 		return frame.ReturnValue(lua.String(string(b)))
 	})
-	jsonTbl.RawSetString("encode", jsonEncode.Value())
+	_ = jsonTbl.RawSetString("encode", jsonEncode.Value())
 
 	jsonDecode, _ := state.NewNativeFunction(func(frame lua.Frame) lua.Outcome {
 		s, ok := frame.String(0)
@@ -177,9 +177,9 @@ func (m *Manager) loadLua(id, dir string) (*loadedPlugin, error) {
 		}
 		return frame.ReturnValue(luaval)
 	})
-	jsonTbl.RawSetString("decode", jsonDecode.Value())
+	_ = jsonTbl.RawSetString("decode", jsonDecode.Value())
 
-	state.RawSetGlobal("json", jsonTbl.Value())
+	_ = state.RawSetGlobal("json", jsonTbl.Value())
 
 	// Register log.debug/info/warn/error(msg, ...) globals.
 	logTbl, _ := state.NewTable()
@@ -194,9 +194,9 @@ func (m *Manager) loadLua(id, dir string) (*loadedPlugin, error) {
 			logFn(msg, "plugin", id)
 			return frame.Return()
 		})
-		logTbl.RawSetString(lvlName, fn.Value())
+		_ = logTbl.RawSetString(lvlName, fn.Value())
 	}
-	state.RawSetGlobal("log", logTbl.Value())
+	_ = state.RawSetGlobal("log", logTbl.Value())
 
 	// Register http_request(req_table) global — mirrors hostHTTPRequest proxy.
 	httpFn, _ := state.NewNativeFunction(func(frame lua.Frame) lua.Outcome {
@@ -231,58 +231,58 @@ func (m *Manager) loadLua(id, dir string) (*loadedPlugin, error) {
 		}
 		return frame.ReturnValue(luaval)
 	})
-	state.RawSetGlobal("http_request", httpFn.Value())
+	_ = state.RawSetGlobal("http_request", httpFn.Value())
 
 	// Load main.lua via state.Load (reader-backed, no ScriptLoader needed).
 	mainPath := filepath.Join(dir, "main.lua")
 	mainData, err := readFile(mainPath)
 	if err != nil {
-		state.Close()
+		_ = state.Close()
 		return nil, fmt.Errorf("lua read %s: %w", mainPath, err)
 	}
 	loaded, err := state.Load("main.lua", bytes.NewReader(mainData))
 	if err != nil {
-		state.Close()
+		_ = state.Close()
 		return nil, fmt.Errorf("lua load %s: %w", mainPath, err)
 	}
 	if _, err := state.Call(loaded.Value()); err != nil {
-		state.Close()
+		_ = state.Close()
 		return nil, fmt.Errorf("lua exec %s: %w", mainPath, err)
 	}
 
 	// Read the PLUGIN metadata table.
 	pluginVal, err := state.RawGlobal("PLUGIN")
 	if err != nil || pluginVal.IsNil() || pluginVal.Kind() != lua.TableKind {
-		state.Close()
+		_ = state.Close()
 		return nil, fmt.Errorf("lua plugin %s: PLUGIN global is not a table", id)
 	}
 	pluginTbl, _ := pluginVal.AsTable()
 
 	metaJSON, err := lunarTableToJSON(state, pluginTbl)
 	if err != nil {
-		state.Close()
+		_ = state.Close()
 		return nil, fmt.Errorf("lua plugin %s: encode PLUGIN: %w", id, err)
 	}
 	var meta types.PluginMeta
 	if err := json.Unmarshal(metaJSON, &meta); err != nil {
-		state.Close()
+		_ = state.Close()
 		return nil, fmt.Errorf("lua plugin %s: decode PLUGIN metadata: %w", id, err)
 	}
 
 	// Resolve contract_version from the PLUGIN table.
 	verVal := pluginTbl.RawGetString("contract_version")
 	if verVal.IsNil() {
-		state.Close()
+		_ = state.Close()
 		return nil, fmt.Errorf("lua plugin %s: PLUGIN.contract_version missing", id)
 	}
 	verNum, ok := verVal.AsNumber()
 	if !ok {
-		state.Close()
+		_ = state.Close()
 		return nil, fmt.Errorf("lua plugin %s: PLUGIN.contract_version not a number", id)
 	}
 	contractVer := int32(verNum)
 	if err := types.CheckVersion(contractVer); err != nil {
-		state.Close()
+		_ = state.Close()
 		return nil, fmt.Errorf("lua plugin %s: %w", id, err)
 	}
 
@@ -294,7 +294,7 @@ func (m *Manager) loadLua(id, dir string) (*loadedPlugin, error) {
 		}
 		fn, err := state.RawGlobal(name)
 		if err != nil || fn.Kind() != lua.FunctionKind {
-			state.Close()
+			_ = state.Close()
 			return nil, fmt.Errorf("lua plugin %s: global %q is not a function", id, name)
 		}
 	}
@@ -335,7 +335,7 @@ func callLua(p *loadedPlugin, fnName, inputJSON string) (string, error) {
 	if err := state.SetContext(ctx); err != nil {
 		return "", fmt.Errorf("lua plugin %s %s: set context: %w", p.id, fnName, err)
 	}
-	defer state.RemoveContext()
+	defer func() { _ = state.RemoveContext() }()
 
 	vals, err := state.Call(fnVal, lua.String(inputJSON))
 	if err != nil {
@@ -407,7 +407,7 @@ func tableToGoMap(tbl *lua.Table) (any, error) {
 		intK  int
 	}
 	var entries []kv
-	var cur lua.Value = lua.Nil()
+	cur := lua.Nil()
 	for {
 		k, v, ok, err := tbl.Next(cur)
 		if err != nil {
@@ -502,7 +502,7 @@ func goLunarValue(state *lua.State, v any) (lua.Value, error) {
 			if err != nil {
 				return lua.Nil(), err
 			}
-			tbl.RawSetInt(i+1, lv) // Lua 1-indexed
+			_ = tbl.RawSetInt(i+1, lv) // Lua 1-indexed
 		}
 		return tbl.Value(), nil
 	case map[string]any:
@@ -515,7 +515,7 @@ func goLunarValue(state *lua.State, v any) (lua.Value, error) {
 			if err != nil {
 				return lua.Nil(), err
 			}
-			tbl.RawSetString(k, lv)
+			_ = tbl.RawSetString(k, lv)
 		}
 		return tbl.Value(), nil
 	default:
@@ -526,8 +526,8 @@ func goLunarValue(state *lua.State, v any) (lua.Value, error) {
 // errorTable creates a Lua table {status=0, error=msg} for proxy error returns.
 func errorTable(state *lua.State, msg string) lua.Value {
 	tbl, _ := state.NewTable()
-	tbl.RawSetString("status", lua.Number(0))
-	tbl.RawSetString("error", state.String(msg))
+	_ = tbl.RawSetString("status", lua.Number(0))
+	_ = tbl.RawSetString("error", state.String(msg))
 	return tbl.Value()
 }
 

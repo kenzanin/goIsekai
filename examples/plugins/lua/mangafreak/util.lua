@@ -1,8 +1,21 @@
 -- util.lua — Mangafreak HTML parsing + HTTP helpers
 -- Sibling module required by main.lua via require("util")
-
 local util = {}
 
+-- normalizeStatus maps a raw status string to a canonical host value.
+-- Canonical set: Ongoing, Completed, Hiatus, Dropped, Upcoming.
+-- Unknown values pass through as-is.
+local function normalizeStatus(s)
+    -- Strip hyphens first: source uses "ON-GOING" / "on-hold" forms that
+    -- would otherwise evade the keyword checks below.
+    local raw = (s or ""):lower():gsub("%-", "")
+    if raw:find("ongo") or raw:find("releas") or raw:find("publish") then return "Ongoing" end
+    if raw:find("complet") or raw:find("finish") then return "Completed" end
+    if raw:find("hiatus") or raw:find("on.?hold") or raw:find("onhold") then return "Hiatus" end
+    if raw:find("drop") or raw:find("cancel") then return "Dropped" end
+    if raw:find("upcom") or raw:find("not.?publish") then return "Upcoming" end
+    return s or ""
+end
 -- URL encoding
 function util.url_encode(s)
     return s:gsub("([^%w%-%.%_%~])", function(c)
@@ -93,16 +106,32 @@ function util.parse_manga_detail(html, manga_id)
     local img_block = html:match('class="manga_series_image">(.-)</div>') or ""
     detail.cover_url = img_block:match('<img[^>]*src="([^"]*)"') or ""
 
-    -- Status, Author, Artist
-    local data_block = html:match('class="manga_series_data">(.-)%s*</div>%s*</div>')
-        or html:match('class="manga_series_data">(.-)</div>') or ""
-    local divs = {}
-    for d in data_block:gmatch('<div[^>]*>(.-)</div>') do
-        divs[#divs + 1] = strip_tags(d)
-    end
-    detail.status = divs[3] or ""
-    detail.author = divs[4] or ""
-    detail.artist = divs[5] or ""
+	-- Status, Author, Artist — matched by row label, not fixed index, because
+	-- the info div set varies per page (some rows absent), which shifts indexes.
+	local data_block = html:match('class="manga_series_data">(.-)%s*</div>%s*</div>')
+		or html:match('class="manga_series_data">(.-)</div>') or ""
+	local divs = {}
+	for d in data_block:gmatch('<div[^>]*>(.-)</div>') do
+		divs[#divs + 1] = strip_tags(d)
+	end
+	local function rowValue(label)
+		for _, v in ipairs(divs) do
+			local trimmed = v:gsub("^%s+", ""):gsub("%s+$", "")
+			if trimmed:sub(1, #label):lower() == label:lower() then
+				local val = trimmed:sub(#label + 1)
+				return val:gsub("^%s*:?%s*", ""):gsub("%s+$", ""), true
+			end
+		end
+		return nil, false
+	end
+	local statusVal, statusFound = rowValue("This is ")
+	if statusFound then
+		detail.status = normalizeStatus(statusVal)
+	else
+		detail.status = normalizeStatus(divs[3])
+	end
+	detail.author, _ = rowValue("Written By")
+	detail.artist, _ = rowValue("Illustrated By")
 
     -- Genres
     local genres = {}
@@ -129,7 +158,14 @@ function util.parse_chapter_list(html, manga_id)
     local chapters = {}
     local seen = {}
 
-    for href, name in html:gmatch('<a[^>]*href="([^"]*Read1_[^"]+)"[^>]*>([^<]+)</a>') do
+    -- The authoritative complete chapter list is the manga_series_list TABLE
+    -- (oldest-first: Chapter 1..N). The series_sub_chapter_list block above it
+    -- holds only the latest ~4 chapters (newest-first), so scanning the whole
+    -- page mixes both blocks and scrambles the order.
+    local block = html:match('class="manga_series_list">(.-)</table>')
+        or html
+
+    for href, name in block:gmatch('<a[^>]*href="([^"]*Read1_[^"]+)"[^>]*>([^<]+)</a>') do
         local ch_name = name:gsub("^%s+", ""):gsub("%s+$", "")
         if ch_name ~= "" then
             local ch_path = href:match("/Read1_(.+)")
@@ -146,7 +182,7 @@ function util.parse_chapter_list(html, manga_id)
         end
     end
 
-    -- Newest-first (HTML lists oldest-first)
+    -- Table lists oldest-first; reverse to the ABI newest-first order.
     local reversed = {}
     for i = #chapters, 1, -1 do
         reversed[#reversed + 1] = chapters[i]

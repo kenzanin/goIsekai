@@ -16,6 +16,19 @@ var PLUGIN = {
 
 var BASE = "https://www.mangzio.com";
 
+// normalizeStatus maps a raw status string to a canonical host value.
+// Canonical set: Ongoing, Completed, Hiatus, Dropped, Upcoming.
+// Unknown values pass through as-is.
+function normalizeStatus(s) {
+    var raw = (s || "").toLowerCase();
+    if (raw.indexOf("ongo") === 0 || raw.indexOf("releas") === 0 || raw.indexOf("publish") === 0) return "Ongoing";
+    if (raw.indexOf("complet") === 0 || raw.indexOf("finish") === 0) return "Completed";
+    if (raw.indexOf("hiatus") === 0 || raw.indexOf("on hold") === 0 || raw.indexOf("onhold") === 0) return "Hiatus";
+    if (raw.indexOf("drop") === 0 || raw.indexOf("cancel") === 0) return "Dropped";
+    if (raw.indexOf("upcom") === 0) return "Upcoming";
+    return s || "";
+}
+
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
@@ -174,7 +187,7 @@ function getMangaDetail(arg) {
         description: stripHTML(synopsis),
         cover_url: manga.coverImageUrl ? (manga.coverImageUrl.indexOf("http") === 0 ? manga.coverImageUrl : BASE + manga.coverImageUrl) : "",
         genres: manga.genres || [],
-        status: (manga.status || "").toLowerCase(),
+        status: normalizeStatus(manga.status || ""),
     };
 
     return JSON.stringify(result);

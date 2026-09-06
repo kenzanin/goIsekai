@@ -275,7 +275,7 @@ func (d *DB) GetAltTitles(pluginID, sourceMangaID string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	type alt struct {
 		Title  string `json:"title"`
 		Source string `json:"source"`

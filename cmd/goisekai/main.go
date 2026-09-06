@@ -121,7 +121,9 @@ func main() {
 	} else {
 		defer func() {
 			logger.Info("removing PID file", "path", pidPath)
-			os.Remove(pidPath)
+			if err := os.Remove(pidPath); err != nil {
+				logger.Warn("remove PID file", "error", err)
+			}
 		}()
 	}
 

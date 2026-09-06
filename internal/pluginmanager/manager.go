@@ -423,7 +423,7 @@ func (m *Manager) UnloadPlugin(id string) error {
 		return nil
 	}
 	if p.kind == "lua" && p.lunar != nil {
-		p.lunar.Close()
+		_ = p.lunar.Close()
 	}
 	if p.kind == "wasm" && p.extismPlugin != nil {
 		_ = p.extismPlugin.Close(m.ctx)
@@ -454,7 +454,7 @@ func (m *Manager) ReloadPlugin(id string) (string, error) {
 	}
 	// Close the old plugin instance first
 	if old.kind == "lua" && old.lunar != nil {
-		old.lunar.Close()
+		_ = old.lunar.Close()
 	}
 	if old.kind == "wasm" && old.extismPlugin != nil {
 		_ = old.extismPlugin.Close(m.ctx)
@@ -467,18 +467,10 @@ func (m *Manager) ReloadPlugin(id string) (string, error) {
 	delete(m.plugins, id)
 	m.mu.Unlock()
 
-	// Determine reload path from stored wasmPath
-	var path string
-	switch old.kind {
-	case "wasm":
-		path = old.wasmPath
-	case "lua":
-		path = filepath.Dir(old.wasmPath)
-	case "js":
-		path = filepath.Dir(old.wasmPath)
-	case "scriggo":
-		path = old.wasmPath
-	}
+	// Determine reload path from stored wasmPath.
+	// wasm stores the .wasm file path; lua/js/scriggo store their plugin folder
+	// directly, so the stored path is already LoadPlugin-ready for every kind.
+	path := old.wasmPath
 	newID, err := m.LoadPlugin(path)
 	if err != nil {
 		return "", fmt.Errorf("reload %s: %w", id, err)
@@ -522,7 +514,7 @@ func (m *Manager) Close() error {
 			continue
 		}
 		if p.kind == "lua" && p.lunar != nil {
-			p.lunar.Close()
+			_ = p.lunar.Close()
 		}
 		if p.kind == "wasm" && p.extismPlugin != nil {
 			_ = p.extismPlugin.Close(m.ctx)

@@ -111,7 +111,7 @@ func migrateAltTitles(tx *sql.Tx) error {
 	if err != nil {
 		return fmt.Errorf("query alt_titles JSON: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	for rows.Next() {
 		var mangaID, payload string
 		if err := rows.Scan(&mangaID, &payload); err != nil {

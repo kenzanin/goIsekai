@@ -136,7 +136,7 @@ func TestSetTitleUnknownTitle(t *testing.T) {
 
 	// Seed a manga with one alt title.
 	seedManga(t, db, "p1|m1", "p1", "m1", "Main Title")
-	db.AddAltTitles("p1|m1", []string{"Known Alt"}, "src")
+	db.AddAltTitles("p1|m1", []string{"Known Alt"}, "src") //nolint:errcheck
 
 	body := bytes.NewBufferString(`{"title":"Totally Unknown"}`)
 	req := httptest.NewRequest("PUT", "/api/manga/p1/m1/title", body)

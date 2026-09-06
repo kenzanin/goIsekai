@@ -189,7 +189,7 @@ func TestScriggoPanicIsolation(t *testing.T) {
 
 func TestScriggoHTTPGet(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		fmt.Fprint(w, "hello from test")
+		_, _ = fmt.Fprint(w, "hello from test")
 	}))
 	defer srv.Close()
 

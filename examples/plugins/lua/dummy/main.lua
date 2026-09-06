@@ -19,7 +19,7 @@ local catalog = {
         cover_url = "https://picsum.photos/seed/dummy-solo/400/560",
         author = "Dummy Author",
         description = "A dummy isekai action series used as a plugin reference.",
-        status = "ongoing",
+        status = "Ongoing",
         genres = {"action", "fantasy", "isekai"}
     },
     {
@@ -28,7 +28,7 @@ local catalog = {
         cover_url = "https://picsum.photos/seed/dummy-romance/400/560",
         author = "Dummy Author",
         description = "A dummy slice-of-life romance series.",
-        status = "completed",
+        status = "Completed",
         genres = {"romance", "slice of life"}
     },
     {
@@ -37,7 +37,7 @@ local catalog = {
         cover_url = "https://picsum.photos/seed/dummy-horror/400/560",
         author = "Dummy Author",
         description = "A dummy horror/mystery series.",
-        status = "ongoing",
+        status = "Ongoing",
         genres = {"horror", "mystery"}
     }
 }

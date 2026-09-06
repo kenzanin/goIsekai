@@ -43,12 +43,6 @@ var scriggoRequired = []string{
 	types.GetPageListFunc,
 }
 
-// scriggoOptional are ABI function names that MAY appear in a plugin.
-var scriggoOptional = []string{
-	types.GetAltTitlesFunc,
-	types.InitFunc,
-}
-
 // loadScriggo builds and loads a Scriggo plugin from <dir>/main.go. It
 // constructs a virtual module FS, registers native host packages, compiles
 // the program, and optionally runs Init to populate metadata.
@@ -205,7 +199,7 @@ func rewritePackageMain(src string) string {
 func buildScriggoShim(modPath string, hasAltTitles, hasInit bool) string {
 	var b strings.Builder
 	b.WriteString("package main\n\nimport (\n")
-	b.WriteString(fmt.Sprintf("\tp %q\n", modPath+"/plugin"))
+	fmt.Fprintf(&b, "\tp %q\n", modPath+"/plugin")
 	b.WriteString("\t\"hostapi\"\n")
 	b.WriteString(")\n\n")
 	b.WriteString("func main() {\n")
@@ -215,13 +209,13 @@ func buildScriggoShim(modPath string, hasAltTitles, hasInit bool) string {
 	b.WriteString("\tvar err error\n")
 	b.WriteString("\tswitch fn {\n")
 	for _, name := range scriggoRequired {
-		b.WriteString(fmt.Sprintf("\tcase %q:\n\t\tout, err = p.%s(arg)\n", name, name))
+		fmt.Fprintf(&b, "\tcase %q:\n\t\tout, err = p.%s(arg)\n", name, name)
 	}
 	if hasAltTitles {
-		b.WriteString(fmt.Sprintf("\tcase %q:\n\t\tout, err = p.%s(arg)\n", types.GetAltTitlesFunc, types.GetAltTitlesFunc))
+		fmt.Fprintf(&b, "\tcase %q:\n\t\tout, err = p.%s(arg)\n", types.GetAltTitlesFunc, types.GetAltTitlesFunc)
 	}
 	if hasInit {
-		b.WriteString(fmt.Sprintf("\tcase %q:\n\t\tout = p.%s()\n", types.InitFunc, types.InitFunc))
+		fmt.Fprintf(&b, "\tcase %q:\n\t\tout = p.%s()\n", types.InitFunc, types.InitFunc)
 	}
 	b.WriteString("\tdefault:\n\t\thostapi.Report(out, \"unknown ABI function: \"+fn)\n\t\treturn\n")
 	b.WriteString("\t}\n")
