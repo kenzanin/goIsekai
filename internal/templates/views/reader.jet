@@ -40,8 +40,8 @@
     <div class="h-10 w-10 animate-spin rounded-full border-2 border-neutral-700 border-t-indigo-500"></div>
   </div>
 
-  <!-- Error card: centered between toolbars, non-blocking -->
-  <div id="error-panel" class="absolute top-12 bottom-14 left-0 right-0 z-40 hidden items-center justify-center pointer-events-none">
+  <!-- Error card: centered between toolbars, non-blocking. Inline display:none keeps the "Failed to load page" flash invisible until the stylesheet applies (Tailwind `hidden` alone leaves it visible pre-CSS). -->
+  <div id="error-panel" style="display:none" class="absolute top-12 bottom-14 left-0 right-0 z-40 hidden items-center justify-center pointer-events-none">
     <div class="bg-black/85 backdrop-blur-sm rounded-lg p-6 max-w-md w-[90%] flex flex-col items-center gap-3 pointer-events-auto">
       <p class="text-sm text-red-400">Failed to load page</p>
       <div class="flex gap-2">
