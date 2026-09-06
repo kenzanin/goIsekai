@@ -3,6 +3,7 @@ package database
 import (
 	"encoding/json"
 	"fmt"
+	"slices"
 	"strings"
 	"time"
 
@@ -70,6 +71,29 @@ func (d *DB) IsInLibrary(mangaID string) (bool, error) {
 		return false, nil
 	}
 	return rows[0].InLibrary == 1, err
+}
+
+// PluginCount is one row of the per-plugin library title counts.
+type PluginCount struct {
+	PluginID string `alias:"mangas.plugin_id"`
+	Count    int    `alias:"stats.count"`
+}
+
+// CountLibraryByPlugin returns how many in-library titles each plugin
+// contributes, ordered by count descending.
+func (d *DB) CountLibraryByPlugin() ([]PluginCount, error) {
+	var rows []PluginCount
+	stmt := SELECT(
+		Mangas.PluginID.AS("mangas.plugin_id"),
+		COUNT(Mangas.ID).AS("stats.count"),
+	).FROM(Mangas).
+		WHERE(Mangas.InLibrary.EQ(Int(1))).
+		GROUP_BY(Mangas.PluginID)
+	if err := stmt.Query(d.db, &rows); err != nil {
+		return nil, err
+	}
+	slices.SortFunc(rows, func(a, b PluginCount) int { return b.Count - a.Count })
+	return rows, nil
 }
 
 // ListLibrary returns all in-library manga ordered by last update.

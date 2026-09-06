@@ -64,10 +64,25 @@ func (s *Server) viewLibrary(w http.ResponseWriter, r *http.Request) {
 		s.logger.Warn("library stats", "error", err)
 	}
 	mangaPluginMap := make(map[string]string) // mangaID -> pluginID (from DB)
-	pluginNameMap := make(map[string]string)  // pluginID -> display name
+	// Resolve display names + icons from the DB-persisted plugin rows
+	// (populated by SyncPluginMeta after first load), overlaying runtime
+	// metas when they are fresher. PluginMetas alone is runtime-only and
+	// returns zero values for deferred plugins after a restart, which
+	// renders raw IDs in pills and cards.
+	dbPlugins, _ := s.service.ListPlugins()
+	pluginNameMap := make(map[string]string, len(dbPlugins)) // pluginID -> display name
+	pluginIconMap := make(map[string]string, len(dbPlugins)) // pluginID -> icon URL
+	for _, p := range dbPlugins {
+		pluginNameMap[p.ID] = p.Name
+		pluginIconMap[p.ID] = p.IconURL
+	}
 	for pid, m := range metas {
-		pluginNameMap[pid] = pid
-		_ = m
+		if m.Name != "" {
+			pluginNameMap[pid] = m.Name
+		}
+		if m.Logo != "" {
+			pluginIconMap[pid] = resolveLogoURL(m.Logo, pid)
+		}
 	}
 	rows, err := s.service.QueryMangaPluginIDs()
 	if err == nil {
@@ -83,8 +98,8 @@ func (s *Server) viewLibrary(w http.ResponseWriter, r *http.Request) {
 			pluginName = pluginID
 		}
 		pluginIcon := ""
-		if m, ok := metas[pluginID]; ok && m.Logo != "" {
-			pluginIcon = resolveLogoURL(m.Logo, pluginID)
+		if icon, ok := pluginIconMap[pluginID]; ok {
+			pluginIcon = icon
 		}
 		statsMap[st.MangaID] = map[string]any{
 			"TotalChapters": st.TotalChapters,
@@ -151,6 +166,23 @@ func (s *Server) viewLibrary(w http.ResponseWriter, r *http.Request) {
 		}
 		duplicateCount = len(seen)
 	}
+	// Per-plugin title counts for the sidebar card.
+	var pluginCounts []map[string]any
+	if q == "" {
+		if pc, pcErr := s.service.CountLibraryByPlugin(); pcErr != nil {
+			s.logger.Warn("library plugin counts", "error", pcErr)
+		} else {
+			pluginCounts = make([]map[string]any, 0, len(pc))
+			for _, p := range pc {
+				pluginCounts = append(pluginCounts, map[string]any{
+					"PluginID": p.PluginID,
+					"Name":     pluginNameMap[p.PluginID],
+					"Icon":     pluginIconMap[p.PluginID],
+					"Count":    p.Count,
+				})
+			}
+		}
+	}
 	s.renderPage(w, "views/library.jet", "library", map[string]any{
 		"Mangas":          mangas[start:end],
 		"Q":               q,
@@ -162,6 +194,7 @@ func (s *Server) viewLibrary(w http.ResponseWriter, r *http.Request) {
 		"HasPrev":         page > 1,
 		"DuplicateCount":  duplicateCount,
 		"DuplicateGroups": duplicateGroups,
+		"PluginCounts":    pluginCounts,
 		"Stats": map[string]any{
 			"TotalTitles": overview.TotalTitles,
 			"StatusLine":  statusLine,

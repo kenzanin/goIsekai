@@ -120,6 +120,11 @@ func (s *AppService) FindPotentialDuplicates() ([]database.DuplicateGroup, error
 	return s.db.FindPotentialDuplicates()
 }
 
+// CountLibraryByPlugin returns per-plugin in-library title counts.
+func (s *AppService) CountLibraryByPlugin() ([]database.PluginCount, error) {
+	return s.db.CountLibraryByPlugin()
+}
+
 // GetReadHistory returns the reading history enriched with plugin names.
 func (s *AppService) GetReadHistory() ([]database.HistoryEntry, error) {
 	entries, err := s.db.GetReadHistory()
