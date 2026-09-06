@@ -51,15 +51,18 @@
             <div class="text-xl font-semibold">{{.Stats.FewestLine}}</div>
             <div class="text-xs text-neutral-400">fewest chapters</div>
         </div>
-        {{end}}
-        {{if isset(.Duplicates) && .Duplicates > 0}}
-        <details class="bg-neutral-900 border border-neutral-700 rounded-lg overflow-hidden">
-            <summary class="px-4 py-3 cursor-pointer select-none text-sm font-medium text-neutral-200 hover:bg-neutral-800/60 transition list-none flex items-center justify-between gap-2">
-                <span>Duplicate <span class="text-indigo-400 font-semibold">{{.Duplicates}}</span></span>
-                <svg class="w-4 h-4 text-neutral-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
-            </summary>
-            <div class="border-t border-neutral-800 px-3 py-3 flex flex-col gap-4">
-                {{range gi, g := .DuplicateGroups}}
+		{{end}}
+		{{if isset(.DuplicateCount)}}
+		<details class="bg-neutral-900 border border-neutral-700 rounded-lg overflow-hidden" {{if .DuplicateCount == 0}}open{{end}}>
+			<summary class="px-4 py-3 cursor-pointer select-none text-sm font-medium text-neutral-200 hover:bg-neutral-800/60 transition list-none flex items-center justify-between gap-2">
+				<span>Duplicate <span class="text-indigo-400 font-semibold">{{.DuplicateCount}}</span></span>
+				<svg class="w-4 h-4 text-neutral-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+			</summary>
+			<div class="border-t border-neutral-800 px-3 py-3 flex flex-col gap-4">
+				{{if .DuplicateCount == 0}}
+				<div class="text-xs text-neutral-500">Tidak ada judul yang berpotensi duplikat.</div>
+				{{end}}
+				{{range gi, g := .DuplicateGroups}}
                 <div class="flex flex-col gap-2">
                     <div class="text-xs font-medium text-neutral-300 line-clamp-2" title="{{g.Title}}">{{g.Title}}</div>
                     <div class="flex flex-col gap-1.5">
