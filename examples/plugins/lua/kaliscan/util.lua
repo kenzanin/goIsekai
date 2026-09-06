@@ -158,8 +158,11 @@ function util.parse_chapter_list(html, manga_id)
             id = chapter_id,
             manga_id = manga_id,
             chapter_num = tonumber(number) or 0,
-            title = title
+            title = title,
+            url = BASE .. href,
+            uploaded_at = upload_time
         }
+    -- ponytail: uploaded_at field kept for completeness, sorting by date not needed
     -- ponytail: uploaded_at (human-relative, e.g. "2 days ago") dropped:
     -- types.Chapter wants RFC3339 time; add a parser when sorting by date matters.
     end

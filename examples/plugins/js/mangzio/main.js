@@ -11,6 +11,7 @@ var PLUGIN = {
     needs_human_verify: false,
     thumb_ratio: 0.703,
     search_page_size: 24,
+    alt_title_servers: [{id: "mangadex", name: "MangaDex"}],
 };
 
 var BASE = "https://www.mangzio.com";
@@ -287,4 +288,33 @@ function getPageList(arg) {
 
     log.error("mangzio pages: pageImageUrls not found");
     return JSON.stringify([]);
+}
+
+// Optional enricher export: resolve alternative titles via MangaDex.
+function getAltTitles(arg) {
+    var input = JSON.parse(arg);
+    var title = input.title || "";
+    var qs = "title=" + encodeURIComponent(title) + "&limit=5&includes[]=manga";
+    var resp = httpGet("https://api.mangadex.org/manga?" + qs);
+    var body = typeof resp === "string" ? JSON.parse(resp) : (resp && resp.body ? JSON.parse(resp.body) : {});
+    var data = body && body.data;
+    if (!data || data.length === 0) {
+        return JSON.stringify({ source: "MangaDex", titles: [] });
+    }
+    var attrs = data[0].attributes;
+    var out = [];
+    var seen = {};
+    var keepLangs = { "en": true, "ja": true, "ja-ro": true, "ko": true, "ko-ro": true };
+    for (var i = 0; i < (attrs.altTitles || []).length; i++) {
+        var alt = attrs.altTitles[i];
+        var keys = Object.keys(alt);
+        for (var j = 0; j < keys.length; j++) {
+            var lang = keys[j];
+            if (keepLangs[lang] && alt[lang] && !seen[alt[lang]]) {
+                seen[alt[lang]] = true;
+                out.push(alt[lang]);
+            }
+        }
+    }
+    return JSON.stringify({ source: "MangaDex", titles: out });
 }

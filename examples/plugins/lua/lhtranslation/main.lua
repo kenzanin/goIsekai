@@ -10,7 +10,8 @@ PLUGIN = {
     verify_url = "https://lhtranslation.net",
     needs_human_verify = false,
     thumb_ratio = 0.703,
-    search_page_size = 24
+    search_page_size = 24,
+    alt_title_servers = {{id = "mangadex", name = "MangaDex"}}
 }
 
 local BASE = "https://lhtranslation.net"
@@ -238,4 +239,33 @@ function get_page_list(arg)
 
     log.debug("lhtranslation pages " .. path .. " count=" .. tostring(#pages))
     return json.encode(pages)
+end
+
+function getAltTitles(arg)
+    local input = json.decode(arg)
+    local title = input.title or ""
+    local url = "https://api.mangadex.org/manga?title=" .. url_encode(title) .. "&limit=5&includes[]=manga"
+    local resp = http_request({url = url, method = "GET", headers = {}})
+    if not resp or resp.status ~= 200 then
+        return json.encode({source = "MangaDex", titles = {}})
+    end
+    local ok, body = pcall(json.decode, resp.body)
+    if not ok or not body or not body.data or #body.data == 0 then
+        return json.encode({source = "MangaDex", titles = {}})
+    end
+    local attrs = body.data[1].attributes
+    local out = {}
+    local seen = {}
+    local keep_langs = {en=true, ja=true, ["ja-ro"]=true, ko=true, ["ko-ro"]=true}
+    if attrs.altTitles then
+        for _, alt in ipairs(attrs.altTitles) do
+            for lang, val in pairs(alt) do
+                if keep_langs[lang] and val and not seen[val] then
+                    seen[val] = true
+                    out[#out + 1] = val
+                end
+            end
+        end
+    end
+    return json.encode({source = "MangaDex", titles = out})
 end
