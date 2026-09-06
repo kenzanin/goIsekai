@@ -32,6 +32,7 @@ type HistoryEntry struct {
 	ReadChapters  int       `alias:"stats.read_chapters"`
 	LastReadAt    time.Time `alias:"history.last_read_at"`
 	PluginName    string    // filled by bridge, not DB
+	PluginIcon    string    // filled by bridge, not DB
 }
 
 // GetReadHistory returns manga that have been read, ordered by most recently read.

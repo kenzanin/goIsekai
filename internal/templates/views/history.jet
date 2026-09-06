@@ -24,7 +24,7 @@
           </div>
           <div class="flex items-center gap-2 mt-1">
             <span class="text-xs text-neutral-400">{{h.ReadChapters}}/{{h.TotalChapters}} chapters</span>
-            <span class="text-xs px-1.5 py-0.5 rounded bg-neutral-800 text-neutral-500">{{h.PluginName}}</span>
+            <span class="inline-flex items-center gap-1.5 text-xs px-2 py-0.5 rounded-full bg-neutral-800 text-neutral-500">{{if h.PluginIcon != ""}}<img src="{{h.PluginIcon}}" alt="" class="h-3.5 w-3.5 rounded-sm object-cover">{{end}}{{h.PluginName}}</span>
             <div class="text-xs text-neutral-500 sm:hidden" data-ts="{{h.LastReadAt.Format(`2006-01-02T15:04:05Z07:00`)}}" title="{{formatDate(h.LastReadAt.Format(`2006-01-02T15:04:05Z07:00`))}}">{{formatDate(h.LastReadAt.Format(`2006-01-02T15:04:05Z07:00`))}}</div>
           </div>
         </div>

@@ -82,10 +82,15 @@ func (s *Server) viewLibrary(w http.ResponseWriter, r *http.Request) {
 		if pluginName == "" {
 			pluginName = pluginID
 		}
+		pluginIcon := ""
+		if m, ok := metas[pluginID]; ok && m.Logo != "" {
+			pluginIcon = resolveLogoURL(m.Logo, pluginID)
+		}
 		statsMap[st.MangaID] = map[string]any{
 			"TotalChapters": st.TotalChapters,
 			"ReadChapters":  st.ReadChapters,
 			"PluginName":    pluginName,
+			"PluginIcon":    pluginIcon,
 			"HasNew":        st.HasNew,
 		}
 	}
@@ -177,8 +182,17 @@ func (s *Server) viewHistory(w http.ResponseWriter, r *http.Request) {
 		s.logger.Error("history list", "error", err)
 	}
 	var entries []database.HistoryEntry
+	metas := s.service.PluginMetas()
 	for _, h := range history {
 		h.PluginName = h.PluginID
+		if m, ok := metas[h.PluginID]; ok {
+			if m.Name != "" {
+				h.PluginName = m.Name
+			}
+			if m.Logo != "" {
+				h.PluginIcon = resolveLogoURL(m.Logo, h.PluginID)
+			}
+		}
 		entries = append(entries, h)
 	}
 	s.renderPage(w, "views/history.jet", "history", map[string]any{"History": entries})
@@ -220,10 +234,24 @@ func (s *Server) viewSearch(w http.ResponseWriter, r *http.Request) {
 	total := len(results)
 	start := min((page-1)*pageSize, total)
 	end := min(start+pageSize, total)
+	pluginName := pluginID
+	pluginIcon := ""
+	if pluginID != "" {
+		if m, ok := s.service.PluginMetas()[pluginID]; ok {
+			if m.Name != "" {
+				pluginName = m.Name
+			}
+			if m.Logo != "" {
+				pluginIcon = resolveLogoURL(m.Logo, pluginID)
+			}
+		}
+	}
 	s.renderPage(w, "views/search.jet", "search", map[string]any{
 		"Plugins":    plugins,
 		"Q":          q,
 		"PluginID":   pluginID,
+		"PluginName": pluginName,
+		"PluginIcon": pluginIcon,
 		"Results":    results[start:end],
 		"Page":       page,
 		"TotalPages": max((total+pageSize-1)/pageSize, 1),

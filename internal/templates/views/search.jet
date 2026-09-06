@@ -5,7 +5,7 @@
 
 <form method="get" action="/view/search" class="flex gap-2 items-end mb-8">
     <div>
-        <label for="pluginID" class="block text-xs text-neutral-400 mb-1">Plugin</label>
+        <label for="pluginID" class="block text-xs text-neutral-400 mb-1">Plugin{{if .PluginIcon != ""}} <img src="{{.PluginIcon}}" alt="" class="inline h-3.5 w-3.5 rounded-sm object-cover align-[-1px]">{{end}}{{if .PluginName != ""}} <span class="text-neutral-500 font-normal">· {{.PluginName}}</span>{{end}}</label>
         <select id="pluginID" name="pluginID" class="bg-neutral-900 border border-neutral-700 rounded-md px-3 py-2 text-sm">
             {{range i, p := .Plugins }}
             {{if p.IsActive}}
@@ -36,6 +36,11 @@
         {{end}}
         <div class="p-3">
             <div class="text-sm font-medium line-clamp-2" title="{{r.Title}}">{{r.Title}}</div>
+            {{if .PluginName != ""}}
+            <div class="mt-1.5">
+                <span class="inline-flex items-center gap-1.5 text-[10px] px-2 py-0.5 rounded-full bg-neutral-800 text-neutral-500">{{if .PluginIcon != ""}}<img src="{{.PluginIcon}}" alt="" class="h-3.5 w-3.5 rounded-sm object-cover">{{end}}{{ .PluginName }}</span>
+            </div>
+            {{end}}
         </div>
     </a>
     {{end}}
