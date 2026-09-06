@@ -25,6 +25,7 @@ var luaFnNames = map[string]string{
 	types.GetMangaDetailFunc: "get_manga_detail",
 	types.GetChapterListFunc: "get_chapter_list",
 	types.GetPageListFunc:    "get_page_list",
+	types.GetAltTitlesFunc:   "getAltTitles",
 }
 
 // loadLua creates a sandboxed Lunar 5.4 VM, loads <dir>/main.lua, reads the
@@ -286,7 +287,11 @@ func (m *Manager) loadLua(id, dir string) (*loadedPlugin, error) {
 	}
 
 	// Verify all ABI globals are functions (snake_case Lua names).
-	for _, name := range luaFnNames {
+	// GetAltTitles is OPTIONAL (enricher capability) — mirror js.go.
+	for abi, name := range luaFnNames {
+		if abi == types.GetAltTitlesFunc {
+			continue
+		}
 		fn, err := state.RawGlobal(name)
 		if err != nil || fn.Kind() != lua.FunctionKind {
 			state.Close()
