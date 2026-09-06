@@ -58,6 +58,10 @@ function getChapterList(arg) {
         if (body.data.length < 500) break;
     }
 
+    // ABI contract: chapters newest-first (descending chapter_num). The API
+    // sorts ascending (oldest-first), so reverse to match the other plugins.
+    all.reverse();
+
     log.info("mangadex chapters: found " + all.length + " chapters for " + mangaID);
     return JSON.stringify(all);
 }
