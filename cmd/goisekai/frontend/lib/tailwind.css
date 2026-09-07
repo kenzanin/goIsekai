@@ -1266,6 +1266,10 @@ video {
   border-color: rgb(23 23 23 / var(--tw-border-opacity, 1));
 }
 
+.border-red-800\/50 {
+  border-color: rgb(153 27 27 / 0.5);
+}
+
 .border-red-900\/60 {
   border-color: rgb(127 29 29 / 0.6);
 }
@@ -1791,6 +1795,11 @@ video {
 .hover\:text-neutral-300:hover {
   --tw-text-opacity: 1;
   color: rgb(212 212 212 / var(--tw-text-opacity, 1));
+}
+
+.hover\:text-red-300:hover {
+  --tw-text-opacity: 1;
+  color: rgb(252 165 165 / var(--tw-text-opacity, 1));
 }
 
 .hover\:text-red-400:hover {

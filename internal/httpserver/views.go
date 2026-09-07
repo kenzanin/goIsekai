@@ -446,13 +446,15 @@ func (s *Server) continueFromHistory(pluginID, mangaID string, chapters []types.
 // declared thumbnail ratio for the plugins page.
 type PluginView struct {
 	database.Plugin
-	Loaded           bool // true once the runtime has been instantiated
-	VerifyURL        string
-	NeedsHumanVerify bool
-	VerifyCookies    string
-	VerifyUserAgent  string
-	ThumbRatio       float64 // runtime meta; shadows database.Plugin.ThumbRatio (0 for bridge-installed plugins)
-	SiteURL          string
+	Loaded            bool // true once the runtime has been instantiated
+	VerifyURL         string
+	NeedsHumanVerify  bool
+	VerifyCookies     string
+	VerifyUserAgent   string
+	ThumbRatio        float64 // runtime meta; shadows database.Plugin.ThumbRatio (0 for bridge-installed plugins)
+	SiteURL           string
+	PinnedProfile     string   // current pinned TLS profile name, "" = auto
+	AvailableProfiles []string // selectable profile names for dropdown
 }
 
 // viewPlugins renders the plugin manager page.
@@ -482,6 +484,7 @@ func (s *Server) viewPlugins(w http.ResponseWriter, _ *http.Request) {
 			v.VerifyCookies = row.Cookies
 			v.VerifyUserAgent = row.UserAgent
 		}
+		v.PinnedProfile, v.AvailableProfiles = s.service.PluginProfile(p.ID)
 		views = append(views, v)
 	}
 	s.renderPage(w, "views/plugins.jet", "plugins", map[string]any{"Plugins": views})

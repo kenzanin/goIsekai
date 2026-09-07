@@ -81,6 +81,30 @@
         </details>
     </div>
     {{end}}
+    {{if p.Loaded}}
+    <div class="bg-neutral-900 rounded-lg p-4 border border-neutral-800">
+        <div class="flex items-center justify-between gap-3 mb-3">
+            <div class="text-sm font-medium">TLS Profile</div>
+            {{if p.PinnedProfile != ""}}
+            <span class="text-xs px-2 py-0.5 rounded-full bg-sky-500/15 text-sky-400">Pinned: {{p.PinnedProfile}}</span>
+            {{else}}
+            <span class="text-xs px-2 py-0.5 rounded-full bg-neutral-700/50 text-neutral-400">Auto (ladder)</span>
+            {{end}}
+        </div>
+        <div class="flex items-center gap-2 flex-wrap">
+            <select data-plugin-profile="{{p.ID}}" class="bg-neutral-800 border border-neutral-700 rounded-md px-3 py-1.5 text-sm">
+                <option value="">Auto (ladder)</option>
+                {{range _, name := p.AvailableProfiles}}
+                <option value="{{name}}" {{if name == p.PinnedProfile}}selected{{end}}>{{name}}</option>
+                {{end}}
+            </select>
+            <button type="button" onclick="testProfile('{{p.ID}}')" class="border border-neutral-700 text-neutral-400 hover:text-neutral-200 rounded-md px-3 py-1.5 text-sm">Test</button>
+            {{if p.PinnedProfile != ""}}
+            <button type="button" onclick="resetProfile('{{p.ID}}')" class="border border-red-800/50 text-red-400 hover:text-red-300 rounded-md px-3 py-1.5 text-sm">Reset</button>
+            {{end}}
+        </div>
+    </div>
+    {{end}}
     {{end}}
 </div>
 {{end}}
@@ -92,5 +116,40 @@ document.querySelectorAll('input[type=file]').forEach(inp => {
     if (label) label.textContent = this.files[0] ? this.files[0].name : 'Choose .wasm…';
   });
 });
+
+function testProfile(pluginID) {
+  var sel = document.querySelector('[data-plugin-profile="' + pluginID + '"]');
+  var profile = sel.value;
+  if (!profile) { showToast('Select a profile first', true); return; }
+  var btn = sel.nextElementSibling;
+  btn.disabled = true;
+  btn.textContent = 'Testing…';
+  fetch('/action/test-profile/' + pluginID, {
+    method: 'POST',
+    headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+    body: 'profile=' + encodeURIComponent(profile)
+  }).then(function(r) { return r.json(); })
+    .then(function(d) {
+      btn.disabled = false;
+      btn.textContent = 'Test';
+      if (d.ok) {
+        showToast('OK ' + d.status + ' via ' + profile, false);
+      } else {
+        showToast(profile + ' → ' + d.status + ' blocked', true);
+      }
+    })
+    .catch(function() {
+      btn.disabled = false;
+      btn.textContent = 'Test';
+      showToast('Test request failed', true);
+    });
+}
+
+function resetProfile(pluginID) {
+  fetch('/action/reset-profile/' + pluginID, {method: 'POST'})
+    .then(function(r) { return r.json(); })
+    .then(function() { showToast('Profile reset to auto'); location.reload(); })
+    .catch(function() { showToast('Reset failed', true); });
+}
 </script>
 {{ end }}
