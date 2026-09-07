@@ -70,7 +70,7 @@ function normalizeStatus(s) {
     if (raw.indexOf("hiatus") === 0 || raw.indexOf("on hold") === 0 || raw.indexOf("onhold") === 0) return "Hiatus";
     if (raw.indexOf("drop") === 0 || raw.indexOf("cancel") === 0) return "Dropped";
     if (raw.indexOf("upcom") === 0) return "Upcoming";
-    return s || "";
+    return s || "unknown";
 }
 
 function toManga(md) {

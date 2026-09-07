@@ -212,7 +212,7 @@ function stripHTML(s) {
 function normalizeStatus(s) {
     if (s === "releasing") return "Ongoing";
     if (s === "finished") return "Completed";
-    if (s === "on_hold") return "Hiatus";
+    if (s === "on_hold" || s === "on_hiatus") return "Hiatus";
     if (s === "discontinued") return "Dropped";
     if (s === "not_published" || s === "upcoming") return "Upcoming";
     if (s) return s;
