@@ -26,10 +26,9 @@ func (d *DB) RegisterPlugin(p Plugin) error {
 		Float(p.ThumbRatio),
 	).ON_CONFLICT(Plugins.ID).DO_UPDATE(
 		SET(
-			Plugins.Name.SET(Plugins.EXCLUDED.Name),
 			Plugins.Version.SET(Plugins.EXCLUDED.Version),
 			Plugins.WasmPath.SET(Plugins.EXCLUDED.WasmPath),
-			Plugins.IconURL.SET(Plugins.EXCLUDED.IconURL),
+			Plugins.IsActive.SET(Plugins.EXCLUDED.IsActive),
 			Plugins.ThumbRatio.SET(Plugins.EXCLUDED.ThumbRatio),
 		),
 	).Exec(d.db)
