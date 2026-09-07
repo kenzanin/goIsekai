@@ -1,6 +1,4 @@
-(function () {
-  'use strict';
-
+(() => {
   // ---- Toasts ------------------------------------------------------------
   var stack;
 
@@ -13,19 +11,19 @@
   var ICONS = {
     success: '✓',
     error: '✕',
-    info: 'ℹ'
+    info: 'ℹ',
   };
   var ACCENT = {
     success: 'bg-emerald-500',
     error: 'bg-red-500',
-    info: 'bg-indigo-400'
+    info: 'bg-indigo-400',
   };
   var DURATION = { success: 3500, info: 3500, error: 6000 };
 
   // showToast(message, type) — type: 'success'|'error'|'info'. Truthy non-string
   // second arg is treated as 'error' for backward compatibility with the old
   // showToast(m, isError) signature.
-  window.showToast = function (m, type) {
+  window.showToast = (m, type) => {
     if (typeof type !== 'string') type = type ? 'error' : 'success';
     if (ACCENT[type] === undefined) type = 'info';
 
@@ -40,7 +38,7 @@
     el.setAttribute('role', 'status');
 
     var bar = document.createElement('span');
-    bar.className = 'absolute left-0 top-0 bottom-0 w-1 ' + ACCENT[type];
+    bar.className = `absolute left-0 top-0 bottom-0 w-1 ${ACCENT[type]}`;
     el.appendChild(bar);
 
     var icon = document.createElement('span');
@@ -61,17 +59,21 @@
       'ml-auto shrink-0 size-5 inline-flex items-center justify-center rounded text-neutral-500 hover:text-neutral-300';
     close.setAttribute('aria-label', 'Dismiss');
     close.textContent = '✕';
-    close.addEventListener('click', function () { dismiss(el); });
+    close.addEventListener('click', () => {
+      dismiss(el);
+    });
     el.appendChild(close);
 
     container.appendChild(el);
 
     // enter animation
-    requestAnimationFrame(function () {
+    requestAnimationFrame(() => {
       el.classList.add('toast-visible');
     });
 
-    el._hideTimer = setTimeout(function () { dismiss(el); }, DURATION[type]);
+    el._hideTimer = setTimeout(() => {
+      dismiss(el);
+    }, DURATION[type]);
 
     while (container.children.length > 4) {
       container.removeChild(container.firstChild);
@@ -84,10 +86,10 @@
     clearTimeout(el._hideTimer);
     el.classList.remove('toast-visible');
     el.classList.add('toast-leave');
-    el.addEventListener('transitionend', function () {
+    el.addEventListener('transitionend', () => {
       if (el.parentNode) el.parentNode.removeChild(el);
     });
-    setTimeout(function () {
+    setTimeout(() => {
       if (el.parentNode) el.parentNode.removeChild(el);
     }, 350);
   }
@@ -102,25 +104,29 @@
     modalMsg = document.getElementById('confirm-message');
     confirmBtn = document.getElementById('confirm-ok');
     cancelBtn = document.getElementById('confirm-cancel');
-    modal.addEventListener('click', function (e) {
+    modal.addEventListener('click', (e) => {
       if (e.target === modal) resolveConfirm(false);
     });
-    confirmBtn.addEventListener('click', function () { resolveConfirm(true); });
-    cancelBtn.addEventListener('click', function () { resolveConfirm(false); });
-    document.addEventListener('keydown', function (e) {
+    confirmBtn.addEventListener('click', () => {
+      resolveConfirm(true);
+    });
+    cancelBtn.addEventListener('click', () => {
+      resolveConfirm(false);
+    });
+    document.addEventListener('keydown', (e) => {
       if (e.key === 'Escape' && activeResolve) resolveConfirm(false);
     });
     return true;
   }
 
-  window.showConfirm = function (m) {
+  window.showConfirm = (m) => {
     if (!ensureModal()) return Promise.resolve(true); // no modal markup: allow
     modalMsg.textContent = m;
     modal.classList.remove('hidden');
     activeReturnEl = document.activeElement;
     cancelBtn.focus();
     document.body.style.overflow = 'hidden';
-    return new Promise(function (resolve) {
+    return new Promise((resolve) => {
       activeResolve = resolve;
     });
   };
@@ -138,48 +144,50 @@
   }
 
   // ---- data-confirm delegation ------------------------------------------
-  function confirmValue(el) {
-    var form = el.closest('form');
-    var v = el.getAttribute('data-confirm');
-    if (!v && form) v = form.getAttribute('data-confirm');
-    return v || 'Are you sure?';
-  }
 
   // Intercept submits whose form (or submitter) declares data-confirm.
-  document.addEventListener('submit', function (e) {
-    var form = e.target;
-    var submitter = e.submitter;
-    var msg = (submitter && submitter.getAttribute('data-confirm')) || form.getAttribute('data-confirm');
-    if (!msg) return;
-    if (form._confirmPassed) {
-      form._confirmPassed = false;
-      return;
-    }
-    e.preventDefault();
-    window.showConfirm(msg).then(function (ok) {
-      if (!ok) return;
-      form._confirmPassed = true;
-      if (typeof form.requestSubmit === 'function') {
-        form.requestSubmit(submitter);
-      } else {
-        form.submit();
+  document.addEventListener(
+    'submit',
+    (e) => {
+      var form = e.target;
+      var submitter = e.submitter;
+      var msg = submitter?.getAttribute('data-confirm') || form.getAttribute('data-confirm');
+      if (!msg) return;
+      if (form._confirmPassed) {
+        form._confirmPassed = false;
+        return;
       }
-    });
-  }, true);
+      e.preventDefault();
+      window.showConfirm(msg).then((ok) => {
+        if (!ok) return;
+        form._confirmPassed = true;
+        if (typeof form.requestSubmit === 'function') {
+          form.requestSubmit(submitter);
+        } else {
+          form.submit();
+        }
+      });
+    },
+    true,
+  );
 
   // Intercept clicks on any [data-confirm] not inside a form (defensive).
-  document.addEventListener('click', function (e) {
-    var el = e.target.closest('[data-confirm]');
-    if (!el || el.closest('form')) return;
-    e.preventDefault();
-    e.stopPropagation();
-    window.showConfirm(el.getAttribute('data-confirm')).then(function (ok) {
-      if (ok && el.click) {
-        el.removeAttribute('data-confirm');
-        el.click();
-      }
-    });
-  }, true);
+  document.addEventListener(
+    'click',
+    (e) => {
+      var el = e.target.closest('[data-confirm]');
+      if (!el || el.closest('form')) return;
+      e.preventDefault();
+      e.stopPropagation();
+      window.showConfirm(el.getAttribute('data-confirm')).then((ok) => {
+        if (ok && el.click) {
+          el.removeAttribute('data-confirm');
+          el.click();
+        }
+      });
+    },
+    true,
+  );
 
   // ---- URL param toast (?msg=) ------------------------------------------
   var url = new URL(window.location);
@@ -191,17 +199,21 @@
   }
 
   // ---- HTMX error handling ----------------------------------------------
-  document.addEventListener('htmx:responseError', function (e) {
-    var xhr = e.detail && e.detail.xhr;
+  document.addEventListener('htmx:responseError', (e) => {
+    var xhr = e.detail?.xhr;
     var m = '';
-    if (xhr && xhr.responseText) {
-      var t = xhr.responseText.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
+    var t = '';
+    if (xhr?.responseText) {
+      t = String(xhr.responseText)
+        .replace(/<[^>]*>/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim();
       if (t.length > 0 && t.length <= 120) m = t;
     }
-    if (!m) m = (xhr && xhr.statusText) || 'Request failed';
+    if (!m) m = xhr?.statusText || 'Request failed';
     window.showToast(m, 'error');
   });
-  document.addEventListener('htmx:sendError', function () {
+  document.addEventListener('htmx:sendError', () => {
     window.showToast('Network error — check your connection', 'error');
   });
 })();

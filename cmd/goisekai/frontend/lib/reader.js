@@ -168,7 +168,7 @@
     if (err instanceof TypeError) return 'Network error — check your connection';
     if (err instanceof SyntaxError) return 'Server returned invalid data';
     var m = err.message || String(err);
-    if (/^HTTP \d+$/.test(m)) return 'Server error (' + m.slice(5) + ')';
+    if (/^HTTP \d+$/.test(m)) return `Server error (${m.slice(5)})`;
     return m;
   }
 
