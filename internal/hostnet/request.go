@@ -28,13 +28,29 @@ func (p *Proxy) Request(pluginID string, req types.HTTPRequest) (types.HTTPRespo
 		_ = p.solveAndSeed(pluginID, req.URL)
 	}
 
+	// Stdlib h2 path: pinned plugins skip tls-client entirely (WAF blocks the
+	// utls fingerprint but allows Go's stock TLS + h2).
+	if p.stdlibPrefers(pluginID) {
+		return p.doRequestStd(pluginID, req)
+	}
+
 	resp, err := p.doRequest(pluginID, req)
 	if err != nil {
 		return types.HTTPResponse{}, err
 	}
 
-	if !isChallengeResponse(resp) {
+	if !isChallengeResponse(resp) && !isWafBlock(resp) {
 		return resp, nil
+	}
+
+	// WAF block on the tls-client fingerprint: retry once over stdlib h2 and
+	// pin the plugin to that path when it succeeds.
+	if isWafBlock(resp) {
+		if retried, rerr := p.doRequestStd(pluginID, req); rerr == nil && !isWafBlock(retried) && !isChallengeResponse(retried) {
+			p.markStdlib(pluginID)
+			return retried, nil
+		}
+		return types.HTTPResponse{}, &ChallengeError{}
 	}
 
 	// Challenge detected. Solve via the engine, seed cookies, and retry once.

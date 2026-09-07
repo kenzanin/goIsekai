@@ -280,12 +280,19 @@ function getMangaDetail(arg) {
     var d = body && body.data;
     if (!d) return JSON.stringify(null);
 
+    var genres = [];
+    if (d.genres) for (var i = 0; i < d.genres.length; i++) genres.push(d.genres[i].title);
+    var authors = [];
+    if (d.authors) for (var j = 0; j < d.authors.length; j++) authors.push(d.authors[j].title);
+
     return JSON.stringify({
         id: d.hid || hid,
         title: sanitizeTitle(d.title),
         description: stripHTML(d.synopsisHtml),
         cover_url: d.poster && d.poster.medium || "",
         status: normalizeStatus(d.status),
+        genres: genres,
+        author: authors.join(", "),
     });
 }
 

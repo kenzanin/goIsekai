@@ -35,6 +35,7 @@ type Proxy struct {
 	uaOverrides    map[string]string                // per-plugin User-Agent override
 	pendingVerify  map[string]verifySeed            // cookie jar seeds awaiting client creation
 	needsJS        map[string]bool                  // per-plugin needs_js hint
+	stdlibPref     map[string]bool                  // per-plugin pin to stdlib h2 path
 	cdp            CDPConfig
 
 	// solveChallenge is swappable for tests; nil means the real chromedp solver.
@@ -63,6 +64,7 @@ func NewProxy() *Proxy {
 		uaOverrides:    make(map[string]string),
 		pendingVerify:  make(map[string]verifySeed),
 		needsJS:        make(map[string]bool),
+		stdlibPref:     make(map[string]bool),
 		solveChallenge: solveChallenge,
 	}
 }
