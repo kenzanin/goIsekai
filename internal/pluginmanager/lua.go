@@ -300,8 +300,11 @@ func (m *Manager) loadLua(id, dir string) (*loadedPlugin, error) {
 	}
 
 	return &loadedPlugin{
-		id:              id,
-		wasmPath:        mainPath,
+		id: id,
+		// Return the plugin FOLDER, not the entry file: ensureLoaded passes this
+		// path back to loadLua on lazy reload, and loadLua appends "main.lua"
+		// itself — a file path here would produce "main.lua/main.lua".
+		wasmPath:        dir,
 		kind:            "lua",
 		loaded:          true,
 		lunar:           state,
