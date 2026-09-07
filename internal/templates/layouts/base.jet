@@ -23,15 +23,6 @@
             font-family: 'Space Grotesk', system-ui, sans-serif;
             letter-spacing: -0.02em;
         }
-        #toast {
-            background: #065f46;
-            color: #d1fae5;
-            padding: 0.75rem 1rem;
-            border-radius: 0.5rem;
-            font-size: 0.875rem;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.4);
-            transition: opacity 0.3s;
-        }
         @media (prefers-reduced-motion: reduce) {
             *, ::before, ::after {
                 transition-duration: 0.01ms !important;
@@ -46,46 +37,7 @@
         {{block body()}}{{end}}
     </main>
     <script src="/static/lib/htmx.min.js" defer></script>
-    <div id="toast" class="fixed bottom-4 left-4 z-50 hidden"></div>
-    <script>
-      (function() {
-        // URL param toast (?msg=...)
-        const url = new URL(window.location);
-        const msg = url.searchParams.get('msg');
-        if (msg) {
-          const toast = document.getElementById('toast');
-          toast.textContent = msg;
-          toast.classList.remove('hidden');
-          toast.addEventListener('click', () => toast.classList.add('hidden'));
-          setTimeout(() => toast.classList.add('hidden'), 3000);
-          url.searchParams.delete('msg');
-          history.replaceState(null, '', url);
-        }
-        // Programmatic toast (for HTMX errors, etc.)
-        window.showToast = function(m, isError) {
-          var t = document.getElementById('toast');
-          t.textContent = m;
-          t.style.background = isError ? '#991b1b' : '';
-          t.style.color = isError ? '#fecaca' : '';
-          t.classList.remove('hidden');
-          clearTimeout(t._hideTimer);
-          t._hideTimer = setTimeout(function() { t.classList.add('hidden'); }, 5000);
-        };
-        // HTMX error handler
-        document.addEventListener('htmx:responseError', function(e) {
-          var xhr = e.detail && e.detail.xhr;
-          var m = '';
-          if (xhr && xhr.responseText) {
-            var t = xhr.responseText.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
-            if (t.length > 0 && t.length <= 120) m = t;
-          }
-          if (!m) m = (xhr && xhr.statusText) || 'Request failed';
-          window.showToast(m, true);
-        });
-        document.addEventListener('htmx:sendError', function() {
-          window.showToast('Network error — check your connection', true);
-        });
-      })();
-    </script>
+    <script src="/static/lib/app.js" defer></script>
+    {{include "/partials/toast.jet" .}}
 </body>
 </html>
