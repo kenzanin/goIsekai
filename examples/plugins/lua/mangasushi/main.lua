@@ -70,39 +70,9 @@ function search_manga(arg)
     local query = args.query or ""
     local page = args.page or 1
 
-    -- Madara AJAX: POST admin-ajax.php with madara_load_more
-    -- Per Madara dev docs: vars[search][keyword] for search term
-    local p = tostring(page - 1)
-    local form = "action=madara_load_more"
-        .. "&vars%5Bpaged%5D=1"
-        .. "&vars%5Btemplate%5D=madara-core%2Fcontent%2Fcontent-archive"
-        .. "&vars%5Bposts_per_page%5D=25"
-        .. "&vars%5Bpost_type%5D=wp-manga"
-        .. "&vars%5Bpost_status%5D=publish"
-        .. "&vars%5Bmanga_archives_item_layout%5D=big_thumbnail"
-        .. "&vars%5Bmeta_key%5D=_wp_manga_chapter"
-        .. "&vars%5Borderby%5D=meta_value_num"
-        .. "&vars%5Border%5D=DESC"
-        .. "&vars%5Bpage%5D=" .. p
-        .. "&vars%5Bvars%5D%5Bpaged%5D=1"
-        .. "&vars%5Bvars%5D%5Bpost_type%5D=wp-manga"
-        .. "&vars%5Bvars%5D%5Bpost_status%5D=publish"
-        .. "&vars%5Bvars%5D%5Bposts_per_page%5D=25"
-        .. "&vars%5Bvars%5D%5Bmeta_key%5D=_wp_manga_chapter"
-        .. "&vars%5Bvars%5D%5Borderby%5D=meta_value_num"
-        .. "&vars%5Bvars%5D%5Border%5D=DESC"
-        .. "&vars%5Bvars%5D%5Bmanga_archives_item_layout%5D=big_thumbnail"
-        .. "&vars%5Bvars%5D%5Bpage%5D=1"
-        .. "&vars%5Bvars%5D%5Bmeta_query%5D%5B0%5D%5Bkey%5D=_wp_manga_chapter_type"
-        .. "&vars%5Bvars%5D%5Bmeta_query%5D%5B0%5D%5Bvalue%5D=manga"
-        .. "&vars%5Bvars%5D%5Bmeta_query%5D%5B0%5D%5Bcompare%5D=="
-        .. "&vars%5Bvars%5D%5Bmeta_query%5D%5Brelation%5D=AND"
-    if query ~= "" then
-        form = form .. "&vars%5Bvars%5D%5Bsearch%5D%5Bkeyword%5D=" .. url_encode(query)
-        form = form .. "&vars%5Bsearch%5D%5Bkeyword%5D=" .. url_encode(query)
-    end
-
-    local body = http_post(BASE .. "/wp-admin/admin-ajax.php", form)
+    -- Madara GET search: admin-ajax.php returns 0 bytes, use server-rendered GET instead
+    local url = BASE .. "/?s=" .. url_encode(query) .. "&post_type=wp-manga"
+    local body = http_get(url)
     if not body or body == "" then
         log.error("mangasushi search empty response")
         return json.encode({})
@@ -111,22 +81,28 @@ function search_manga(arg)
     local results = {}
     local seen = {}
 
-    -- Madara listing: <a href="URL" title="TITLE"><img data-src="COVER"></a>
-    for href, title, cover in body:gmatch('<a[^>]*href="([^"]+)"[^>]*title="([^"]+)"[^>]*>.-<img[^>]*(?:data%-src|src)="([^"]+)"') do
+    -- Parse .post-title > h3 > a for title + href
+    -- Structure: <div class="post-title"><h3 class="h4"><a href="URL">TITLE</a></h3></div>
+    for href, title in body:gmatch('post%-title[^>]*>.-<a[^>]*href="([^"]+)"[^>]*>([^<]+)</a>') do
         local slug = href:match('/manga/([^/]+)/') or href:match('/manga/([^/]+)$')
         if slug and not seen[slug] then
             seen[slug] = true
+            -- Find cover: search nearby for data-src or src with image URL
+            local cover = ""
+            local pos = body:find(slug, 1, true)
+            if pos then
+                local area = body:sub(math.max(1, pos - 3000), math.min(#body, pos + 3000))
+                -- Madara lazy images: data-src with possible tabs/newlines before URL
+                cover = area:match('data%-src="[\t\n%s]*(https?://[^"]+)"')
+                    or area:match('data%-src="(https?://[^"]+)"')
+                    or area:match('src="(https?://[^"]+)"')
+                if cover then cover = trim(cover) end
+            end
             results[#results + 1] = {
                 id = slug,
                 title = unescape(title),
-                cover_url = trim(cover)
+                cover_url = cover or ""
             }
-        end
-    end
-
-    -- Fallback: page-item-detail blocks
-    if #results == 0 then
-        for block in body:gmatch('<div class="page%-item%-detail.-%z>') do -- dummy pattern to force scan
         end
     end
 
@@ -197,18 +173,43 @@ function get_chapter_list(arg)
     if not body then return json.encode({}) end
 
     local chapters = {}
-    for li in body:gmatch('<li%s+class="wp%-manga%-chapter[^>]*>(.-)</li>') do
+    local seen = {}
+
+    -- Madara chapter list: <li class="wp-manga-chapter"><a href="URL">LABEL</a>...<i>DATE</i></li>
+    for li in body:gmatch('<li[^>]*class="wp%-manga%-chapter[^"]*"[^>]*>(.-)</li>') do
         local href = li:match('href="([^"]+)"')
-        local label = trim(li:match(">([^<]*[Cc]hapter[^<]*)<") or "")
+        local label = trim(li:match('>([^<]*[Cc]hapter[^<]*)<') or "")
+        local date = trim(li:match('chapter%-release%-date[^>]*>.-<i>([^<]+)</i>') or "")
         if href and label ~= "" then
-            local num = label:match("[Cc]hapter%s+([%d%.%-]+)")
-            local cid = href:match("/manga/[^/]+/([^/]+)/$")
-            chapters[#chapters + 1] = {
-                id = cid or label,
-                chapter_num = tonumber(num) or 0,
-                title = label,
-                url = href
-            }
+            local num = label:match('[Cc]hapter%s+([%d%.%-]+)')
+            local cid = href:match('/manga/[^/]+/([^/]+)/?$') or href:match('/([^/]+)/?$')
+            if cid and not seen[cid] then
+                seen[cid] = true
+                chapters[#chapters + 1] = {
+                    id = cid,
+                    chapter_num = tonumber(num) or 0,
+                    title = label,
+                    uploaded_at = date,
+                    url = href
+                }
+            end
+        end
+    end
+
+    -- Fallback: extract chapter links from <a href> containing /chapter-
+    if #chapters == 0 then
+        for href, label in body:gmatch('<a[^>]*href="([^"]*chapter-[^"]+)"[^>]*>%s*([^<]+)%s*</a>') do
+            local cid = href:match('/([^/]+)/?$')
+            if cid and not seen[cid] then
+                seen[cid] = true
+                local num = label:match('[Cc]hapter%s+([%d%.%-]+)')
+                chapters[#chapters + 1] = {
+                    id = cid,
+                    chapter_num = tonumber(num) or 0,
+                    title = trim(label),
+                    url = href
+                }
+            end
         end
     end
 
@@ -233,7 +234,11 @@ function get_page_list(arg)
         if not e then break end
         local tag = body:sub(s, e)
         if tag:find("wp%-manga%-chapter%-img") then
-            local src = tag:match('data%-src="([^"]+)"') or tag:match('src="([^"]+)"')
+            -- data-src may have tabs/newlines between the attribute and URL value
+            local src = tag:match('data%-src="[\t\n%s]*(https?://[^"]+)"')
+                or tag:match('data%-src="(https?://[^"]+)"')
+                or tag:match('src="[\t\n%s]*(https?://[^"]+)"')
+                or tag:match('src="(https?://[^"]+)"')
             if src then pages[#pages + 1] = { url = trim(src) } end
         end
         pos = e + 1

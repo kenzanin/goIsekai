@@ -153,6 +153,48 @@ func main() {
 		proxy.SetDefaultHeader("Referer", updated.Referer)
 	})
 
+	// Maintenance: prune orphaned rows at startup, then back up + re-prune
+	// on the configured interval until shutdown.
+	backupsDir := filepath.Join(dataDir, "backups")
+	if cfg.PruneOrphans {
+		if summary, err := db.PruneOrphans(); err != nil {
+			logger.Error("prune orphans", "error", err)
+		} else if summary != "clean" {
+			logger.Info("pruned orphaned rows", "summary", summary)
+		}
+	}
+	maintenanceStop := make(chan struct{})
+	go func() {
+		interval := time.Duration(cfg.BackupIntervalHours) * time.Hour
+		if interval <= 0 {
+			return // backups disabled
+		}
+		backup := func() {
+			if _, err := db.BackupTo(backupsDir, cfg.BackupKeep); err != nil {
+				logger.Error("db backup", "error", err)
+			} else {
+				logger.Info("db backup written", "dir", backupsDir, "keep", cfg.BackupKeep)
+			}
+		}
+		backup() // first backup at startup
+		ticker := time.NewTicker(interval)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-maintenanceStop:
+				return
+			case <-ticker.C:
+				if cfg.PruneOrphans {
+					if summary, err := db.PruneOrphans(); err == nil && summary != "clean" {
+						logger.Info("pruned orphaned rows", "summary", summary)
+					}
+				}
+				backup()
+			}
+		}
+	}()
+	defer close(maintenanceStop)
+
 	mgr := pluginmanager.NewManager(proxy, pluginsDir)
 	if err := mgr.Discover(); err != nil {
 		logger.Fatal("discover plugins", "error", err)

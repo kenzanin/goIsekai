@@ -34,6 +34,14 @@ type Config struct {
 	// APIKey is the optional bearer key for /api/* endpoints.
 	APIKey string
 
+	// [maintenance] — automatic DB backup and cleanup.
+	// BackupIntervalHours is how often a DB snapshot is written; 0 disables.
+	BackupIntervalHours int
+	// BackupKeep is the max number of backup files to retain.
+	BackupKeep int
+	// PruneOrphans enables the automatic orphaned-row janitor.
+	PruneOrphans bool
+
 	// [network] — default headers injected into plugin HTTP requests.
 	UserAgent      string
 	AcceptLanguage string
@@ -66,6 +74,10 @@ func Default() *Config {
 		CDPPath:         "",
 		CDPSolveTimeout: 30,
 		APIKey:          "",
+
+		BackupIntervalHours: 24,
+		BackupKeep:          5,
+		PruneOrphans:        true,
 	}
 	c.CacheDir = filepath.Join(c.DataDir, "cache")
 	return c
@@ -132,6 +144,10 @@ func (c *Config) Save(path string) error {
 	fmt.Fprintf(&b, "cdp_engine = %s\n", c.CDPEngine)
 	fmt.Fprintf(&b, "cdp_path = %s\n", c.CDPPath)
 	fmt.Fprintf(&b, "cdp_solve_timeout = %d\n", c.CDPSolveTimeout)
+	fmt.Fprintf(&b, "\n[maintenance]\n")
+	fmt.Fprintf(&b, "backup_interval_hours = %d\n", c.BackupIntervalHours)
+	fmt.Fprintf(&b, "backup_keep = %d\n", c.BackupKeep)
+	fmt.Fprintf(&b, "prune_orphans = %t\n", c.PruneOrphans)
 	return os.WriteFile(path, []byte(b.String()), 0o644)
 }
 
@@ -208,6 +224,19 @@ func (c *Config) set(section, key, val string) {
 			if n, err := strconv.Atoi(val); err == nil {
 				c.Port = n
 			}
+		}
+	case "maintenance":
+		switch key {
+		case "backup_interval_hours":
+			if n, err := strconv.Atoi(val); err == nil && n >= 0 {
+				c.BackupIntervalHours = n
+			}
+		case "backup_keep":
+			if n, err := strconv.Atoi(val); err == nil && n > 0 {
+				c.BackupKeep = n
+			}
+		case "prune_orphans":
+			c.PruneOrphans = val == "true" || val == "1" || val == "yes"
 		}
 	case "network":
 		switch key {
