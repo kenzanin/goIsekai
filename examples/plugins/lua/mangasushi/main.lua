@@ -239,7 +239,7 @@ function get_page_list(arg)
                 or tag:match('data%-src="(https?://[^"]+)"')
                 or tag:match('src="[\t\n%s]*(https?://[^"]+)"')
                 or tag:match('src="(https?://[^"]+)"')
-            if src then pages[#pages + 1] = { url = trim(src) } end
+            if src then pages[#pages + 1] = { index = #pages, url = trim(src) } end
         end
         pos = e + 1
     end

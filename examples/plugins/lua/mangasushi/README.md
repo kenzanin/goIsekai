@@ -1,14 +1,33 @@
-# mangasushi — Madara Theme Plugin (NOT INSTALLABLE)
+# mangasushi — Madara Theme Plugin
 
-**Status: Disabled — not installable as an active plugin.**
+**Status: Installable — fully working.**
 
-mangasushi.org uses WordPress + Madara theme. While the plugin code exists
-here as a reference implementation, it cannot be used as an installed plugin
-due to site-side limitations that cannot be worked around via HTTP.
+mangasushi.org uses WordPress + Madara theme. All four ABI surfaces work
+over plain HTTP (GET search + POST chapter list; no Cloudflare, no JS
+rendering needed).
 
-## Why It Fails
+## Correction (2026-09-07)
 
-### 1. AJAX Search Returns Empty (Site-Side Bug)
+An earlier investigation concluded the site capped chapters at 5 per
+series. That was wrong: the tested series simply had only 5 chapters.
+POST `/manga/<slug>/ajax/chapters/` returns the FULL chapter list (e.g.
+Lonely Attack on the Different World → 331 chapters). There is no
+cap.
+
+## How It Works
+
+- **Search**: GET `/?s=<query>&post_type=wp-manga` → `.post-title h3 a`
+  + `.summary_image img` cards. Note WP search only matches titles the
+  site indexes (e.g. "isekai" → 9 results, "kodoku" → 0).
+- **Detail**: GET `/manga/<slug>/` → `.post-content_item` label/value rows
+  (status, author, genres, alt titles).
+- **Chapters**: POST `/manga/<slug>/ajax/chapters/` (empty body,
+  `X-Requested-With: XMLHttpRequest`) → `li.wp-manga-chapter` rows,
+  newest-first, full list in one response (no pagination).
+- **Pages**: GET `/manga/<slug>/chapter-<n>/` → `img.wp-manga-chapter-img`
+  with the real URL in `data-src` (lazy-loaded; contains embedded
+  tabs/newlines — the parser tolerates whitespace).
+
 
 The Madara theme's `admin-ajax.php` endpoint — which is how the search
 normally works — returns **0 bytes** for every query. This is not a
@@ -37,22 +56,20 @@ series — users can only access the 5 newest chapters.
 |-------------|--------|-------|
 | Search      | ✅     | Via GET server-rendered search |
 | Detail      | ✅     | Title, author, status, genres, description |
-| Chapters    | ⚠️    | 5 most recent only (site cap) |
+| Chapters    | ✅     | Full list, newest-first (331 for Lonely Attack) |
 | Pages       | ✅     | Full page list per chapter |
 
-## Reinstalling
+## Installing
 
-If mangasushi.org changes their chapter-loading mechanism (e.g., adds
-pagination or removes the 5-chapter cap), this plugin can be reactivated:
-
-1. Copy `main.lua` to `app_data/plugins/mangasushi/main.lua`
-2. `sqlite3 app_data/goisekai.db "UPDATE plugins SET is_active=1 WHERE id='mangasushi';"`
-3. Restart the server
+1. Copy `main.lua` (+ `logo.png` if present) to `app_data/plugins/mangasushi/`
+2. Register/restart: the server discovers plugins from `app_data/plugins` at
+   startup (`DB row` is created automatically)
+3. Verify via sandbox: `/api/sandbox/plugins/mangasushi/search?q=isekai`
 
 ## Technical Details
 
 - **Theme:** WordPress Madara (`ChapterMode.MangaAjax`)
 - **Search:** GET `/?s={query}&post_type=wp-manga` (server-rendered HTML)
-- **Chapters:** POST `{manga_path}/ajax/chapters/` (capped at 5)
-- **Pages:** GET chapter URL, parse `div.page-break img`
+- **Chapters:** POST `{manga_path}/ajax/chapters/` (empty body + `X-Requested-With`)
+- **Pages:** GET chapter URL, parse `img.wp-manga-chapter-img` `data-src`
 - **Alt-titles:** MangaDex API (`alt_title_servers: [{id:"mangadex"}]`)
