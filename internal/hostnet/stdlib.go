@@ -21,16 +21,12 @@ var stdTransport = &nethttp.Transport{ForceAttemptHTTP2: true}
 
 // stdlibPrefers reports whether pluginID is pinned to the stdlib path.
 func (p *Proxy) stdlibPrefers(pluginID string) bool {
-	p.mu.Lock()
-	defer p.mu.Unlock()
-	return p.stdlibPref[pluginID]
+	return p.pin(pluginID) == stdlibProfileName
 }
 
 // markStdlib pins pluginID to the stdlib path.
 func (p *Proxy) markStdlib(pluginID string) {
-	p.mu.Lock()
-	p.stdlibPref[pluginID] = true
-	p.mu.Unlock()
+	p.setPin(pluginID, stdlibProfileName)
 }
 
 // doRequestStd executes a single request over the stdlib client (HTTP/2 via

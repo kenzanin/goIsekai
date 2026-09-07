@@ -66,4 +66,15 @@ var migrations = []string{
 	`/* alt_titles: see migrateAltTitles */`,
 	// Index 10: user-chosen main title lock — UpsertManga must not overwrite it.
 	`ALTER TABLE mangas ADD COLUMN custom_title INTEGER NOT NULL DEFAULT 0;`,
+	// Index 11: per-plugin pinned TLS profile (winner of the WAF rotation
+	// ladder). Empty string = not yet pinned (auto-ladder on next block).
+	`ALTER TABLE plugins ADD COLUMN http_profile TEXT DEFAULT '';`,
+	// Index 12: per-chapter cached page list (JSON array of {index,url}) so a
+	// fully-fetched chapter can be read offline without a plugin round-trip.
+	`CREATE TABLE IF NOT EXISTS chapter_pages (
+    chapter_id TEXT PRIMARY KEY,
+    pages TEXT NOT NULL,
+    fetched_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY(chapter_id) REFERENCES chapters(id) ON DELETE CASCADE
+);`,
 }

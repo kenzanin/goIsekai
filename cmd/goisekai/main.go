@@ -142,6 +142,19 @@ func main() {
 		Timeout: time.Duration(cfg.CDPSolveTimeout) * time.Second,
 	})
 
+	// Restore persisted TLS-profile pins and wire persistence so a plugin's
+	// winning profile survives restarts without a re-probe.
+	if pins, perr := db.GetPluginProfiles(); perr == nil {
+		proxy.SetPinnedProfiles(pins)
+	} else {
+		logger.Warn("load plugin profile pins", "error", perr)
+	}
+	proxy.SetPersistPin(func(pluginID, profile string) {
+		if err := db.SetPluginProfile(pluginID, profile); err != nil {
+			logger.Warn("persist plugin profile", "plugin", pluginID, "error", err)
+		}
+	})
+
 	// Hot-reload: poll goisekai.ini every 5s and apply the safe subset
 	// (log level, user-agent, referer) live. Unsafe fields like host/port/
 	// cdp_engine need a restart, so they are deliberately not applied here.

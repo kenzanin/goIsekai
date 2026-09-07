@@ -79,8 +79,14 @@ func (p *Proxy) SetVerifyCookies(pluginID, domain, cookieHeader, ua string) erro
 	}
 	p.pendingVerify[pluginID] = seed
 
-	if c, ok := p.clients[pluginID]; ok {
-		c.SetCookies(seed.url(), seed.cookies)
+	// Clients are cached per (plugin, profile) under a composite key, so an
+	// existing plugin may have several. Update every jar in place; new clients
+	// pick the seed up in clientFor via pendingVerify.
+	prefix := pluginID + "\x00"
+	for k, c := range p.clients {
+		if strings.HasPrefix(k, prefix) {
+			c.SetCookies(seed.url(), seed.cookies)
+		}
 	}
 	return nil
 }

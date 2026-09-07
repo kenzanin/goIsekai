@@ -1,9 +1,11 @@
 package bridge
 
 import (
+	"encoding/json"
 	"fmt"
 
 	"goisekai/internal/database"
+	"goisekai/internal/logger"
 	"goisekai/pkg/types"
 )
 
@@ -52,13 +54,72 @@ func (s *AppService) GetMangaDetails(pluginID, mangaID string) (types.Manga, []t
 	return manga, chapters, nil
 }
 
+// resolveChapterRowID maps a source chapter ID to the database row ID used
+// by the chapters table ("pluginID|mangaID|sourceChapterID"). On failure it
+// returns "" and the caller skips caching — best-effort only.
+func (s *AppService) resolveChapterRowID(pluginID, chapterID string) string {
+	rowID, err := s.db.ResolveChapterID(pluginID, chapterID)
+	if err != nil {
+		return ""
+	}
+	return rowID
+}
+
 // GetPageList delegates to the plugin's GetPageList function.
+// On success the result is persisted to chapter_pages so a later
+// GetPageListCached call can serve it when the plugin is unreachable.
 func (s *AppService) GetPageList(pluginID, chapterID string) ([]types.Page, error) {
 	result, err := s.mgr.GetPageList(pluginID, chapterID)
 	if err != nil {
 		return nil, fmt.Errorf("bridge: get page list: %w", err)
 	}
+	// Best-effort cache persist — log-and-ignore on failure.
+	if raw, merr := json.Marshal(result); merr == nil {
+		if rowID := s.resolveChapterRowID(pluginID, chapterID); rowID != "" {
+			if perr := s.db.SaveChapterPages(rowID, raw); perr != nil {
+				logger.Warn("cache chapter pages", "chapter", chapterID, "error", perr)
+			}
+		}
+	}
 	return result, nil
+}
+
+// GetPageListCached is like GetPageList but falls back to the local
+// chapter_pages cache when the plugin call fails. A cache hit logs the
+// original plugin error and returns the cached pages; a cache miss
+// returns the original error unchanged.
+func (s *AppService) GetPageListCached(pluginID, chapterID string) ([]types.Page, error) {
+	result, err := s.mgr.GetPageList(pluginID, chapterID)
+	if err == nil {
+		// Online path succeeded — persist for future offline use.
+		if raw, merr := json.Marshal(result); merr == nil {
+			if rowID := s.resolveChapterRowID(pluginID, chapterID); rowID != "" {
+				if perr := s.db.SaveChapterPages(rowID, raw); perr != nil {
+					logger.Warn("cache chapter pages", "chapter", chapterID, "error", perr)
+				}
+			}
+		}
+		return result, nil
+	}
+	// Plugin failed — try the local cache.
+	rowID := s.resolveChapterRowID(pluginID, chapterID)
+	if rowID == "" {
+		return nil, fmt.Errorf("bridge: get page list: %w", err)
+	}
+	cached, cerr := s.db.GetChapterPages(rowID)
+	if cerr != nil {
+		logger.Warn("read chapter pages cache", "chapter", chapterID, "error", cerr)
+		return nil, fmt.Errorf("bridge: get page list: %w", err)
+	}
+	if cached != nil {
+		logger.Warn("serving cached page list (plugin unreachable)", "chapter", chapterID, "plugin_err", err)
+		var pages []types.Page
+		if uerr := json.Unmarshal(cached, &pages); uerr != nil {
+			return nil, fmt.Errorf("bridge: unmarshal cached pages: %w", uerr)
+		}
+		return pages, nil
+	}
+	return nil, fmt.Errorf("bridge: get page list: %w", err)
 }
 
 // ToggleLibraryItem flips the in-library flag for a manga, addressed by its

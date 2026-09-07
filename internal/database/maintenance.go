@@ -67,6 +67,7 @@ func (d *DB) PruneOrphans() (string, error) {
 	}
 
 	// Order matters: children first so we never delete a parent still referenced.
+	run("orphan_chapter_pages", `DELETE FROM chapter_pages WHERE chapter_id NOT IN (SELECT id FROM chapters)`)
 	run("orphan_read_history", `DELETE FROM read_history WHERE chapter_id NOT IN (SELECT id FROM chapters)`)
 	run("orphan_chapters", `DELETE FROM chapters WHERE manga_id NOT IN (SELECT id FROM mangas)`)
 	run("orphan_alt_titles", `DELETE FROM alt_titles WHERE manga_row_id NOT IN (SELECT id FROM mangas)`)

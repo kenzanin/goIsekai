@@ -34,6 +34,8 @@ func (s *Server) registerActionRoutes() {
 	s.Router.Post("/action/export-cbz/{pluginID}/{mangaID}/{chapterID}", s.handleExportCBZ)
 	s.Router.Post("/action/clear-cache/{pluginID}/{mangaID}", s.handleClearMangaCache)
 	s.Router.Post("/action/clear-cache-all", s.handleClearAllCache)
+	s.Router.Post("/action/test-profile/{pluginID}", s.handleTestProfile)
+	s.Router.Post("/action/reset-profile/{pluginID}", s.handleResetProfile)
 }
 
 // hxRedirect answers a successful action with a 303 See Other redirect —
@@ -42,6 +44,39 @@ func (s *Server) registerActionRoutes() {
 func (s *Server) hxRedirect(w http.ResponseWriter, location string) {
 	w.Header().Set("Location", location)
 	w.WriteHeader(http.StatusSeeOther)
+}
+
+// handleTestProfile runs a single GET against the plugin's site URL (or an
+// explicit url form field) using the requested TLS profile and reports the
+// resulting HTTP status as JSON. It does not change the pinned profile.
+func (s *Server) handleTestProfile(w http.ResponseWriter, r *http.Request) {
+	pluginID := param(r, "pluginID")
+	if err := r.ParseForm(); err != nil {
+		writeErr(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	profile := r.FormValue("profile")
+	if profile == "" {
+		writeErr(w, http.StatusBadRequest, "missing 'profile' field")
+		return
+	}
+	status, err := s.service.TestProfile(pluginID, profile, r.FormValue("url"))
+	if err != nil {
+		writeErr(w, http.StatusBadGateway, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{
+		"ok":      status >= 200 && status < 400,
+		"profile": profile,
+		"status":  status,
+	})
+}
+
+// handleResetProfile clears the plugin's pinned TLS profile.
+func (s *Server) handleResetProfile(w http.ResponseWriter, r *http.Request) {
+	pluginID := param(r, "pluginID")
+	s.service.ResetProfile(pluginID)
+	writeJSON(w, http.StatusOK, map[string]any{"ok": true})
 }
 
 // handleInstallPlugin saves the uploaded .wasm to a temp file and installs it

@@ -1,26 +1,32 @@
 package hostnet
 
 import (
+	"fmt"
 	"sort"
 	"strings"
 
 	http "github.com/bogdanfinn/fhttp"
 	tls_client "github.com/bogdanfinn/tls-client"
-	"github.com/bogdanfinn/tls-client/profiles"
 )
 
-// client returns the tls-client for pluginID, creating one on first use with a
-// browser TLS profile and an isolated cookie jar.
-func (p *Proxy) client(pluginID string) (tls_client.HttpClient, error) {
+// clientFor returns the tls-client for pluginID+profile, creating one on first
+// use with that browser TLS profile and the plugin's isolated cookie jar.
+// Clients are cached per (plugin, profile) so rotation does not discard cookies.
+func (p *Proxy) clientFor(pluginID, profileName string) (tls_client.HttpClient, error) {
+	prof, ok := profileByName(profileName)
+	if !ok {
+		return nil, fmt.Errorf("hostnet: unknown tls profile %q", profileName)
+	}
+	key := pluginID + "\x00" + profileName
+
 	p.mu.Lock()
 	defer p.mu.Unlock()
-	c, ok := p.clients[pluginID]
-	if ok {
+	if c, ok := p.clients[key]; ok {
 		return c, nil
 	}
 	c, err := tls_client.NewHttpClient(tls_client.NewNoopLogger(),
 		tls_client.WithTimeoutSeconds(30),
-		tls_client.WithClientProfile(profiles.Chrome_146),
+		tls_client.WithClientProfile(prof),
 		tls_client.WithCookieJar(tls_client.NewCookieJar()),
 	)
 	if err != nil {
@@ -29,7 +35,7 @@ func (p *Proxy) client(pluginID string) (tls_client.HttpClient, error) {
 	if seed, ok := p.pendingVerify[pluginID]; ok {
 		c.SetCookies(seed.url(), seed.cookies)
 	}
-	p.clients[pluginID] = c
+	p.clients[key] = c
 	return c, nil
 }
 

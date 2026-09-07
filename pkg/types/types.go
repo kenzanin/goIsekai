@@ -85,6 +85,11 @@ type PluginMeta struct {
 	// alternative-title resolution. A non-empty list signals enricher
 	// capability — the host also expects a GetAltTitles export.
 	AltTitleServers []AltTitleServer `json:"alt_title_servers,omitempty"`
+	// HTTPProfiles optionally declares the plugin's preferred TLS client
+	// profile ladder (ordered). Names map to tls-client profiles (e.g.
+	// "firefox_148", "chrome_131") or "stdlib" for Go's stock TLS + h2.
+	// Empty → host default (Chrome_146) then the built-in auto ladder.
+	HTTPProfiles []string `json:"http_profiles,omitempty"`
 	// Name is the human-readable site name (e.g. "MangaDex"). Falls back to the
 	// plugin ID when empty.
 	Name string `json:"name,omitempty"`

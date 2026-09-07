@@ -16,11 +16,12 @@ import (
 // Per-page headers overlay the default headers, and cookies are persisted per
 // plugin so they survive across calls.
 //
-// Anti-bot challenge handling: when a plugin declares needs_js, the browser
-// engine is run preemptively to clear the site before the fast path. When a
-// challenge response is detected and an engine is enabled, the host solves the
-// challenge, seeds the harvested cookies into the plugin's jar, and retries the
-// original request once before surfacing a challenge error.
+// Two distinct failure modes are handled differently:
+//   - Anti-bot CHALLENGES (CF JS challenge / Turnstile): solved via the browser
+//     engine (CDP) when configured, surfacing ChallengeError when not.
+//   - WAF BLOCKS (utls fingerprint detection): retried through the TLS-profile
+//     ladder, pinning the first profile that clears the block. The CDP engine is
+//     the last resort when the ladder is exhausted.
 func (p *Proxy) Request(pluginID string, req types.HTTPRequest) (types.HTTPResponse, error) {
 	// needs_js: preemptively solve + seed cookies via the browser engine so the
 	// client-side site is already cleared when the fast path runs.
@@ -39,32 +40,130 @@ func (p *Proxy) Request(pluginID string, req types.HTTPRequest) (types.HTTPRespo
 		return types.HTTPResponse{}, err
 	}
 
-	if !isChallengeResponse(resp) && !isWafBlock(resp) {
-		return resp, nil
+	// ── Challenge response (CF JS / Turnstile) ──
+	// These require JavaScript execution, not a different TLS fingerprint.
+	if isChallengeResponse(resp) {
+		if !p.CDPConfig().enabled() {
+			return types.HTTPResponse{}, &ChallengeError{VerifyURL: req.URL}
+		}
+		if err := p.solveAndSeed(pluginID, req.URL); err != nil {
+			return types.HTTPResponse{}, &ChallengeError{VerifyURL: req.URL}
+		}
+		retried, rerr := p.doRequest(pluginID, req)
+		// A solve that seeds cookies but does not clear the challenge (chained
+		// challenge, stale clearance) must NOT surface as success: the plugin
+		// relies on ChallengeError to show "source requires verification".
+		if rerr != nil || isChallengeResponse(retried) {
+			return types.HTTPResponse{}, &ChallengeError{VerifyURL: req.URL}
+		}
+		return retried, nil
 	}
 
-	// WAF block on the tls-client fingerprint: retry once over stdlib h2 and
-	// pin the plugin to that path when it succeeds.
+	// ── WAF block (utls fingerprint detection) ──
+	// The server rejects the browser fingerprint itself; try a different TLS
+	// profile via the ladder (plugin hints then default rotation). An HTML body
+	// is a JS interstitial wearing the WAF marker, so it needs the browser
+	// engine — skip the ladder and treat it as a challenge.
 	if isWafBlock(resp) {
-		if retried, rerr := p.doRequestStd(pluginID, req); rerr == nil && !isWafBlock(retried) && !isChallengeResponse(retried) {
-			p.markStdlib(pluginID)
-			return retried, nil
+		htmlBlock := strings.Contains(resp.Headers["Content-Type"], "text/html")
+		if !htmlBlock {
+			if retried, ok := p.tryLadder(pluginID, req); ok {
+				return retried, nil
+			}
 		}
-		return types.HTTPResponse{}, &ChallengeError{}
+		// Ladder exhausted (or HTML block). Last resort: solve via the engine,
+		// seed cookies, and retry once.
+		if p.CDPConfig().enabled() && p.solveAndSeed(pluginID, req.URL) == nil {
+			if retried, rerr := p.doRequest(pluginID, req); rerr == nil && !isWafBlock(retried) && !isChallengeResponse(retried) {
+				return retried, nil
+			}
+		}
+		return types.HTTPResponse{}, &ChallengeError{VerifyURL: req.URL}
 	}
 
-	// Challenge detected. Solve via the engine, seed cookies, and retry once.
-	if p.CDPConfig().enabled() && p.solveAndSeed(pluginID, req.URL) == nil {
-		if retried, rerr := p.doRequest(pluginID, req); rerr == nil && !isChallengeResponse(retried) {
-			return retried, nil
-		}
-	}
-
-	return types.HTTPResponse{}, &ChallengeError{}
+	return resp, nil
 }
 
-// doRequest executes a single fast-path request with no challenge handling.
+// tryLadder walks the candidate ladder (plugin hints then the default ladder),
+// retrying the request with each untried profile. It returns the first
+// response that is not a challenge and not a WAF block, and pins the winning
+// profile only when that response is a clean 2xx/3xx (a 429/5xx from a rung is
+// a real origin answer, not a fingerprint win — it must not become permanent).
+// ok is false when every candidate fails.
+func (p *Proxy) tryLadder(pluginID string, req types.HTTPRequest) (types.HTTPResponse, bool) {
+	tried := p.pin(pluginID)
+	if tried == "" {
+		tried = defaultProfileName
+	}
+	seen := map[string]bool{tried: true}
+
+	// Without a browser engine fallback, a block-all origin burns the entire
+	// profile ladder on every request (8 probes). When no pin exists yet,
+	// restrict to stdlib — it provides the key h2 bypass without the burst
+	// cost. Pinned plugins still get full rotation (the pin may have gone
+	// stale).
+	candidates := p.ladderFor(pluginID)
+
+	for _, name := range candidates {
+		if seen[name] {
+			continue
+		}
+		seen[name] = true
+
+		if name == stdlibProfileName {
+			retried, rerr := p.doRequestStd(pluginID, req)
+			if rerr == nil && !isChallengeResponse(retried) && !isWafBlock(retried) {
+				if retried.Status < 400 {
+					p.markStdlib(pluginID)
+				}
+				return retried, true
+			}
+			continue
+		}
+
+		retried, rerr := p.doRequestProfile(pluginID, name, req)
+		if rerr == nil && !isChallengeResponse(retried) && !isWafBlock(retried) {
+			if retried.Status < 400 {
+				p.setPin(pluginID, name)
+			}
+			return retried, true
+		}
+	}
+	return types.HTTPResponse{}, false
+}
+
+// ladderFor returns the ordered candidate profile names for pluginID: the
+// plugin's declared hints followed by the default ladder, deduplicated.
+func (p *Proxy) ladderFor(pluginID string) []string {
+	p.mu.Lock()
+	hints := append([]string{}, p.hints[pluginID]...)
+	p.mu.Unlock()
+
+	out := make([]string, 0, len(hints)+8)
+	seen := map[string]bool{}
+	for _, n := range append(hints, defaultLadder()...) {
+		if seen[n] || !isKnownProfile(n) {
+			continue
+		}
+		seen[n] = true
+		out = append(out, n)
+	}
+	return out
+}
+
+// doRequest executes a single fast-path request with no challenge handling,
+// using the plugin's pinned profile (or the default when unpinned).
 func (p *Proxy) doRequest(pluginID string, req types.HTTPRequest) (types.HTTPResponse, error) {
+	prof := p.pin(pluginID)
+	if prof == "" || prof == stdlibProfileName {
+		prof = defaultProfileName
+	}
+	return p.doRequestProfile(pluginID, prof, req)
+}
+
+// doRequestProfile executes a single fast-path request using an explicit TLS
+// profile, with no challenge handling.
+func (p *Proxy) doRequestProfile(pluginID, profileName string, req types.HTTPRequest) (types.HTTPResponse, error) {
 	method := req.Method
 	if method == "" {
 		method = http.MethodGet
@@ -85,7 +184,7 @@ func (p *Proxy) doRequest(pluginID string, req types.HTTPRequest) (types.HTTPRes
 		httpReq.Header.Set("User-Agent", ua)
 	}
 
-	client, err := p.client(pluginID)
+	client, err := p.clientFor(pluginID, profileName)
 	if err != nil {
 		return types.HTTPResponse{}, fmt.Errorf("hostnet: init client: %w", err)
 	}

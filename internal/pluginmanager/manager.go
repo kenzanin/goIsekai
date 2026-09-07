@@ -102,6 +102,7 @@ func (m *Manager) ensureLoaded(id string) error {
 	p.meta = loaded.meta
 	p.loaded = true
 	m.proxy.SetNeedsJS(id, p.meta.NeedsJS)
+	m.proxy.SetHTTPProfiles(id, p.meta.HTTPProfiles)
 	logger.Debug("plugin loaded (lazy)", "id", id, "version", p.contractVersion)
 	if m.onLoad != nil {
 		go m.onLoad(id)
@@ -266,6 +267,7 @@ func (m *Manager) Install(wasmPath string) (string, error) {
 		}
 		m.plugins[id] = p
 		m.proxy.SetNeedsJS(id, p.meta.NeedsJS)
+		m.proxy.SetHTTPProfiles(id, p.meta.HTTPProfiles)
 		logger.Debug("lua plugin installed", "id", id)
 		return filepath.Join(destDir, "main.lua"), nil
 	}
@@ -287,6 +289,7 @@ func (m *Manager) Install(wasmPath string) (string, error) {
 		}
 		m.plugins[id] = p
 		m.proxy.SetNeedsJS(id, p.meta.NeedsJS)
+		m.proxy.SetHTTPProfiles(id, p.meta.HTTPProfiles)
 		logger.Debug("js plugin installed", "id", id)
 		return filepath.Join(destDir, "main.js"), nil
 	}
@@ -309,6 +312,7 @@ func (m *Manager) Install(wasmPath string) (string, error) {
 		}
 		m.plugins[id] = p
 		m.proxy.SetNeedsJS(id, p.meta.NeedsJS)
+		m.proxy.SetHTTPProfiles(id, p.meta.HTTPProfiles)
 		logger.Debug("scriggo plugin installed", "id", id)
 		return filepath.Join(destDir, "main.go"), nil
 	}
@@ -327,6 +331,7 @@ func (m *Manager) Install(wasmPath string) (string, error) {
 	}
 	m.plugins[id] = p
 	m.proxy.SetNeedsJS(id, p.meta.NeedsJS)
+	m.proxy.SetHTTPProfiles(id, p.meta.HTTPProfiles)
 	logger.Debug("plugin installed", "id", id)
 	return dest, nil
 }
@@ -353,6 +358,7 @@ func (m *Manager) LoadPlugin(path string) (string, error) {
 		}
 		m.plugins[id] = p
 		m.proxy.SetNeedsJS(id, p.meta.NeedsJS)
+		m.proxy.SetHTTPProfiles(id, p.meta.HTTPProfiles)
 		logger.Info("plugin loaded (hot)", "id", id, "kind", "lua")
 		return id, nil
 	}
@@ -369,6 +375,7 @@ func (m *Manager) LoadPlugin(path string) (string, error) {
 		}
 		m.plugins[id] = p
 		m.proxy.SetNeedsJS(id, p.meta.NeedsJS)
+		m.proxy.SetHTTPProfiles(id, p.meta.HTTPProfiles)
 		logger.Info("plugin loaded (hot)", "id", id, "kind", "js")
 		return id, nil
 	}
@@ -385,6 +392,7 @@ func (m *Manager) LoadPlugin(path string) (string, error) {
 		}
 		m.plugins[id] = p
 		m.proxy.SetNeedsJS(id, p.meta.NeedsJS)
+		m.proxy.SetHTTPProfiles(id, p.meta.HTTPProfiles)
 		logger.Info("plugin loaded (hot)", "id", id, "kind", "scriggo")
 		return id, nil
 	}
@@ -403,6 +411,7 @@ func (m *Manager) LoadPlugin(path string) (string, error) {
 	}
 	m.plugins[id] = p
 	m.proxy.SetNeedsJS(id, p.meta.NeedsJS)
+	m.proxy.SetHTTPProfiles(id, p.meta.HTTPProfiles)
 	logger.Info("plugin loaded (hot)", "id", id, "kind", "wasm")
 	return id, nil
 }

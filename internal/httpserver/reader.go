@@ -89,7 +89,7 @@ func (s *Server) readerData(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "missing route params", http.StatusBadRequest)
 		return
 	}
-	pages, err := s.service.GetPageList(pluginID, chapterID)
+	pages, err := s.service.GetPageListCached(pluginID, chapterID)
 	if err != nil {
 		s.logger.Error("reader page list", "error", err, "plugin", pluginID, "chapter", chapterID)
 		http.Error(w, "failed to load pages: "+err.Error(), http.StatusBadGateway)

@@ -56,6 +56,31 @@ func (s *AppService) PluginMetas() map[string]pluginmanager.LoadedPlugin {
 	return out
 }
 
+// PluginProfile returns the plugin's pinned TLS profile ("" when unpinned) and
+// the selectable profile names, for the plugins-page profile UI.
+func (s *AppService) PluginProfile(pluginID string) (pin string, available []string) {
+	return s.proxy.PinnedProfile(pluginID), s.proxy.AvailableProfiles()
+}
+
+// TestProfile runs a single GET against url (defaulting to the plugin's site
+// URL) using an explicit TLS profile or "stdlib", returning the HTTP status.
+// It does not change the plugin's pinned profile.
+func (s *AppService) TestProfile(pluginID, profile, url string) (int, error) {
+	if url == "" {
+		url = s.PluginMeta(pluginID).SiteURL
+	}
+	if url == "" {
+		return 0, fmt.Errorf("bridge: no site URL for plugin %s", pluginID)
+	}
+	return s.proxy.TestProfile(pluginID, profile, url)
+}
+
+// ResetProfile clears a plugin's pinned TLS profile so it returns to the
+// default and re-probes on the next challenge.
+func (s *AppService) ResetProfile(pluginID string) {
+	s.proxy.ClearPin(pluginID)
+}
+
 // verifyHost extracts the host (e.g. "example.com") from a verify URL, or ""
 // when the URL is empty or unparsable.
 func verifyHost(verifyURL string) string {
