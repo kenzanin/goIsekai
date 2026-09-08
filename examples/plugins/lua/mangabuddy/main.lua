@@ -13,6 +13,17 @@
 --   chapter: GET /get-chapter-list?slug={bare-slug}  -> clean JSON, all chapters,
 --                                       newest-first, has chapter_num + updated_at
 --   pages:   GET /series/{slug}.{zid}/{chapter-slug} -> HTML; data-src CDN webp imgs
+--
+-- Layout (split to make copying to a new plugin trivial):
+--   helpers.lua  generic helpers  (normalizeStatus, url_encode, http_get,
+--                decode_entities, lua_escape, titlecase) — copy unchanged
+--   enrich.lua   generic alt-title/alt-summary providers (MangaDex +
+--                MangaUpdates via getAltTitles/getAltSummary) — copy unchanged,
+--                then declare the servers you want in PLUGIN.alt_title_servers
+--   main.lua     THIS file — the only one you edit: PLUGIN table + BASE/CDN/UA
+--                + site-specific parsers + the four core ABI functions.
+-- Every sibling pre-executes before main.lua, so their globals are ready.
+-- Trim the site comment above when reusing for another site.
 
 PLUGIN = {
     contract_version = 1,
@@ -33,66 +44,7 @@ BASE = "https://mangabuddy1.co.uk"
 CDN = "https://cdn1.love4awalk.xyz"
 UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 Safari/537.36"
 
--- normalizeStatus maps a raw status string to a canonical host value.
--- Canonical set: Ongoing, Completed, Hiatus, Dropped, Upcoming.
--- Unknown values pass through as-is.
-local function normalizeStatus(s)
-    if not s or s == "" then return "unknown" end
-    local raw = s:lower()
-    if raw:find("ongo") or raw:find("releas") or raw:find("publish") then return "Ongoing" end
-    if raw:find("complet") or raw:find("finish") then return "Completed" end
-    if raw:find("hiatus") or raw:find("on.?hold") or raw:find("onhold") then return "Hiatus" end
-    if raw:find("drop") or raw:find("cancel") then return "Dropped" end
-    if raw:find("upcom") or raw:find("not.?publish") then return "Upcoming" end
-    return s
-end
-
--- ─── helpers ───────────────────────────────────────────────────────────────
-
-function url_encode(s)
-    return (s:gsub("([^%w%-%.%_%~])", function(c)
-        return string.format("%%%02X", string.byte(c))
-    end))
-end
-
--- Escape Lua pattern magic chars in literals interpolated into patterns.
-function lua_escape(s)
-    return (s:gsub("[%-%.%+%[%]%(%)%$%^%%%?%*]", "%%%0"))
-end
-
-function http_get(url, accept_json)
-    local headers = {
-        ["User-Agent"] = UA,
-        ["Accept"] = "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-        ["Accept-Language"] = "en-US,en;q=0.9"
-    }
-    if accept_json then
-        headers["Accept"] = "application/json"
-        headers["Referer"] = BASE .. "/"
-    end
-    local resp = http_request({url = url, method = "GET", headers = headers})
-    if not resp then
-        log.error("http_request returned nil for " .. url)
-    elseif resp.status ~= 200 then
-        log.error("http status " .. tostring(resp.status) .. " for " .. url)
-    end
-    return resp
-end
-
-function decode_entities(s)
-    if not s then return "" end
-    -- site double-escapes some entities in meta description: "&amp;#039;"
-    s = s:gsub("&amp;#0?39;", "'"):gsub("&amp;quot;", '"')
-    s = s:gsub("&#0?39;", "'"):gsub("&apos;", "'")
-    s = s:gsub("&quot;", '"')
-    s = s:gsub("&amp;", "&")
-    return s
-end
-
-function titlecase(s)
-    if s == nil then return "" end
-    return s:sub(1, 1):upper() .. s:sub(2)
-end
+-- ─── site-specific helpers ────────────────────────────────────────────────
 
 -- Full manga id is "{slug}.{zid}"; several endpoints want the bare slug.
 function bare_slug(manga_id)
@@ -101,6 +53,7 @@ end
 
 -- Info rows on the detail page carry their value as a link target, not a
 -- text node: <a href="/series?status=Ongoing"> and <a href="/author/NAME">.
+-- (site-specific shape; keep the anchor scan in this plugin's main)
 function label_value(html, label, href_prefix)
     -- no ">" anchor: the label is preceded by a newline+indent in real markup
     local pos = string.match(html, label .. "%s*</h1>()")
@@ -191,7 +144,7 @@ function get_manga_detail(arg)
 end
 
 -- ─── ABI: get_chapter_list(arg) ────────────────────────────────────────────
--- arg: '"slug.ZID"'  ->  array of {id, manga_id, chapter_num, title, url, uploaded_at}
+-- arg: '"slug.ZID"'  ->  array of {id, manga_id, chapter_num, title, url, released_at}
 -- Chapters are newest-first (descending number) per ABI convention.
 function get_chapter_list(arg)
     local manga_id = json.decode(arg)
@@ -255,139 +208,4 @@ function get_page_list(arg)
     end
     log.debug("pages: " .. #pages .. " for chapter " .. manga_id .. ":" .. chslug)
     return json.encode(pages)
-end
-
--- fetch_mangaupdates searches MangaUpdates by title and returns the best-match
--- series_id (or nil). search_result is the decoded JSON search response body.
-local function mangaupdates_search(title)
-    local body = json.encode({search = title, stype = "title", perpage = 5})
-    local resp = http_request({
-        url = "https://api.mangaupdates.com/v1/series/search",
-        method = "POST",
-        headers = {
-            ["Content-Type"] = "application/json",
-            ["Accept"] = "application/json"
-        },
-        body = body
-    })
-    if not resp or resp.status ~= 200 then
-        log.error("mangaupdates search http " .. tostring(resp and resp.status or "nil"))
-        return nil
-    end
-    local ok, data = pcall(json.decode, resp.body)
-    if not ok or not data or not data.results or #data.results == 0 then
-        return nil
-    end
-    -- best match = first result (API sorts by relevance)
-    return data.results[1].record
-end
-
-local function mangaupdates_detail(series_id)
-    local resp = http_request({
-        url = "https://api.mangaupdates.com/v1/series/" .. tostring(series_id),
-        method = "GET",
-        headers = {["Accept"] = "application/json"}
-    })
-    if not resp or resp.status ~= 200 then
-        log.error("mangaupdates detail http " .. tostring(resp and resp.status or "nil"))
-        return nil
-    end
-    local ok, data = pcall(json.decode, resp.body)
-    if not ok or not data then return nil end
-    return data
-end
-
--- ─── ABI: getAltTitles(arg) ────────────────────────────────────────────────
--- Each plugin carries its own alt-title source (MangaDex API) so no plugin
--- depends on another. arg: {"title":"...","server":"..."} -> {source, titles}
-function getAltTitles(arg)
-    local input = json.decode(arg)
-    local title = input.title or ""
-    local server = input.server or "mangadex"
-
-    if server == "mangaupdates" then
-        return getAltTitles_mangaupdates(title)
-    end
-    -- default: MangaDex
-    return getAltTitles_mangadex(title)
-end
-
-function getAltTitles_mangadex(title)
-    local url = "https://api.mangadex.org/manga?title=" .. url_encode(title) ..
-        "&limit=5&includes[]=manga"
-    local resp = http_request({url = url, method = "GET", headers = {}})
-    if not resp or resp.status ~= 200 then
-        return json.encode({source = "MangaDex", titles = {}})
-    end
-    local ok, body = pcall(json.decode, resp.body)
-    if not ok or not body or not body.data or #body.data == 0 then
-        return json.encode({source = "MangaDex", titles = {}})
-    end
-    local attrs = body.data[1].attributes
-    local out = {}
-    local seen = {}
-    local keep_langs = {en = true, ja = true, ["ja-ro"] = true, ko = true, ["ko-ro"] = true}
-    if attrs.altTitles then
-        for _, alt in ipairs(attrs.altTitles) do
-            for lang, val in pairs(alt) do
-                if keep_langs[lang] and val and not seen[val] then
-                    seen[val] = true
-                    out[#out + 1] = val
-                end
-            end
-        end
-    end
-    return json.encode({source = "MangaDex", titles = out})
-end
-
-function getAltTitles_mangaupdates(title)
-    local record = mangaupdates_search(title)
-    if not record then
-        return json.encode({source = "MangaUpdates", titles = {}})
-    end
-    local detail = mangaupdates_detail(record.series_id)
-    if not detail or not detail.associated then
-        return json.encode({source = "MangaUpdates", titles = {}})
-    end
-    local out = {}
-    local seen = {}
-    for _, item in ipairs(detail.associated) do
-        if item.title and item.title ~= "" and not seen[item.title] then
-            seen[item.title] = true
-            out[#out + 1] = item.title
-        end
-    end
-    return json.encode({source = "MangaUpdates", titles = out})
-end
-
--- ─── ABI: getAltSummary(arg) ───────────────────────────────────────────────
--- getAltSummary(arg): {"title":..., "server":...} -> {source, summaries}
-function getAltSummary(arg)
-    local input = json.decode(arg)
-    local title = input.title or ""
-    local server = input.server or "mangaupdates"
-
-    if server == "mangaupdates" then
-        return getAltSummary_mangaupdates(title)
-    end
-    -- No other summary provider known; return empty.
-    return json.encode({source = server, summaries = {}})
-end
-
-function getAltSummary_mangaupdates(title)
-    local record = mangaupdates_search(title)
-    if not record then
-        return json.encode({source = "MangaUpdates", summaries = {}})
-    end
-    -- The search response already includes the description in the record.
-    local desc = record.description or ""
-    if desc == "" then
-        -- Fallback: fetch full detail.
-        local detail = mangaupdates_detail(record.series_id)
-        if detail then desc = detail.description or "" end
-    end
-    if desc == "" then
-        return json.encode({source = "MangaUpdates", summaries = {}})
-    end
-    return json.encode({source = "MangaUpdates", summaries = {desc}})
 end
