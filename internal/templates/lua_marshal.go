@@ -96,10 +96,11 @@ func marshalMapToLua(S *lua.State, m map[string]any) lua.Value {
 }
 
 // marshalStructToLua converts a struct to a Lua table via exported fields.
+// Embedded (anonymous) struct fields are flattened into the parent table.
 func marshalStructToLua(S *lua.State, rv reflect.Value) lua.Value {
 	rt := rv.Type()
 	n := rv.NumField()
-	t, err := S.NewTableWithCapacity(0, n)
+	t, err := S.NewTableWithCapacity(0, n*2)
 	if err != nil {
 		return lua.Nil()
 	}
@@ -108,7 +109,32 @@ func marshalStructToLua(S *lua.State, rv reflect.Value) lua.Value {
 		if !field.IsExported() {
 			continue
 		}
-		if err := t.RawSetString(field.Name, marshalGoToLua(S, rv.Field(i).Interface())); err != nil {
+		fv := rv.Field(i)
+		// Flatten embedded (anonymous) structs so their fields appear at the parent level.
+		if field.Anonymous {
+			if fv.Kind() == reflect.Ptr {
+				if fv.IsNil() {
+					continue
+				}
+				fv = fv.Elem()
+			}
+			if fv.Kind() == reflect.Struct {
+				inner := marshalStructToLua(S, fv)
+				if tbl, ok := inner.AsTable(); ok {
+					var after = lua.Nil()
+					for {
+						k, v, found, _ := tbl.Next(after)
+						if !found {
+							break
+						}
+						_ = t.RawSet(k, v)
+						after = k
+					}
+				}
+				continue
+			}
+		}
+		if err := t.RawSetString(field.Name, marshalGoToLua(S, fv.Interface())); err != nil {
 			return lua.Nil()
 		}
 	}

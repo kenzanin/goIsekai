@@ -16,3 +16,7 @@ linters:
         linters:
           - govet
         text: "should be inlined"
+      # SVG files parsed as Go produce false positives
+      - path: '\.svg$'
+        linters:
+          - staticcheck
