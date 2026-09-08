@@ -8,6 +8,7 @@
 // Image CDN (e.g. img-r1.2xstorage.com) returns 403 without a Referer, so
 // page objects carry Headers={"Referer":"https://mangafire.to/"}; the host
 // /image endpoint forwards that Referer upstream.
+require("./enrich.js");
 
 var PLUGIN = {
     contract_version: 1,
@@ -16,7 +17,10 @@ var PLUGIN = {
     logo: "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ctext y='28' font-size='28'%3E\uD83D\uDD25%3C/text%3E%3C/svg%3E",
     thumb_ratio: 0.677,
     search_page_size: 50,
-    alt_title_servers: [{ id: "mangadex", name: "MangaDex" }],
+    alt_title_servers: [
+        { id: "mangadex", name: "MangaDex", kind: "titles" },
+        { id: "mangaupdates", name: "MangaUpdates", kind: "both" },
+    ],
 };
 
 var API_URL = "https://mangafire.to/api";
@@ -360,39 +364,4 @@ function getPageList(arg) {
     return JSON.stringify(pages);
 }
 
-// Optional enricher: resolve alternative titles via the MangaDex API.
-// Returns {source, titles} — the host uses `source` as the "via X" badge.
-function getAltTitles(arg) {
-    var input = JSON.parse(arg);
-    var title = input.title || "";
-    var qs2 = "title=" + encodeURIComponent(title) + "&limit=5&includes[]=manga";
-    var resp = httpGet("https://api.mangadex.org/manga?" + qs2);
-    if (!resp || resp.status < 200 || resp.status >= 300) {
-        return JSON.stringify({ source: "MangaDex", titles: [] });
-    }
-    var body;
-    try { body = JSON.parse(resp.body); } catch (e) {
-        return JSON.stringify({ source: "MangaDex", titles: [] });
-    }
-    var data = body && body.data;
-    if (!data || data.length === 0) {
-        return JSON.stringify({ source: "MangaDex", titles: [] });
-    }
-    var attrs = data[0].attributes;
-    var out = [], seen = {};
-    var keepLangs = { "en": true, "ja": true, "ja-ro": true, "ko": true, "ko-ro": true };
-    if (attrs && attrs.altTitles) {
-        for (var i = 0; i < attrs.altTitles.length; i++) {
-            var alt = attrs.altTitles[i];
-            var keys = Object.keys(alt);
-            for (var j = 0; j < keys.length; j++) {
-                var lang = keys[j];
-                if (keepLangs[lang] && alt[lang] && !seen[alt[lang]]) {
-                    seen[alt[lang]] = true;
-                    out.push(alt[lang]);
-                }
-            }
-        }
-    }
-    return JSON.stringify({ source: "MangaDex", titles: out });
-}
+// Optional enricher: resolve alternative titles/summaries via external APIs.

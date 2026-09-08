@@ -1,6 +1,7 @@
 // 1Manga (MangaHub) JS plugin for goIsekai
 // Uses MangaHub GraphQL API at api.mghcdn.com.
 // Source ID: mn03 — requires mhub_access cookie for authentication.
+require("./enrich.js");
 
 var PLUGIN = {
     contract_version: 1,
@@ -11,7 +12,10 @@ var PLUGIN = {
     needs_human_verify: false,
     thumb_ratio: 0.703,
     search_page_size: 30,
-    alt_title_servers: [{id: "mangadex", name: "MangaDex"}],
+    alt_title_servers: [
+        { id: "mangadex", name: "MangaDex", kind: "titles" },
+        { id: "mangaupdates", name: "MangaUpdates", kind: "both" },
+    ],
 };
 
 var GRAPHQL_URL = "https://api.mghcdn.com/graphql";
@@ -298,40 +302,3 @@ function getPageList(arg) {
     return JSON.stringify(pages);
 }
 
-// Optional enricher export: resolve alternative titles via MangaDex.
-function getAltTitles(arg) {
-    var input = JSON.parse(arg);
-    var title = input.title || "";
-    var qs = "title=" + encodeURIComponent(title) + "&limit=5&includes[]=manga";
-    var resp = http_request(JSON.stringify({ method: "GET", url: "https://api.mangadex.org/manga?" + qs, headers: {} }));
-    resp = typeof resp === "string" ? JSON.parse(resp) : resp;
-    if (!resp || resp.status < 200 || resp.status >= 300) {
-        return JSON.stringify({ source: "MangaDex", titles: [] });
-    }
-    var body;
-    try {
-        body = JSON.parse(resp.body);
-    } catch (e) {
-        return JSON.stringify({ source: "MangaDex", titles: [] });
-    }
-    var data = body && body.data;
-    if (!data || data.length === 0) {
-        return JSON.stringify({ source: "MangaDex", titles: [] });
-    }
-    var attrs = data[0].attributes;
-    var out = [];
-    var seen = {};
-    var keepLangs = { "en": true, "ja": true, "ja-ro": true, "ko": true, "ko-ro": true };
-    for (var i = 0; i < (attrs.altTitles || []).length; i++) {
-        var alt = attrs.altTitles[i];
-        var keys = Object.keys(alt);
-        for (var j = 0; j < keys.length; j++) {
-            var lang = keys[j];
-            if (keepLangs[lang] && alt[lang] && !seen[alt[lang]]) {
-                seen[alt[lang]] = true;
-                out.push(alt[lang]);
-            }
-        }
-    }
-    return JSON.stringify({ source: "MangaDex", titles: out });
-}
