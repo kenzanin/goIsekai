@@ -177,8 +177,14 @@ func (e *LuaEngine) render(w io.Writer, name string, data map[string]any, partia
 		return fmt.Errorf("view %s did not return a string: %w", name, err)
 	}
 
-	// Wrap body with the base layout.
+	// Wrap body with the layout. Views can override via _layout data key
+	// (e.g. reader sets "_layout": "blank" for no-nav fullscreen).
 	layoutName := "layouts/base"
+	if ln, ok := data["_layout"]; ok {
+		if s, ok := ln.(string); ok && s != "" {
+			layoutName = "layouts/" + s
+		}
+	}
 	var layoutProto *lua.Prototype
 	if e.devMode {
 		src, rerr := fs.ReadFile(e.templatesFS, layoutName+".lua")

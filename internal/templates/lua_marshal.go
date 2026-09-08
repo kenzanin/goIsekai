@@ -66,6 +66,32 @@ func marshalGoToLua(S *lua.State, v any) lua.Value {
 			return marshalReflectSliceToLua(S, rv)
 		case reflect.Struct:
 			return marshalStructToLua(S, rv)
+		case reflect.Map:
+			// Typed maps (e.g. map[string]float64, map[string]ChapterProgress)
+			// must reach Lua as tables — falling through to fmt.Sprint would
+			// yield a useless string and silently blank every field the
+			// template reads from them.
+			if rv.IsNil() {
+				return lua.Nil()
+			}
+			t, merr := S.NewTableWithCapacity(0, rv.Len())
+			if merr != nil {
+				return lua.Nil()
+			}
+			iter := rv.MapRange()
+			for iter.Next() {
+				k := iter.Key()
+				var ks string
+				if k.Kind() == reflect.String {
+					ks = k.String()
+				} else {
+					ks = fmt.Sprint(k.Interface())
+				}
+				if err := t.RawSetString(ks, marshalGoToLua(S, iter.Value().Interface())); err != nil {
+					return lua.Nil()
+				}
+			}
+			return t.Value()
 		}
 		return lua.String(fmt.Sprint(val))
 	}

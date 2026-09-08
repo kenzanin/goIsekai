@@ -1,5 +1,7 @@
 package database
 
+import "fmt"
+
 // AltDescriptionRow is one stored alternative description for a manga.
 type AltDescriptionRow struct {
 	Description string
@@ -29,6 +31,45 @@ func (d *DB) AddAltDescriptions(mangaRowID string, descriptions []string, source
 func (d *DB) RemoveAltDescription(mangaRowID, description string) error {
 	_, err := d.db.Exec(`DELETE FROM alt_descriptions WHERE manga_row_id = ? AND description = ?`, mangaRowID, description)
 	return err
+}
+
+// SwapMainDescription promotes newDesc to be the manga's main description.
+// The old description is demoted into alt_descriptions (source 'plugin'),
+// any alt_descriptions row equal to newDesc is dropped, and the manga's
+// custom_description flag is set so UpsertManga will not overwrite it. All
+// changes are atomic.
+func (d *DB) SwapMainDescription(pluginID, sourceMangaID, newDesc string) error {
+	tx, err := d.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	var rowID string
+	var oldDesc string
+	if err := tx.QueryRow(`SELECT id, description FROM mangas WHERE plugin_id = ? AND source_manga_id = ?`, pluginID, sourceMangaID).Scan(&rowID, &oldDesc); err != nil {
+		return fmt.Errorf("resolve manga: %w", err)
+	}
+	if oldDesc == newDesc {
+		return tx.Commit()
+	}
+
+	// Remove the chosen description from alt_descriptions (it becomes the main).
+	if _, err := tx.Exec(`DELETE FROM alt_descriptions WHERE manga_row_id = ? AND description = ?`, rowID, newDesc); err != nil {
+		return err
+	}
+	// Demote the old main description into alt_descriptions (if non-empty and
+	// not already present).
+	if oldDesc != "" {
+		if _, err := tx.Exec(`INSERT OR IGNORE INTO alt_descriptions (manga_row_id, description, source) VALUES (?, ?, ?)`, rowID, oldDesc, pluginID); err != nil {
+			return err
+		}
+	}
+	// Set the new main description and lock it from plugin overwrites.
+	if _, err := tx.Exec(`UPDATE mangas SET description = ?, custom_description = 1 WHERE id = ?`, newDesc, rowID); err != nil {
+		return err
+	}
+	return tx.Commit()
 }
 
 // ListAltDescriptions returns a manga's alternative descriptions ordered by description.

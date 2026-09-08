@@ -68,6 +68,7 @@ func (s *Server) viewReader(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	s.renderPage(w, r, "views/reader", "library", map[string]any{
+		"_layout":        "blank",
 		"PluginID":       pluginID,
 		"MangaID":        mangaID,
 		"Manga":          manga,

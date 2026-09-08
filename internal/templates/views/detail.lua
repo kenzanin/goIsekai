@@ -148,6 +148,10 @@ return function(data)
             if a.Source and a.Source ~= "" then
                 emit('                    <span class="text-[10px] px-1.5 py-0.5 rounded-full bg-neutral-700/50 text-neutral-400">via ' .. h(a.Source) .. '</span>')
             end
+            emit('                    <form method="post" action="/action/set-summary/' .. h(pluginID) .. '/' .. h(mangaID) .. '" class="inline-flex">')
+            emit('                        <input type="hidden" name="description" value="' .. h(a.Description or "") .. '">')
+            emit('                        <button type="submit" title="Use as main summary" class="text-[10px] px-1.5 py-0.5 rounded bg-indigo-900/40 text-indigo-300 hover:bg-indigo-800/50" data-confirm="Use this as the main summary?">Use</button>')
+            emit('                    </form>')
             emit('                    <form method="post" action="/action/remove-alt-summary/' .. h(pluginID) .. '/' .. h(mangaID) .. '" class="inline-flex">')
             emit('                        <input type="hidden" name="description" value="' .. h(a.Description or "") .. '">')
             emit('                        <button type="submit" title="Remove alternative summary" aria-label="Remove" class="size-4 inline-flex items-center justify-center rounded-full text-neutral-500 hover:text-red-400 hover:bg-neutral-700" data-confirm="Remove this alternative summary?">&times;</button>')

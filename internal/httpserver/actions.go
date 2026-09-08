@@ -24,6 +24,7 @@ func (s *Server) registerActionRoutes() {
 	s.Router.Post("/action/remove-alt-title/{pluginID}/{mangaID}", s.handleRemoveAltTitle)
 	s.Router.Post("/action/fetch-alt-summaries/{pluginID}/{mangaID}", s.handleFetchAltSummaries)
 	s.Router.Post("/action/remove-alt-summary/{pluginID}/{mangaID}", s.handleRemoveAltSummary)
+	s.Router.Post("/action/set-summary/{pluginID}/{mangaID}", s.handleSetSummary)
 	s.Router.Post("/action/set-chapter-progress", s.handleSetChapterProgress)
 	s.Router.Post("/action/mark-read/{pluginID}/{mangaID}/{chapterID}", s.handleMarkChapterRead)
 	s.Router.Post("/action/mark-read-bulk", s.handleMarkChaptersReadBulk)
@@ -346,6 +347,25 @@ func (s *Server) handleRemoveAltSummary(w http.ResponseWriter, r *http.Request) 
 	description := r.FormValue("description")
 	if err := s.service.RemoveAltSummary(pluginID, mangaID, description); err != nil {
 		s.logger.Error("remove alt summary", "pluginID", pluginID, "mangaID", mangaID, "description", description, "error", err)
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	s.hxRedirect(w, "/view/manga/"+pluginID+"/"+mangaID)
+}
+
+// handleSetSummary promotes the submitted alternative description to be
+// the manga's main description.
+func (s *Server) handleSetSummary(w http.ResponseWriter, r *http.Request) {
+	pluginID := param(r, "pluginID")
+	mangaID := param(r, "mangaID")
+	if err := r.ParseForm(); err != nil {
+		s.logger.Error("set summary: parse form", "error", err)
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	description := r.FormValue("description")
+	if err := s.service.SetMainSummary(pluginID, mangaID, description); err != nil {
+		s.logger.Error("set summary", "pluginID", pluginID, "mangaID", mangaID, "error", err)
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}

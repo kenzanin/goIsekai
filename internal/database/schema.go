@@ -86,4 +86,6 @@ var migrations = []string{
     source TEXT NOT NULL,
     UNIQUE(manga_row_id, description)
 );`,
+	// Index 14: user-chosen main summary lock — UpsertManga must not overwrite it.
+	`ALTER TABLE mangas ADD COLUMN custom_description INTEGER NOT NULL DEFAULT 0;`,
 }

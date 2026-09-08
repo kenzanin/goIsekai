@@ -41,7 +41,7 @@ func (d *DB) UpsertManga(m Manga) error {
 		SET(
 			Mangas.Title.SET(RawString("CASE WHEN mangas.custom_title = 1 THEN mangas.title ELSE excluded.title END")),
 			Mangas.CoverURL.SET(Mangas.EXCLUDED.CoverURL),
-			Mangas.Description.SET(Mangas.EXCLUDED.Description),
+			Mangas.Description.SET(RawString("CASE WHEN mangas.custom_description = 1 THEN mangas.description ELSE excluded.description END")),
 			Mangas.Status.SET(Mangas.EXCLUDED.Status),
 			Mangas.UpdatedAt.SET(RawTimestamp("CURRENT_TIMESTAMP")),
 		),
