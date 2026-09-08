@@ -90,6 +90,48 @@ func (s *AppService) RemoveAltTitle(pluginID, mangaID, title string) error {
 	return nil
 }
 
+// FetchAltSummaries resolves alternative summaries for a manga from the given
+// provider server and merges them into the database (deduplicating by
+// description), then returns the full stored list. Unlike FetchAltTitles there
+// is no FTS sync — descriptions are not in library_fts.
+func (s *AppService) FetchAltSummaries(pluginID, mangaID, server string) ([]database.AltDescriptionRow, error) {
+	rowID, err := s.db.MangaRowID(pluginID, mangaID)
+	if err != nil {
+		return nil, fmt.Errorf("bridge: resolve manga: %w", err)
+	}
+	title, err := s.db.MangaTitle(pluginID, mangaID)
+	if err != nil {
+		return nil, fmt.Errorf("bridge: resolve title: %w", err)
+	}
+	res, err := s.mgr.GetAltSummaries(title, server)
+	if err != nil {
+		return nil, fmt.Errorf("bridge: fetch alt summaries: %w", err)
+	}
+	if _, err := s.db.AddAltDescriptions(rowID, res.Summaries, res.Source); err != nil {
+		return nil, fmt.Errorf("bridge: persist alt summaries: %w", err)
+	}
+	return s.db.ListAltDescriptions(rowID)
+}
+
+// ListAltSummaries returns the stored alternative summaries for a manga by its
+// plugin and source identifiers.
+func (s *AppService) ListAltSummaries(pluginID, mangaID string) ([]database.AltDescriptionRow, error) {
+	rowID, err := s.db.MangaRowID(pluginID, mangaID)
+	if err != nil {
+		return nil, fmt.Errorf("bridge: resolve manga: %w", err)
+	}
+	return s.db.ListAltDescriptions(rowID)
+}
+
+// RemoveAltSummary deletes a single alternative description from the manga.
+func (s *AppService) RemoveAltSummary(pluginID, mangaID, description string) error {
+	rowID, err := s.db.MangaRowID(pluginID, mangaID)
+	if err != nil {
+		return fmt.Errorf("bridge: resolve manga: %w", err)
+	}
+	return s.db.RemoveAltDescription(rowID, description)
+}
+
 // SearchLibrary runs an FTS-backed fuzzy search across the user's library,
 // scoring candidates by match quality and returning the top 50.
 func (s *AppService) SearchLibrary(q string) ([]SearchHit, error) {

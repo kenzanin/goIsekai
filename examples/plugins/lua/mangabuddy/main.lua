@@ -23,7 +23,10 @@ PLUGIN = {
     needs_human_verify = false,
     thumb_ratio = 0.667,
     search_page_size = 24,
-    alt_title_servers = {{id = "mangadex", name = "MangaDex"}}
+    alt_title_servers = {
+        {id = "mangadex", name = "MangaDex", kind = "titles"},
+        {id = "mangaupdates", name = "MangaUpdates", kind = "both"}
+    },
 }
 
 BASE = "https://mangabuddy1.co.uk"
@@ -254,12 +257,62 @@ function get_page_list(arg)
     return json.encode(pages)
 end
 
+-- fetch_mangaupdates searches MangaUpdates by title and returns the best-match
+-- series_id (or nil). search_result is the decoded JSON search response body.
+local function mangaupdates_search(title)
+    local body = json.encode({search = title, stype = "title", perpage = 5})
+    local resp = http_request({
+        url = "https://api.mangaupdates.com/v1/series/search",
+        method = "POST",
+        headers = {
+            ["Content-Type"] = "application/json",
+            ["Accept"] = "application/json"
+        },
+        body = body
+    })
+    if not resp or resp.status ~= 200 then
+        log.error("mangaupdates search http " .. tostring(resp and resp.status or "nil"))
+        return nil
+    end
+    local ok, data = pcall(json.decode, resp.body)
+    if not ok or not data or not data.results or #data.results == 0 then
+        return nil
+    end
+    -- best match = first result (API sorts by relevance)
+    return data.results[1].record
+end
+
+local function mangaupdates_detail(series_id)
+    local resp = http_request({
+        url = "https://api.mangaupdates.com/v1/series/" .. tostring(series_id),
+        method = "GET",
+        headers = {["Accept"] = "application/json"}
+    })
+    if not resp or resp.status ~= 200 then
+        log.error("mangaupdates detail http " .. tostring(resp and resp.status or "nil"))
+        return nil
+    end
+    local ok, data = pcall(json.decode, resp.body)
+    if not ok or not data then return nil end
+    return data
+end
+
 -- ─── ABI: getAltTitles(arg) ────────────────────────────────────────────────
 -- Each plugin carries its own alt-title source (MangaDex API) so no plugin
 -- depends on another. arg: {"title":"...","server":"..."} -> {source, titles}
 function getAltTitles(arg)
     local input = json.decode(arg)
     local title = input.title or ""
+    local server = input.server or "mangadex"
+
+    if server == "mangaupdates" then
+        return getAltTitles_mangaupdates(title)
+    end
+    -- default: MangaDex
+    return getAltTitles_mangadex(title)
+end
+
+function getAltTitles_mangadex(title)
     local url = "https://api.mangadex.org/manga?title=" .. url_encode(title) ..
         "&limit=5&includes[]=manga"
     local resp = http_request({url = url, method = "GET", headers = {}})
@@ -285,4 +338,56 @@ function getAltTitles(arg)
         end
     end
     return json.encode({source = "MangaDex", titles = out})
+end
+
+function getAltTitles_mangaupdates(title)
+    local record = mangaupdates_search(title)
+    if not record then
+        return json.encode({source = "MangaUpdates", titles = {}})
+    end
+    local detail = mangaupdates_detail(record.series_id)
+    if not detail or not detail.associated then
+        return json.encode({source = "MangaUpdates", titles = {}})
+    end
+    local out = {}
+    local seen = {}
+    for _, item in ipairs(detail.associated) do
+        if item.title and item.title ~= "" and not seen[item.title] then
+            seen[item.title] = true
+            out[#out + 1] = item.title
+        end
+    end
+    return json.encode({source = "MangaUpdates", titles = out})
+end
+
+-- ─── ABI: getAltSummary(arg) ───────────────────────────────────────────────
+-- getAltSummary(arg): {"title":..., "server":...} -> {source, summaries}
+function getAltSummary(arg)
+    local input = json.decode(arg)
+    local title = input.title or ""
+    local server = input.server or "mangaupdates"
+
+    if server == "mangaupdates" then
+        return getAltSummary_mangaupdates(title)
+    end
+    -- No other summary provider known; return empty.
+    return json.encode({source = server, summaries = {}})
+end
+
+function getAltSummary_mangaupdates(title)
+    local record = mangaupdates_search(title)
+    if not record then
+        return json.encode({source = "MangaUpdates", summaries = {}})
+    end
+    -- The search response already includes the description in the record.
+    local desc = record.description or ""
+    if desc == "" then
+        -- Fallback: fetch full detail.
+        local detail = mangaupdates_detail(record.series_id)
+        if detail then desc = detail.description or "" end
+    end
+    if desc == "" then
+        return json.encode({source = "MangaUpdates", summaries = {}})
+    end
+    return json.encode({source = "MangaUpdates", summaries = {desc}})
 end

@@ -77,4 +77,13 @@ var migrations = []string{
     fetched_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY(chapter_id) REFERENCES chapters(id) ON DELETE CASCADE
 );`,
+	// Index 13: alternative descriptions (mirror of alt_titles). Origin
+	// summary lives in mangas.description and is never stored here.
+	`CREATE TABLE IF NOT EXISTS alt_descriptions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    manga_row_id TEXT NOT NULL REFERENCES mangas(id) ON DELETE CASCADE,
+    description TEXT NOT NULL,
+    source TEXT NOT NULL,
+    UNIQUE(manga_row_id, description)
+);`,
 }

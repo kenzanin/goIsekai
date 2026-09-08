@@ -26,6 +26,7 @@ var luaFnNames = map[string]string{
 	types.GetChapterListFunc: "get_chapter_list",
 	types.GetPageListFunc:    "get_page_list",
 	types.GetAltTitlesFunc:   "getAltTitles",
+	types.GetAltSummaryFunc:  "getAltSummary",
 }
 
 // loadLua creates a sandboxed Lunar 5.4 VM, loads <dir>/main.lua, reads the
@@ -289,7 +290,7 @@ func (m *Manager) loadLua(id, dir string) (*loadedPlugin, error) {
 	// Verify all ABI globals are functions (snake_case Lua names).
 	// GetAltTitles is OPTIONAL (enricher capability) — mirror js.go.
 	for abi, name := range luaFnNames {
-		if abi == types.GetAltTitlesFunc {
+		if abi == types.GetAltTitlesFunc || abi == types.GetAltSummaryFunc {
 			continue
 		}
 		fn, err := state.RawGlobal(name)

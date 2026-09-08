@@ -20,6 +20,8 @@ return function(data)
     local altTitles = data.AltTitles or {}
     local currentTitle = data.CurrentTitle or manga.Title or ""
     local altTitleServers = data.AltTitleServers or {}
+    local altSummaries = data.AltSummaries or {}
+    local altSummaryServers = data.AltSummaryServers or {}
     local chapters = data.Chapters or {}
     local progress = data.Progress or {}
     local continuePoint = data.Continue
@@ -77,11 +79,6 @@ return function(data)
         emit('        <p class="text-sm text-neutral-400 mb-2">' .. h(manga.Author) .. '</p>')
     end
 
-    -- Description
-    if manga.Description and manga.Description ~= "" then
-        emit('        <p class="text-sm text-neutral-400 mb-4">' .. h(manga.Description) .. '</p>')
-    end
-
     -- Alternative titles
     emit('        <div class="mb-4">')
     emit('            <div class="flex items-center gap-2 mb-1.5">')
@@ -127,6 +124,54 @@ return function(data)
         emit('            </form>')
     else
         emit('            <p class="text-xs text-neutral-500">No alt-title providers available — install a plugin that declares alt-title servers.</p>')
+    end
+    emit('        </div>')
+
+    -- Origin summary (from the source plugin — never deletable)
+    if manga.Description and manga.Description ~= "" then
+        emit('        <div class="mb-4 border-t border-neutral-800 pt-4">')
+        emit('            <span class="text-xs font-semibold text-neutral-300 uppercase tracking-wide">Summary</span>')
+        emit('            <p class="text-sm text-neutral-400 mt-1.5">' .. h(manga.Description) .. '</p>')
+        emit('        </div>')
+    end
+
+    -- Alternative summaries (mirror of alternative titles; origin summary lives in mangas.description)
+    emit('        <div class="mb-4 border-t border-neutral-800 pt-4">')
+    emit('            <div class="flex items-center gap-2 mb-1.5">')
+    emit('                <span class="text-xs font-semibold text-neutral-300 uppercase tracking-wide">Alternative summaries</span>')
+    emit('            </div>')
+    if #altSummaries > 0 then
+        for _, a in ipairs(altSummaries) do
+            emit('            <div class="flex items-start justify-between gap-2 py-1">')
+            emit('                <div class="text-sm text-neutral-400 flex-1 min-w-0">' .. h(a.Description or "") .. '</div>')
+            emit('                <div class="flex items-center gap-1.5 shrink-0">')
+            if a.Source and a.Source ~= "" then
+                emit('                    <span class="text-[10px] px-1.5 py-0.5 rounded-full bg-neutral-700/50 text-neutral-400">via ' .. h(a.Source) .. '</span>')
+            end
+            emit('                    <form method="post" action="/action/remove-alt-summary/' .. h(pluginID) .. '/' .. h(mangaID) .. '" class="inline-flex">')
+            emit('                        <input type="hidden" name="description" value="' .. h(a.Description or "") .. '">')
+            emit('                        <button type="submit" title="Remove alternative summary" aria-label="Remove" class="size-4 inline-flex items-center justify-center rounded-full text-neutral-500 hover:text-red-400 hover:bg-neutral-700" data-confirm="Remove this alternative summary?">&times;</button>')
+            emit('                    </form>')
+            emit('                </div>')
+            emit('            </div>')
+        end
+    end
+
+    -- Fetch alt-summaries form
+    if #altSummaryServers > 0 then
+        emit('            <form method="post" action="/action/fetch-alt-summaries/' .. h(pluginID) .. '/' .. h(mangaID) .. '" class="flex flex-wrap items-center gap-2 mt-1">')
+        emit('                <select name="server" class="bg-neutral-900 border border-neutral-700 rounded-md px-2 py-1.5 text-xs text-neutral-300 focus:outline-none focus:border-indigo-500">')
+        for _, s in ipairs(altSummaryServers) do
+            emit('                    <option value="' .. h(s.ServerID or "") .. '">' .. h(s.Name or "") .. '</option>')
+        end
+        emit('                </select>')
+        emit('                <button type="submit" class="border border-neutral-700 hover:bg-neutral-800 rounded-md px-3 py-1.5 text-xs font-medium inline-flex items-center gap-1.5">')
+        emit('                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="size-3.5"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>')
+        emit('                    Get alternative summaries')
+        emit('                </button>')
+        emit('            </form>')
+    else
+        emit('            <p class="text-xs text-neutral-500">No alt-summary providers available — install a plugin that declares alt-summary servers.</p>')
     end
     emit('        </div>')
 

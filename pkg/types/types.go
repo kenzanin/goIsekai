@@ -47,9 +47,12 @@ type SearchFilter struct {
 }
 
 // AltTitleServer describes a single lookup server offered by a plugin.
+// Kind controls what the server can resolve: empty or "titles" (default)
+// means titles only; "summaries" means summaries only; "both" means both.
 type AltTitleServer struct {
 	ID   string `json:"id"`
 	Name string `json:"name"`
+	Kind string `json:"kind,omitempty"`
 }
 
 // AltTitlesResult is what a GetAltTitles provider returns: the provider's own
@@ -58,6 +61,13 @@ type AltTitleServer struct {
 type AltTitlesResult struct {
 	Source string   `json:"source"`
 	Titles []string `json:"titles"`
+}
+
+// AltSummaryResult is what a GetAltSummary provider returns: the provider's
+// own display name plus alternative summary/description texts.
+type AltSummaryResult struct {
+	Source    string   `json:"source"`
+	Summaries []string `json:"summaries"`
 }
 
 // PluginMeta is the metadata a plugin optionally declares in its Init response.

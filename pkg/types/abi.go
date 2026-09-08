@@ -29,6 +29,14 @@ const (
 	// Plugins declaring it act as alt-title providers (e.g. MangaDex, MAL,
 	// or even an AI backend) — the host never hardcodes a provider.
 	GetAltTitlesFunc = "GetAltTitles"
+	// GetAltSummaryFunc is an OPTIONAL enrichment export. When present, the
+	// plugin can resolve alternative summaries/descriptions for a manga title
+	// via one of its declared alt-title servers that are summary-capable.
+	// Input: JSON {"title":string,"server":string}.
+	// Output: JSON {"source":string,"summaries":[]string}.
+	// Plugins may omit this export entirely; only servers with kind
+	// "summaries" or "both" require it.
+	GetAltSummaryFunc = "GetAltSummary"
 )
 
 // HostHTTPRequestFunc is the host-imported function available to plugins for

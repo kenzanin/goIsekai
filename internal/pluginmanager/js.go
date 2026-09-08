@@ -22,6 +22,7 @@ var jsFnNames = map[string]string{
 	types.GetChapterListFunc: "getChapterList",
 	types.GetPageListFunc:    "getPageList",
 	types.GetAltTitlesFunc:   "getAltTitles",
+	types.GetAltSummaryFunc:  "getAltSummary",
 }
 
 // loadJS creates a sandboxed JavaScript VM via goja, loads <dir>/main.js,
@@ -141,7 +142,7 @@ func (m *Manager) loadJS(id, dir string) (*loadedPlugin, error) {
 	// Verify that all required ABI functions exist. GetAltTitles is OPTIONAL
 	// (enricher capability) — its absence is not an error.
 	for abi, jsName := range jsFnNames {
-		if abi == types.GetAltTitlesFunc {
+		if abi == types.GetAltTitlesFunc || abi == types.GetAltSummaryFunc {
 			continue
 		}
 		val := vm.Get(jsName)

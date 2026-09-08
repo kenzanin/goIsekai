@@ -22,6 +22,8 @@ func (s *Server) registerActionRoutes() {
 	s.Router.Post("/action/fetch-alt-titles/{pluginID}/{mangaID}", s.handleFetchAltTitles)
 	s.Router.Post("/action/set-title/{pluginID}/{mangaID}", s.handleSetTitle)
 	s.Router.Post("/action/remove-alt-title/{pluginID}/{mangaID}", s.handleRemoveAltTitle)
+	s.Router.Post("/action/fetch-alt-summaries/{pluginID}/{mangaID}", s.handleFetchAltSummaries)
+	s.Router.Post("/action/remove-alt-summary/{pluginID}/{mangaID}", s.handleRemoveAltSummary)
 	s.Router.Post("/action/set-chapter-progress", s.handleSetChapterProgress)
 	s.Router.Post("/action/mark-read/{pluginID}/{mangaID}/{chapterID}", s.handleMarkChapterRead)
 	s.Router.Post("/action/mark-read-bulk", s.handleMarkChaptersReadBulk)
@@ -307,6 +309,43 @@ func (s *Server) handleRemoveAltTitle(w http.ResponseWriter, r *http.Request) {
 	title := r.FormValue("title")
 	if err := s.service.RemoveAltTitle(pluginID, mangaID, title); err != nil {
 		s.logger.Error("remove alt title", "pluginID", pluginID, "mangaID", mangaID, "title", title, "error", err)
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	s.hxRedirect(w, "/view/manga/"+pluginID+"/"+mangaID)
+}
+
+// handleFetchAltSummaries resolves alternative summaries via the provider
+// plugin and redirects back to the manga detail page.
+func (s *Server) handleFetchAltSummaries(w http.ResponseWriter, r *http.Request) {
+	pluginID := param(r, "pluginID")
+	mangaID := param(r, "mangaID")
+	if err := r.ParseForm(); err != nil {
+		s.logger.Error("fetch alt summaries: parse form", "error", err)
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	server := r.FormValue("server")
+	if _, err := s.service.FetchAltSummaries(pluginID, mangaID, server); err != nil {
+		s.logger.Error("fetch alt summaries", "pluginID", pluginID, "mangaID", mangaID, "server", server, "error", err)
+		http.Error(w, err.Error(), http.StatusBadGateway)
+		return
+	}
+	s.hxRedirect(w, "/view/manga/"+pluginID+"/"+mangaID)
+}
+
+// handleRemoveAltSummary removes the submitted alternative description.
+func (s *Server) handleRemoveAltSummary(w http.ResponseWriter, r *http.Request) {
+	pluginID := param(r, "pluginID")
+	mangaID := param(r, "mangaID")
+	if err := r.ParseForm(); err != nil {
+		s.logger.Error("remove alt summary: parse form", "error", err)
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	description := r.FormValue("description")
+	if err := s.service.RemoveAltSummary(pluginID, mangaID, description); err != nil {
+		s.logger.Error("remove alt summary", "pluginID", pluginID, "mangaID", mangaID, "description", description, "error", err)
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}

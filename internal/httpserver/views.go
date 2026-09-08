@@ -342,11 +342,22 @@ func (s *Server) viewMangaDetail(w http.ResponseWriter, r *http.Request) {
 		s.logger.Warn("alt titles", "error", altErr, "manga", mangaID)
 		altTitles = nil
 	}
+	altSummaries, altSumErr := s.service.ListAltSummaries(pluginID, mangaID)
+	if altSumErr != nil {
+		s.logger.Warn("alt summaries", "error", altSumErr, "manga", mangaID)
+		altSummaries = nil
+	}
 	allServers := s.service.AltTitleServers()
 	var altTitleServers []pluginmanager.AltTitleServerEntry
+	var altSummaryServers []pluginmanager.AltTitleServerEntry
 	for _, srv := range allServers {
 		if srv.ProviderPluginID == pluginID {
-			altTitleServers = append(altTitleServers, srv)
+			if srv.Kind == "" || srv.Kind == "titles" || srv.Kind == "both" {
+				altTitleServers = append(altTitleServers, srv)
+			}
+			if srv.Kind == "summaries" || srv.Kind == "both" {
+				altSummaryServers = append(altSummaryServers, srv)
+			}
 		}
 	}
 	// Host-side chapter pagination: slice the full chapter list (newest-first)
@@ -360,23 +371,25 @@ func (s *Server) viewMangaDetail(w http.ResponseWriter, r *http.Request) {
 	chStart := min((chPage-1)*chapterPageSize, chTotal)
 	chEnd := min(chStart+chapterPageSize, chTotal)
 	s.renderPage(w, r, "views/detail", "search", map[string]any{
-		"PluginID":        pluginID,
-		"PluginName":      pluginName,
-		"PluginIcon":      pluginIcon,
-		"MangaID":         mangaID,
-		"Manga":           manga,
-		"AltTitles":       altTitles,
-		"CurrentTitle":    manga.Title,
-		"AltTitleServers": altTitleServers,
-		"Chapters":        chapters[chStart:chEnd],
-		"Progress":        progress,
-		"Continue":        continueTo,
-		"InLibrary":       inLibrary,
-		"Challenge":       challenge,
-		"ChCurrentPage":   chPage,
-		"ChTotalPages":    max((chTotal+chapterPageSize-1)/chapterPageSize, 1),
-		"ChHasNext":       chEnd < chTotal,
-		"ChHasPrev":       chPage > 1,
+		"PluginID":          pluginID,
+		"PluginName":        pluginName,
+		"PluginIcon":        pluginIcon,
+		"MangaID":           mangaID,
+		"Manga":             manga,
+		"AltTitles":         altTitles,
+		"AltSummaries":      altSummaries,
+		"CurrentTitle":      manga.Title,
+		"AltTitleServers":   altTitleServers,
+		"AltSummaryServers": altSummaryServers,
+		"Chapters":          chapters[chStart:chEnd],
+		"Progress":          progress,
+		"Continue":          continueTo,
+		"InLibrary":         inLibrary,
+		"Challenge":         challenge,
+		"ChCurrentPage":     chPage,
+		"ChTotalPages":      max((chTotal+chapterPageSize-1)/chapterPageSize, 1),
+		"ChHasNext":         chEnd < chTotal,
+		"ChHasPrev":         chPage > 1,
 	})
 }
 

@@ -139,6 +139,7 @@ type AltTitleServerEntry struct {
 	ProviderPluginID string
 	ServerID         string
 	Name             string
+	Kind             string
 }
 
 // AltTitleServers iterates all discovered plugins and returns every declared
@@ -169,6 +170,7 @@ func (m *Manager) AltTitleServers() []AltTitleServerEntry {
 				ProviderPluginID: id,
 				ServerID:         s.ID,
 				Name:             s.Name,
+				Kind:             s.Kind,
 			})
 		}
 	}
@@ -181,16 +183,28 @@ func (m *Manager) AltTitleServers() []AltTitleServerEntry {
 	return out
 }
 
+// titlesKind reports whether a server kind is titles-capable (empty,
+// "titles", or "both").
+func titlesKind(kind string) bool {
+	return kind == "" || kind == "titles" || kind == "both"
+}
+
+// summariesKind reports whether a server kind is summaries-capable
+// ("summaries" or "both").
+func summariesKind(kind string) bool {
+	return kind == "summaries" || kind == "both"
+}
+
 // GetAltTitles calls the provider plugin that advertises the given server to
 // resolve alternative titles. The input JSON sent to the plugin is
 // {"title":..., "server":...} per the ABI contract.
 func (m *Manager) GetAltTitles(title, server string) (types.AltTitlesResult, error) {
-	// Find the provider plugin for this server.
+	// Find the provider plugin for this server (must be titles-capable).
 	m.mu.RLock()
 	var providerID string
 	for id, p := range m.plugins {
 		for _, s := range p.meta.AltTitleServers {
-			if s.ID == server {
+			if s.ID == server && titlesKind(s.Kind) {
 				providerID = id
 				break
 			}
@@ -222,6 +236,54 @@ func (m *Manager) GetAltTitles(title, server string) (types.AltTitlesResult, err
 	var res types.AltTitlesResult
 	if err := json.Unmarshal([]byte(out), &res); err != nil {
 		return types.AltTitlesResult{}, fmt.Errorf("alt-titles decode: %w", err)
+	}
+	if res.Source == "" {
+		res.Source = providerID
+	}
+	return res, nil
+}
+
+// GetAltSummaries calls the provider plugin that advertises the given server
+// to resolve alternative summaries. The input JSON sent to the plugin is
+// {"title":..., "server":...} per the ABI contract.
+func (m *Manager) GetAltSummaries(title, server string) (types.AltSummaryResult, error) {
+	// Find the provider plugin for this server (must be summaries-capable).
+	m.mu.RLock()
+	var providerID string
+	for id, p := range m.plugins {
+		for _, s := range p.meta.AltTitleServers {
+			if s.ID == server && summariesKind(s.Kind) {
+				providerID = id
+				break
+			}
+		}
+		if providerID != "" {
+			break
+		}
+	}
+	m.mu.RUnlock()
+
+	if providerID == "" {
+		return types.AltSummaryResult{}, fmt.Errorf("server %q not found in any summaries provider", server)
+	}
+
+	p, err := m.get(providerID)
+	if err != nil {
+		return types.AltSummaryResult{}, err
+	}
+
+	input, err := json.Marshal(map[string]string{"title": title, "server": server})
+	if err != nil {
+		return types.AltSummaryResult{}, err
+	}
+	out, err := m.call(p, types.GetAltSummaryFunc, string(input))
+	if err != nil {
+		return types.AltSummaryResult{}, err
+	}
+
+	var res types.AltSummaryResult
+	if err := json.Unmarshal([]byte(out), &res); err != nil {
+		return types.AltSummaryResult{}, fmt.Errorf("alt-summaries decode: %w", err)
 	}
 	if res.Source == "" {
 		res.Source = providerID
