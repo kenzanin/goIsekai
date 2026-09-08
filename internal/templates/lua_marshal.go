@@ -3,6 +3,7 @@ package templates
 import (
 	"fmt"
 	"reflect"
+	"time"
 
 	lua "github.com/mmcdole/lunar"
 )
@@ -42,6 +43,11 @@ func marshalGoToLua(S *lua.State, v any) lua.Value {
 		return lua.Number(val)
 	case string:
 		return lua.String(val)
+	case time.Time:
+		if val.IsZero() {
+			return lua.String("")
+		}
+		return lua.String(val.UTC().Format(time.RFC3339))
 	case []any:
 		return marshalSliceToLua(S, val)
 	case map[string]any:
