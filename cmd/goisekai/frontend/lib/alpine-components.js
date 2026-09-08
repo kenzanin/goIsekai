@@ -368,7 +368,22 @@
           }
         };
 
-        fetch(action, {
+        // Follow redirects manually so we can keep X-Partial on the
+        // re-fetch — fetch() auto-follow drops custom headers on 303.
+        const followRedirects = (url, opts) =>
+          fetch(url, { ...opts, redirect: 'manual' }).then((resp) => {
+            if (resp.status >= 301 && resp.status <= 303) {
+              const loc = resp.headers.get('Location') || url;
+              return fetch(loc, {
+                method: 'GET',
+                headers: { 'X-Partial': 'true' },
+                credentials: 'same-origin',
+              });
+            }
+            return resp;
+          });
+
+        followRedirects(action, {
           method: 'POST',
           body: new FormData(form),
           headers: { 'X-Partial': 'true' },
@@ -385,7 +400,10 @@
               }
               const main = document.getElementById('content');
               if (!main || !html) return;
-              main.innerHTML = html;
+              // Parse the partial response to extract just the <main> content
+              // in case the redirect returned a full page.
+              const match = html.match(/<main[^>]*id="content"[\s\S]*?>([\s\S]*?)<\/main>/i);
+              main.innerHTML = match ? match[1] : html;
               if (window.Alpine && Alpine.initTree) {
                 Alpine.initTree(main);
               }

@@ -6,6 +6,8 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"syscall"
+	"time"
 
 	"goisekai/internal/config"
 )
@@ -39,6 +41,8 @@ func (s *Server) registerActionRoutes() {
 	s.Router.Post("/action/clear-cache-all", s.handleClearAllCache)
 	s.Router.Post("/action/test-profile/{pluginID}", s.handleTestProfile)
 	s.Router.Post("/action/reset-profile/{pluginID}", s.handleResetProfile)
+	// Restart the application process via syscall.Exec (true re-exec).
+	s.Router.Post("/action/restart", s.handleRestart)
 }
 
 // hxRedirect answers a successful action with a 303 See Other redirect —
@@ -370,4 +374,27 @@ func (s *Server) handleSetSummary(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s.hxRedirect(w, "/view/manga/"+pluginID+"/"+mangaID)
+}
+
+// handleRestart re-executes the current binary with its original arguments,
+// giving a true in-place restart that works under nohup, a shell loop, or a
+// supervisor. The response is flushed first so the client sees the 303.
+func (s *Server) handleRestart(w http.ResponseWriter, r *http.Request) {
+	s.hxRedirect(w, "/view/settings")
+	if f, ok := w.(http.Flusher); ok {
+		f.Flush()
+	}
+	s.logger.Info("restart requested", "remote", r.RemoteAddr)
+	go func() {
+		time.Sleep(500 * time.Millisecond)
+		exe, err := os.Executable()
+		if err != nil {
+			s.logger.Error("restart: resolve executable", "error", err)
+			return
+		}
+		s.logger.Info("re-executing", "path", exe, "args", os.Args)
+		if err := syscall.Exec(exe, os.Args, os.Environ()); err != nil {
+			s.logger.Error("restart: exec", "error", err)
+		}
+	}()
 }

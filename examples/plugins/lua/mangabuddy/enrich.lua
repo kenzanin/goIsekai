@@ -29,6 +29,48 @@ local function url_encode(s)
     end))
 end
 
+-- ─── markdown/URL cleanup for enrichment text ──────────────────────────────
+
+-- Decode a limited set of percent-encoded sequences that show up in
+-- MangaUpdates descriptions (non-ASCII titles, punctuation).
+local function url_decode_text(s)
+    -- Decode every %XX into its raw byte. Consecutive decoded bytes >= 128
+    -- reassemble into valid UTF-8 multibyte chars. Control bytes (< 32)
+    -- are kept encoded to avoid NUL/newline injection.
+    local decoded = s:gsub("%%(%x%x)", function(h)
+        local byte = tonumber(h, 16)
+        if byte and byte >= 32 then
+            return string.char(byte)
+        end
+        return "%%" .. h
+    end)
+    return decoded
+end
+
+-- Strip markdown formatting: **bold**, *italic*, __underline__, [text](url).
+-- Links become just their display text. Multiple blank lines collapse to one.
+local function strip_markdown(s)
+    if not s or s == "" then return s end
+    -- [text](url) -> text (do first so bold markers inside link text are handled)
+    s = s:gsub("%[([^%]]*)%]%([^)]*%)", "%1")
+    -- bare url in angle brackets
+    s = s:gsub("<(https?://[^>]+)>", "%1")
+    -- bold/italic markers
+    s = s:gsub("%*%*([^*]+)%*%*", "%1")
+    s = s:gsub("__([^_]+)__", "%1")
+    s = s:gsub("%*([^*]+)%*", "%1")
+    s = s:gsub("_([^_]+)_", "%1")
+    -- markdown headings and horizontal rules at line start
+    s = s:gsub("\n#+%s*", "\n")
+    s = s:gsub("\n___+\n", "\n\n")
+    s = s:gsub("\n%-%-%-+\n", "\n\n")
+    -- collapse 3+ newlines to 2
+    s = s:gsub("\n\n\n+", "\n\n")
+    -- trim trailing spaces per line
+    s = s:gsub("[ \t]+\n", "\n")
+    return s
+end
+
 -- ─── MangaUpdates helpers (local to this module) ───────────────────────────
 
 -- search the MangaUpdates v1 API by title; returns best-match record or nil.
@@ -116,7 +158,7 @@ local function altTitles_mangaupdates(title)
     for _, item in ipairs(detail.associated) do
         if item.title and item.title ~= "" and not seen[item.title] then
             seen[item.title] = true
-            out[#out + 1] = item.title
+        out[#out + 1] = url_decode_text(item.title)
         end
     end
     return json.encode({source = "MangaUpdates", titles = out})
@@ -139,6 +181,8 @@ local function altSummary_mangaupdates(title)
     if desc == "" then
         return json.encode({source = "MangaUpdates", summaries = {}})
     end
+    desc = url_decode_text(desc)
+    desc = strip_markdown(desc)
     return json.encode({source = "MangaUpdates", summaries = {desc}})
 end
 

@@ -142,25 +142,32 @@ type AltTitleServerEntry struct {
 	Kind             string
 }
 
-// AltTitleServers iterates all discovered plugins and returns every declared
-// alt-title server. JS plugins are cheap to load (goja VM, no multi-MB
-// runtime), so a deferred JS plugin is loaded on demand to read its metadata;
-// WASM/Lua plugins contribute only when already loaded.
-func (m *Manager) AltTitleServers() []AltTitleServerEntry {
-	// Ensure JS plugins expose their metadata.
+// ensureMetaLoaded instantiates every registered plugin that is not yet
+// loaded so its metadata (AltTitleServers and friends) is visible. Plugin
+// load is lazy elsewhere; the provider-lookup paths need full visibility to
+// find which plugin serves a given server after a cold start.
+func (m *Manager) ensureMetaLoaded() {
 	m.mu.RLock()
-	var jsIDs []string
+	var ids []string
 	for id, p := range m.plugins {
-		if p.kind == "js" && !p.loaded {
-			jsIDs = append(jsIDs, id)
+		if !p.loaded {
+			ids = append(ids, id)
 		}
 	}
 	m.mu.RUnlock()
-	for _, id := range jsIDs {
+	for _, id := range ids {
 		if err := m.ensureLoaded(id); err != nil {
-			logger.Warn("alt-title meta load", "id", id, "error", err)
+			logger.Warn("meta load", "id", id, "error", err)
 		}
 	}
+}
+
+// AltTitleServers iterates all discovered plugins and returns every declared
+// alt-title server. Deferred plugins are loaded on demand so their metadata
+// is visible even after a cold start.
+func (m *Manager) AltTitleServers() []AltTitleServerEntry {
+	// Ensure every deferred plugin exposes its metadata.
+	m.ensureMetaLoaded()
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 	var out []AltTitleServerEntry
@@ -200,6 +207,7 @@ func summariesKind(kind string) bool {
 // {"title":..., "server":...} per the ABI contract.
 func (m *Manager) GetAltTitles(title, server string) (types.AltTitlesResult, error) {
 	// Find the provider plugin for this server (must be titles-capable).
+	m.ensureMetaLoaded()
 	m.mu.RLock()
 	var providerID string
 	for id, p := range m.plugins {
@@ -248,6 +256,7 @@ func (m *Manager) GetAltTitles(title, server string) (types.AltTitlesResult, err
 // {"title":..., "server":...} per the ABI contract.
 func (m *Manager) GetAltSummaries(title, server string) (types.AltSummaryResult, error) {
 	// Find the provider plugin for this server (must be summaries-capable).
+	m.ensureMetaLoaded()
 	m.mu.RLock()
 	var providerID string
 	for id, p := range m.plugins {
