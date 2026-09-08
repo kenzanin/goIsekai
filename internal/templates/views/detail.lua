@@ -82,7 +82,8 @@ return function(data)
     -- Alternative titles (collapsible)
     local atCount = #altTitles
     emit('        <div class="mb-4">')
-    emit('            <button type="button" onclick="this.nextElementSibling.classList.toggle(\"hidden\");this.querySelector(\".chev\").classList.toggle(\"rotate-90\")" class="flex items-center gap-1.5 cursor-pointer group select-none">')
+    local chevOnclick = "this.nextElementSibling.classList.toggle(&quot;hidden&quot;);this.querySelector(&quot;.chev&quot;).classList.toggle(&quot;rotate-90&quot;)"
+    emit('            <button type="button" onclick="' .. chevOnclick .. '" class="flex items-center gap-1.5 cursor-pointer group select-none">')
     emit('                <svg class="size-3.5 text-neutral-500 chev transition-transform" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>')
     emit('                <span class="text-xs font-semibold text-neutral-300 uppercase tracking-wide">Alternative titles' .. (atCount > 0 and (' <span class="text-neutral-500 font-normal">(' .. atCount .. ')</span>') or '') .. '</span>')
     emit('            </button>')
@@ -142,7 +143,7 @@ return function(data)
     -- Alternative summaries (mirror of alternative titles; origin summary lives in mangas.description)
     local asCount = #altSummaries
     emit('        <div class="mb-4 border-t border-neutral-800 pt-4">')
-    emit('            <button type="button" onclick="this.nextElementSibling.classList.toggle(\"hidden\");this.querySelector(\".chev\").classList.toggle(\"rotate-90\")" class="flex items-center gap-1.5 cursor-pointer group select-none">')
+    emit('            <button type="button" onclick="' .. chevOnclick .. '" class="flex items-center gap-1.5 cursor-pointer group select-none">')
     emit('                <svg class="size-3.5 text-neutral-500 chev transition-transform" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>')
     emit('                <span class="text-xs font-semibold text-neutral-300 uppercase tracking-wide">Alternative summaries' .. (asCount > 0 and (' <span class="text-neutral-500 font-normal">(' .. asCount .. ')</span>') or '') .. '</span>')
     emit('            </button>')
