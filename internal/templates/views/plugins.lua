@@ -38,96 +38,97 @@ return function(data)
             local pinnedProfile = p.PinnedProfile or ""
             local availableProfiles = p.AvailableProfiles or {}
 
-            emit('    <div class="bg-neutral-900 rounded-lg p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">')
-            emit('        <div class="flex items-center gap-3 min-w-0">')
+            -- Main plugin card (single card with all controls)
+            emit('<div class="bg-neutral-900 rounded-lg p-4 border border-neutral-800">')
+
+            -- Top row: icon + name + profile badge + right-side badges/toggle
+            emit('  <div class="flex items-center gap-3">')
             if iconURL ~= "" then
-                emit('            <img src="' .. h(iconURL) .. '" alt="" class="h-10 w-10 rounded-md object-cover bg-neutral-800">')
+                emit('    <img src="' .. h(iconURL) .. '" alt="" class="h-10 w-10 rounded-md object-cover bg-neutral-800">')
             else
                 local firstChar = string.sub(name, 1, 1)
-                emit('            <div class="h-10 w-10 rounded-md bg-neutral-800 flex items-center justify-center text-sm font-semibold text-neutral-400 shrink-0">' .. h(firstChar) .. '</div>')
+                emit('    <div class="h-10 w-10 rounded-md bg-neutral-800 flex items-center justify-center text-sm font-semibold text-neutral-400 shrink-0">' .. h(firstChar) .. '</div>')
             end
-            emit('            <div class="min-w-0">')
-            emit('                <div class="font-medium text-sm">' .. h(name) .. '</div>')
-            emit('                <div class="text-xs font-mono text-neutral-500 truncate">' .. h(id) .. '</div>')
+            emit('    <div class="min-w-0 flex-1">')
+            emit('      <div class="font-medium text-sm flex items-center gap-2">')
+            emit('        ' .. h(name))
+            if pinnedProfile ~= "" then
+                emit('        <span class="text-[10px] px-1.5 py-0.5 rounded-full bg-sky-500/15 text-sky-400">' .. h(pinnedProfile) .. '</span>')
+            end
+            emit('      </div>')
+            emit('      <div class="text-xs font-mono text-neutral-500 truncate">' .. h(id) .. '</div>')
             if siteURL ~= "" then
-                emit('                <a href="' .. h(siteURL) .. '" target="_blank" rel="noopener" class="text-xs text-indigo-400 hover:text-indigo-300 truncate">' .. h(siteURL) .. '</a>')
+                emit('      <a href="' .. h(siteURL) .. '" target="_blank" rel="noopener" class="text-xs text-indigo-400 hover:text-indigo-300 truncate">' .. h(siteURL) .. '</a>')
             end
-            emit('            </div>')
-            emit('        </div>')
-            emit('            <div class="flex items-center gap-2 shrink-0 flex-wrap">')
-            if pinnedProfile ~= '' then
-                emit('            <span class="text-xs px-2 py-0.5 rounded-full bg-sky-500/15 text-sky-400">' .. h(pinnedProfile) .. '</span>')
-            end
-            if version ~= "" then
-                emit('            <span class="text-xs px-2 py-0.5 rounded-full bg-neutral-700/50 text-neutral-400">v' .. h(version) .. '</span>')
-            end
-            if isActive then
-                emit('            <span class="text-xs px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400">Active</span>')
-            else
-                emit('            <span class="text-xs px-2 py-0.5 rounded-full bg-neutral-700/50 text-neutral-400">Inactive</span>')
-            end
-            if loaded then
-                emit('            <span class="text-xs px-2 py-0.5 rounded-full bg-sky-500/15 text-sky-400">Loaded</span>')
-            else
-                emit('            <span class="text-xs px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-400">Deferred</span>')
-            end
-            emit('            <form method="post" action="/action/toggle-plugin/' .. h(id) .. '">')
-                emit('                <button type="submit" class="border border-neutral-700 text-neutral-400 hover:text-neutral-200 rounded-md px-3 py-1.5 text-sm">')
-                if isActive then emit('Deactivate') else emit('Activate') end
-                emit('                </button>')
-            emit('            </form>')
-            emit('        </div>')
             emit('    </div>')
 
-            -- Human verification section
-            if needsHumanVerify then
-                emit('    <div class="bg-neutral-900 rounded-lg p-4 border border-neutral-800">')
-                emit('        <div class="flex items-center justify-between gap-3 mb-3">')
-                emit('            <div class="text-sm font-medium">Human Verification</div>')
-                if #verifyCookies > 0 then
-                    emit('            <span class="text-xs px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400">Verified ✓</span>')
-                else
-                    emit('            <span class="text-xs px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-400">Not verified — site requires a browser challenge</span>')
-                end
-                emit('        </div>')
-                if #verifyURL > 0 then
-                    emit('        <a href="' .. h(verifyURL) .. '" target="_blank" rel="noopener" class="inline-block bg-indigo-600 hover:bg-indigo-500 text-white rounded-md px-3 py-1.5 text-sm font-medium mb-3">Open verification page</a>')
-                end
-                emit('        <form method="post" action="/action/save-verify/' .. h(id) .. '" class="space-y-2">')
-                emit('            <textarea name="cookies" rows="3" placeholder="cf_clearance=... or the full cookie header" class="w-full bg-neutral-800 border border-neutral-700 rounded-md px-3 py-2 text-sm font-mono">' .. h(verifyCookies) .. '</textarea>')
-                emit('            <input type="text" name="user_agent" value="' .. h(verifyUserAgent) .. '" placeholder="Browser User-Agent (optional — must match the browser that solved the challenge)" class="w-full bg-neutral-800 border border-neutral-700 rounded-md px-3 py-2 text-xs font-mono">')
-                emit('            <button type="submit" class="bg-indigo-600 hover:bg-indigo-500 text-white rounded-md px-4 py-1.5 text-sm font-medium">Save</button>')
-                emit('        </form>')
-                emit('        <details class="mt-3">')
-                emit('            <summary class="text-xs text-neutral-400 cursor-pointer hover:text-neutral-200">How to copy cookies</summary>')
-                emit('            <ol class="list-decimal list-inside text-xs text-neutral-400 space-y-1 mt-2 pl-1">')
-                emit('                <li>Open the verification page and complete the challenge.</li>')
-                emit('                <li>Press F12 → Network tab → refresh the page.</li>')
-                emit('                <li>Click the first request → Request Headers → find the <code>cookie:</code> line.</li>')
-                emit('                <li>Right-click → Copy value.</li>')
-                emit('                <li>Paste everything into the box above.</li>')
-                emit('            </ol>')
-                emit('        </details>')
-                emit('    </div>')
-            end
-
-            -- TLS Profile section (collapsible)
-            emit('    <details class="bg-neutral-900 rounded-lg border border-neutral-800">')
-            emit('        <summary class="p-4 text-sm font-medium cursor-pointer hover:text-neutral-200">TLS Profile</summary>')
-            emit('        <div class="px-4 pb-4 flex items-center gap-2 flex-wrap">')
-            emit('            <select data-plugin-profile="' .. h(id) .. '" class="bg-neutral-800 border border-neutral-700 rounded-md px-3 py-1.5 text-sm">')
-            emit('                <option value="">Auto (ladder)</option>')
+            -- Right side: profile select + badges + toggle
+            emit('    <div class="flex items-center gap-2 shrink-0 flex-wrap">')
+            emit('      <select data-plugin-profile="' .. h(id) .. '" class="bg-neutral-800 border border-neutral-700 rounded px-2 py-1 text-xs">')
+            emit('        <option value="">auto</option>')
             for _, profileName in ipairs(availableProfiles) do
                 local sel = profileName == pinnedProfile and " selected" or ""
-                emit('                <option value="' .. h(profileName) .. '"' .. sel .. '>' .. h(profileName) .. '</option>')
+                emit('        <option value="' .. h(profileName) .. '"' .. sel .. '>' .. h(profileName) .. '</option>')
             end
-            emit('            </select>')
-            emit('            <button type="button" onclick="testProfile(\'' .. h(id) .. '\')" class="border border-neutral-700 text-neutral-400 hover:text-neutral-200 rounded-md px-3 py-1.5 text-sm">Test</button>')
+            emit('      </select>')
+            emit('      <button type="button" onclick="testProfile(\'' .. h(id) .. '\')" class="border border-neutral-700 text-neutral-400 hover:text-neutral-200 rounded px-2 py-1 text-xs">Test</button>')
             if pinnedProfile ~= "" then
-                emit('            <button type="button" onclick="resetProfile(\'' .. h(id) .. '\')" class="border border-red-800/50 text-red-400 hover:text-red-300 rounded-md px-3 py-1.5 text-sm">Reset</button>')
+                emit('      <button type="button" onclick="resetProfile(\'' .. h(id) .. '\')" class="border border-red-800/50 text-red-400 hover:text-red-300 rounded px-2 py-1 text-xs">Reset</button>')
             end
-            emit('        </div>')
-            emit('    </details>')
+            if version ~= "" then
+                emit('      <span class="text-xs px-2 py-0.5 rounded-full bg-neutral-700/50 text-neutral-400">v' .. h(version) .. '</span>')
+            end
+            if isActive then
+                emit('      <span class="text-xs px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400">Active</span>')
+            else
+                emit('      <span class="text-xs px-2 py-0.5 rounded-full bg-neutral-700/50 text-neutral-400">Inactive</span>')
+            end
+            if loaded then
+                emit('      <span class="text-xs px-2 py-0.5 rounded-full bg-sky-500/15 text-sky-400">Loaded</span>')
+            else
+                emit('      <span class="text-xs px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-400">Deferred</span>')
+            end
+            emit('      <form method="post" action="/action/toggle-plugin/' .. h(id) .. '">')
+            emit('        <button type="submit" class="border border-neutral-700 text-neutral-400 hover:text-neutral-200 rounded-md px-3 py-1.5 text-sm">')
+            if isActive then emit('Deactivate') else emit('Activate') end
+            emit('        </button>')
+            emit('      </form>')
+            emit('    </div>')
+            emit('  </div>')
+
+            emit('</div>')
+
+            -- Human verification section (separate card, only when needed)
+            if needsHumanVerify then
+                emit('<div class="bg-neutral-900 rounded-lg p-4 border border-neutral-800">')
+                emit('  <div class="flex items-center justify-between gap-3 mb-3">')
+                emit('    <div class="text-sm font-medium">Human Verification</div>')
+                if #verifyCookies > 0 then
+                    emit('    <span class="text-xs px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400">Verified ✓</span>')
+                else
+                    emit('    <span class="text-xs px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-400">Not verified — site requires a browser challenge</span>')
+                end
+                emit('  </div>')
+                if #verifyURL > 0 then
+                    emit('  <a href="' .. h(verifyURL) .. '" target="_blank" rel="noopener" class="inline-block bg-indigo-600 hover:bg-indigo-500 text-white rounded-md px-3 py-1.5 text-sm font-medium mb-3">Open verification page</a>')
+                end
+                emit('  <form method="post" action="/action/save-verify/' .. h(id) .. '" class="space-y-2">')
+                emit('    <textarea name="cookies" rows="3" placeholder="cf_clearance=... or the full cookie header" class="w-full bg-neutral-800 border border-neutral-700 rounded-md px-3 py-2 text-sm font-mono">' .. h(verifyCookies) .. '</textarea>')
+                emit('    <input type="text" name="user_agent" value="' .. h(verifyUserAgent) .. '" placeholder="Browser User-Agent (optional — must match the browser that solved the challenge)" class="w-full bg-neutral-800 border border-neutral-700 rounded-md px-3 py-2 text-xs font-mono">')
+                emit('    <button type="submit" class="bg-indigo-600 hover:bg-indigo-500 text-white rounded-md px-4 py-1.5 text-sm font-medium">Save</button>')
+                emit('  </form>')
+                emit('  <details class="mt-3">')
+                emit('    <summary class="text-xs text-neutral-400 cursor-pointer hover:text-neutral-200">How to copy cookies</summary>')
+                emit('    <ol class="list-decimal list-inside text-xs text-neutral-400 space-y-1 mt-2 pl-1">')
+                emit('      <li>Open the verification page and complete the challenge.</li>')
+                emit('      <li>Press F12 → Network tab → refresh the page.</li>')
+                emit('      <li>Click the first request → Request Headers → find the <code>cookie:</code> line.</li>')
+                emit('      <li>Right-click → Copy value.</li>')
+                emit('      <li>Paste everything into the box above.</li>')
+                emit('    </ol>')
+                emit('  </details>')
+                emit('</div>')
+            end
         end
         emit('</div>')
     end
