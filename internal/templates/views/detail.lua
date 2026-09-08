@@ -46,15 +46,15 @@ return function(data)
     end
 
     -- Manga header grid
-    emit('<div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">')
-    emit('    <div class="md:col-span-1">')
+    emit('<div class="flex flex-col md:flex-row gap-6 mb-8">')
+    emit('    <div class="md:w-[200px] md:shrink-0">')
     if manga.CoverURL and manga.CoverURL ~= "" then
-        emit('        <img src="/image?pluginID=' .. h(pluginID) .. '&amp;url=' .. h(manga.CoverURL) .. '" alt="' .. h(manga.Title or "") .. '" class="w-full md:max-w-[200px] aspect-[2/3] rounded-lg object-cover">')
+        emit('        <img src="/image?pluginID=' .. h(pluginID) .. '&amp;url=' .. h(manga.CoverURL) .. '" alt="' .. h(manga.Title or "") .. '" class="w-full aspect-[2/3] rounded-lg object-cover">')
     else
-        emit('        <div class="w-full md:max-w-[200px] aspect-[2/3] bg-neutral-800 rounded-lg flex items-center justify-center text-neutral-500 text-4xl font-semibold">' .. h(getInitials(manga.Title or "")) .. '</div>')
+        emit('        <div class="w-full aspect-[2/3] bg-neutral-800 rounded-lg flex items-center justify-center text-neutral-500 text-4xl font-semibold">' .. h(getInitials(manga.Title or "")) .. '</div>')
     end
     emit('    </div>')
-    emit('    <div class="md:col-span-3">')
+    emit('    <div class="flex-1 min-w-0">')
     emit('        <h1 class="text-2xl font-semibold mb-2">' .. h(manga.Title or "") .. '</h1>')
 
     -- Plugin badge + status + genres
@@ -79,11 +79,14 @@ return function(data)
         emit('        <p class="text-sm text-neutral-400 mb-2">' .. h(manga.Author) .. '</p>')
     end
 
-    -- Alternative titles
+    -- Alternative titles (collapsible)
+    local atCount = #altTitles
     emit('        <div class="mb-4">')
-    emit('            <div class="flex items-center gap-2 mb-1.5">')
-    emit('                <span class="text-xs font-semibold text-neutral-300 uppercase tracking-wide">Alternative titles</span>')
-    emit('            </div>')
+    emit('            <button type="button" onclick="this.nextElementSibling.classList.toggle(\"hidden\");this.querySelector(\".chev\").classList.toggle(\"rotate-90\")" class="flex items-center gap-1.5 cursor-pointer group select-none">')
+    emit('                <svg class="size-3.5 text-neutral-500 chev transition-transform" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>')
+    emit('                <span class="text-xs font-semibold text-neutral-300 uppercase tracking-wide">Alternative titles' .. (atCount > 0 and (' <span class="text-neutral-500 font-normal">(' .. atCount .. ')</span>') or '') .. '</span>')
+    emit('            </button>')
+    emit('            <div id="alt-titles-body" class="' .. (atCount > 0 and 'hidden' or '') .. '">')
     if #altTitles > 0 then
         emit('            <div class="flex flex-wrap gap-1.5 mb-2">')
         -- Current title badge
@@ -126,6 +129,7 @@ return function(data)
         emit('            <p class="text-xs text-neutral-500">No alt-title providers available — install a plugin that declares alt-title servers.</p>')
     end
     emit('        </div>')
+    emit('        </div>')
 
     -- Origin summary (from the source plugin — never deletable)
     if manga.Description and manga.Description ~= "" then
@@ -136,22 +140,25 @@ return function(data)
     end
 
     -- Alternative summaries (mirror of alternative titles; origin summary lives in mangas.description)
+    local asCount = #altSummaries
     emit('        <div class="mb-4 border-t border-neutral-800 pt-4">')
-    emit('            <div class="flex items-center gap-2 mb-1.5">')
-    emit('                <span class="text-xs font-semibold text-neutral-300 uppercase tracking-wide">Alternative summaries</span>')
-    emit('            </div>')
+    emit('            <button type="button" onclick="this.nextElementSibling.classList.toggle(\"hidden\");this.querySelector(\".chev\").classList.toggle(\"rotate-90\")" class="flex items-center gap-1.5 cursor-pointer group select-none">')
+    emit('                <svg class="size-3.5 text-neutral-500 chev transition-transform" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>')
+    emit('                <span class="text-xs font-semibold text-neutral-300 uppercase tracking-wide">Alternative summaries' .. (asCount > 0 and (' <span class="text-neutral-500 font-normal">(' .. asCount .. ')</span>') or '') .. '</span>')
+    emit('            </button>')
+    emit('            <div id="alt-summaries-body" class="' .. (asCount > 0 and 'hidden' or '') .. '">')
     if #altSummaries > 0 then
         for _, a in ipairs(altSummaries) do
-            emit('            <div class="flex items-start justify-between gap-2 py-1">')
-            emit('                <div class="text-sm text-neutral-400 flex-1 min-w-0">' .. h(a.Description or "") .. '</div>')
-            emit('                <div class="flex items-center gap-1.5 shrink-0">')
+            emit('            <div class="flex items-start gap-2 py-1">')
+            -- Click the description text to promote it (mirrors alt-title UX).
+            emit('                <form method="post" action="/action/set-summary/' .. h(pluginID) .. '/' .. h(mangaID) .. '" class="flex-1 min-w-0 group" data-confirm="Set this as the main summary?">')
+            emit('                    <input type="hidden" name="description" value="' .. h(a.Description or "") .. '">')
+            emit('                    <button type="submit" title="Set as main summary" class="w-full text-left text-sm text-neutral-300 hover:text-indigo-300 transition">' .. h(a.Description or "") .. '</button>')
+            emit('                </form>')
+            emit('                <div class="flex items-center gap-1.5 shrink-0 mt-0.5">')
             if a.Source and a.Source ~= "" then
                 emit('                    <span class="text-[10px] px-1.5 py-0.5 rounded-full bg-neutral-700/50 text-neutral-400">via ' .. h(a.Source) .. '</span>')
             end
-            emit('                    <form method="post" action="/action/set-summary/' .. h(pluginID) .. '/' .. h(mangaID) .. '" class="inline-flex">')
-            emit('                        <input type="hidden" name="description" value="' .. h(a.Description or "") .. '">')
-            emit('                        <button type="submit" title="Use as main summary" class="text-[10px] px-1.5 py-0.5 rounded bg-indigo-900/40 text-indigo-300 hover:bg-indigo-800/50" data-confirm="Use this as the main summary?">Use</button>')
-            emit('                    </form>')
             emit('                    <form method="post" action="/action/remove-alt-summary/' .. h(pluginID) .. '/' .. h(mangaID) .. '" class="inline-flex">')
             emit('                        <input type="hidden" name="description" value="' .. h(a.Description or "") .. '">')
             emit('                        <button type="submit" title="Remove alternative summary" aria-label="Remove" class="size-4 inline-flex items-center justify-center rounded-full text-neutral-500 hover:text-red-400 hover:bg-neutral-700" data-confirm="Remove this alternative summary?">&times;</button>')
@@ -177,6 +184,7 @@ return function(data)
     else
         emit('            <p class="text-xs text-neutral-500">No alt-summary providers available — install a plugin that declares alt-summary servers.</p>')
     end
+    emit('        </div>')
     emit('        </div>')
 
     -- Action buttons: library + continue reading

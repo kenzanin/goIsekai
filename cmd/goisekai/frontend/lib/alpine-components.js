@@ -12,6 +12,17 @@
     '.toast-leave{transform:translateX(100%);opacity:0}';
   (document.head || document.documentElement).appendChild(_style);
 
+  // Expand a collapsible section (used after fetch-alt-* actions so freshly
+  // fetched items are visible instead of re-collapsed by the re-render).
+  const expandSection = (id) => {
+    const body = document.getElementById(id);
+    if (!body) return;
+    body.classList.remove('hidden');
+    const btn = body.previousElementSibling;
+    const ch = btn?.querySelector('.chev');
+    if (ch) ch.classList.add('rotate-90');
+  };
+
   // =====================================================================
   // Alpine stores — registered inside alpine:init so Alpine is guaranteed
   // to be present but hasn't processed the DOM yet.
@@ -277,11 +288,18 @@
           return;
         }
         e.preventDefault();
+        // Mark the form so the SPA submit interceptor (4.5) ignores this
+        // event — the confirmed re-submit below drives the actual request.
+        form._confirmPending = true;
         Alpine.store('confirm')
           .ask(msg)
           .then((ok) => {
-            if (!ok) return;
+            if (!ok) {
+              form._confirmPending = false;
+              return;
+            }
             form._confirmPassed = true;
+            form._confirmPending = false;
             if (typeof form.requestSubmit === 'function') {
               form.requestSubmit(submitter);
             } else {
@@ -311,6 +329,79 @@
               el.removeAttribute('data-confirm');
               el.click();
             }
+          });
+      },
+      true,
+    );
+
+    // ---- 4.5 SPA submit: same-page actions via fetch, history stays clean -
+    // Detail-page action forms POST to /action/* which 303-redirects back to
+    // the same /view/manga/* page. A plain form submit makes the browser push a
+    // new history entry every time (alt-title clicks pile up), so Back ends up
+    // stuck on the detail page instead of returning to search/library. Instead:
+    // fetch the action with X-Partial, follow the redirect to the re-rendered
+    // view content, and swap #content in place — no new history entry. Binary
+    // downloads (export-cbz) and cross-page actions keep native navigation.
+    document.addEventListener(
+      'submit',
+      (e) => {
+        var form = e.target;
+        if (!form?.tagName || form.tagName !== 'FORM' || e.isDefaultPrevented()) return;
+        var method = (form.getAttribute('method') || 'get').toLowerCase();
+        if (method !== 'post') return;
+        var action = (form.getAttribute('action') || '').trim();
+        if (action.indexOf('/action/') !== 0) return;
+        // Scope to the manga detail page — other pages keep native navigation.
+        if (window.location.pathname.indexOf('/view/manga/') !== 0) return;
+        if (action.indexOf('export-cbz') !== -1) return; // binary download
+        if (action.indexOf('save-verify') !== -1) return; // cookie form (plugins page)
+        // If a confirm is pending, let the confirm flow drive the submit.
+        if (form._confirmPending) return;
+        if (form._confirmPassed) {
+          form._confirmPassed = false;
+        }
+        e.preventDefault();
+
+        var showErr = (m) => {
+          if (typeof Alpine !== 'undefined' && Alpine.store('toast')) {
+            Alpine.store('toast').show(m, 'error');
+          }
+        };
+
+        fetch(action, {
+          method: 'POST',
+          body: new FormData(form),
+          headers: { 'X-Partial': 'true' },
+          credentials: 'same-origin',
+        })
+          .then((resp) => {
+            return resp.text().then((html) => {
+              if (!resp.ok) {
+                let m = html?.trim() || `Request failed (${resp.status})`;
+                // Error bodies are plain text — don't toast raw HTML.
+                if (/^</.test(m)) m = `Request failed (${resp.status})`;
+                showErr(m);
+                return;
+              }
+              const main = document.getElementById('content');
+              if (!main || !html) return;
+              main.innerHTML = html;
+              if (window.Alpine && Alpine.initTree) {
+                Alpine.initTree(main);
+              }
+              // Sync the address bar to the canonical re-rendered URL without
+              // adding a history entry — Back still leaves the detail page.
+              const u = resp.url || action;
+              if (u && u.indexOf(window.location.origin) === 0) {
+                history.replaceState(history.state, '', u);
+              }
+              // After a fetch action, reveal the section that just grew.
+              if (action.indexOf('fetch-alt-titles') !== -1) expandSection('alt-titles-body');
+              if (action.indexOf('fetch-alt-summaries') !== -1) expandSection('alt-summaries-body');
+            });
+          })
+          .catch(() => {
+            showErr('Network error — check your connection');
           });
       },
       true,

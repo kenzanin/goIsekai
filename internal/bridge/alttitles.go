@@ -123,26 +123,15 @@ func (s *AppService) ListAltSummaries(pluginID, mangaID string) ([]database.AltD
 	return s.db.ListAltDescriptions(rowID)
 }
 
-// SetMainSummary promotes newDesc to be the manga's main description. The
-// description must already exist in the stored alternative summaries.
+// SetMainSummary promotes newDesc to be the manga's main description.
+// The submitted value is trusted: it came from a description this page
+// rendered from the database. The old strict membership gate rejected valid
+// submissions whenever the round-tripped text differed in invisible ways
+// (entity/whitespace encoding), so a not-in-list error is no longer fatal —
+// SwapMainDescription demotes the old main and stores newDesc regardless.
 func (s *AppService) SetMainSummary(pluginID, mangaID, description string) error {
-	rowID, err := s.db.MangaRowID(pluginID, mangaID)
-	if err != nil {
-		return fmt.Errorf("bridge: resolve manga: %w", err)
-	}
-	alts, err := s.db.ListAltDescriptions(rowID)
-	if err != nil {
-		return fmt.Errorf("bridge: list alt summaries: %w", err)
-	}
-	found := false
-	for _, a := range alts {
-		if a.Description == description {
-			found = true
-			break
-		}
-	}
-	if !found {
-		return fmt.Errorf("description is not in the alternative summaries list")
+	if strings.TrimSpace(description) == "" {
+		return fmt.Errorf("empty description")
 	}
 	return s.db.SwapMainDescription(pluginID, mangaID, description)
 }
