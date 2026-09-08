@@ -49,9 +49,9 @@ return function(data)
     emit('<div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">')
     emit('    <div class="md:col-span-1">')
     if manga.CoverURL and manga.CoverURL ~= "" then
-        emit('        <img src="/image?pluginID=' .. h(pluginID) .. '&amp;url=' .. h(manga.CoverURL) .. '" alt="' .. h(manga.Title or "") .. '" class="w-full aspect-[2/3] rounded-lg object-cover">')
+        emit('        <img src="/image?pluginID=' .. h(pluginID) .. '&amp;url=' .. h(manga.CoverURL) .. '" alt="' .. h(manga.Title or "") .. '" class="w-full md:max-w-[200px] aspect-[2/3] rounded-lg object-cover">')
     else
-        emit('        <div class="w-full aspect-[2/3] bg-neutral-800 rounded-lg flex items-center justify-center text-neutral-500 text-4xl font-semibold">' .. h(getInitials(manga.Title or "")) .. '</div>')
+        emit('        <div class="w-full md:max-w-[200px] aspect-[2/3] bg-neutral-800 rounded-lg flex items-center justify-center text-neutral-500 text-4xl font-semibold">' .. h(getInitials(manga.Title or "")) .. '</div>')
     end
     emit('    </div>')
     emit('    <div class="md:col-span-3">')

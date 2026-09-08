@@ -119,7 +119,7 @@ return function(data)
         emit('    <a href="/view/search" class="text-indigo-400 hover:text-indigo-300 text-sm">Search manga</a>')
         emit('</div>')
     else
-        emit('<div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">')
+        emit('<div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-4">')
         for _, m in ipairs(mangas) do
             local mid = m.ID or ""
             local pluginID = m.PluginID or ""
