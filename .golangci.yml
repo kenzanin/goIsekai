@@ -11,3 +11,8 @@ linters:
         linters:
           - staticcheck
         text: "ST1001"
+      # reflect.Ptr is a readable constant; inlining to raw value hurts clarity
+      - path: internal/templates/
+        linters:
+          - govet
+        text: "should be inlined"

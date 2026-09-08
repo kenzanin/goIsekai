@@ -3,7 +3,6 @@ module goisekai
 go 1.27.0
 
 require (
-	github.com/CloudyKit/jet/v6 v6.3.2
 	github.com/bogdanfinn/fhttp v0.6.8
 	github.com/bogdanfinn/tls-client v1.15.1
 	github.com/chromedp/cdproto v0.0.0-20260714215040-dc233986426f
@@ -15,13 +14,13 @@ require (
 	github.com/go-chi/chi/v5 v5.3.2
 	github.com/go-jet/jet/v2 v2.15.0
 	github.com/mmcdole/lunar v0.1.1
+	github.com/open2b/scriggo v0.61.1
 	golang.org/x/image v0.45.0
 	golang.org/x/net v0.58.0
 	modernc.org/sqlite v1.57.0
 )
 
 require (
-	github.com/CloudyKit/fastprinter v0.0.0-20200109182630-33d98a066a53 // indirect
 	github.com/andybalholm/brotli v1.2.0 // indirect
 	github.com/bdandy/go-errors v1.2.2 // indirect
 	github.com/bdandy/go-socks4 v1.2.3 // indirect
@@ -47,7 +46,6 @@ require (
 	github.com/lib/pq v1.12.3 // indirect
 	github.com/mattn/go-isatty v0.0.24 // indirect
 	github.com/ncruces/go-strftime v1.0.0 // indirect
-	github.com/open2b/scriggo v0.61.1 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/quic-go/qpack v0.6.0 // indirect
 	github.com/remyoudompheng/bigfft v0.0.0-20230129092748-24d4a6f8daec // indirect

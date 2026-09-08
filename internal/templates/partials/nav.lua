@@ -1,0 +1,41 @@
+-- partials/nav.lua
+-- Top navigation bar. Replaces partials/nav.jet.
+-- Called as: nav(data) -> string
+-- data.active holds the highlight token injected by the server.
+
+local ACTIVE_CLASS = 'border-b-2 border-indigo-400 bg-indigo-500/15 text-indigo-300'
+local BASE_CLASS   = 'rounded-md px-3 py-2 text-sm font-medium hover:bg-neutral-800'
+
+local function navLink(href, token, label, active)
+    local cls = BASE_CLASS
+    if active == token then
+        cls = cls .. ' ' .. ACTIVE_CLASS
+    end
+    return '<a href="' .. h(href) .. '" class="' .. h(cls) .. '">' .. h(label) .. '</a>'
+end
+
+return function(data)
+    local active = data.active or ''
+    return table.concat({
+        '<nav class="flex items-center gap-2 overflow-x-auto whitespace-nowrap border-b border-neutral-800 bg-neutral-900 px-4 pt-4">',
+        '    <a href="/" class="flex shrink-0 items-center gap-2 px-2 py-2" title="goIsekai home" aria-label="goIsekai home">',
+        '        <svg width="20" height="20" viewBox="0 0 64 64" aria-hidden="true">',
+        '            <rect width="64" height="64" rx="14" fill="#1e1b4b"/>',
+        '            <path d="M32 18 C26 14 18 13 12 15 L12 46 C18 44 26 45 32 49 C38 45 46 44 52 46 L52 15 C46 13 38 14 32 18 Z" fill="#eef2ff"/>',
+        '            <path d="M32 18 C26 14 18 13 12 15 L12 46 C18 44 26 45 32 49 Z" fill="#c7d2fe"/>',
+        '            <path d="M17 22 C21 21 25 21.5 28 23 M17 28 C21 27 25 27.5 28 29 M17 34 C21 33 25 33.5 28 35 M47 22 C43 21 39 21.5 36 23 M47 28 C43 27 39 27.5 36 29 M47 34 C43 33 39 33.5 36 35" stroke="#6366f1" stroke-width="2" stroke-linecap="round" fill="none"/>',
+        '            <path d="M40 38 h9 a4 4 0 0 1 4 4 v5 a4 4 0 0 1 -4 4 h-5 l-3 3 v-3 h-1 a4 4 0 0 1 -4 -4 v-5 a4 4 0 0 1 4 -4 z" fill="#f59e0b"/>',
+        '            <circle cx="44.5" cy="44.5" r="1.3" fill="#1e1b4b"/>',
+        '            <circle cx="48.5" cy="44.5" r="1.3" fill="#1e1b4b"/>',
+        '        </svg>',
+        "        <span style=\"font-family: 'Space Grotesk', system-ui, sans-serif; letter-spacing: -0.02em;\">goIsekai</span>",
+        '    </a>',
+        navLink('/',             'library',  'Library',  active),
+        navLink('/view/search',  'search',   'Search',   active),
+        navLink('/view/history', 'history',  'History',  active),
+        navLink('/view/plugins', 'plugins',  'Plugins',  active),
+        navLink('/view/settings','settings', 'Settings', active),
+        navLink('/view/logs',    'logs',     'Logs',     active),
+        '</nav>',
+    }, '\n')
+end

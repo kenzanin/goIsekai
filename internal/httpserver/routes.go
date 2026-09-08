@@ -4,7 +4,6 @@ import (
 	"io/fs"
 	"net/http"
 
-	"github.com/CloudyKit/jet/v6"
 	"github.com/go-chi/chi/v5"
 )
 
@@ -39,8 +38,7 @@ func (s *Server) registerStaticRoutes() {
 	s.Router.Handle("/static/*", http.StripPrefix("/static/", fileServer))
 }
 
-// registerViewRoutes maps HTML page routes. Views render full pages that
-// extend /layouts/base.jet; hx-boost in the nav gives HTMX-style swaps.
+// registerViewRoutes maps HTML page routes. Views render full Lua templates.
 func (s *Server) registerViewRoutes() {
 	s.Router.Get("/", s.viewLibrary)
 	s.Router.Get("/view/library", s.viewLibrary)
@@ -52,15 +50,28 @@ func (s *Server) registerViewRoutes() {
 	s.Router.Get("/view/history", s.viewHistory)
 }
 
-// renderPage renders a view template with the `active` nav var set. Every
-// view extends /layouts/base.jet, so this is always a full page.
-func (s *Server) renderPage(w http.ResponseWriter, name, active string, data any) {
-	vars := jet.VarMap{}
-	vars.Set("active", active)
+// renderPage renders a Lua template with the `active` nav var set.
+// When the client sends X-Partial: true, only the <main> content is rendered
+// (no layout wrapper) — used by the SPA router.
+func (s *Server) renderPage(w http.ResponseWriter, r *http.Request, name, active string, data any) {
+	var m map[string]any
+	if data == nil {
+		m = map[string]any{}
+	} else if converted, ok := data.(map[string]any); ok {
+		m = converted
+	} else {
+		m = map[string]any{}
+	}
+	m["active"] = active
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	if err := s.engine.Render(w, name, vars, data); err != nil {
+	var err error
+	if r != nil && r.Header.Get("X-Partial") == "true" {
+		err = s.engine.RenderPartial(w, name, m)
+	} else {
+		err = s.engine.Render(w, name, m)
+	}
+	if err != nil {
 		s.logger.Error("render "+name, "error", err)
-		// Header may already be written; best effort.
 		http.Error(w, "internal error", http.StatusInternalServerError)
 	}
 }

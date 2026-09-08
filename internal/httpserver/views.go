@@ -183,7 +183,7 @@ func (s *Server) viewLibrary(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 	}
-	s.renderPage(w, "views/library.jet", "library", map[string]any{
+	s.renderPage(w, r, "views/library", "library", map[string]any{
 		"Mangas":          mangas[start:end],
 		"Q":               q,
 		"Ratios":          ratios,
@@ -228,7 +228,7 @@ func (s *Server) viewHistory(w http.ResponseWriter, r *http.Request) {
 		}
 		entries = append(entries, h)
 	}
-	s.renderPage(w, "views/history.jet", "history", map[string]any{"History": entries})
+	s.renderPage(w, r, "views/history", "history", map[string]any{"History": entries})
 }
 
 // viewSearch renders the search form and, when q+pluginID are present, results.
@@ -279,7 +279,7 @@ func (s *Server) viewSearch(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 	}
-	s.renderPage(w, "views/search.jet", "search", map[string]any{
+	s.renderPage(w, r, "views/search", "search", map[string]any{
 		"Plugins":    plugins,
 		"Q":          q,
 		"PluginID":   pluginID,
@@ -359,7 +359,7 @@ func (s *Server) viewMangaDetail(w http.ResponseWriter, r *http.Request) {
 	chTotal := len(chapters)
 	chStart := min((chPage-1)*chapterPageSize, chTotal)
 	chEnd := min(chStart+chapterPageSize, chTotal)
-	s.renderPage(w, "views/detail.jet", "search", map[string]any{
+	s.renderPage(w, r, "views/detail", "search", map[string]any{
 		"PluginID":        pluginID,
 		"PluginName":      pluginName,
 		"PluginIcon":      pluginIcon,
@@ -458,7 +458,7 @@ type PluginView struct {
 }
 
 // viewPlugins renders the plugin manager page.
-func (s *Server) viewPlugins(w http.ResponseWriter, _ *http.Request) {
+func (s *Server) viewPlugins(w http.ResponseWriter, r *http.Request) {
 	plugins, err := s.service.ListPlugins()
 	if err != nil {
 		s.logger.Error("plugin list", "error", err)
@@ -487,18 +487,18 @@ func (s *Server) viewPlugins(w http.ResponseWriter, _ *http.Request) {
 		v.PinnedProfile, v.AvailableProfiles = s.service.PluginProfile(p.ID)
 		views = append(views, v)
 	}
-	s.renderPage(w, "views/plugins.jet", "plugins", map[string]any{"Plugins": views})
+	s.renderPage(w, r, "views/plugins", "plugins", map[string]any{"Plugins": views})
 }
 
 // viewSettings renders the current goisekai.ini values.
-func (s *Server) viewSettings(w http.ResponseWriter, _ *http.Request) {
+func (s *Server) viewSettings(w http.ResponseWriter, r *http.Request) {
 	path := s.service.GetConfigPath()
 	cfg, err := config.Load(path)
 	if err != nil {
 		s.logger.Error("config load", "error", err, "path", path)
 	}
 	cacheBytes, _ := s.service.CacheSize()
-	s.renderPage(w, "views/settings.jet", "settings", map[string]any{
+	s.renderPage(w, r, "views/settings", "settings", map[string]any{
 		"Config":     cfg,
 		"Path":       path,
 		"CacheBytes": cacheBytes,
@@ -545,7 +545,7 @@ func (s *Server) viewLogs(w http.ResponseWriter, r *http.Request) {
 	if len(logs) > limit {
 		logs = logs[len(logs)-limit:]
 	}
-	s.renderPage(w, "views/logs.jet", "logs", map[string]any{"Logs": logs, "Limit": limit, "Limits": []int{100, 250, 500, 1000, 2000}, "Filter": filter})
+	s.renderPage(w, r, "views/logs", "logs", map[string]any{"Logs": logs, "Limit": limit, "Limits": []int{100, 250, 500, 1000, 2000}, "Filter": filter})
 }
 
 // jsonMarshalLogs writes lines as a JSON array.
