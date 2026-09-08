@@ -55,6 +55,9 @@ return function(data)
             emit('            </div>')
             emit('        </div>')
             emit('            <div class="flex items-center gap-2 shrink-0 flex-wrap">')
+            if pinnedProfile ~= '' then
+                emit('            <span class="text-xs px-2 py-0.5 rounded-full bg-sky-500/15 text-sky-400">' .. h(pinnedProfile) .. '</span>')
+            end
             if version ~= "" then
                 emit('            <span class="text-xs px-2 py-0.5 rounded-full bg-neutral-700/50 text-neutral-400">v' .. h(version) .. '</span>')
             end
@@ -69,9 +72,9 @@ return function(data)
                 emit('            <span class="text-xs px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-400">Deferred</span>')
             end
             emit('            <form method="post" action="/action/toggle-plugin/' .. h(id) .. '">')
-            emit('                <button type="submit" class="border border-neutral-700 text-neutral-400 hover:text-neutral-200 rounded-md px-3 py-1.5 text-sm">')
-            if isActive then emit('Deactivate') else emit('Activate') end
-            emit('                </button>')
+                emit('                <button type="submit" class="border border-neutral-700 text-neutral-400 hover:text-neutral-200 rounded-md px-3 py-1.5 text-sm">')
+                if isActive then emit('Deactivate') else emit('Activate') end
+                emit('                </button>')
             emit('            </form>')
             emit('        </div>')
             emit('    </div>')
@@ -108,32 +111,23 @@ return function(data)
                 emit('    </div>')
             end
 
-            -- TLS Profile section
-            if loaded then
-                emit('    <div class="bg-neutral-900 rounded-lg p-4 border border-neutral-800">')
-                emit('        <div class="flex items-center justify-between gap-3 mb-3">')
-                emit('            <div class="text-sm font-medium">TLS Profile</div>')
-                if pinnedProfile ~= "" then
-                    emit('            <span class="text-xs px-2 py-0.5 rounded-full bg-sky-500/15 text-sky-400">Pinned: ' .. h(pinnedProfile) .. '</span>')
-                else
-                    emit('            <span class="text-xs px-2 py-0.5 rounded-full bg-neutral-700/50 text-neutral-400">Auto (ladder)</span>')
-                end
-                emit('        </div>')
-                emit('        <div class="flex items-center gap-2 flex-wrap">')
-                emit('            <select data-plugin-profile="' .. h(id) .. '" class="bg-neutral-800 border border-neutral-700 rounded-md px-3 py-1.5 text-sm">')
-                emit('                <option value="">Auto (ladder)</option>')
-                for _, profileName in ipairs(availableProfiles) do
-                    local sel = profileName == pinnedProfile and " selected" or ""
-                    emit('                <option value="' .. h(profileName) .. '"' .. sel .. '>' .. h(profileName) .. '</option>')
-                end
-                emit('            </select>')
-                emit('            <button type="button" onclick="testProfile(\'' .. h(id) .. '\')" class="border border-neutral-700 text-neutral-400 hover:text-neutral-200 rounded-md px-3 py-1.5 text-sm">Test</button>')
-                if pinnedProfile ~= "" then
-                    emit('            <button type="button" onclick="resetProfile(\'' .. h(id) .. '\')" class="border border-red-800/50 text-red-400 hover:text-red-300 rounded-md px-3 py-1.5 text-sm">Reset</button>')
-                end
-                emit('        </div>')
-                emit('    </div>')
+            -- TLS Profile section (collapsible)
+            emit('    <details class="bg-neutral-900 rounded-lg border border-neutral-800">')
+            emit('        <summary class="p-4 text-sm font-medium cursor-pointer hover:text-neutral-200">TLS Profile</summary>')
+            emit('        <div class="px-4 pb-4 flex items-center gap-2 flex-wrap">')
+            emit('            <select data-plugin-profile="' .. h(id) .. '" class="bg-neutral-800 border border-neutral-700 rounded-md px-3 py-1.5 text-sm">')
+            emit('                <option value="">Auto (ladder)</option>')
+            for _, profileName in ipairs(availableProfiles) do
+                local sel = profileName == pinnedProfile and " selected" or ""
+                emit('                <option value="' .. h(profileName) .. '"' .. sel .. '>' .. h(profileName) .. '</option>')
             end
+            emit('            </select>')
+            emit('            <button type="button" onclick="testProfile(\'' .. h(id) .. '\')" class="border border-neutral-700 text-neutral-400 hover:text-neutral-200 rounded-md px-3 py-1.5 text-sm">Test</button>')
+            if pinnedProfile ~= "" then
+                emit('            <button type="button" onclick="resetProfile(\'' .. h(id) .. '\')" class="border border-red-800/50 text-red-400 hover:text-red-300 rounded-md px-3 py-1.5 text-sm">Reset</button>')
+            end
+            emit('        </div>')
+            emit('    </details>')
         end
         emit('</div>')
     end
