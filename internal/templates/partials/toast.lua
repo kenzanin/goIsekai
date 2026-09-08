@@ -17,7 +17,7 @@ local TOAST_ACCENT_INFO    = 'bg-indigo-400'
 return function(data)
     return table.concat({
         -- Toast region: Alpine store renders items into this container.
-        '<div id="toast-region" x-data x-init="$store.toast.render(this.$el)" class="fixed bottom-4 left-4 z-50 space-y-2"></div>',
+        '<div id="toast-region" x-data x-init="$store.toast.render($el)" class="fixed bottom-4 left-4 z-50 space-y-2"></div>',
         '',
         -- Toast item transition styles (reused by JS-injected items).
         '<style>',
@@ -27,7 +27,7 @@ return function(data)
         '</style>',
         '',
         -- Confirm modal mount point.
-        '<div id="confirm-modal" x-data x-init="$store.confirm.mount(this.$el)" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/50" style="display:none">',
+        '<div id="confirm-modal" x-data x-init="$store.confirm.mount($el)" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/50" style="display:none">',
         '    <div class="relative bg-neutral-900 border border-neutral-700 rounded-lg shadow-xl w-full max-w-sm p-5">',
         '        <p id="confirm-message" class="text-sm text-neutral-200 mb-4"></p>',
         '        <div class="flex justify-end gap-2">',
