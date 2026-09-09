@@ -177,7 +177,7 @@ return function(data)
     <a href="/view/search" class="inline-block bg-indigo-600 hover:bg-indigo-500 text-white rounded-md px-4 py-2 text-sm font-medium">Search manga</a>
 </div>]]
 	else
-		mangaCards = '<div class="view-container grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-4">'
+		mangaCards = '<div class="view-container grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">'
 		for _, m in ipairs(mangas) do
 			local mid = m.ID or ""
 			local pluginID = m.PluginID or ""
@@ -220,14 +220,14 @@ return function(data)
 
 			-- Badges overlaid on the thumbnail
 			local statusBadge = status ~= ""
-					and ('<span class="absolute top-2 left-2 bg-black/60 backdrop-blur rounded-full px-2 py-0.5 text-[10px] text-neutral-200">' .. h(status) .. "</span>")
+					and ('<span class="absolute top-2 left-2 bg-black/60 backdrop-blur rounded-full px-2 py-0.5 text-xs text-neutral-200">' .. h(status) .. "</span>")
 				or ""
 			local pluginBadge = ""
 			if pluginName ~= "" then
 				local pIcon = pluginIcon ~= ""
 					and ('<img src="' .. h(pluginIcon) .. '" alt="" class="h-3 w-3 rounded-sm object-cover">')
 				or ""
-				pluginBadge = '<span class="absolute bottom-2 left-2 bg-black/60 backdrop-blur rounded-full px-2 py-0.5 text-[10px] text-neutral-200 flex items-center gap-1 max-w-[90%]">'
+				pluginBadge = '<span class="absolute bottom-2 left-2 bg-black/60 backdrop-blur rounded-full px-2 py-0.5 text-[11px] text-neutral-200 flex items-center gap-1 max-w-[90%]">'
 					.. pIcon
 					.. '<span class="truncate">' .. h(pluginName) .. "</span></span>"
 			end
@@ -326,8 +326,8 @@ return function(data)
     width: 80px;
     height: 110px;
   }
-  .view-container[data-view-mode="list"] .view-item .relative img,
-  .view-container[data-view-mode="list"] .view-item .relative > div {
+  .view-container[data-view-mode="list"] .view-item > .relative img,
+  .view-container[data-view-mode="list"] .view-item > .relative > div {
     width: 100%;
     height: 100%;
     object-fit: cover;

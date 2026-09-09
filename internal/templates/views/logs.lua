@@ -27,7 +27,7 @@ return function(data)
 	local logLines = ""
 	for i, line in ipairs(logs) do
 		logLines = logLines
-			.. '    <pre class="text-xs font-mono whitespace-pre-wrap break-all border-b border-neutral-900 py-0.5 select-text">'
+			.. '    <pre class="text-sm font-mono whitespace-pre-wrap break-all border-b border-neutral-900 py-0.5 select-text">'
 			.. h(line)
 			.. "</pre>\n"
 	end
@@ -49,7 +49,7 @@ return function(data)
     </div>
 </div>
 
-<div id="logview" class="bg-neutral-900 border border-neutral-700 rounded-md px-3 py-2 mb-6 overflow-y-auto max-h-[70vh] font-mono text-xs">
+<div id="logview" class="bg-neutral-900 border border-neutral-700 rounded-md px-3 py-2 mb-6 overflow-y-auto max-h-[70vh] font-mono text-sm">
 ]] .. logLines .. [[</div>
 
 <script>

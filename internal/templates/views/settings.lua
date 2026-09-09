@@ -11,7 +11,7 @@ return function(data)
 	return [[<h1 class="text-xl font-semibold mb-1">Settings</h1>
 <p class="text-xs text-neutral-500 mb-6">Config: <code class="text-xs bg-neutral-800 rounded px-1.5 py-0.5">]] .. h(
 		path
-	) .. [[</code></p>]] .. (cfg and [[<form method="post" action="/action/save-settings" class="space-y-4 max-w-xl">
+	) .. [[</code></p>]] .. (cfg and [[<form method="post" action="/action/save-settings" class="space-y-4 max-w-2xl mx-auto">
     <div class="border border-neutral-800 rounded-lg p-4">
         <h2 class="text-sm font-medium text-neutral-300 mb-3">Server</h2>
         <div class="space-y-4">
@@ -74,7 +74,7 @@ return function(data)
     <button type="submit" class="bg-indigo-600 hover:bg-indigo-500 text-white rounded-md px-4 py-2 text-sm font-medium">Save</button>
 </form>
 
-<div class="max-w-xl mt-10 p-4 border border-neutral-800 rounded-lg">
+<div class="max-w-2xl mx-auto mt-10 p-4 border border-neutral-800 rounded-lg">
     <h2 class="text-sm font-semibold mb-1">Image Cache</h2>
     <p class="text-xs text-neutral-400 mb-3">Cached images: ]] .. h(formatBytes(cacheBytes)) .. [["
     <form method="post" action="/action/clear-cache-all" data-confirm="Delete ALL cached images?">
