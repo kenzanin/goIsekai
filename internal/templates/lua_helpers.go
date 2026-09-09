@@ -135,7 +135,6 @@ func formatBytesHelper(S *lua.State) lua.NativeFunc {
 		if !ok || arg.IsNil() {
 			return frame.ReturnString("0 B")
 		}
-		// Accept number (float64 in Lua) or string
 		var n int64
 		switch arg.Kind() {
 		case lua.NumberKind:
@@ -161,7 +160,7 @@ func formatBytesHelper(S *lua.State) lua.NativeFunc {
 			exp++
 		}
 		return frame.ReturnString(
-			strconv.FormatFloat(float64(n)/float64(div), 'f', 1, 64) + " " + string("KMG"[exp]) + "B",
+			strconv.FormatFloat(float64(n)/float64(div), 'f', 1, 64)+" "+string("KMG"[exp])+"B",
 		)
 	}
 }
@@ -186,15 +185,63 @@ func pageWindowHelper(S *lua.State) lua.NativeFunc {
 	}
 }
 
-// pageURLHelper appends a page query param to a base URL.
+// pageURLHelper builds a paginated URL from either:
+//
+//	1. pageURL(base, page) — simple: base string + "?page=N"
+//	2. pageURL(paginationTable, page) — full: extracts Base, Param, Extra from table.
 func pageURLHelper(S *lua.State) lua.NativeFunc {
 	return func(frame lua.Frame) lua.Outcome {
-		base, _ := frame.CoerceString(0)
-		page, _ := frame.CoerceNumber(1)
+		pageNum, _ := frame.CoerceNumber(1)
+		p := strconv.Itoa(int(pageNum))
+
+		// Simple form: pageURL(base, page)
+		arg0, _ := frame.Argument(0)
+		if arg0.Kind() != lua.TableKind {
+			base, _ := frame.CoerceString(0)
+			sep := "?"
+			if strings.Contains(base, "?") {
+				sep = "&"
+			}
+			return frame.ReturnString(base + sep + "page="+p)
+		}
+
+		// Table form: pageURL(paginationTable, page)
+		t, ok := frame.Table(0)
+		if !ok {
+			return frame.ReturnString("?page=" + p)
+		}
+
+		base := ""
+		param := "page"
+
+		// Read Base field
+		if v, err := frame.Index(t.Value(), lua.String("Base")); err == nil && v.Kind() == lua.StringKind {
+			base, _ = v.AsString()
+		}
+
+		// Read Param field
+		if v, err := frame.Index(t.Value(), lua.String("Param")); err == nil && v.Kind() == lua.StringKind {
+			param, _ = v.AsString()
+		}
+
 		sep := "?"
 		if strings.Contains(base, "?") {
 			sep = "&"
 		}
-		return frame.ReturnString(base + sep + "page=" + strconv.Itoa(int(page)))
+		url := base + sep + param + "=" + p
+
+		// Read Extra field and append as key=value pairs
+		if v, err := frame.Index(t.Value(), lua.String("Extra")); err == nil && v.Kind() == lua.TableKind {
+			if vt, ok := v.AsTable(); ok {
+				nilVal := lua.Nil()
+				for k, val, ok, _ := vt.Next(nilVal); ok; k, val, ok, _ = vt.Next(k) {
+					ev, _ := frame.ToString(val)
+					url += "&" + ev
+				}
+			}
+		}
+		return frame.ReturnString(url)
 	}
 }
+
+// pageWindow returns a window of page numbers to display around current.
