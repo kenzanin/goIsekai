@@ -7,9 +7,11 @@ import (
 )
 
 // DuplicateGroup is a set of ≥2 in-library manga that share a normalised
-// title or alternative title.  The UI consumes these to flag likely dupes.
+// title or alternative title (or, when from different plugins, a normalised
+// description or alternative description).  The UI consumes these to flag
+// likely dupes.
 type DuplicateGroup struct {
-	Key     string  // normalised title that was matched
+	Key     string  // normalised key that was matched
 	Title   string  // most readable original title (main title preferred)
 	Members []Manga // the manga in this group (≥2)
 }
@@ -33,10 +35,19 @@ func normalizeTitle(s string) string {
 	return strings.TrimSpace(b.String())
 }
 
-// FindPotentialDuplicates groups in-library manga by normalised title or
-// alternative title.  Manga that share at least one normalised key form a
-// DuplicateGroup; each manga appears in at most one group.  Groups are
-// sorted by member count descending.
+// minDescKeyLen is the minimum length (in runes) of a normalised description
+// before it takes part in duplicate matching.  Short blurbs ("read online
+// free", SEO placeholder text) are too generic to be evidence on their own.
+const minDescKeyLen = 100
+
+// FindPotentialDuplicates groups in-library manga by normalised title,
+// alternative title, description, or alternative description.  Title-family
+// keys are plugin-agnostic (the same story is usually listed under the same
+// name everywhere).  Description-family keys additionally require the members
+// to come from different plugins — a single source repeating one boilerplate
+// blurb must not mass-collide — and a minimum length to skip generic text.
+// Manga that share at least one key form a DuplicateGroup; each manga appears
+// in at most one group.  Groups are sorted by member count descending.
 func (d *DB) FindPotentialDuplicates() ([]DuplicateGroup, error) {
 	// 1. Load all in-library manga.
 	allManga, err := d.ListLibrary()
@@ -52,70 +63,110 @@ func (d *DB) FindPotentialDuplicates() ([]DuplicateGroup, error) {
 		idIndex[m.ID] = i
 	}
 
-	// 2. Bulk-load all alt_titles for in-library manga (one query, no N+1).
+	// 2. Bulk-load all alt_titles and alt_descriptions for in-library manga
+	//    (two queries, no N+1).
 	type altRow struct {
 		MangaRowID string
-		Title      string
+		Value      string
 	}
-	rows, err := d.db.Query(`SELECT at.manga_row_id, at.title
-		FROM alt_titles at
-		JOIN mangas m ON m.id = at.manga_row_id
-		WHERE m.in_library = 1`)
+
+	loadAlts := func(table, column string) ([]altRow, error) {
+		rows, err := d.db.Query(`SELECT at.manga_row_id, at.` + column + `
+			FROM ` + table + ` at
+			JOIN mangas m ON m.id = at.manga_row_id
+			WHERE m.in_library = 1`)
+		if err != nil {
+			return nil, err
+		}
+		defer func() { _ = rows.Close() }()
+		var alts []altRow
+		for rows.Next() {
+			var a altRow
+			if err := rows.Scan(&a.MangaRowID, &a.Value); err != nil {
+				return nil, err
+			}
+			alts = append(alts, a)
+		}
+		return alts, rows.Err()
+	}
+
+	titleAlts, err := loadAlts("alt_titles", "title")
 	if err != nil {
 		return nil, err
 	}
-	defer func() { _ = rows.Close() }()
-	var alts []altRow
-	for rows.Next() {
-		var a altRow
-		if err := rows.Scan(&a.MangaRowID, &a.Title); err != nil {
-			return nil, err
-		}
-		alts = append(alts, a)
-	}
-	if err := rows.Err(); err != nil {
+	descAlts, err := loadAlts("alt_descriptions", "description")
+	if err != nil {
 		return nil, err
 	}
 
-	// 3. Build normalised key → manga-index set.
-	keyToMembers := make(map[string]map[int]struct{})
+	// 3. Build normalised key → manga-index set.  Title keys bind any two
+	//    manga; description keys bind only across different plugins.
+	titleKeys := make(map[string]map[int]struct{})
+	descKeys := make(map[string]map[int]struct{})
 
-	addKey := func(key string, idx int) {
+	addTitle := func(key string, idx int) {
 		if key == "" {
 			return
 		}
-		if keyToMembers[key] == nil {
-			keyToMembers[key] = make(map[int]struct{})
+		if titleKeys[key] == nil {
+			titleKeys[key] = make(map[int]struct{})
 		}
-		keyToMembers[key][idx] = struct{}{}
+		titleKeys[key][idx] = struct{}{}
+	}
+	addDesc := func(key string, idx int) {
+		if len([]rune(key)) < minDescKeyLen {
+			return
+		}
+		if descKeys[key] == nil {
+			descKeys[key] = make(map[int]struct{})
+		}
+		descKeys[key][idx] = struct{}{}
 	}
 
 	for i, m := range allManga {
-		addKey(normalizeTitle(m.Title), i)
+		addTitle(normalizeTitle(m.Title), i)
+		addDesc(normalizeTitle(m.Description), i)
 	}
-	for _, a := range alts {
-		idx, ok := idIndex[a.MangaRowID]
-		if !ok {
-			continue
+	for _, a := range titleAlts {
+		if idx, ok := idIndex[a.MangaRowID]; ok {
+			addTitle(normalizeTitle(a.Value), idx)
 		}
-		addKey(normalizeTitle(a.Title), idx)
+	}
+	for _, a := range descAlts {
+		if idx, ok := idIndex[a.MangaRowID]; ok {
+			addDesc(normalizeTitle(a.Value), idx)
+		}
 	}
 
-	// 4. Extract groups: keys that bind ≥2 distinct manga.
+	// 4. Extract groups: keys that bind ≥2 distinct manga.  Description keys
+	//    additionally require the members to span ≥2 plugins.
 	//    Each manga lands in at most one group (first match wins).
 	grouped := make([]bool, len(allManga))
 	var groups []DuplicateGroup
 
 	// Sort keys so grouping is deterministic.
-	keys := make([]string, 0, len(keyToMembers))
-	for key := range keyToMembers {
+	keys := make([]string, 0, len(titleKeys)+len(descKeys))
+	for key := range titleKeys {
+		keys = append(keys, key)
+	}
+	for key := range descKeys {
 		keys = append(keys, key)
 	}
 	sort.Strings(keys)
 
+	membersOf := func(key string) map[int]struct{} {
+		if m, ok := titleKeys[key]; ok {
+			return m
+		}
+		return descKeys[key]
+	}
+
 	for _, key := range keys {
-		memberSet := keyToMembers[key]
+		memberSet := membersOf(key)
 		if len(memberSet) < 2 {
+			continue
+		}
+		if _, isDesc := descKeys[key]; isDesc && !spansPlugins(memberSet, allManga) {
 			continue
 		}
 		var members []Manga
@@ -145,4 +196,18 @@ func (d *DB) FindPotentialDuplicates() ([]DuplicateGroup, error) {
 	})
 
 	return groups, nil
+}
+
+// spansPlugins reports whether the member indices come from at least two
+// different plugin IDs.
+func spansPlugins(members map[int]struct{}, all []Manga) bool {
+	var seen string
+	for idx := range members {
+		if seen == "" {
+			seen = all[idx].PluginID
+		} else if seen != all[idx].PluginID {
+			return true
+		}
+	}
+	return false
 }
