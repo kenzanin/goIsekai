@@ -42,25 +42,30 @@ return function(data)
         emit('<div class="flex flex-col lg:flex-row gap-6">')
         emit('    <aside class="lg:w-56 shrink-0 flex flex-col gap-3">')
         -- Stats sidebar
-        local function statCard(value, label, color)
+        local function statCard(value, label, color, longText)
             emit('        <div class="bg-neutral-900 border border-neutral-700 rounded-lg px-4 py-3">')
-            local cls = color and (' class="text-xl font-semibold ' .. h(color) .. '"') or ' class="text-xl font-semibold"'
+            local cls
+            if longText then
+                cls = color and (' class="text-sm font-medium ' .. h(color) .. '"') or ' class="text-sm font-medium"'
+            else
+                cls = color and (' class="text-lg font-semibold ' .. h(color) .. '"') or ' class="text-lg font-semibold"'
+            end
             emit('            <div' .. cls .. '>' .. h(tostring(value)) .. '</div>')
             emit('            <div class="text-xs text-neutral-400">' .. h(label) .. '</div>')
             emit('        </div>')
         end
 
         if stats.TotalTitles then statCard(stats.TotalTitles, "titles") end
-        if stats.StatusLine and stats.StatusLine ~= "" then statCard(stats.StatusLine, "status") end
-        if stats.ReadLine and stats.ReadLine ~= "" then statCard(stats.ReadLine, "read") end
+        if stats.StatusLine and stats.StatusLine ~= "" then statCard(stats.StatusLine, "status", nil, true) end
+        if stats.ReadLine and stats.ReadLine ~= "" then statCard(stats.ReadLine, "read", nil, true) end
         if stats.HasUpdates and stats.HasUpdates > 0 then statCard(stats.HasUpdates, "updates", "text-indigo-400") end
-        if stats.ReadingTime and stats.ReadingTime ~= "" then statCard(stats.ReadingTime, "reading time") end
-        if stats.MostLine and stats.MostLine ~= "" then statCard(stats.MostLine, "most chapters") end
-        if stats.HasFewest and stats.FewestLine and stats.FewestLine ~= "" then statCard(stats.FewestLine, "fewest chapters") end
+        if stats.ReadingTime and stats.ReadingTime ~= "" then statCard(stats.ReadingTime, "reading time", nil, true) end
+        if stats.MostLine and stats.MostLine ~= "" then statCard(stats.MostLine, "most chapters", nil, true) end
+        if stats.HasFewest and stats.FewestLine and stats.FewestLine ~= "" then statCard(stats.FewestLine, "fewest chapters", nil, true) end
 
         -- Duplicate groups
         emit('        <details class="bg-neutral-900 border border-neutral-700 rounded-lg overflow-hidden"' .. (duplicateCount == 0 and ' open' or '') .. '>')
-        emit('            <summary class="px-4 py-3 cursor-pointer select-none text-sm font-medium text-neutral-200 hover:bg-neutral-800/60 transition list-none flex items-center justify-between gap-2">')
+        emit('            <summary class="px-4 py-3 cursor-pointer select-none text-xs font-medium text-neutral-200 hover:bg-neutral-800/60 transition list-none flex items-center justify-between gap-2">')
         emit('                <span>Duplicate <span class="text-indigo-400 font-semibold">' .. h(tostring(duplicateCount)) .. '</span></span>')
         emit('                <svg class="w-4 h-4 text-neutral-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>')
         emit('            </summary>')
@@ -91,7 +96,7 @@ return function(data)
         -- Plugin counts
         if #pluginCounts > 0 then
             emit('        <div class="bg-neutral-900 border border-neutral-700 rounded-lg px-4 py-3">')
-            emit('            <div class="text-xs text-neutral-400 mb-2">titles per plugin</div>')
+            emit('            <div class="text-xs font-medium text-neutral-400 mb-2">titles per plugin</div>')
             emit('            <div class="flex flex-col gap-1.5">')
             for _, p in ipairs(pluginCounts) do
                 emit('                <div class="flex items-center justify-between gap-2 text-xs rounded-md px-1.5 py-1">')

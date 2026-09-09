@@ -370,7 +370,7 @@ func (s *Server) viewMangaDetail(w http.ResponseWriter, r *http.Request) {
 	chTotal := len(chapters)
 	chStart := min((chPage-1)*chapterPageSize, chTotal)
 	chEnd := min(chStart+chapterPageSize, chTotal)
-	s.renderPage(w, r, "views/detail", "search", map[string]any{
+	s.renderPage(w, r, "views/detail", "", map[string]any{
 		"PluginID":          pluginID,
 		"PluginName":        pluginName,
 		"PluginIcon":        pluginIcon,
