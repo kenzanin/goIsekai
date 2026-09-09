@@ -17,7 +17,7 @@ flowchart LR
 
     subgraph goIsekai[goIsekai single binary]
         HTTP[chi HTTP server]
-        API[/api JSON endpoints]
+        API["/api JSON endpoints"]
         Bridge[AppService bridge]
         PM[pluginmanager<br/>lazy-load]
         subgraph Sandboxes
@@ -26,10 +26,10 @@ flowchart LR
             JS[goja<br/>ES5.1]
             GO[go plugin<br/>.so]
         end
-        HostNet[hostnet proxy<br/>profile ladder]
+        HostNet["hostnet proxy<br/>profile ladder"]
         DB[(SQLite<br/>modernc.org)]
         Cache[(WebP disk cache)]
-        Backup[auto-backup<br/>+ orphan prune]
+        Backup["auto-backup<br/>+ orphan prune"]
     end
 
     subgraph Internet
