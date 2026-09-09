@@ -1,7 +1,6 @@
 package httpserver
 
 import (
-	"fmt"
 	"goisekai/internal/database"
 	"net/http"
 	"strconv"
@@ -106,39 +105,7 @@ func (s *Server) viewLibrary(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		s.logger.Warn("library overview", "error", err)
 	}
-	// Precompute display strings for the template (Jet logic stays dumb).
-	statusParts := make([]string, 0, 3)
-	if overview.StatusDone > 0 {
-		statusParts = append(statusParts, fmt.Sprintf("%d done", overview.StatusDone))
-	}
-	if overview.StatusOngoing > 0 {
-		statusParts = append(statusParts, fmt.Sprintf("%d ongoing", overview.StatusOngoing))
-	}
-	if overview.StatusUnknown > 0 {
-		statusParts = append(statusParts, fmt.Sprintf("%d unknown", overview.StatusUnknown))
-	}
-	statusLine := strings.Join(statusParts, " · ")
-	if statusLine == "" {
-		statusLine = "no data"
-	}
-	readLine := fmt.Sprintf("%d finished · %d reading", overview.FullyRead, overview.StartedReading)
-	readingTime := fmt.Sprintf("%.1f h", float64(overview.PagesRead)*120/3600)
-	mostLine := fmt.Sprintf("%d ch", overview.MostCount)
-	if overview.MostDup > 1 {
-		mostLine = fmt.Sprintf("%d ch · %d titles", overview.MostCount, overview.MostDup)
-	} else if len(overview.MostTitle) > 25 {
-		mostLine = fmt.Sprintf("%s… · %d ch", overview.MostTitle[:25], overview.MostCount)
-	} else if overview.MostTitle != "" {
-		mostLine = fmt.Sprintf("%s · %d ch", overview.MostTitle, overview.MostCount)
-	}
-	fewestLine := fmt.Sprintf("%d ch", overview.FewestCount)
-	if overview.FewestDup > 1 {
-		fewestLine = fmt.Sprintf("%d ch · %d titles", overview.FewestCount, overview.FewestDup)
-	} else if len(overview.FewestTitle) > 25 {
-		fewestLine = fmt.Sprintf("%s… · %d ch", overview.FewestTitle[:25], overview.FewestCount)
-	} else if overview.FewestTitle != "" {
-		fewestLine = fmt.Sprintf("%s · %d ch", overview.FewestTitle, overview.FewestCount)
-	}
+	statusLine, readLine, readingTime, mostLine, fewestLine := buildOverviewStrings(overview)
 	// Duplicate detection is skipped on search (keeps it cheap on filter);
 	// keys are still passed (empty) so the template always has them.
 	var (
