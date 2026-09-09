@@ -10,16 +10,15 @@ package main
 import (
 	"encoding/json"
 	"fmt"
-	"math"
 	"net/url"
 	"strconv"
 	"strings"
-	"time"
 
 	"github.com/extism/go-pdk"
 
 	"goisekai/pkg/types"
 )
+
 const (
 	apiURL = "https://api.mangadex.org"
 	cdnURL = "https://uploads.mangadex.org"
@@ -60,174 +59,9 @@ func doFetch(requestURL string) (*types.HTTPResponse, error) {
 // MangaDex API response DTOs
 // ---------------------------------------------------------------------------
 
-type mangaListResp struct {
-	Result   string      `json:"result"`
-	Response string      `json:"response"`
-	Data     []mangaData `json:"data"`
-	Limit    int         `json:"limit"`
-	Offset   int         `json:"offset"`
-	Total    int         `json:"total"`
-}
-
-type singleMangaResp struct {
-	Result   string    `json:"result"`
-	Response string    `json:"response"`
-	Data     mangaData `json:"data"`
-}
-
-type mangaData struct {
-	ID            string         `json:"id"`
-	Type          string         `json:"type"`
-	Attributes    mangaAttrs     `json:"attributes"`
-	Relationships []relationship `json:"relationships"`
-}
-
-type mangaAttrs struct {
-	Title       map[string]string   `json:"title"`
-	AltTitles   []map[string]string `json:"altTitles"`
-	Description map[string]string   `json:"description"`
-	Status      string              `json:"status"`
-	Tags        []mangaTag          `json:"tags"`
-}
-
-type mangaTag struct {
-	ID         string `json:"id"`
-	Type       string `json:"type"`
-	Attributes struct {
-		Name  map[string]string `json:"name"`
-		Group string            `json:"group"`
-	} `json:"attributes"`
-}
-
-type relationship struct {
-	ID         string `json:"id"`
-	Type       string `json:"type"`
-	Attributes *struct {
-		FileName string `json:"fileName"`
-		Name     string `json:"name"`
-	} `json:"attributes"`
-}
-
-type chapterListResp struct {
-	Result string        `json:"result"`
-	Data   []chapterData `json:"data"`
-	Limit  int           `json:"limit"`
-	Offset int           `json:"offset"`
-	Total  int           `json:"total"`
-}
-
-type chapterData struct {
-	ID         string          `json:"id"`
-	Attributes chapterAttrs    `json:"attributes"`
-	Relationships []relationship `json:"relationships"`
-}
-
-type chapterAttrs struct {
-	Chapter      string `json:"chapter"`
-	Volume       string `json:"volume"`
-	Title        string `json:"title"`
-	TranslatedLanguage string `json:"translatedLanguage"`
-	PublishAt    string `json:"publishAt"`
-	ExternalURL  string `json:"externalURL"`
-}
-
-type atHomeResp struct {
-	BaseURL  string `json:"baseUrl"`
-	Chapter  struct {
-		Hash string   `json:"hash"`
-		Data []string `json:"data"`
-	} `json:"chapter"`
-}
-
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
-
-func defaultHeaders() map[string]string {
-	return map[string]string{
-		"Referer": cdnURL + "/",
-	}
-}
-
-func firstTitle(attrs mangaAttrs) string {
-	if t, ok := attrs.Title[lang]; ok && t != "" {
-		return t
-	}
-	for _, at := range attrs.AltTitles {
-		if t, ok := at[lang]; ok && t != "" {
-			return t
-		}
-	}
-	for _, at := range attrs.AltTitles {
-		for _, t := range at {
-			if t != "" {
-				return t
-			}
-		}
-	}
-	for _, t := range attrs.Title {
-		if t != "" {
-			return t
-		}
-	}
-	return ""
-}
-
-// firstLang returns the first non-empty value from a localized string map,
-// preferring English, mirroring firstTitle.
-func firstLang(m map[string]string) string {
-	if v, ok := m[lang]; ok && v != "" {
-		return v
-	}
-	for _, v := range m {
-		if v != "" {
-			return v
-		}
-	}
-	return ""
-}
-
-func coverURL(md mangaData) string {
-	for _, r := range md.Relationships {
-		if r.Type == "cover_art" && r.Attributes != nil {
-			return cdnURL + "/covers/" + md.ID + "/" + r.Attributes.FileName + ".256.jpg"
-		}
-	}
-	return ""
-}
-
-func toManga(md mangaData) types.Manga {
-	tags := make([]string, 0, len(md.Attributes.Tags))
-	for _, t := range md.Attributes.Tags {
-		if n := firstLang(t.Attributes.Name); n != "" {
-			tags = append(tags, n)
-		}
-	}
-	return types.Manga{
-		ID:          md.ID,
-		Title:       firstTitle(md.Attributes),
-		CoverURL:    coverURL(md),
-		Description: firstLang(md.Attributes.Description),
-		Status:      md.Attributes.Status,
-		Genres:      tags,
-	}
-}
-
-func parseFloat64(s string) float64 {
-	f, _ := strconv.ParseFloat(s, 64)
-	return f
-}
-
-func parseTime(s string) time.Time {
-	t, _ := time.Parse(time.RFC3339, s)
-	return t
-}
-
-func contentRatingQuery(q url.Values) {
-	q.Add("contentRating[]", "safe")
-	q.Add("contentRating[]", "suggestive")
-	q.Add("contentRating[]", "erotica")
-}
 
 // ---------------------------------------------------------------------------
 // Extism ABI exports — pdk.Input() / pdk.Output(), return int32
@@ -328,85 +162,6 @@ func GetMangaDetail() int32 {
 		return 0
 	}
 	b, _ := json.Marshal(toManga(single.Data))
-	pdk.Output(b)
-	return 0
-}
-
-// GetChapterList returns all chapters for a manga (paginated feed).
-//
-//go:wasmexport GetChapterList
-func GetChapterList() int32 {
-	var mangaID string
-	_ = json.Unmarshal(pdk.Input(), &mangaID)
-	if mangaID == "" {
-		b, _ := json.Marshal([]types.Chapter{})
-		pdk.Output(b)
-		return 0
-	}
-
-	var all []types.Chapter
-	offset := 0
-	for {
-		q := url.Values{}
-		q.Set("limit", "500")
-		q.Set("offset", strconv.Itoa(offset))
-		q.Add("translatedLanguage[]", lang)
-		q.Add("order[volume]", "asc")
-		q.Add("order[chapter]", "asc")
-		q.Add("includes[]", "scanlation_group")
-		q.Set("includeEmptyPages", "0")
-		contentRatingQuery(q)
-
-		resp, err := doFetch(apiURL + "/manga/" + mangaID + "/feed?" + q.Encode())
-		if err != nil || resp.Status < 200 || resp.Status >= 300 {
-			break
-		}
-
-		var list chapterListResp
-		if err := json.Unmarshal([]byte(resp.Body), &list); err != nil {
-			break
-		}
-
-		for _, cd := range list.Data {
-			if cd.Attributes.ExternalURL != "" {
-				continue
-			}
-
-			chNum := parseFloat64(cd.Attributes.Chapter)
-			if math.IsNaN(chNum) {
-				chNum = 0
-			}
-
-			volNum := parseFloat64(cd.Attributes.Volume)
-			if math.IsNaN(volNum) {
-				volNum = 0
-			}
-
-			chTitle := "Chapter " + cd.Attributes.Chapter
-			if cd.Attributes.Title != "" {
-				chTitle = cd.Attributes.Title
-			}
-			if cd.Attributes.Chapter == "" && cd.Attributes.Title == "" {
-				chTitle = "Oneshot"
-			}
-
-			all = append(all, types.Chapter{
-				ID:         cd.ID,
-				MangaID:    mangaID,
-				Title:      chTitle,
-				ChapterNum: chNum,
-				VolumeNum:  volNum,
-				ReleasedAt: parseTime(cd.Attributes.PublishAt),
-				URL:        "https://mangadex.org/chapter/" + cd.ID,
-			})
-		}
-
-		offset += list.Limit
-		if offset >= list.Total {
-			break
-		}
-	}
-	b, _ := json.Marshal(all)
 	pdk.Output(b)
 	return 0
 }

@@ -8,9 +8,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/dop251/goja"
 	"goisekai/internal/logger"
 	"goisekai/pkg/types"
+
+	"github.com/dop251/goja"
 )
 
 // jsFnNames maps host ABI function names to the JS global names a JS plugin

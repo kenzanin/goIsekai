@@ -5,10 +5,11 @@ import (
 	"errors"
 	"time"
 
-	"github.com/go-jet/jet/v2/qrm"
-	. "github.com/go-jet/jet/v2/sqlite"
 	"goisekai/internal/database/.gen/model"
 	tbl "goisekai/internal/database/.gen/table"
+
+	"github.com/go-jet/jet/v2/qrm"
+	. "github.com/go-jet/jet/v2/sqlite"
 )
 
 // PluginVerify holds a plugin's human-verification state: the URL the user

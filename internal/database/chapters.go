@@ -3,8 +3,9 @@ package database
 import (
 	"math"
 
-	. "github.com/go-jet/jet/v2/sqlite"
 	. "goisekai/internal/database/.gen/table"
+
+	. "github.com/go-jet/jet/v2/sqlite"
 )
 
 // UpsertChapter inserts a chapter or, on a duplicate id, refreshes the

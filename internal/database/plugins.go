@@ -1,9 +1,10 @@
 package database
 
 import (
-	. "github.com/go-jet/jet/v2/sqlite"
 	"goisekai/internal/database/.gen/model"
 	. "goisekai/internal/database/.gen/table"
+
+	. "github.com/go-jet/jet/v2/sqlite"
 )
 
 // RegisterPlugin inserts a plugin or, on a duplicate id, refreshes its metadata.

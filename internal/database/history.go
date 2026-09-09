@@ -3,8 +3,9 @@ package database
 import (
 	"time"
 
-	. "github.com/go-jet/jet/v2/sqlite"
 	. "goisekai/internal/database/.gen/table"
+
+	. "github.com/go-jet/jet/v2/sqlite"
 )
 
 // RecordRead inserts a read-history row for a chapter.

@@ -18,15 +18,11 @@ package main
 import (
 	"encoding/json"
 	"fmt"
-	neturl "net/url"
 	"strconv"
-	"strings"
-	"time"
 
 	"github.com/extism/go-pdk"
 
 	"mangafire-plugin/types"
-	"mangafire-plugin/vrf"
 )
 
 const (
@@ -70,79 +66,6 @@ func fetchJSON(requestURL string, v any) error {
 // ---------------------------------------------------------------------------
 // VRF signer — port of the MangaFire frontend signer (see ./vrf).
 // ---------------------------------------------------------------------------
-
-// vrfURL builds the full API URL: path + url-encoded params + vrf param.
-func vrfURL(apiPath string, params map[string]string) string {
-	sig := vrf.Sign(apiPath, params)
-	u := apiBase + apiPath
-	if len(params) == 0 {
-		return u + "?vrf=" + sig
-	}
-	q := neturl.Values{}
-	for k, v := range params {
-		q.Set(k, v)
-	}
-	return u + "?" + q.Encode() + "&vrf=" + sig
-}
-
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
-// stripHTML removes HTML tags from a synopsis HTML string.
-func stripHTML(s string) string {
-	s = strings.ReplaceAll(s, "<br>", "\n")
-	s = strings.ReplaceAll(s, "<br/>", "\n")
-	s = strings.ReplaceAll(s, "<br />", "\n")
-	re := strings.NewReplacer(
-		"&quot;", "\"", "&#039;", "'", "&amp;", "&", "&lt;", "<", "&gt;", ">",
-	)
-	s = re.Replace(s)
-	var b strings.Builder
-	inTag := false
-	for _, c := range s {
-		if c == '<' {
-			inTag = true
-			continue
-		}
-		if c == '>' {
-			inTag = false
-			continue
-		}
-		if !inTag {
-			b.WriteRune(c)
-		}
-	}
-	return strings.TrimSpace(b.String())
-}
-
-// normalizeStatus maps MangaFire's native status codes to human-readable labels.
-// MangaFire returns e.g. "releasing" / "finished" / "on_hold" / "discontinued" /
-// "not_published"; these read awkwardly next to other plugins' "Ongoing" etc.
-func normalizeStatus(s string) string {
-	switch s {
-	case "releasing":
-		return "Ongoing"
-	case "finished":
-		return "Completed"
-	case "on_hold":
-		return "Hiatus"
-	case "discontinued":
-		return "Dropped"
-	case "not_published", "upcoming":
-		return "Upcoming"
-	default:
-		return s
-	}
-}
-
-// sanitizeTitle strips MangaFire's HTML-escaped title entities.
-func sanitizeTitle(s string) string {
-	s = strings.ReplaceAll(s, "&#039;", "'")
-	s = strings.ReplaceAll(s, "&quot;", "\"")
-	s = strings.ReplaceAll(s, "&amp;", "&")
-	return strings.TrimSpace(s)
-}
 
 // ---------------------------------------------------------------------------
 // Extism ABI exports — pdk.Input() / pdk.Output(), return int32
@@ -233,10 +156,10 @@ func GetMangaDetail() int32 {
 
 	var response struct {
 		Data struct {
-			HID     string `json:"hid"`
-			Title   string `json:"title"`
-			Summary string `json:"synopsisHtml"`
-			Status  string `json:"status"`
+			HID     string                  `json:"hid"`
+			Title   string                  `json:"title"`
+			Summary string                  `json:"synopsisHtml"`
+			Status  string                  `json:"status"`
 			Poster  struct{ Medium string } `json:"poster"`
 		} `json:"data"`
 	}
@@ -259,57 +182,6 @@ func GetMangaDetail() int32 {
 
 // GetChapterList — arg = JSON mangaID (the hid). Returns []Chapter.
 // Fetches up to 3 pages (200/page, ~600 chapters), newest-first.
-
-//go:wasmexport GetChapterList
-func GetChapterList() int32 {
-	var hid string
-	_ = json.Unmarshal(pdk.Input(), &hid)
-
-	chapters := []types.Chapter{}
-	page := 1
-	for {
-		params := map[string]string{
-			"language": "en",
-			"limit":    "200",
-			"order":    "desc",
-			"page":     strconv.Itoa(page),
-			"sort":     "number",
-		}
-		var resp struct {
-			Items []struct {
-				ID        int     `json:"id"`
-				Number    float64 `json:"number"`
-				Name      string  `json:"name"`
-				CreatedAt int64   `json:"created_at"`
-			} `json:"items"`
-			Meta struct {
-				LastPage int  `json:"last_page"`
-				HasNext  bool `json:"has_next"`
-			} `json:"meta"`
-		}
-		u := vrfURL("/titles/"+hid+"/chapters", params)
-		if err := fetchJSON(u, &resp); err != nil {
-			break
-		}
-		for _, c := range resp.Items {
-			chapters = append(chapters, types.Chapter{
-				ID:         strconv.Itoa(c.ID),
-				MangaID:    hid,
-				ChapterNum: c.Number,
-				Title:      c.Name,
-				ReleasedAt: time.Unix(c.CreatedAt, 0).UTC(),
-			})
-		}
-		if page >= resp.Meta.LastPage || !resp.Meta.HasNext || page >= 3 {
-			break
-		}
-		page++
-	}
-	// Descending page order => newest first, matching the host convention.
-	b, _ := json.Marshal(chapters)
-	pdk.Output(b)
-	return 0
-}
 
 // GetPageList — arg = JSON chapterID (the numeric string from a chapter id).
 // Returns []Page; each page carries the Referer required by the image CDN.

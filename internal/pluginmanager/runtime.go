@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"strconv"
 
-	"github.com/extism/go-sdk"
+	extism "github.com/extism/go-sdk"
 
 	"goisekai/internal/logger"
 	"goisekai/pkg/types"
