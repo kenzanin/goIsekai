@@ -366,7 +366,3 @@ func callLua(p *loadedPlugin, fnName, inputJSON string) (string, error) {
 		return s, nil
 	}
 }
-
-// ---------------------------------------------------------------------------
-// Lunar ↔ Go value conversion (replaces gopher-json entirely)
-// ---------------------------------------------------------------------------

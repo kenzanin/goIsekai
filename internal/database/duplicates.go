@@ -2,8 +2,6 @@ package database
 
 import (
 	"sort"
-	"strings"
-	"unicode"
 )
 
 // DuplicateGroup is a set of ≥2 in-library manga that share a normalised
@@ -16,24 +14,7 @@ type DuplicateGroup struct {
 	Members []Manga // the manga in this group (≥2)
 }
 
-// normalizeTitle lowercases, trims, strips non-alphanumeric characters
-// (keeping letters, digits, and spaces), and collapses whitespace runs.
-func normalizeTitle(s string) string {
-	s = strings.ToLower(strings.TrimSpace(s))
-	var b strings.Builder
-	b.Grow(len(s))
-	prevSpace := false
-	for _, r := range s {
-		if unicode.IsLetter(r) || unicode.IsDigit(r) {
-			b.WriteRune(r)
-			prevSpace = false
-		} else if !prevSpace { // non-alnum → treat as space separator
-			b.WriteByte(' ')
-			prevSpace = true
-		}
-	}
-	return strings.TrimSpace(b.String())
-}
+
 
 // minDescKeyLen is the minimum length (in runes) of a normalised description
 // before it takes part in duplicate matching.  Short blurbs ("read online
@@ -198,16 +179,4 @@ func (d *DB) FindPotentialDuplicates() ([]DuplicateGroup, error) {
 	return groups, nil
 }
 
-// spansPlugins reports whether the member indices come from at least two
-// different plugin IDs.
-func spansPlugins(members map[int]struct{}, all []Manga) bool {
-	var seen string
-	for idx := range members {
-		if seen == "" {
-			seen = all[idx].PluginID
-		} else if seen != all[idx].PluginID {
-			return true
-		}
-	}
-	return false
-}
+

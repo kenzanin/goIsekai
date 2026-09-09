@@ -60,6 +60,19 @@ func (s *AppService) SetChapterProgress(pluginID, mangaID, chapterID string, las
 	return nil
 }
 
+// MarkChapterComplete records the chapter's page URLs in complete.csv so a
+// later CBZ export can run fully offline.
+func (s *AppService) MarkChapterComplete(pluginID, mangaID, chapterID string) error {
+	pages, err := s.GetPageList(pluginID, chapterID)
+	if err != nil {
+		return fmt.Errorf("mark chapter complete: %w", err)
+	}
+	if err := s.writeCompleteCSV(pluginID, mangaID, chapterID, pages); err != nil {
+		return fmt.Errorf("mark chapter complete: %w", err)
+	}
+	return nil
+}
+
 // MarkChapterRead marks a single chapter as read, addressed by source ids.
 func (s *AppService) MarkChapterRead(pluginID, mangaID, chapterID string) error {
 	if err := s.db.MarkChapterRead(chapterRowID(pluginID, mangaID, chapterID)); err != nil {
