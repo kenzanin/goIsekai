@@ -116,7 +116,8 @@ return function(data)
 			end
 		end
 
-		sidebarHTML = [[<aside class="lg:w-56 shrink-0 flex flex-col gap-3">
+		sidebarHTML = [[<div class="flex flex-col lg:flex-row gap-4 items-start">
+<aside class="lg:w-56 shrink-0 flex flex-col gap-3">
     <div class="bg-neutral-900 border border-neutral-800 rounded-lg px-4 py-3">
         <div class="flex flex-col gap-3">]] .. statCards .. [[</div>
     </div>
@@ -214,38 +215,32 @@ return function(data)
 					.. "</div>"
 			end
 
-			local statsHTML = ""
-			if statsObj then
-				local totalCh = statsObj.TotalChapters or 0
-				local readCh = statsObj.ReadChapters or 0
-				local unread = totalCh - readCh
-				local pluginIcon = statsObj.PluginIcon or ""
-				local pluginName = statsObj.PluginName or ""
-				local hasNew = statsObj.HasNew or false
-				local iconHTML = pluginIcon ~= ""
-						and ('<img src="' .. h(pluginIcon) .. '" alt="" class="inline h-2.5 w-2.5 rounded-sm object-cover align-[-0.5px]"> ')
-					or ""
-				statsHTML = '<div class="flex items-center gap-2 mt-1">'
-					.. '<span class="rounded-full text-xs px-2 py-0.5 bg-neutral-800 text-neutral-400"><span class="text-indigo-400 font-medium">'
-					.. h(tostring(unread))
-					.. " unread</span> of "
-					.. h(tostring(totalCh))
-					.. " · "
-					.. iconHTML
-					.. h(pluginName)
-					.. "</span>"
-					.. (hasNew and '<span class="text-[10px] px-1.5 py-0.5 rounded-full bg-red-500 text-white font-medium">New</span>' or "")
-					.. "</div>"
+			local pluginName = statsObj and (statsObj.PluginName or "") or ""
+			local pluginIcon = statsObj and (statsObj.PluginIcon or "") or ""
+
+			-- Badges overlaid on the thumbnail
+			local statusBadge = status ~= ""
+					and ('<span class="absolute top-2 left-2 bg-black/60 backdrop-blur rounded-full px-2 py-0.5 text-[10px] text-neutral-200">' .. h(status) .. "</span>")
+				or ""
+			local pluginBadge = ""
+			if pluginName ~= "" then
+				local pIcon = pluginIcon ~= ""
+					and ('<img src="' .. h(pluginIcon) .. '" alt="" class="h-3 w-3 rounded-sm object-cover">')
+				or ""
+				pluginBadge = '<span class="absolute bottom-2 left-2 bg-black/60 backdrop-blur rounded-full px-2 py-0.5 text-[10px] text-neutral-200 flex items-center gap-1 max-w-[90%]">'
+					.. pIcon
+					.. '<span class="truncate">' .. h(pluginName) .. "</span></span>"
 			end
 
-			local statusBadge = status ~= "" and ('<span class="text-[10px] text-neutral-400">' .. h(status) .. '</span>' or "")
+			-- read/total in the title area
 			local statsBadge = ""
 			if statsObj then
-				statsBadge = '<span class="text-xs text-neutral-400 truncate">'
+				statsBadge = '<span class="text-sm font-semibold text-indigo-400">'
 					.. h(tostring(statsObj.ReadChapters or 0))
-					.. "/" .. h(tostring(statsObj.TotalChapters or 0))
-					.. '</span>'
-					.. (statsObj.HasNew and ' <span class="text-[10px] px-1.5 py-0.5 rounded-full bg-red-500 text-white font-medium">New</span>' or "")
+					.. '</span><span class="text-xs text-neutral-500">/</span><span class="text-sm font-medium text-neutral-300">'
+					.. h(tostring(statsObj.TotalChapters or 0))
+					.. "</span>"
+					.. (statsObj.HasNew and ' <span class="text-[10px] px-1.5 py-0.5 rounded-full bg-red-500 text-white font-medium align-middle">New</span>' or "")
 			end
 
 			mangaCards = mangaCards
@@ -261,6 +256,8 @@ return function(data)
 				.. '">' 
 				.. coverHTML
 				.. '<div class="lib-dim" style="display:none;position:absolute;inset:0;background:rgba(0,0,0,0.82);border-radius:0.5rem;"></div>'
+				.. statusBadge
+				.. pluginBadge
 				.. "</div>"
 				.. '<div class="p-3 flex flex-col gap-1">'
 				.. '<div class="text-sm font-medium line-clamp-2" title="'
@@ -268,10 +265,9 @@ return function(data)
 				.. '">' 
 				.. h(title)
 				.. "</div>"
-				.. '<div class="flex items-center justify-between gap-1">'
-				.. statusBadge
+				.. '<div class="flex items-center gap-1">'
 				.. statsBadge
-				.. '</div>'
+				.. "</div>"
 				.. "</div></a>"
 		end
 		mangaCards = mangaCards
