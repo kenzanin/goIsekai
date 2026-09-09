@@ -51,6 +51,10 @@ func (s *AppService) GetMangaDetails(pluginID, mangaID string) (types.Manga, []t
 	if dbTitle, custom, err := s.db.MangaTitleIfCustom(pluginID, mangaID); err == nil && custom {
 		manga.Title = dbTitle
 	}
+	// A user-set main description (via alt-summary swap) wins over the plugin-sourced one.
+	if dbDesc, custom, err := s.db.MangaDescriptionIfCustom(pluginID, mangaID); err == nil && custom {
+		manga.Description = dbDesc
+	}
 	return manga, chapters, nil
 }
 

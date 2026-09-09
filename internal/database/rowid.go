@@ -24,6 +24,18 @@ func (d *DB) MangaTitleIfCustom(pluginID, sourceMangaID string) (string, bool, e
 	}
 	return title, custom, nil
 }
+
+// MangaDescriptionIfCustom returns the stored main description and whether
+// it is a user-set (custom) description that must override the plugin-sourced one.
+func (d *DB) MangaDescriptionIfCustom(pluginID, sourceMangaID string) (string, bool, error) {
+	var desc string
+	var custom bool
+	err := d.db.QueryRow(`SELECT description, custom_description FROM mangas WHERE plugin_id = ? AND source_manga_id = ?`, pluginID, sourceMangaID).Scan(&desc, &custom)
+	if err != nil {
+		return "", false, fmt.Errorf("manga custom description: %w", err)
+	}
+	return desc, custom, nil
+}
 func (d *DB) MangaTitle(pluginID, sourceMangaID string) (string, error) {
 	var title string
 	err := d.db.QueryRow(`SELECT title FROM mangas WHERE plugin_id = ? AND source_manga_id = ?`, pluginID, sourceMangaID).Scan(&title)
