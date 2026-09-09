@@ -45,7 +45,7 @@ return function(data)
 	end
 
 	-- Manga header grid
-	body = body .. '<div class="flex flex-col md:flex-row gap-6 mb-8">' .. '<div class="md:w-[200px] md:shrink-0">'
+	body = body .. '<div class="flex flex-col md:flex-row gap-6 mb-4 items-start">' .. '<div class="md:w-[200px] md:shrink-0">'
 
 	-- Cover or placeholder
 	local coverHTML = ""
@@ -198,7 +198,7 @@ return function(data)
 		titlesFormHTML =
 			'<p class="text-xs text-neutral-500">No alt-title providers available — install a plugin that declares alt-title servers.</p>'
 	end
-	body = body .. titlesFormHTML .. "</div></div>"
+	body = body .. titlesFormHTML
 
 	-- Origin summary
 	if manga.Description and manga.Description ~= "" then
@@ -323,7 +323,7 @@ return function(data)
 			.. h(label)
 			.. "</a>"
 	end
-	body = body .. actionsHTML .. "</div></div></div>"
+	body = body .. actionsHTML .. "</div>"
 
 	-- Chapters section
 	body = body .. '<h2 class="text-xl font-semibold mb-4">Chapters</h2>'
