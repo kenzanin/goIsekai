@@ -51,10 +51,10 @@ return function(data)
     if manga.CoverURL and manga.CoverURL ~= "" then
         emit('        <div id="cover-wrap" class="relative" data-key="' .. h(pluginID) .. ':' .. h(mangaID) .. '">')
         emit('            <img src="/image?pluginID=' .. h(pluginID) .. '&amp;url=' .. h(manga.CoverURL) .. '" alt="' .. h(manga.Title or "") .. '" class="w-full aspect-[2/3] rounded-lg object-cover">')
-        emit('            <div id="cover-dim" style="display:none;position:absolute;top:0;left:0;right:0;bottom:0;border-radius:0.5rem;background:rgba(0,0,0,0.82);"></div>')
+        emit('            <div id="cover-dim" class="lib-dim" style="display:none;position:absolute;top:0;left:0;right:0;bottom:0;border-radius:0.5rem;background:rgba(0,0,0,0.82);"></div>')
         emit('        </div>')
         emit('        <button type="button" id="cover-dim-btn" title="Dim the cover image" onclick="var w=document.getElementById(&quot;cover-wrap&quot;);var d=document.getElementById(&quot;cover-dim&quot;);var b=document.getElementById(&quot;cover-dim-btn&quot;);if(b.dataset.on===&quot;1&quot;){b.dataset.on=&quot;0&quot;;d.style.display=&quot;none&quot;;localStorage.setItem(&quot;gsk:cover-dim:&quot;+w.dataset.key,&quot;0&quot;);b.textContent=&quot;Hide cover&quot;;}else{b.dataset.on=&quot;1&quot;;d.style.display=&quot;block&quot;;localStorage.setItem(&quot;gsk:cover-dim:&quot;+w.dataset.key,&quot;1&quot;);b.textContent=&quot;Show cover&quot;;}" class="mt-2 inline-flex items-center text-xs text-neutral-400 hover:text-neutral-200 transition cursor-pointer">Hide cover</button>')
-        emit('        <script>(function(){var w=document.getElementById(&quot;cover-wrap&quot;);if(!w)return;var d=document.getElementById(&quot;cover-dim&quot;);var b=document.getElementById(&quot;cover-dim-btn&quot;);if(!d||!b)return;if(localStorage.getItem(&quot;gsk:cover-dim:&quot;+w.dataset.key)===&quot;1&quot;){d.style.display=&quot;block&quot;;b.dataset.on=&quot;1&quot;;b.textContent=&quot;Show cover&quot;;}})();</script>')
+
     else
         emit('        <div class="w-full aspect-[2/3] bg-neutral-800 rounded-lg flex items-center justify-center text-neutral-500 text-4xl font-semibold">' .. h(getInitials(manga.Title or "")) .. '</div>')
     end

@@ -182,11 +182,7 @@ return function(data)
         emit(pagination({ Pagination = { Base = "/", Param = "page", Current = page, Total = totalPages } }))
     end
 
-    -- Restore dim state from localStorage
-    if #mangas > 0 then
-        emit('<script>(function(){document.querySelectorAll(".relative[data-key]").forEach(function(w){var d=w.querySelector(".lib-dim");if(d&&localStorage.getItem("gsk:cover-dim:"+w.dataset.key)==="1"){d.style.display="block";}});})();</script>')
-    end
-
+    -- Cover-dim restore handled centrally by alpine-components.js syncCoverDim()
     if #mangas > 0 and q == "" then
         emit('    </div>')
         emit('</div>')

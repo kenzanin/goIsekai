@@ -407,6 +407,7 @@
               if (window.Alpine && Alpine.initTree) {
                 Alpine.initTree(main);
               }
+              if (window.syncCoverDim) syncCoverDim();
               // Sync the address bar to the canonical re-rendered URL without
               // adding a history entry — Back still leaves the detail page.
               const u = resp.url || action;
@@ -470,6 +471,31 @@
       history.replaceState(null, '', url);
     }
   });
+
+  // =====================================================================
+  // Cover-dim restore (shared by detail + library templates)
+  // Dim state lives in localStorage as gsk:cover-dim:{pluginID}:{id}.
+  // Templates no longer inline restore <script> tags: HTML entities inside
+  // <script> are not decoded (JS syntax error) and innerHTML swaps skip
+  // inline scripts entirely. This runs on load + after SPA content swaps.
+  // =====================================================================
+  const syncCoverDim = () => {
+    document.querySelectorAll('[data-key]').forEach((wrap) => {
+      const dim = wrap.querySelector('.lib-dim');
+      if (!dim || !wrap.dataset.key) return;
+      const on = localStorage.getItem('gsk:cover-dim:' + wrap.dataset.key) === '1';
+      dim.style.display = on ? 'block' : 'none';
+    });
+    const btn = document.getElementById('cover-dim-btn');
+    const wrap = document.getElementById('cover-wrap');
+    if (btn && wrap && wrap.dataset.key) {
+      const on = localStorage.getItem('gsk:cover-dim:' + wrap.dataset.key) === '1';
+      btn.dataset.on = on ? '1' : '0';
+      btn.textContent = on ? 'Show cover' : 'Hide cover';
+    }
+  };
+  window.syncCoverDim = syncCoverDim;
+  syncCoverDim();
 
   // =====================================================================
   // Backward compat — window.showToast(msg, isError)
