@@ -16,190 +16,112 @@ return function(data)
 	local prevChapterID = data.PrevChapterID or ""
 	local nextChapterID = data.NextChapterID or ""
 
-	local parts = {}
-	local function emit(s)
-		parts[#parts + 1] = s
-	end
+	local prevStyle = prevChapterID == "" and ' style="display:none"' or ""
+	local nextStyle = nextChapterID == "" and ' style="display:none"' or ""
 
-	-- Reader container with data-* attributes for reader.js
-	emit('<div id="reader" class="relative w-full h-screen"')
-	emit('  data-plugin-id="' .. h(pluginID) .. '"')
-	emit('  data-manga-id="' .. h(mangaID) .. '"')
-	emit('  data-chapter-id="' .. h(chapterID) .. '"')
-	emit('  data-manga-title="' .. h(mangaTitle) .. '"')
-	emit('  data-next-chapter-id="' .. h(nextChapterID) .. '"')
-	emit('  data-prev-chapter-id="' .. h(prevChapterID) .. '">')
-
-	-- Top bar
-	emit("  <!-- Top bar: persistent (back + page counter + controls) -->")
-	emit(
-		'  <div id="top-bar" class="absolute top-0 left-0 right-0 z-30 flex flex-wrap items-center gap-2 bg-neutral-950/85 backdrop-blur-sm px-3 py-2 text-sm transition-transform duration-300 ease-in-out">'
-	)
-	emit(
-		'  <a href="/view/manga/'
-			.. h(pluginID)
-			.. "/"
-			.. h(mangaID)
-			.. '" class="border border-neutral-700 hover:bg-neutral-800 active:scale-95 transition rounded-md px-3 py-1.5">← Back</a>'
-	)
-	emit('  <span class="ml-2 text-xs cursor-default" title="← → navigate · Space next · Esc back">⌨</span>')
-	emit('    <span class="text-neutral-500 truncate max-w-[25%]">' .. h(mangaTitle) .. "</span>")
-	emit('    <span id="page-counter" class="text-neutral-400">– / –</span>')
-	emit('    <div class="flex-1 flex justify-center min-w-0">')
-	emit('      <span id="chapter-title" class="text-neutral-300 truncate">')
+	-- Chapter title display
+	local chapterDisplay
 	if chNum > 0 then
-		emit("        Ch. " .. h(tostring(chNum)))
+		chapterDisplay = "Ch. " .. h(tostring(chNum))
 		if chTitle ~= "" then
-			emit(" — " .. h(chTitle))
+			chapterDisplay = chapterDisplay .. " — " .. h(chTitle)
 		end
 	else
-		emit("        " .. h(chTitle))
+		chapterDisplay = h(chTitle)
 	end
-	emit("      </span>")
-	emit("    </div>")
-	emit('    <div class="flex items-center gap-1">')
-	emit(
-		'      <button id="btn-fit" title="Fit mode" class="border border-neutral-700 hover:bg-neutral-800 active:scale-95 transition rounded-md px-3 py-1.5 text-xs">Fit W</button>'
-	)
-	emit(
-		'      <button id="btn-zoom-out" title="Zoom out" class="border border-neutral-700 hover:bg-neutral-800 active:scale-95 transition rounded-md px-3 py-1.5 text-xs">−</button>'
-	)
-	emit(
-		'      <button id="btn-zoom-in" title="Zoom in" class="border border-neutral-700 hover:bg-neutral-800 active:scale-95 transition rounded-md px-3 py-1.5 text-xs">＋</button>'
-	)
-	emit(
-		'      <button id="btn-dir" title="Direction (RTL/LTR)" class="border border-neutral-700 hover:bg-neutral-800 active:scale-95 transition rounded-md px-3 py-1.5 text-xs">LTR</button>'
-	)
-	emit("    </div>")
-	emit("  </div>")
 
-	-- Click zones
-	emit("  <!-- Click zones: left/right = page, top/bottom strip = chapter -->")
-	emit(
-		'  <div id="zone-top" class="absolute top-12 left-[35%] right-[35%] h-[18%] z-10 cursor-pointer" title="Previous chapter"></div>'
-	)
-	emit(
-		'  <div id="zone-bottom" class="absolute bottom-14 left-[35%] right-[35%] h-[18%] z-10 cursor-pointer" title="Next chapter"></div>'
-	)
-	emit(
-		'  <div id="zone-left" class="absolute top-12 bottom-14 left-0 w-[35%] z-10 cursor-pointer" title="Previous page"></div>'
-	)
-	emit(
-		'  <div id="zone-right" class="absolute top-12 bottom-14 right-0 w-[35%] z-10 cursor-pointer" title="Next page"></div>'
-	)
+	return [[<div id="reader" class="relative w-full h-screen"
+  data-plugin-id="]] .. h(pluginID) .. [["
+  data-manga-id="]] .. h(mangaID) .. [["
+  data-chapter-id="]] .. h(chapterID) .. [["
+  data-manga-title="]] .. h(mangaTitle) .. [["
+  data-next-chapter-id="]] .. h(nextChapterID) .. [["
+  data-prev-chapter-id="]] .. h(prevChapterID) .. [[">
+  <!-- Top bar: persistent (back + page counter + controls) -->
+  <div id="top-bar" class="absolute top-0 left-0 right-0 z-30 flex flex-wrap items-center gap-2 bg-neutral-950/85 backdrop-blur-sm px-3 py-2 text-sm transition-transform duration-300 ease-in-out">
+  <a href="/view/manga/]] .. h(pluginID) .. [[" class="border border-neutral-700 hover:bg-neutral-800 active:scale-95 transition rounded-md px-3 py-1.5">← Back</a>
+  <span class="ml-2 text-xs cursor-default" title="← → navigate · Space next · Esc back">⌨</span>
+    <span class="text-neutral-500 truncate max-w-[25%]">]] .. h(mangaTitle) .. [["
+    <span id="page-counter" class="text-neutral-400">– / –</span>
+    <div class="flex-1 flex justify-center min-w-0">
+      <span id="chapter-title" class="text-neutral-300 truncate">]] .. chapterDisplay .. [[</span>
+    </div>
+    <div class="flex items-center gap-1">
+      <button id="btn-fit" title="Fit mode" class="border border-neutral-700 hover:bg-neutral-800 active:scale-95 transition rounded-md px-3 py-1.5 text-xs">Fit W</button>
+      <button id="btn-zoom-out" title="Zoom out" class="border border-neutral-700 hover:bg-neutral-800 active:scale-95 transition rounded-md px-3 py-1.5 text-xs">−</button>
+      <button id="btn-zoom-in" title="Zoom in" class="border border-neutral-700 hover:bg-neutral-800 active:scale-95 transition rounded-md px-3 py-1.5 text-xs">＋</button>
+      <button id="btn-dir" title="Direction (RTL/LTR)" class="border border-neutral-700 hover:bg-neutral-800 active:scale-95 transition rounded-md px-3 py-1.5 text-xs">LTR</button>
+    </div>
+  </div>
 
-	-- Canvas
-	emit("  <!-- Canvas -->")
-	emit('  <canvas id="page-canvas" class="absolute inset-0 h-full w-full"></canvas>')
+  <!-- Click zones -->
+  <div id="zone-top" class="absolute top-12 left-[35%] right-[35%] h-[18%] z-10 cursor-pointer" title="Previous chapter"></div>
+  <div id="zone-bottom" class="absolute bottom-14 left-[35%] right-[35%] h-[18%] z-10 cursor-pointer" title="Next chapter"></div>
+  <div id="zone-left" class="absolute top-12 bottom-14 left-0 w-[35%] z-10 cursor-pointer" title="Previous page"></div>
+  <div id="zone-right" class="absolute top-12 bottom-14 right-0 w-[35%] z-10 cursor-pointer" title="Next page"></div>
 
-	-- Center click zone
-	emit("  <!-- Center click zone: toggles bars visibility (before side zones in DOM so nav strips win overlaps) -->")
-	emit(
-		'  <div id="zone-center" class="absolute top-12 bottom-14 left-[35%] right-[35%] z-10 cursor-pointer" title="Toggle bars"></div>'
-	)
+  <!-- Canvas -->
+  <canvas id="page-canvas" class="absolute inset-0 h-full w-full"></canvas>
 
-	-- Spinner
-	emit("  <!-- Spinner -->")
-	emit('  <div id="spinner" class="absolute inset-0 z-20 hidden items-center justify-center bg-neutral-950/70">')
-	emit('    <div class="h-10 w-10 animate-spin rounded-full border-2 border-neutral-700 border-t-indigo-500"></div>')
-	emit("  </div>")
+  <!-- Center click zone -->
+  <div id="zone-center" class="absolute top-12 bottom-14 left-[35%] right-[35%] z-10 cursor-pointer" title="Toggle bars"></div>
 
-	-- Error panel
-	emit(
-		'  <!-- Error card: centered between toolbars, non-blocking. Inline display:none keeps the "Failed to load page" flash invisible until the stylesheet applies (Tailwind `hidden` alone leaves it visible pre-CSS). -->'
-	)
-	emit(
-		'  <div id="error-panel" style="display:none" class="absolute top-12 bottom-14 left-0 right-0 z-40 hidden items-center justify-center pointer-events-none">'
-	)
-	emit(
-		'    <div class="bg-black/85 backdrop-blur-sm rounded-lg p-6 max-w-md w-[90%] flex flex-col items-center gap-3 pointer-events-auto">'
-	)
-	emit('      <p class="text-sm text-red-400">Failed to load page</p>')
-	emit('      <div class="flex gap-2">')
-	emit(
-		'        <button id="btn-retry" class="bg-indigo-600 hover:bg-indigo-500 rounded-md px-4 py-2 text-sm">↻ Retry</button>'
-	)
-	emit(
-		'        <button id="btn-skip" class="border border-neutral-700 hover:bg-neutral-800 rounded-md px-4 py-2 text-sm">→ Skip</button>'
-	)
-	emit("      </div>")
-	emit("    </div>")
-	emit("  </div>")
+  <!-- Spinner -->
+  <div id="spinner" class="absolute inset-0 z-20 hidden items-center justify-center bg-neutral-950/70">
+    <div class="h-10 w-10 animate-spin rounded-full border-2 border-neutral-700 border-t-indigo-500"></div>
+  </div>
 
-	-- Bottom bar
-	emit("  <!-- Bottom bar: chapter nav + page slider -->")
-	emit(
-		'  <div id="bottom-bar" class="absolute bottom-0 left-0 right-0 z-30 flex items-center gap-3 bg-neutral-950/85 backdrop-blur-sm px-3 py-2 text-sm transition-transform duration-300 ease-in-out">'
-	)
-	local prevStyle = prevChapterID == "" and ' style="display:none"' or ""
-	emit(
-		'    <a id="btn-prev-ch" href="/view/read/'
-			.. h(pluginID)
-			.. "/"
-			.. h(mangaID)
-			.. "/"
-			.. h(prevChapterID)
-			.. '" class="border border-neutral-700 hover:bg-neutral-800 active:scale-95 transition rounded-md px-3 py-1.5"'
-			.. prevStyle
-			.. ">← Prev ch.</a>"
-	)
-	emit(
-		'    <button id="btn-prev-page" class="border border-neutral-700 hover:bg-neutral-800 active:scale-95 transition rounded-md px-3 py-1.5">‹</button>'
-	)
-	emit('    <input id="page-slider" type="range" min="1" value="1" class="h-2 flex-1 accent-indigo-500" />')
-	emit(
-		'    <button id="btn-next-page" class="border border-neutral-700 hover:bg-neutral-800 active:scale-95 transition rounded-md px-3 py-1.5">›</button>'
-	)
-	local nextStyle = nextChapterID == "" and ' style="display:none"' or ""
-	emit(
-		'    <a id="btn-next-ch" href="/view/read/'
-			.. h(pluginID)
-			.. "/"
-			.. h(mangaID)
-			.. "/"
-			.. h(nextChapterID)
-			.. '" class="border border-neutral-700 hover:bg-neutral-800 active:scale-95 transition rounded-md px-3 py-1.5"'
-			.. nextStyle
-			.. ">Next ch. →</a>"
-	)
-	emit("  </div>")
+  <!-- Error panel -->
+  <div id="error-panel" style="display:none" class="absolute top-12 bottom-14 left-0 right-0 z-40 hidden items-center justify-center pointer-events-none">
+    <div class="bg-black/85 backdrop-blur-sm rounded-lg p-6 max-w-md w-[90%] flex flex-col items-center gap-3 pointer-events-auto">
+      <p class="text-sm text-red-400">Failed to load page</p>
+      <div class="flex gap-2">
+        <button id="btn-retry" class="bg-indigo-600 hover:bg-indigo-500 rounded-md px-4 py-2 text-sm">↻ Retry</button>
+        <button id="btn-skip" class="border border-neutral-700 hover:bg-neutral-800 rounded-md px-4 py-2 text-sm">→ Skip</button>
+      </div>
+    </div>
+  </div>
 
-	-- Progress line
-	emit("  <!-- Progress line: visible when bars are hidden -->")
-	emit(
-		'  <div id="progress-line" class="absolute bottom-0 left-0 right-0 z-40 h-2 bg-indigo-500 shadow-[0_0_8px_2px_rgba(99,102,241,0.55)] transition-opacity duration-300 ease-in-out opacity-0"></div>'
-	)
+  <!-- Bottom bar -->
+  <div id="bottom-bar" class="absolute bottom-0 left-0 right-0 z-30 flex items-center gap-3 bg-neutral-950/85 backdrop-blur-sm px-3 py-2 text-sm transition-transform duration-300 ease-in-out">
+    <a id="btn-prev-ch" href="/view/read/]] .. h(pluginID) .. [[" class="border border-neutral-700 hover:bg-neutral-800 active:scale-95 transition rounded-md px-3 py-1.5" ]] .. prevStyle .. [[>← Prev ch.</a>
+    <button id="btn-prev-page" class="border border-neutral-700 hover:bg-neutral-800 active:scale-95 transition rounded-md px-3 py-1.5">‹</button>
+    <input id="page-slider" type="range" min="1" value="1" class="h-2 flex-1 accent-indigo-500" />
+    <button id="btn-next-page" class="border border-neutral-700 hover:bg-neutral-800 active:scale-95 transition rounded-md px-3 py-1.5">›</button>
+    <a id="btn-next-ch" href="/view/read/]] .. h(pluginID) .. [[" class="border border-neutral-700 hover:bg-neutral-800 active:scale-95 transition rounded-md px-3 py-1.5" ]] .. nextStyle .. [[>Next ch. →</a>
+  </div>
 
-	emit("</div>")
+  <!-- Progress line -->
+  <div id="progress-line" class="absolute bottom-0 left-0 right-0 z-40 h-2 bg-indigo-500 shadow-[0_0_8px_2px_rgba(99,102,241,0.55)] transition-opacity duration-300 ease-in-out opacity-0"></div>
 
-	-- reader.js
-	emit('<script src="/static/lib/reader.js" defer></script>')
-	emit("<script>")
-	emit("(function() {")
-	emit("  var title = '" .. h(mangaTitle) .. "';")
-	emit("  var chNum = " .. tostring(chNum) .. ";")
-	emit("  var chTitle = '" .. h(chTitle) .. "';")
-	emit("  if (title) {")
-	emit("    var label = title;")
-	emit("    if (chNum > 0) { label += ' \\u2013 Ch. ' + chNum; if (chTitle) label += ': ' + chTitle; }")
-	emit("    else if (chTitle) { label += ' \\u2013 ' + chTitle; }")
-	emit("    document.title = label + ' \\u2013 goIsekai';")
-	emit("  }")
-	emit("")
-	emit("  var dirBtn = document.getElementById('btn-dir');")
-	emit("  if (dirBtn) {")
-	emit("    var RTL_CLASSES = 'bg-indigo-600/20 border-indigo-500/40';")
-	emit("    function applyDirStyle() {")
-	emit("      if (localStorage.getItem('gi_direction') === 'rtl') dirBtn.classList.add(...RTL_CLASSES.split(' '));")
-	emit("      else dirBtn.classList.remove(...RTL_CLASSES.split(' '));")
-	emit("    }")
-	emit("    applyDirStyle();")
-	emit("    dirBtn.addEventListener('click', function() {")
-	emit("      requestAnimationFrame(applyDirStyle);")
-	emit("    });")
-	emit("  }")
-	emit("})();")
-	emit("</script>")
+</div>
 
-	return table.concat(parts, "\n")
+<script src="/static/lib/reader.js" defer></script>
+<script>
+(function() {
+  var title = ']] .. h(mangaTitle) .. [[';
+  var chNum = ]] .. tostring(chNum) .. [[';
+  var chTitle = ']] .. h(chTitle) .. [[';
+  if (title) {
+    var label = title;
+    if (chNum > 0) { label += ' \\u2013 Ch. ' + chNum; if (chTitle) label += ': ' + chTitle; }
+    else if (chTitle) { label += ' \\u2013 ' + chTitle; }
+    document.title = label + ' \\u2013 goIsekai';
+  }
+
+  var dirBtn = document.getElementById('btn-dir');
+  if (dirBtn) {
+    var RTL_CLASSES = 'bg-indigo-600/20 border-indigo-500/40';
+    function applyDirStyle() {
+      if (localStorage.getItem('gi_direction') === 'rtl') dirBtn.classList.add(...RTL_CLASSES.split(' '));
+      else dirBtn.classList.remove(...RTL_CLASSES.split(' '));
+    }
+    applyDirStyle();
+    dirBtn.addEventListener('click', function() {
+      requestAnimationFrame(applyDirStyle);
+    });
+  }
+})();
+</script>
+]]
 end
