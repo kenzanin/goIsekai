@@ -137,15 +137,18 @@ return function(data)
             local ratio = ratios[pluginID] or 0
 
             emit('    <a href="/view/manga/' .. h(pluginID) .. '/' .. h(sourceMangaID) .. '" class="bg-neutral-900 rounded-lg overflow-hidden relative hover:-translate-y-0.5 hover:shadow-lg hover:shadow-black/40 transition">')
+            emit('        <div class="relative" data-key="' .. h(pluginID) .. ':' .. h(sourceMangaID) .. '">')
             if coverURL ~= "" then
                 if ratio > 0 then
-                    emit('        <img src="/image?pluginID=' .. h(pluginID) .. '&amp;url=' .. h(coverURL) .. '" alt="' .. h(title) .. '" style="aspect-ratio: ' .. h(tostring(ratio)) .. '" class="w-full object-cover" loading="lazy">')
+                    emit('            <img src="/image?pluginID=' .. h(pluginID) .. '&amp;url=' .. h(coverURL) .. '" alt="' .. h(title) .. '" style="aspect-ratio: ' .. h(tostring(ratio)) .. '" class="w-full object-cover" loading="lazy">')
                 else
-                    emit('        <img src="/image?pluginID=' .. h(pluginID) .. '&amp;url=' .. h(coverURL) .. '" alt="' .. h(title) .. '" class="w-full aspect-[2/3] object-cover" loading="lazy">')
+                    emit('            <img src="/image?pluginID=' .. h(pluginID) .. '&amp;url=' .. h(coverURL) .. '" alt="' .. h(title) .. '" class="w-full aspect-[2/3] object-cover" loading="lazy">')
                 end
             else
-                emit('        <div class="w-full aspect-[2/3] bg-neutral-800 flex items-center justify-center text-neutral-500 text-2xl font-semibold">' .. h(getInitials(title)) .. '</div>')
+                emit('            <div class="w-full aspect-[2/3] bg-neutral-800 flex items-center justify-center text-neutral-500 text-2xl font-semibold">' .. h(getInitials(title)) .. '</div>')
             end
+            emit('            <div class="lib-dim" style="display:none;position:absolute;inset:0;background:rgba(0,0,0,0.82);border-radius:0.5rem;"></div>')
+            emit('        </div>')
             if status ~= "" then
                 emit('        <span class="absolute top-2 left-2 bg-black/60 backdrop-blur rounded-full px-2 py-0.5 text-[10px] text-neutral-200">' .. h(status) .. '</span>')
             end
@@ -172,14 +175,13 @@ return function(data)
             emit('        </div>')
             emit('    </a>')
         end
-        emit('</div>')
-        emit(pagination({ Pagination = { Base = "/", Param = "page", Current = page, Total = totalPages } }))
+    -- Restore dim state from localStorage
+    if #mangas > 0 then
+        emit('<script>(function(){document.querySelectorAll(".relative[data-key]").forEach(function(w){var d=w.querySelector(".lib-dim");if(d&&localStorage.getItem("gsk:cover-dim:"+w.dataset.key)==="1"){d.style.display="block";}});})();</script>')
     end
 
-    if #mangas > 0 and q == "" then
-        emit('    </div>')
-        emit('</div>')
-    end
+    return table.concat(parts, '\n')
+end
 
     return table.concat(parts, '\n')
 end
