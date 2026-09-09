@@ -50,7 +50,7 @@ func (s *AppService) GetImage(pluginID, url string, headers map[string]string, m
 	if s.imgSem == nil {
 		s.imgSem = make(chan struct{}, 1)
 	}
-		s.imgSem <- struct{}{}
+	s.imgSem <- struct{}{}
 	host := func() string {
 		if u, err := neturl.Parse(url); err == nil && u.Host != "" {
 			return u.Host

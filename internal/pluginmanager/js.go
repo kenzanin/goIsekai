@@ -164,5 +164,3 @@ func (m *Manager) loadJS(id, dir string) (*loadedPlugin, error) {
 		meta:            meta,
 	}, nil
 }
-
-

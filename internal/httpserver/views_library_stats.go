@@ -3,6 +3,7 @@ package httpserver
 import (
 	"fmt"
 	"goisekai/internal/database"
+	"strings"
 )
 
 // buildOverviewStrings creates the display strings for the library overview
@@ -32,11 +33,12 @@ func joinStatusParts(parts []string) string {
 	if len(parts) == 0 {
 		return "no data"
 	}
-	result := parts[0]
+	var result strings.Builder
+	result.WriteString(parts[0])
 	for _, p := range parts[1:] {
-		result += " · " + p
+		result.WriteString(" · " + p)
 	}
-	return result
+	return result.String()
 }
 
 func formatMostTitle(title string, count, dup int) string {

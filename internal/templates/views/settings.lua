@@ -9,8 +9,9 @@ return function(data)
 	local cacheBytes = data.CacheBytes or 0
 
 	return [[<h1 class="text-xl font-semibold mb-1">Settings</h1>
-<p class="text-xs text-neutral-500 mb-6">Config: <code class="text-xs bg-neutral-800 rounded px-1.5 py-0.5">]] .. h(path) .. [[</code></p>]]
-		.. (cfg and [[<form method="post" action="/action/save-settings" class="space-y-4 max-w-xl">
+<p class="text-xs text-neutral-500 mb-6">Config: <code class="text-xs bg-neutral-800 rounded px-1.5 py-0.5">]] .. h(
+		path
+	) .. [[</code></p>]] .. (cfg and [[<form method="post" action="/action/save-settings" class="space-y-4 max-w-xl">
     <div class="border border-neutral-800 rounded-lg p-4">
         <h2 class="text-sm font-medium text-neutral-300 mb-3">Server</h2>
         <div class="space-y-4">
@@ -48,7 +49,9 @@ return function(data)
             </div>
             <div>
                 <label for="accept_language" class="block text-sm font-medium mb-1">Accept Language</label>
-                <input id="accept_language" name="accept_language" type="text" value="]] .. h(cfg.AcceptLanguage or "") .. [[" class="w-full bg-neutral-900 border border-neutral-700 rounded-md px-3 py-2 text-sm">
+                <input id="accept_language" name="accept_language" type="text" value="]] .. h(
+		cfg.AcceptLanguage or ""
+	) .. [[" class="w-full bg-neutral-900 border border-neutral-700 rounded-md px-3 py-2 text-sm">
             </div>
             <div>
                 <label for="referer" class="block text-sm font-medium mb-1">Referer</label>

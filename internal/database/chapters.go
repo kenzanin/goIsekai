@@ -68,5 +68,3 @@ func (d *DB) SetChapterProgress(chapterID string, lastPage int) error {
 	}
 	return err
 }
-
-

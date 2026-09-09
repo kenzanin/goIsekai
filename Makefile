@@ -3,7 +3,7 @@
 BINARY := goisekai
 PKGS   := ./internal/... ./pkg/... ./cmd/...
 
-.PHONY: build dev devrun run open check fmt fmt-web test race modernize lint lint-web br clean build-plugins install-plugins all
+.PHONY: build dev devrun run open check fmt fmt-web fmt-lua test race modernize lint lint-web lint-lua br clean build-plugins install-plugins all
 
 ## build: compile the server binary (pure Go, CGO-free, cross-compilable).
 build: br
@@ -32,7 +32,7 @@ open:
 	xdg-open http://127.0.0.1:8080
 
 ## check: full quality gate — format, race tests, modernize, lint (Go + web).
-check: fmt fmt-web race modernize lint lint-web
+check: fmt fmt-web fmt-lua race modernize lint lint-web lint-lua
 
 fmt:
 	go fmt $(PKGS)
@@ -41,9 +41,18 @@ fmt:
 fmt-web:
 	biome check --write cmd/goisekai/frontend
 
+## fmt-lua: format all Lua templates with Stylua.
+fmt-lua:
+	stylua internal/templates/
+
+## lint-lua: lint Lua templates with Luacheck.
+lint-lua:
+	luacheck internal/templates/ --codes --no-unused --no-unused-args
+
 ## lint-web: lint + format-check the frontend (Biome), read-only.
 lint-web:
 	biome check cmd/goisekai/frontend
+
 
 test:
 	CGO_ENABLED=0 go test $(PKGS)

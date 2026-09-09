@@ -8,8 +8,6 @@ import (
 	"goisekai/internal/logger"
 )
 
-
-
 // ExportCBZ builds a .cbz archive of one chapter's pages in reading order and
 // returns the path to the written file. It prefers an offline path — when
 // complete.csv exists and every page is still on disk, no plugin/network call

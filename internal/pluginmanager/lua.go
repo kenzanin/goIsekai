@@ -21,7 +21,6 @@ var luaFnNames = map[string]string{
 	types.GetAltSummaryFunc:  "getAltSummary",
 }
 
-
 // callLua invokes a Lua ABI function with a JSON string argument under timeout,
 // and returns the result as a JSON string.
 func callLua(p *loadedPlugin, fnName, inputJSON string) (string, error) {

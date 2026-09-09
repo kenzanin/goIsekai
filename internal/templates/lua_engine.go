@@ -99,4 +99,3 @@ func (e *LuaEngine) Render(w io.Writer, name string, data map[string]any) error 
 func (e *LuaEngine) RenderPartial(w io.Writer, name string, data map[string]any) error {
 	return e.render(w, name, data, true)
 }
-

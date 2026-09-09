@@ -14,8 +14,6 @@ type DuplicateGroup struct {
 	Members []Manga // the manga in this group (≥2)
 }
 
-
-
 // minDescKeyLen is the minimum length (in runes) of a normalised description
 // before it takes part in duplicate matching.  Short blurbs ("read online
 // free", SEO placeholder text) are too generic to be evidence on their own.
@@ -178,5 +176,3 @@ func (d *DB) FindPotentialDuplicates() ([]DuplicateGroup, error) {
 
 	return groups, nil
 }
-
-

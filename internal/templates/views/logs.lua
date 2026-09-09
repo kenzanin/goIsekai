@@ -14,17 +14,28 @@ return function(data)
 	local limitOpts = ""
 	for _, n in ipairs(limits) do
 		local sel = n == limit and " selected" or ""
-		limitOpts = limitOpts .. "            <option value=" .. h(tostring(n)) .. sel .. ">" .. tostring(n) .. " lines</option>\n"
+		limitOpts = limitOpts
+			.. "            <option value="
+			.. h(tostring(n))
+			.. sel
+			.. ">"
+			.. tostring(n)
+			.. " lines</option>\n"
 	end
 
 	-- Build log lines
 	local logLines = ""
 	for i, line in ipairs(logs) do
-		logLines = logLines .. "    <pre class=\"text-xs font-mono whitespace-pre-wrap break-all border-b border-neutral-900 py-0.5 select-text\">" .. h(line) .. "</pre>\n"
+		logLines = logLines
+			.. '    <pre class="text-xs font-mono whitespace-pre-wrap break-all border-b border-neutral-900 py-0.5 select-text">'
+			.. h(line)
+			.. "</pre>\n"
 	end
 
 	return [[<div class="flex items-center justify-between mb-4 gap-2 flex-wrap">
-    <h1 class="text-xl font-semibold">Logs <span class="text-xs font-normal text-neutral-500">last ]] .. h(tostring(limit)) .. [[ lines · ring buffer 2000</span></h1>
+    <h1 class="text-xl font-semibold">Logs <span class="text-xs font-normal text-neutral-500">last ]] .. h(
+		tostring(limit)
+	) .. [[ lines · ring buffer 2000</span></h1>
     <div class="flex items-center gap-2">
         <span id="log-paused" class="hidden text-xs px-2 py-1 rounded-md bg-amber-500/15 text-amber-400">Paused — selecting text</span>
         <select id="log-filter" class="bg-neutral-900 border border-neutral-700 rounded-md px-2 py-1.5 text-xs">
