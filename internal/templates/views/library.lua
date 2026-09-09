@@ -26,11 +26,16 @@ return function(data)
 	if #mangas > 0 and q == "" then
 		-- Build stats cards
 		local statCards = ""
-		local function addStat(value, label, color, longText)
+		local function addStat(value, label, color, longText, accent)
 			local cls = color and (' class="text-sm font-medium ' .. h(color) .. '"')
-				or (longText and ' class="text-sm font-medium"' or ' class="text-lg font-semibold"')
+				or (longText and ' class="text-sm font-medium"' or (accent and ' class="text-2xl font-bold"' or ' class="text-lg font-semibold"'))
+			local outer = accent
+					and 'bg-neutral-900 border border-indigo-500/30 rounded-lg px-4 py-3'
+				or 'bg-neutral-900 border border-neutral-800 rounded-lg px-4 py-3'
 			statCards = statCards
-				.. '<div class="bg-neutral-900 border border-neutral-700 rounded-lg px-4 py-3">'
+				.. '<div class="'
+				.. outer
+				.. '">'
 				.. "<div"
 				.. cls
 				.. ">"
@@ -43,7 +48,7 @@ return function(data)
 		end
 
 		if stats.TotalTitles then
-			addStat(stats.TotalTitles, "titles", "")
+			addStat(stats.TotalTitles, "titles", "", false, true)
 		end
 		if stats.StatusLine and stats.StatusLine ~= "" then
 			addStat(stats.StatusLine, "status", "", true)
@@ -112,11 +117,11 @@ return function(data)
 		end
 
 		sidebarHTML = [[<aside class="lg:w-56 shrink-0 flex flex-col gap-3">
-    <div class="bg-neutral-900 border border-neutral-700 rounded-lg px-4 py-3">
+    <div class="bg-neutral-900 border border-neutral-800 rounded-lg px-4 py-3">
         <div class="flex flex-col gap-3">]] .. statCards .. [[</div>
     </div>
 
-    <details class="bg-neutral-900 border border-neutral-700 rounded-lg overflow-hidden]] .. (duplicateCount == 0 and " open" or "") .. [[">
+    <details class="bg-neutral-900 border border-neutral-800 rounded-lg overflow-hidden]] .. (duplicateCount == 0 and " open" or "") .. [[">
         <summary class="px-4 py-3 cursor-pointer select-none text-xs font-medium text-neutral-200 hover:bg-neutral-800/60 transition list-none flex items-center justify-between gap-2">
                 <span>Duplicate <span class="text-indigo-400 font-semibold">]] .. h(tostring(duplicateCount)) .. [['</span></span>
                 <svg class="w-4 h-4 text-neutral-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
@@ -150,7 +155,7 @@ return function(data)
 			end
 			sidebarHTML = sidebarHTML
 				.. [[
-        <div class="bg-neutral-900 border border-neutral-700 rounded-lg px-4 py-3">
+        <div class="bg-neutral-900 border border-neutral-800 rounded-lg px-4 py-3">
             <div class="text-xs font-medium text-neutral-400 mb-2">titles per plugin</div>
             <div class="flex flex-col gap-1.5">]]
 				.. pluginRows
@@ -166,15 +171,12 @@ return function(data)
 	local mangaCards = ""
 	if #mangas == 0 then
 		mangaCards = [[<div class="py-16 text-center text-neutral-500">
-    <p class="mb-2">Your library is empty — search for manga first</p>
-    <a href="/view/search" class="text-indigo-400 hover:text-indigo-300 text-sm">Search manga</a>
+    <svg class="w-14 h-14 mx-auto mb-4 text-neutral-700" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5 5h6v14H5zM13 5h6v3h-6z"/></svg>
+    <p class="mb-4">Your library is empty — search for manga first</p>
+    <a href="/view/search" class="inline-block bg-indigo-600 hover:bg-indigo-500 text-white rounded-md px-4 py-2 text-sm font-medium">Search manga</a>
 </div>]]
 	else
-		local pagHTML = pagination({
-			Pagination = { Base = "/", Param = "page", Current = page, Total = totalPages },
-		})
-		mangaCards = pagHTML
-			.. '<div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-4">'
+		mangaCards = '<div class="view-container grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-4">'
 		for _, m in ipairs(mangas) do
 			local mid = m.ID or ""
 			local pluginID = m.PluginID or ""
@@ -236,30 +238,40 @@ return function(data)
 					.. "</div>"
 			end
 
+			local statusBadge = status ~= "" and ('<span class="text-[10px] text-neutral-400">' .. h(status) .. '</span>' or "")
+			local statsBadge = ""
+			if statsObj then
+				statsBadge = '<span class="text-xs text-neutral-400 truncate">'
+					.. h(tostring(statsObj.ReadChapters or 0))
+					.. "/" .. h(tostring(statsObj.TotalChapters or 0))
+					.. '</span>'
+					.. (statsObj.HasNew and ' <span class="text-[10px] px-1.5 py-0.5 rounded-full bg-red-500 text-white font-medium">New</span>' or "")
+			end
+
 			mangaCards = mangaCards
 				.. '<a href="/view/manga/'
 				.. h(pluginID)
 				.. "/"
 				.. h(sourceMangaID)
-				.. '" class="bg-neutral-900 rounded-lg overflow-hidden relative hover:-translate-y-0.5 hover:shadow-lg hover:shadow-black/40 transition">'
-				.. '<div class="relative" data-key="'
+				.. '" class="view-item bg-neutral-900 rounded-lg overflow-hidden relative hover:-translate-y-0.5 hover:shadow-lg hover:shadow-black/40 transition flex flex-col">'
+				.. '<div class="relative flex-1 min-w-0" data-key="'
 				.. h(pluginID)
 				.. ":"
 				.. h(sourceMangaID)
-				.. '">'
+				.. '">' 
 				.. coverHTML
 				.. '<div class="lib-dim" style="display:none;position:absolute;inset:0;background:rgba(0,0,0,0.82);border-radius:0.5rem;"></div>'
 				.. "</div>"
-				.. (status ~= "" and ('<span class="absolute top-2 left-2 bg-black/60 backdrop-blur rounded-full px-2 py-0.5 text-[10px] text-neutral-200">' .. h(
-					status
-				) .. "</span>") or "")
-				.. '<div class="p-3">'
+				.. '<div class="p-3 flex flex-col gap-1">'
 				.. '<div class="text-sm font-medium line-clamp-2" title="'
 				.. h(title)
-				.. '">'
+				.. '">' 
 				.. h(title)
 				.. "</div>"
-				.. statsHTML
+				.. '<div class="flex items-center justify-between gap-1">'
+				.. statusBadge
+				.. statsBadge
+				.. '</div>'
 				.. "</div></a>"
 		end
 		mangaCards = mangaCards
@@ -269,19 +281,77 @@ return function(data)
 			})
 	end
 
-	return '<div class="flex items-center justify-between gap-3 mb-6">'
-		.. '<h1 class="text-xl font-semibold shrink-0">Library</h1>'
-		.. '<form method="get" action="/view/library" class="flex-1 max-w-md" role="search">'
-		.. '<div class="flex gap-2">'
+	local subtitle = tostring(stats.TotalTitles or 0)
+		.. " titles · "
+		.. tostring(totalPages)
+		.. " page"
+		.. (totalPages > 1 and "s" or "")
+
+	return '<div class="flex items-center gap-3 flex-wrap mb-6">'
+		.. '<div class="shrink-0"><h1 class="text-xl font-semibold">Library</h1>'
+		.. '<div class="text-xs text-neutral-500">'
+		.. h(subtitle)
+		.. "</div></div>"
+		.. '<form method="get" action="/view/library" class="flex-1 min-w-[180px] max-w-md" role="search">'
+		.. '<div class="relative">'
+		.. '<svg class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-500 pointer-events-none" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path stroke-linecap="round" d="m21 21-4.35-4.35"/></svg>'
 		.. '<input type="search" name="q" value="'
 		.. h(q)
-		.. '" placeholder="Search library…" class="w-full bg-neutral-900 border border-neutral-700 rounded-md px-3 py-1.5 text-sm placeholder-neutral-500 focus:outline-none focus:border-indigo-500">'
-		.. '<button type="submit" class="border border-neutral-700 hover:bg-neutral-800 rounded-md px-3 py-1.5 text-sm font-medium">Search</button>'
+		.. '" placeholder="Search library…" class="w-full bg-neutral-900 border border-neutral-700 rounded-md pl-9 pr-3 py-1.5 text-sm placeholder-neutral-500 focus:outline-none focus:border-indigo-500">'
 		.. "</div></form>"
+		.. '<div class="view-mode-toggle shrink-0 flex items-center gap-1" role="group" aria-label="View mode" data-view-mode="grid">'
+		.. '<button type="button" id="view-grid-btn" aria-pressed="true" class="p-1.5 rounded-md hover:bg-neutral-800 transition" title="Grid view">'
+		.. '<svg class="w-4 h-4 text-neutral-400" fill="currentColor" viewBox="0 0 16 16"><rect x="1" y="1" width="6" height="6" rx="1"/><rect x="9" y="1" width="6" height="6" rx="1"/><rect x="1" y="9" width="6" height="6" rx="1"/><rect x="9" y="9" width="6" height="6" rx="1"/></svg></button>'
+		.. '<button type="button" id="view-list-btn" aria-pressed="false" class="p-1.5 rounded-md hover:bg-neutral-800 transition" title="List view">'
+		.. '<svg class="w-4 h-4 text-neutral-400" fill="currentColor" viewBox="0 0 16 16"><rect x="1" y="1" width="14" height="3" rx="1"/><rect x="1" y="6.5" width="14" height="3" rx="1"/><rect x="1" y="12" width="14" height="3" rx="1"/></svg></button></div>'
 		.. '<form method="post" action="/action/sync">'
-		.. '<button type="submit" class="bg-indigo-600 hover:bg-indigo-500 text-white rounded-md px-4 py-2 text-sm font-medium">⟳ Update</button>'
+		.. '<button type="submit" class="bg-indigo-600 hover:bg-indigo-500 text-white rounded-md px-4 py-2 text-sm font-medium inline-flex items-center gap-1.5">'
+		.. '<svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 0 0 4.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 0 1-15.357-2m15.357 2H15"/></svg>Update</button>'
 		.. "</form></div>"
 		.. sidebarHTML
 		.. mangaCards
 		.. (sidebarHTML ~= "" and "</div></div>" or "")
+		.. [[
+<style>
+  .view-container[data-view-mode="list"] {
+    display: flex;
+    flex-direction: column;
+  }
+  .view-container[data-view-mode="list"] .view-item {
+    flex-direction: row;
+  }
+  .view-container[data-view-mode="list"] .view-item > div:first-child {
+    width: 80px;
+    height: 110px;
+    border-radius: 0.5rem 0 0 0.5rem;
+    overflow: hidden;
+  }
+  .view-container[data-view-mode="list"] .view-item .relative {
+    width: 80px;
+    height: 110px;
+  }
+  .view-container[data-view-mode="list"] .view-item .relative img,
+  .view-container[data-view-mode="list"] .view-item .relative > div {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+  .view-container[data-view-mode="list"] .view-item .lib-dim {
+    border-radius: 0.5rem 0 0 0.5rem;
+  }
+  .view-container[data-view-mode="list"] .view-item .p-3 {
+    flex: 1;
+    padding: 0.75rem 1rem;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+  }
+  .view-container[data-view-mode="list"] .view-item:hover {
+    transform: none;
+  }
+  .view-mode-toggle button[aria-pressed="true"] svg,
+  .view-mode-toggle button.active svg {
+    color: #818cf8;
+  }
+</style>]]
 end

@@ -498,6 +498,43 @@
   syncCoverDim();
 
   // =====================================================================
+  // Library view mode: grid ↔ list, persisted in localStorage (gsk:view-mode)
+  // Reads the stored mode on load, toggles container + buttons, saves on change.
+  // =====================================================================
+  const syncViewMode = () => {
+    const container = document.querySelector('.view-container');
+    const toggle = document.querySelector('.view-mode-toggle');
+    if (!container || !toggle) return;
+    const mode = localStorage.getItem('gsk:view-mode') || 'grid';
+    container.dataset.viewMode = mode;
+    const gridBtn = document.getElementById('view-grid-btn');
+    const listBtn = document.getElementById('view-list-btn');
+    const setActive = (btn, on, other) => {
+      btn.classList.toggle('bg-neutral-700', on);
+      btn.setAttribute('aria-pressed', on ? 'true' : 'false');
+      btn.querySelector('svg').style.color = on ? '#818cf8' : '';
+    };
+    if (gridBtn && listBtn) {
+      setActive(gridBtn, mode === 'grid');
+      setActive(listBtn, mode === 'list');
+      gridBtn.onclick = () => {
+        localStorage.setItem('gsk:view-mode', 'grid');
+        container.dataset.viewMode = 'grid';
+        setActive(gridBtn, true);
+        setActive(listBtn, false);
+      };
+      listBtn.onclick = () => {
+        localStorage.setItem('gsk:view-mode', 'list');
+        container.dataset.viewMode = 'list';
+        setActive(listBtn, true);
+        setActive(gridBtn, false);
+      };
+    }
+  };
+  window.syncViewMode = syncViewMode;
+  syncViewMode();
+
+  // =====================================================================
   // Backward compat — window.showToast(msg, isError)
   // Defined outside alpine:init so it's available immediately; safely
   // no-ops if the store isn't mounted yet.

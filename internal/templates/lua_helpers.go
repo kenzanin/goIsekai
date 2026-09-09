@@ -160,7 +160,7 @@ func formatBytesHelper(S *lua.State) lua.NativeFunc {
 			exp++
 		}
 		return frame.ReturnString(
-			strconv.FormatFloat(float64(n)/float64(div), 'f', 1, 64)+" "+string("KMG"[exp])+"B",
+			strconv.FormatFloat(float64(n)/float64(div), 'f', 1, 64) + " " + string("KMG"[exp]) + "B",
 		)
 	}
 }
@@ -187,8 +187,8 @@ func pageWindowHelper(S *lua.State) lua.NativeFunc {
 
 // pageURLHelper builds a paginated URL from either:
 //
-//	1. pageURL(base, page) — simple: base string + "?page=N"
-//	2. pageURL(paginationTable, page) — full: extracts Base, Param, Extra from table.
+//  1. pageURL(base, page) — simple: base string + "?page=N"
+//  2. pageURL(paginationTable, page) — full: extracts Base, Param, Extra from table.
 func pageURLHelper(S *lua.State) lua.NativeFunc {
 	return func(frame lua.Frame) lua.Outcome {
 		pageNum, _ := frame.CoerceNumber(1)
@@ -202,7 +202,7 @@ func pageURLHelper(S *lua.State) lua.NativeFunc {
 			if strings.Contains(base, "?") {
 				sep = "&"
 			}
-			return frame.ReturnString(base + sep + "page="+p)
+			return frame.ReturnString(base + sep + "page=" + p)
 		}
 
 		// Table form: pageURL(paginationTable, page)
@@ -228,7 +228,8 @@ func pageURLHelper(S *lua.State) lua.NativeFunc {
 		if strings.Contains(base, "?") {
 			sep = "&"
 		}
-		url := base + sep + param + "=" + p
+		var url strings.Builder
+		url.WriteString(base + sep + param + "=" + p)
 
 		// Read Extra field and append as key=value pairs
 		if v, err := frame.Index(t.Value(), lua.String("Extra")); err == nil && v.Kind() == lua.TableKind {
@@ -236,11 +237,11 @@ func pageURLHelper(S *lua.State) lua.NativeFunc {
 				nilVal := lua.Nil()
 				for k, val, ok, _ := vt.Next(nilVal); ok; k, val, ok, _ = vt.Next(k) {
 					ev, _ := frame.ToString(val)
-					url += "&" + ev
+					url.WriteString("&" + ev)
 				}
 			}
 		}
-		return frame.ReturnString(url)
+		return frame.ReturnString(url.String())
 	}
 }
 

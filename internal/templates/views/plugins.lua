@@ -36,9 +36,9 @@ return function(data)
 					.. h(iconURL)
 					.. '" alt="" class="h-10 w-10 rounded-md object-cover bg-neutral-800">'
 			else
-				local firstChar = string.sub(name, 1, 1)
-				iconHTML = '<div class="h-10 w-10 rounded-md bg-neutral-800 flex items-center justify-center text-sm font-semibold text-neutral-400 shrink-0">'
-					.. h(firstChar)
+				local initials = getInitials(name)
+				iconHTML = '<div class="h-10 w-10 rounded-md bg-indigo-500/15 text-indigo-400 flex items-center justify-center text-sm font-semibold shrink-0">'
+					.. h(initials)
 					.. "</div>"
 			end
 
@@ -114,19 +114,19 @@ return function(data)
 					or '<span class="text-xs px-2 py-0.5 rounded-full bg-neutral-700/50 text-neutral-400">Inactive</span>'
 				)
 
-			-- Loaded/Deferred
-			cardHTML = cardHTML
-				.. (
-					loaded
-						and '<span class="text-xs px-2 py-0.5 rounded-full bg-sky-500/15 text-sky-400">Loaded</span>'
-					or '<span class="text-xs px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-400">Deferred</span>'
-				)
+			-- Loaded/Deferred (only show when deferred — loaded is the normal case, not noise)
+			if not loaded then
+				cardHTML = cardHTML
+					.. '<span class="text-xs px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-400">Deferred</span>'
+			end
 
 			-- Toggle button
 			cardHTML = cardHTML
 				.. '<form method="post" action="/action/toggle-plugin/'
 				.. h(id)
-				.. '">'
+				.. '" data-confirm="'
+				.. (isActive and "Deactivate" or "Activate")
+				.. ' this plugin?">'
 				.. '<button type="submit" class="border border-neutral-700 text-neutral-400 hover:text-neutral-200 rounded-md px-3 py-1.5 text-sm">'
 				.. (isActive and "Deactivate" or "Activate")
 				.. "</button></form></div></div>"
@@ -134,9 +134,9 @@ return function(data)
 			-- Human verification section
 			if needsHumanVerify then
 				cardHTML = cardHTML
-					.. '<div class="bg-neutral-900 rounded-lg p-4 border border-neutral-800">'
-					.. '<div class="flex items-center justify-between gap-3 mb-3">'
-					.. '<div class="text-sm font-medium">Human Verification</div>'
+					.. '<div class="bg-neutral-800/50 border border-neutral-700 rounded-md mt-3 p-3">'
+					.. '<div class="flex items-center justify-between gap-3 mb-2">'
+					.. '<div class="text-sm font-medium text-neutral-300">Human Verification</div>'
 					.. (#verifyCookies > 0 and '<span class="text-xs px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400">Verified ✓</span>' or '<span class="text-xs px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-400">Not verified — site requires a browser challenge</span>')
 					.. "</div>"
 					.. (verifyURL ~= "" and ('<a href="' .. h(verifyURL) .. '" target="_blank" rel="noopener" class="inline-block bg-indigo-600 hover:bg-indigo-500 text-white rounded-md px-3 py-1.5 text-sm font-medium mb-3">Open verification page</a>') or "")
@@ -159,18 +159,37 @@ return function(data)
 					.. "<li>Click the first request → Request Headers → find the <code>cookie:</code> line.</li>"
 					.. "<li>Right-click → Copy value.</li>"
 					.. "<li>Paste everything into the box above.</li>"
-					.. "</ol></details></div>"
+					.. '</div></details></div>'
 			end
 
+			cardHTML = cardHTML .. "</div>"
 			pluginCards = pluginCards .. cardHTML
 		end
 		pluginCards = pluginCards .. "</div>"
 	end
 
-	return '<div class="flex items-center justify-between mb-6">'
-		.. '<h1 class="text-xl font-semibold">Plugins</h1>'
+	local activeCount = 0
+	for _, p in ipairs(plugins) do
+		if p.IsActive then
+				activeCount = activeCount + 1
+			end
+	end
+
+	return '<div class="flex items-center gap-3 flex-wrap mb-6">'
+		.. '<div class="shrink-0"><h1 class="text-xl font-semibold">Plugins</h1>'
+		.. '<div class="text-xs text-neutral-500">'
+		.. h(tostring(#plugins))
+		.. " plugins · "
+		.. h(tostring(activeCount))
+		.. " active</div></div>"
+		.. '<div class="flex-1 min-w-[180px] max-w-sm">'
+		.. '<div class="relative">'
+		.. '<svg class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-500 pointer-events-none" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path stroke-linecap="round" d="m21 21-4.35-4.35"/></svg>'
+		.. '<input type="search" id="plugin-filter" placeholder="Filter plugins…" class="w-full bg-neutral-900 border border-neutral-700 rounded-md pl-9 pr-3 py-1.5 text-sm placeholder-neutral-500 focus:outline-none focus:border-indigo-500">'
+		.. "</div></div>"
 		.. '<form method="post" action="/action/install-plugin" enctype="multipart/form-data" class="flex items-center gap-2">'
-		.. '<label for="plugin-file" class="cursor-pointer border border-dashed border-neutral-700 rounded-md px-3 py-2 text-sm text-neutral-400 hover:border-indigo-500">Choose plugin…</label>'
+		.. '<label for="plugin-file" class="cursor-pointer inline-flex items-center gap-1.5 border border-solid border-neutral-700 hover:border-indigo-500 hover:bg-neutral-800 rounded-md px-3 py-2 text-sm text-neutral-400 transition">'
+		.. '<svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 16v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2M12 4v12m0-12-4 4m4-4 4 4"/></svg>Choose plugin…</label>'
 		.. '<input type="file" id="plugin-file" name="file" accept=".wasm,.js,.lua,.so" class="sr-only">'
 		.. '<button type="submit" class="bg-indigo-600 hover:bg-indigo-500 text-white rounded-md px-4 py-2 text-sm font-medium">Install</button>'
 		.. "</form></div>"
@@ -179,9 +198,26 @@ return function(data)
 document.querySelectorAll('input[type=file]').forEach(inp => {
   inp.addEventListener('change', function() {
     var label = this.previousElementSibling;
-    if (label) label.textContent = this.files[0] ? this.files[0].name : 'Choose .wasm…';
+    if (label) label.textContent = this.files[0] ? this.files[0].name : 'Choose plugin…';
   });
 });
+
+document.querySelectorAll('form[data-confirm]').forEach(function(f) {
+  f.addEventListener('submit', function(e) {
+    if (!window.confirm(f.getAttribute('data-confirm'))) e.preventDefault();
+  });
+});
+
+var pluginFilter = document.getElementById('plugin-filter');
+if (pluginFilter) {
+  pluginFilter.addEventListener('input', function() {
+    var q = this.value.toLowerCase();
+    document.querySelectorAll('.space-y-3 > div').forEach(function(card) {
+      var text = card.textContent.toLowerCase();
+      card.style.display = text.indexOf(q) !== -1 ? '' : 'none';
+    });
+  });
+}
 
 function testProfile(pluginID) {
   var sel = document.querySelector('[data-plugin-profile="' + pluginID + '"]');
@@ -210,16 +246,15 @@ function testProfile(pluginID) {
 
 function setBtnState(btn, state) {
   btn.disabled = (state === 'busy');
-  var s = btn.style;
-  s.padding = '4px 8px'; s.borderRadius = '6px'; s.border = '1px solid #525252'; s.fontSize = '12px'; s.fontWeight = 500; s.transition = 'background .15s';
+  btn.className = 'rounded px-2 py-1 text-xs border transition-colors duration-150';
   if (state === 'busy') {
-    s.background = '#d97706'; s.color = '#fff'; s.borderColor = '#d97706';
+    btn.className += ' bg-amber-600 border-amber-600 text-white';
     btn.textContent = 'Testing…';
   } else if (state === 'ok') {
-    s.background = '#059669'; s.color = '#fff'; s.borderColor = '#059669';
+    btn.className += ' bg-emerald-600 border-emerald-600 text-white';
     btn.textContent = 'OK ✓';
   } else {
-    s.background = '#dc2626'; s.color = '#fff'; s.borderColor = '#dc2626';
+    btn.className += ' bg-red-600 border-red-600 text-white';
     btn.textContent = 'Blocked ✗';
   }
 }
