@@ -124,6 +124,8 @@ return function(data)
         emit('    <a href="/view/search" class="text-indigo-400 hover:text-indigo-300 text-sm">Search manga</a>')
         emit('</div>')
     else
+        -- Top pagination (only visible when there is more than one page)
+        emit(pagination({ Pagination = { Base = "/", Param = "page", Current = page, Total = totalPages } }))
         emit('<div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-4">')
         for _, m in ipairs(mangas) do
             local mid = m.ID or ""
@@ -175,13 +177,20 @@ return function(data)
             emit('        </div>')
             emit('    </a>')
         end
+        emit('</div>')
+        -- Bottom pagination
+        emit(pagination({ Pagination = { Base = "/", Param = "page", Current = page, Total = totalPages } }))
+    end
+
     -- Restore dim state from localStorage
     if #mangas > 0 then
         emit('<script>(function(){document.querySelectorAll(".relative[data-key]").forEach(function(w){var d=w.querySelector(".lib-dim");if(d&&localStorage.getItem("gsk:cover-dim:"+w.dataset.key)==="1"){d.style.display="block";}});})();</script>')
     end
 
-    return table.concat(parts, '\n')
-end
+    if #mangas > 0 and q == "" then
+        emit('    </div>')
+        emit('</div>')
+    end
 
     return table.concat(parts, '\n')
 end

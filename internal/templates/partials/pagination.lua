@@ -19,7 +19,7 @@ return function(data)
     local parts = {}
     local function emit(s) parts[#parts + 1] = s end
 
-    emit('<div class="flex items-center justify-center gap-2 mt-4">')
+    emit('<div class="flex items-center justify-center gap-2 mt-4 mb-4">')
 
     -- prev
     if p.Current > 1 then
