@@ -1,23 +1,12 @@
 package bridge
 
 import (
-	"bytes"
-	"crypto/sha256"
-	"encoding/hex"
 	"fmt"
-	"image"
-	_ "image/gif" // register gif decoder for image.DecodeConfig
-	_ "image/jpeg"
-	_ "image/png"
 	"net/http"
 	neturl "net/url"
 	"os"
 	"path/filepath"
-	"strconv"
 	"time"
-
-	"github.com/gen2brain/webp"
-	_ "golang.org/x/image/webp" // register webp for image.DecodeConfig
 
 	"goisekai/internal/logger"
 	"goisekai/pkg/types"
@@ -61,7 +50,7 @@ func (s *AppService) GetImage(pluginID, url string, headers map[string]string, m
 	if s.imgSem == nil {
 		s.imgSem = make(chan struct{}, 1)
 	}
-	s.imgSem <- struct{}{}
+		s.imgSem <- struct{}{}
 	host := func() string {
 		if u, err := neturl.Parse(url); err == nil && u.Host != "" {
 			return u.Host
@@ -125,78 +114,4 @@ func (s *AppService) GetImage(pluginID, url string, headers map[string]string, m
 	}
 
 	return body, nil
-}
-
-// diskCachePath returns the L2 cache file path prefix (SHA256 hex, no
-// extension) for a plugin's image URL, or "" if cacheDir is not set. Page
-// images are scoped to images/<pluginID>/<mangaID>/<chapterID>/; thumbnails
-// (covers, empty mangaID) to images/<pluginID>/library/. Callers append the
-// extension: ".webp" for converted images, ".img" otherwise.
-func (s *AppService) diskCachePath(pluginID, mangaID, chapterID, url string) string {
-	if s.cacheDir == "" {
-		return ""
-	}
-	// Strip query parameters to get a stable cache key across signed URLs.
-	key := url
-	if u, err := neturl.Parse(url); err == nil {
-		// Use only the path component for hashing; scheme/host are already scoped.
-		key = u.Path
-	}
-	h := sha256.Sum256([]byte(key))
-	sub := "library"
-	if mangaID != "" && chapterID != "" {
-		sub = filepath.Join(mangaID, chapterID)
-	}
-	return filepath.Join(s.cacheDir, "images", pluginID, sub, hex.EncodeToString(h[:8]))
-}
-
-// webpOrOriginal converts jpeg/png bytes to webp for disk caching. It returns
-// the (possibly converted) bytes and whether conversion happened. Fail-open:
-// gif/webp input, undecodable input, and encode errors all keep the original
-// bytes untouched.
-func webpOrOriginal(data []byte) ([]byte, bool) {
-	if len(data) < 12 || bytes.HasPrefix(data, []byte("GIF8")) {
-		return data, false
-	}
-	if bytes.HasPrefix(data, []byte("RIFF")) {
-		return data, true
-	}
-	img, _, err := image.Decode(bytes.NewReader(data))
-	if err != nil {
-		return data, false
-	}
-	var buf bytes.Buffer
-	if err := webp.Encode(&buf, img, webp.Options{Quality: 85}); err != nil {
-		return data, false
-	}
-	return buf.Bytes(), true
-}
-
-// respStatus formats the status/err of a retry attempt for logging.
-func respStatus(resp types.HTTPResponse, err error) string {
-	if err != nil {
-		return err.Error()
-	}
-	return strconv.Itoa(resp.Status)
-}
-
-// paceImage blocks until at least a second has passed since the previous
-// request to the same host — MD@Home nodes 404 rapid bursts (upstream
-// convention is ~1 request/second per node).
-func (s *AppService) paceImage(host string) {
-	const gap = 1100 * time.Millisecond
-	s.imgPaceMu.Lock()
-	if s.imgPace == nil {
-		s.imgPace = make(map[string]time.Time)
-	}
-	next, ok := s.imgPace[host]
-	if !ok || time.Now().After(next) {
-		s.imgPace[host] = time.Now().Add(gap)
-		s.imgPaceMu.Unlock()
-		return
-	}
-	wait := time.Until(next)
-	s.imgPace[host] = next.Add(gap) // reserve a slot for this request
-	s.imgPaceMu.Unlock()
-	time.Sleep(wait)
 }
