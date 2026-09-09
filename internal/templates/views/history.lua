@@ -3,53 +3,58 @@
 -- Called as: history(data) -> string (body HTML only, layout wraps it)
 
 return function(data)
-    local history = data.History or {}
+	local history = data.History or {}
 
-    if #history == 0 then
-        return [[
+	if #history == 0 then
+		return [[
 <div class="py-16 text-center text-neutral-500">
     <p class="mb-2">No reading history yet</p>
     <a href="/" class="text-indigo-400 hover:text-indigo-300 text-sm">Go to library</a>
 </div>]]
-    end
+	end
 
-    local rows = {}
-    for _, entry in ipairs(history) do
-        local title = entry.Title or ""
-        local pluginID = entry.PluginID or ""
-        local sourceMangaID = entry.SourceMangaID or ""
-        local coverURL = entry.CoverURL or ""
-        local pluginIcon = entry.PluginIcon or ""
-        local pluginName = entry.PluginName or ""
-        local readChapters = entry.ReadChapters or 0
-        local totalChapters = entry.TotalChapters or 0
-        local lastReadAt = entry.LastReadAt or ""
-        local tsAttr = ""
-        local formattedDate = ""
-        if lastReadAt ~= "" then
-            tsAttr = h(tostring(lastReadAt))
-            formattedDate = h(formatDate(tostring(lastReadAt)))
-        else
-            formattedDate = "—"
-        end
+	local rows = {}
+	for _, entry in ipairs(history) do
+		local title = entry.Title or ""
+		local pluginID = entry.PluginID or ""
+		local sourceMangaID = entry.SourceMangaID or ""
+		local coverURL = entry.CoverURL or ""
+		local pluginIcon = entry.PluginIcon or ""
+		local pluginName = entry.PluginName or ""
+		local readChapters = entry.ReadChapters or 0
+		local totalChapters = entry.TotalChapters or 0
+		local lastReadAt = entry.LastReadAt or ""
+		local tsAttr = ""
+		local formattedDate = ""
+		if lastReadAt ~= "" then
+			tsAttr = h(tostring(lastReadAt))
+			formattedDate = h(formatDate(tostring(lastReadAt)))
+		else
+			formattedDate = "—"
+		end
 
-        local coverHtml
-        if coverURL ~= "" then
-            coverHtml = string.format(
-                '<img src="/image?pluginID=%s&amp;url=%s" alt="%s" class="w-16 aspect-[2/3] object-cover rounded shrink-0" loading="lazy">',
-                h(pluginID), h(coverURL), h(title))
-        else
-            coverHtml = string.format(
-                '<div class="w-16 aspect-[2/3] bg-neutral-800 rounded flex items-center justify-center text-neutral-500 text-sm font-semibold shrink-0">%s</div>',
-                h(getInitials(title)))
-        end
+		local coverHtml
+		if coverURL ~= "" then
+			coverHtml = string.format(
+				'<img src="/image?pluginID=%s&amp;url=%s" alt="%s" class="w-16 aspect-[2/3] object-cover rounded shrink-0" loading="lazy">',
+				h(pluginID),
+				h(coverURL),
+				h(title)
+			)
+		else
+			coverHtml = string.format(
+				'<div class="w-16 aspect-[2/3] bg-neutral-800 rounded flex items-center justify-center text-neutral-500 text-sm font-semibold shrink-0">%s</div>',
+				h(getInitials(title))
+			)
+		end
 
-        local iconHtml = ""
-        if pluginIcon ~= "" then
-            iconHtml = string.format('<img src="%s" alt="" class="h-3.5 w-3.5 rounded-sm object-cover">', h(pluginIcon))
-        end
+		local iconHtml = ""
+		if pluginIcon ~= "" then
+			iconHtml = string.format('<img src="%s" alt="" class="h-3.5 w-3.5 rounded-sm object-cover">', h(pluginIcon))
+		end
 
-        rows[#rows + 1] = string.format([[
+		rows[#rows + 1] = string.format(
+			[[
     <a href="/view/manga/%s/%s" class="flex items-center gap-4 py-4 -mx-2 px-2 rounded hover:bg-neutral-900 transition">
         %s
         <div class="flex-1 min-w-0">
@@ -64,16 +69,25 @@ return function(data)
           </div>
         </div>
     </a>]],
-            h(pluginID), h(sourceMangaID),
-            coverHtml,
-            h(title),
-            tsAttr, formattedDate, formattedDate,
-            h(tostring(readChapters)), h(tostring(totalChapters)),
-            iconHtml, h(pluginName),
-            tsAttr, formattedDate, formattedDate)
-    end
+			h(pluginID),
+			h(sourceMangaID),
+			coverHtml,
+			h(title),
+			tsAttr,
+			formattedDate,
+			formattedDate,
+			h(tostring(readChapters)),
+			h(tostring(totalChapters)),
+			iconHtml,
+			h(pluginName),
+			tsAttr,
+			formattedDate,
+			formattedDate
+		)
+	end
 
-    return string.format([[
+	return string.format(
+		[[
 <h1 class="text-xl font-semibold mb-6">History</h1>
 <div class="divide-y divide-neutral-800">
 %s
@@ -91,5 +105,7 @@ function refreshRelativeTimes() {
 }
 refreshRelativeTimes();
 setInterval(refreshRelativeTimes, 60000);
-</script>]], table.concat(rows, "\n"))
+</script>]],
+		table.concat(rows, "\n")
+	)
 end
