@@ -2,7 +2,7 @@
 
 A self-hosted manga reader with sandboxed plugins. Four runtimes — hardened **WASM**, zero-toolchain **Lua**, pure-Go **JS** (goja), and native **Go** (.so) — power your sources; one fast server-rendered UI reads them all.
 
-goIsekai is a single static Go binary that serves a chi + Jet + HTMX + Tailwind web UI. Manga sources are plugins executed in isolated sandboxes, so a crashing or malicious plugin can never take down the host. All network traffic goes through a Chrome-fingerprinted TLS client, so sites behind Cloudflare just work — with an automatic browser-fallback (CDP) when a challenge appears anyway.
+goIsekai is a single static Go binary that serves a chi + Lua template engine + Alpine.js SPA with Tailwind CSS. Manga sources are plugins executed in isolated sandboxes, so a crashing or malicious plugin can never take down the host. All network traffic goes through a Chrome-fingerprinted TLS client with an automatic profile-ladder that rotates fingerprints on WAF blocks — with an automatic browser fallback (CDP) when a challenge appears anyway.
 
 ![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)
 
@@ -11,8 +11,8 @@ goIsekai is a single static Go binary that serves a chi + Jet + HTMX + Tailwind 
 ```mermaid
 flowchart LR
     subgraph Browser
-        UI[HTMX + Tailwind UI]
-        Reader[SPA Canvas Reader]
+        UI[Alpine.js SPA<br/>Tailwind CSS]
+        Reader[Canvas Reader]
     end
 
     subgraph goIsekai[goIsekai single binary]
@@ -26,9 +26,10 @@ flowchart LR
             JS[goja<br/>ES5.1]
             GO[go plugin<br/>.so]
         end
-        HostNet[hostnet proxy<br/>tls-client + CDP fallback]
+        HostNet[hostnet proxy<br/>profile ladder]
         DB[(SQLite<br/>modernc.org)]
         Cache[(WebP disk cache)]
+        Backup[auto-backup<br/>+ orphan prune]
     end
 
     subgraph Internet
@@ -49,26 +50,30 @@ flowchart LR
     WASM --> HostNet
     Lua --> HostNet
     JS --> HostNet
-    HostNet -->|Chrome_146 TLS| Sites
-    HostNet -.->|403/503 challenge| CDP
+    HostNet -->|profile ladder| Sites
+    HostNet -.->|WAF block / challenge| CDP
     CDP -.->|solved cookies| HostNet
     Bridge --> DB
     Bridge --> Cache
+    Bridge --> Backup
 ```
 
 ## Features
 
 - **Four plugin runtimes** — sandboxed **WASM** (64 MB cap, 15 s timeout, panic isolation), **Lua** (lunar, plain text, no toolchain), **JS** (goja, ES5.1, JSON native), and native **Go** (.so). All share one ABI; plugins are lazy-loaded on first use
 - **API-first** — every feature has a JSON endpoint under `/api` with constant-time API-key auth; the HTML UI and any future client consume the same bridge
-- **Browser TLS fingerprinting** — `bogdanfinn/tls-client` with a Chrome profile + per-plugin cookie jars; built for adversarial sites
+- **TLS profile ladder** — `bogdanfinn/tls-client` with a rotation ladder of 7+ browser profiles (Chrome, Firefox, Safari, Edge, Brave); WAF block on one profile triggers escalation to the next, first success is pinned per plugin and persisted to DB
 - **Automatic anti-bot fallback** — when a site returns a Cloudflare challenge, the host spawns a CDP browser (lightpanda or Chrome), solves it, harvests the cookies back into the jar, and retries the fast path — no manual paste
 - **SPA reader** — canvas reader with fetch-swap chapter navigation (no page reload), cursor-anchored zoom, drag pan, fit-width/fit-height/1:1 modes, RTL/LTR, keyboard nav (arrows/space/Esc/Home/End/r/PageUp/Down), per-chapter read progress, read-ahead prefetch into the next chapter
 - **Read tracking** — per-chapter progress (`N/M` pages), strikethrough when a chapter is fully read or manually marked, reset buttons, cached-page counts, continue-from-history
-- **Alt-titles enricher** — plugins can declare alt-title servers (MangaDex, MAL, AI, …); host discovers them by capability, fetches alternative titles, and lets you swap the main title with any result
-- **Library stats** — title counts by status (done/ongoing/unknown), finished/reading/total, estimated time spent, most/fewest chapters
+- **Alt-title & alt-summary enrichment** — plugins declare enrichment servers (MangaDex, MangaUpdates, etc.) with per-server capability (titles, summaries, or both); host fetches, stores, and lets you swap the main title or summary with any result
+- **Library stats** — sidebar with title counts by status (done/ongoing/unknown), read progress, estimated time spent, most/fewest chapters, per-plugin title counts, duplicate detection
 - **FTS5 library search** — full-text search across titles and alt-titles with Go-side fuzzy ranking (exact > prefix > substring > subsequence)
 - **CBZ export** — per-manga or per-chapter export from the disk cache as an ordered ZIP (1.webp, 2.webp, …); works offline for fully-read chapters
+- **Custom confirm & toast** — in-page confirm modal and stacked toast notifications (success/error/info), replacing browser-native dialogs
 - **Live logs** — merged app + plugin logs over WebSocket, filterable, selectable, copyable, clearable
+- **Auto-backup & orphan prune** — scheduled SQLite backups with configurable retention, plus automatic cleanup of orphaned chapters, history, and alt-titles at startup
+- **Restart API** — `POST /api/restart` re-execs the binary in-place for zero-downtime reloads
 - **Brotli precompression** — static JS/CSS served as `.br` when the client accepts it
 - **Single static binary** — pure Go, `CGO_ENABLED=0`, cross-compiles to Linux/Windows/macOS trivially
 
@@ -87,7 +92,7 @@ Host/port come from CLI flags or `goisekai.ini` (flags win):
 
 ## Plugins
 
-Plugins implement a small ABI (`Init`, `SearchManga`, `GetMangaDetails`, `GetChapterList`, `GetPageList`, optional `GetAltTitles`) and call the host function `http_request` for all networking. All runtimes are interchangeable — pick WASM for hardened plugins, Lua for quick ones, JS for JSON-heavy ones.
+Plugins implement a small ABI (`Init`, `SearchManga`, `GetMangaDetails`, `GetChapterList`, `GetPageList`, optional `GetAltTitles`, optional `GetAltSummary`) and call the host function `http_request` for all networking. All runtimes are interchangeable — pick WASM for hardened plugins, Lua for quick ones, JS for JSON-heavy ones.
 
 ### WASM plugins
 
@@ -106,6 +111,10 @@ local PLUGIN = {
   name = "KaliScan",
   version = "1.0.0",
   thumb_ratio = 0.71,
+  alt_title_servers = {
+    { id = "mangadex", name = "MangaDex", kind = "titles" },
+    { id = "mangaupdates", name = "MangaUpdates", kind = "both" },
+  },
 }
 
 function search_manga(filter_json)
@@ -115,7 +124,9 @@ function search_manga(filter_json)
 end
 ```
 
-`main.lua` declares a `PLUGIN` table and four globals (`search_manga`, `get_manga_detail`, `get_chapter_list`, `get_page_list`). Each takes one JSON-string argument and returns a Lua table. Networking goes through `http_request({url=..., method=..., headers=...})`, which rides the same TLS-fingerprinted, cookie-jarred, rate-paced session as WASM plugins. `json.encode`/`json.decode` are provided. Available stdlib: `string`, `table`, `math`, `os.time/date/clock` — no `io`, no `os.execute`. See `examples/plugins/lua/kaliscan/` for a complete example.
+`main.lua` declares a `PLUGIN` table and ABI globals (`search_manga`, `get_manga_detail`, `get_chapter_list`, `get_page_list`, optional `get_alt_titles`, `get_alt_summary`). Each takes one JSON-string argument and returns a Lua table. Networking goes through `http_request({url=..., method=..., headers=...})`, which rides the same TLS-fingerprinted, cookie-jarred, rate-paced session as WASM plugins. `json.encode`/`json.decode` are provided. Available stdlib: `string`, `table`, `math`, `os.time/date/clock` — no `io`, no `os.execute`.
+
+Reusable modules (`helpers.lua`, `enrich.lua`) can be copied across plugins for shared utilities and enrichment logic. See `examples/plugins/lua/mangabuddy/` for a complete example.
 
 ### JS plugins (no toolchain needed)
 
@@ -126,21 +137,32 @@ var PLUGIN = {
   name: "MangaDex",
   version: "1.0.0",
   thumb_ratio: 0.71,
-  alt_title_servers: [{ id: "mangadex", name: "MangaDex" }],
+  alt_title_servers: [
+    { id: "mangadex", name: "MangaDex", kind: "titles" },
+    { id: "mangaupdates", name: "MangaUpdates", kind: "both" },
+  ],
 };
 
 function search_manga(filterJson) {
   var filter = JSON.parse(filterJson);
-  var res = JSON.parse(http_request(JSON.stringify({ url: "https://api.mangadex.org/manga?title=" + encodeURIComponent(filter.query) })));
+  var res = JSON.parse(http_request(JSON.stringify({
+    url: "https://api.mangadex.org/manga?title=" + encodeURIComponent(filter.query)
+  })));
   return res.data;
 }
 ```
 
-Same ABI as Lua — `PLUGIN` metadata + four PascalCase globals. `http_request` takes a JSON string, returns a JSON string. `json` is native JS. See `examples/plugins/js/mangadex/` for a complete example.
+Same ABI as Lua — `PLUGIN` metadata + PascalCase globals. `http_request` takes a JSON string, returns a JSON string. `json` is native JS. A shared `enrich.js` module handles MangaUpdates enrichment. See `examples/plugins/js/mangadex/` for a complete example.
 
 ```sh
 make install-plugins   # copies all plugin sources → app_data/plugins/
 ```
+
+## TLS profile ladder
+
+The host maintains a rotation ladder of diverse TLS browser profiles (Chrome, Firefox, Safari, Edge, Brave, iOS, plus a stdlib fallback). When a WAF blocks a request (403 with captcha/challenge markers), the host escalates to the next profile in the ladder. The first successful profile is pinned in-memory and persisted to the DB for that plugin, so subsequent requests skip the ladder entirely.
+
+Plugins can declare `http_profiles` in their metadata to customize the trial order; undeclared plugins use the default ladder. The Plugins page shows each plugin's pinned profile with Test and Reset controls.
 
 ## Anti-bot fallback (CDP)
 
@@ -176,7 +198,7 @@ make br              # brotli-compress static assets
 make clean           # remove binary + generated assets
 ```
 
-Stack: Go 1.27 · chi · CloudyKit/jet · HTMX · Tailwind (static build) · Extism · lunar · goja · tls-client · chromedp · modernc.org/sqlite (via go-jet) · gen2brain/webp.
+Stack: Go 1.27 · chi · Lua templates (lunar) · Alpine.js · Tailwind CSS (static build) · Extism · goja · tls-client · chromedp · modernc.org/sqlite (via go-jet) · gen2brain/webp.
 
 ## License
 
