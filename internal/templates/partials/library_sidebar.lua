@@ -17,7 +17,7 @@ return function(data)
 		-- Build stats cards
 		local statCards = ""
 		local function addStat(value, label, color, longText, accent)
-			local cls = color and (' class="text-sm font-medium ' .. h(color) .. '"')
+			local cls = (color and color ~= "") and (' class="text-sm font-medium ' .. h(color) .. '"')
 				or (
 					longText and ' class="text-sm font-medium"'
 					or (accent and ' class="text-3xl font-bold text-indigo-300"' or ' class="text-lg font-semibold"')
