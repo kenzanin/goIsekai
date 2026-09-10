@@ -68,7 +68,8 @@ return function(data)
 			.. h(pluginID)
 			.. "/"
 			.. h(mangaID)
-			.. '" class="bg-neutral-900 rounded-lg overflow-hidden hover:-translate-y-0.5 hover:shadow-lg hover:shadow-black/40 hover:ring-1 hover:ring-indigo-500 transition">'
+			.. '" class="flex flex-col bg-neutral-900 rounded-lg overflow-hidden hover:-translate-y-0.5 hover:shadow-lg hover:shadow-black/40 hover:ring-1 hover:ring-indigo-500 transition">'
+			.. coverHTML
 			.. '<div class="p-3">'
 			.. '<div class="text-sm font-medium line-clamp-2" title="'
 			.. h(title)

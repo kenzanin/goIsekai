@@ -2,8 +2,12 @@
 -- Reading history page. Replaces views/history.jet.
 -- Called as: history(data) -> string (body HTML only, layout wraps it)
 
+local pagination = require("partials.pagination")
+
 return function(data)
 	local history = data.History or {}
+	local page = data.Page or 1
+	local totalPages = data.TotalPages or 1
 
 	if #history == 0 then
 		return [[
@@ -86,7 +90,7 @@ return function(data)
 		)
 	end
 
-	return string.format(
+	local listHTML = string.format(
 		[[
 <h1 class="text-xl font-semibold mb-6">History</h1>
 <div class="divide-y divide-neutral-800">
@@ -108,4 +112,13 @@ setInterval(refreshRelativeTimes, 60000);
 </script>]],
 		table.concat(rows, "\n")
 	)
+
+	local pag = ""
+	if totalPages > 1 then
+		pag = pagination({
+			Pagination = { Base = "/view/history", Param = "page", Current = page, Total = totalPages },
+		})
+	end
+
+	return listHTML .. pag
 end

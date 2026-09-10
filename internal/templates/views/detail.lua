@@ -9,7 +9,8 @@
 -- data.Continue: *ContinuePoint, data.InLibrary: bool, data.Challenge: bool
 -- data.ChCurrentPage/ChTotalPages: int
 
-local pagination = require("partials.pagination")
+local detailAlt = require("partials.detail_alt")
+local detailChapters = require("partials.detail_chapters")
 
 return function(data)
 	local pluginID = data.PluginID or ""
@@ -105,185 +106,19 @@ return function(data)
 		body = body .. '<p class="text-sm text-neutral-400 mb-2">' .. h(manga.Author) .. "</p>"
 	end
 
-	-- Alternative titles (collapsible)
-	local atCount = #altTitles
-	local chevOnclick =
-		"this.nextElementSibling.classList.toggle(&quot;hidden&quot;);this.querySelector(&quot;.chev&quot;).classList.toggle(&quot;rotate-90&quot;)"
-	local atBody = ""
-
-	if #altTitles > 0 then
-		atBody = '<div class="flex flex-wrap gap-1.5 mb-2">'
-		-- Current title badge
-		atBody = atBody
-			.. '<span class="inline-flex items-center gap-1.5 rounded-full bg-neutral-800 border border-indigo-700/60 pl-2.5 pr-1 py-0.5 text-xs">'
-			.. '<span class="text-indigo-300" title="Current main title">'
-			.. h(currentTitle)
-			.. "</span>"
-			.. '<span class="text-[10px] px-1.5 py-0.5 rounded-full bg-indigo-900/40 text-indigo-300">via '
-			.. h(pluginID)
-			.. "</span>"
-			.. "</span>"
-		for _, t in ipairs(altTitles) do
-			atBody = atBody
-				.. '<span class="inline-flex items-center gap-1.5 rounded-full bg-neutral-800 border border-neutral-700/60 pl-2.5 pr-1 py-0.5 text-xs">'
-				.. '<form method="post" action="/action/set-title/'
-				.. h(pluginID)
-				.. "/"
-				.. h(mangaID)
-				.. '" class="inline">'
-				.. '<input type="hidden" name="title" value="'
-				.. h(t.Title or "")
-				.. '">'
-				.. '<button type="submit" title="Set as main title" class="text-neutral-300 hover:text-indigo-300" data-confirm="Set as main title?">'
-				.. h(t.Title or "")
-				.. "</button>"
-				.. "</form>"
-				.. (t.Source and t.Source ~= "" and ('<span class="text-[10px] px-1.5 py-0.5 rounded-full bg-neutral-700/50 text-neutral-400">via ' .. h(
-					t.Source
-				) .. "</span>") or "")
-				.. '<form method="post" action="/action/remove-alt-title/'
-				.. h(pluginID)
-				.. "/"
-				.. h(mangaID)
-				.. '" class="inline-flex">'
-				.. '<input type="hidden" name="title" value="'
-				.. h(t.Title or "")
-				.. '">'
-				.. '<button type="submit" title="Remove alternative title" aria-label="Remove" class="size-4 inline-flex items-center justify-center rounded-full text-neutral-500 hover:text-red-400 hover:bg-neutral-700" data-confirm="Are you sure?">&times;</button>'
-				.. "</form></span>"
-		end
-		atBody = atBody .. "</div>"
-	end
-
+	-- Alternative titles / summaries + fetch forms (info column)
 	body = body
-		.. '<div class="mb-4">'
-		.. '<button type="button" onclick="'
-		.. chevOnclick
-		.. '" class="flex items-center gap-1.5 cursor-pointer group select-none">'
-		.. '<svg class="size-3.5 text-neutral-500 chev transition-transform" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>'
-		.. '<span class="text-xs font-semibold text-neutral-300 uppercase tracking-wide">Alternative titles'
-		.. (atCount > 0 and (' <span class="text-neutral-500 font-normal">(' .. atCount .. ")</span>") or "")
-		.. "</span></button>"
-		.. '<div id="alt-titles-body" class="'
-		.. (atCount > 0 and "hidden" or "")
-		.. '">'
-		.. atBody
-		.. "</div>"
-		.. "</div>"
-
-	-- Fetch alt-titles form
-	local titlesFormHTML = ""
-	if #altTitleServers > 0 then
-		local optionsHTML = ""
-		for _, s in ipairs(altTitleServers) do
-			optionsHTML = optionsHTML
-				.. '<option value="'
-				.. h(s.ServerID or "")
-				.. '">'
-				.. h(s.Name or "")
-				.. "</option>"
-		end
-		titlesFormHTML = '<form method="post" action="/action/fetch-alt-titles/'
-			.. h(pluginID)
-			.. "/"
-			.. h(mangaID)
-			.. '" class="flex flex-wrap items-center gap-2">'
-			.. '<select name="server" class="bg-neutral-900 border border-neutral-700 rounded-md px-2 py-1.5 text-xs text-neutral-300 focus:outline-none focus:border-indigo-500">'
-			.. optionsHTML
-			.. "</select>"
-			.. '<button type="submit" class="border border-neutral-700 hover:bg-neutral-800 rounded-md px-3 py-1.5 text-xs font-medium inline-flex items-center gap-1.5">'
-			.. '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="size-3.5"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>'
-			.. " Get alternative titles</button></form>"
-	else
-		titlesFormHTML =
-			'<p class="text-xs text-neutral-500">No alt-title providers available — install a plugin that declares alt-title servers.</p>'
-	end
-	body = body .. titlesFormHTML
-
-	-- Origin summary
-	if manga.Description and manga.Description ~= "" then
-		body = body
-			.. '<div class="mb-4 border-t border-neutral-800 pt-4">'
-			.. '<span class="text-xs font-semibold text-neutral-300 uppercase tracking-wide">Summary</span>'
-			.. '<p class="text-sm text-neutral-400 mt-1.5">'
-			.. h(manga.Description)
-			.. "</p></div>"
-	end
-
-	-- Alternative summaries (collapsible)
-	local asCount = #altSummaries
-	local asBody = ""
-	if #altSummaries > 0 then
-		for _, a in ipairs(altSummaries) do
-			asBody = asBody
-				.. '<div class="flex items-start gap-2 py-1">'
-				.. '<form method="post" action="/action/set-summary/'
-				.. h(pluginID)
-				.. "/"
-				.. h(mangaID)
-				.. '" class="flex-1 min-w-0 group" data-confirm="Set this as the main summary?">'
-				.. '<input type="hidden" name="description" value="'
-				.. h(a.Description or "")
-				.. '">'
-				.. '<button type="submit" title="Set as main summary" class="w-full text-left text-sm text-neutral-300 hover:text-indigo-300 transition">'
-				.. h(a.Description or "")
-				.. "</button>"
-				.. "</form>"
-				.. '<div class="flex items-center gap-1.5 shrink-0 mt-0.5">'
-				.. (a.Source and a.Source ~= "" and ('<span class="text-[10px] px-1.5 py-0.5 rounded-full bg-neutral-700/50 text-neutral-400">via ' .. h(
-					a.Source
-				) .. "</span>") or "")
-				.. '<form method="post" action="/action/remove-alt-summary/'
-				.. h(pluginID)
-				.. "/"
-				.. h(mangaID)
-				.. '" class="inline-flex">'
-				.. '<input type="hidden" name="description" value="'
-				.. h(a.Description or "")
-				.. '">'
-				.. '<button type="submit" title="Remove alternative summary" aria-label="Remove" class="size-4 inline-flex items-center justify-center rounded-full text-neutral-500 hover:text-red-400 hover:bg-neutral-700" data-confirm="Remove this alternative summary?">&times;</button>'
-				.. "</form></div></div>"
-		end
-	end
-
-	body = body
-		.. '<div class="mb-4 border-t border-neutral-800 pt-4">'
-		.. '<button type="button" onclick="'
-		.. chevOnclick
-		.. '" class="flex items-center gap-1.5 cursor-pointer group select-none">'
-		.. '<svg class="size-3.5 text-neutral-500 chev transition-transform" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>'
-		.. '<span class="text-xs font-semibold text-neutral-300 uppercase tracking-wide">Alternative summaries'
-		.. (asCount > 0 and (' <span class="text-neutral-500 font-normal">(' .. asCount .. ")</span>") or "")
-		.. "</span></button>"
-		.. '<div id="alt-summaries-body" class="'
-		.. (asCount > 0 and "hidden" or "")
-		.. '">'
-		.. asBody
+		.. detailAlt({
+			PluginID = pluginID,
+			MangaID = mangaID,
+			CurrentTitle = currentTitle,
+			AltTitles = altTitles,
+			AltTitleServers = altTitleServers,
+			AltSummaries = altSummaries,
+			AltSummaryServers = altSummaryServers,
+			Manga = manga,
+		})
 		.. "</div></div>"
-
-	-- Fetch alt-summaries form
-	local summariesFormHTML = ""
-	if #altSummaryServers > 0 then
-		local sOptions = ""
-		for _, s in ipairs(altSummaryServers) do
-			sOptions = sOptions .. '<option value="' .. h(s.ServerID or "") .. '">' .. h(s.Name or "") .. "</option>"
-		end
-		summariesFormHTML = '<form method="post" action="/action/fetch-alt-summaries/'
-			.. h(pluginID)
-			.. "/"
-			.. h(mangaID)
-			.. '" class="flex flex-wrap items-center gap-2 mt-1">'
-			.. '<select name="server" class="bg-neutral-900 border border-neutral-700 rounded-md px-2 py-1.5 text-xs text-neutral-300 focus:outline-none focus:border-indigo-500">'
-			.. sOptions
-			.. "</select>"
-			.. '<button type="submit" class="border border-neutral-700 hover:bg-neutral-800 rounded-md px-3 py-1.5 text-xs font-medium inline-flex items-center gap-1.5">'
-			.. '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="size-3.5"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>'
-			.. " Get alternative summaries</button></form>"
-	else
-		summariesFormHTML =
-			'<p class="text-xs text-neutral-500">No alt-summary providers available — install a plugin that declares alt-summary servers.</p>'
-	end
-	body = body .. summariesFormHTML .. "</div></div>"
 
 	-- Action buttons: library + continue reading
 	local actionsHTML = '<div class="flex flex-wrap items-center gap-2 mb-4">'
@@ -326,184 +161,16 @@ return function(data)
 	body = body .. actionsHTML .. "</div>"
 
 	-- Chapters section
-	body = body .. '<h2 class="text-xl font-semibold mb-4">Chapters</h2>'
-
-	if #chapters == 0 then
-		body = body .. '<div class="py-16 text-center text-neutral-500">No chapters yet</div>'
-	else
-		-- Bulk actions toolbar
-		body = body
-			.. '<div class="flex flex-wrap items-center gap-2 mb-4">'
-			.. '<form id="mark-bulk" method="post" action="/action/mark-read-bulk">'
-			.. '<input type="hidden" name="pluginID" value="'
-			.. h(pluginID)
-			.. '">'
-			.. '<input type="hidden" name="mangaID" value="'
-			.. h(mangaID)
-			.. '">'
-			.. '<button type="submit" class="bg-indigo-600 hover:bg-indigo-500 text-white rounded-md px-3 py-1.5 text-sm font-medium">Mark selected as read</button>'
-			.. "</form>"
-			.. '<form method="post" action="/action/reset-progress-all/'
-			.. h(pluginID)
-			.. "/"
-			.. h(mangaID)
-			.. '">'
-			.. '<button type="submit" title="Clear read progress for every chapter" class="bg-transparent border border-red-900/60 text-red-400 hover:bg-red-950/40 rounded-md px-3 py-1.5 text-sm" data-confirm="Are you sure?">↺ Reset all read status</button>'
-			.. "</form>"
-			.. '<form method="post" action="/action/clear-cache/'
-			.. h(pluginID)
-			.. "/"
-			.. h(mangaID)
-			.. '" data-confirm="Clear cached images for this manga?">'
-			.. '<button type="submit" title="Delete cached image files for this manga" class="bg-transparent border border-red-900/60 text-red-400 hover:bg-red-950/40 rounded-md px-3 py-1.5 text-sm">🗑 Clear cached images</button>'
-			.. "</form></div>"
-
-		-- Chapter pagination (top)
-		body = body
-			.. pagination({
-				Pagination = { Base = "", Param = "ChPage", Current = chPage, Total = chTotalPages },
-			})
-
-		-- Chapter list
-		local chaptersHTML = '<div class="divide-y divide-neutral-800">'
-		local firstID = ""
-		for i, c in ipairs(chapters) do
-			local cID = c.ID or ""
-			if i == 1 then
-				firstID = cID
-			end
-			local cTitle = c.Title or ""
-			local chapterNum = c.ChapterNum or 0
-			local p = progress[cID] or {}
-			local isDone = p.Done or false
-			local totalPages = p.TotalPages or 0
-			local lastPageRead = p.LastPageRead or 0
-			local cachedPages = p.CachedPages or 0
-
-			local rowHTML = '<div class="flex items-center gap-3 py-3 px-2 -mx-2 rounded hover:bg-neutral-900 transition">'
-				.. '<input type="checkbox" name="chapterIDs" value="'
-				.. h(cID)
-				.. '" form="mark-bulk" class="size-4 accent-indigo-600 shrink-0">'
-				.. '<a href="/view/read/'
-				.. h(pluginID)
-				.. "/"
-				.. h(mangaID)
-				.. "/"
-				.. h(cID)
-				.. '" class="flex-1 flex items-center justify-between gap-4 min-w-0">'
-				.. '<span class="text-sm">'
-				.. '<span class="text-neutral-400 mr-2">Ch. '
-				.. h(formatChapterNum(chapterNum))
-				.. "</span>"
-				.. (isDone and ('<span class="line-through text-neutral-500">' .. h(cTitle) .. "</span>") or (" " .. h(
-					cTitle
-				)))
-				.. "</span>"
-				.. '<span class="flex items-center gap-2 shrink-0">'
-
-			-- Page info
-			if totalPages > 0 then
-				rowHTML = rowHTML
-					.. '<span class="text-xs px-2 py-0.5 rounded-full bg-neutral-800 text-neutral-400">'
-					.. h(tostring(lastPageRead))
-					.. "/"
-					.. h(tostring(totalPages))
-					.. " read"
-					.. (cachedPages > 0 and (" · " .. h(tostring(cachedPages)) .. " cached") or "")
-					.. "</span>"
-			elseif cachedPages > 0 then
-				rowHTML = rowHTML
-					.. '<span class="text-xs px-2 py-0.5 rounded-full bg-neutral-800 text-neutral-400">'
-					.. h(tostring(cachedPages))
-					.. " cached</span>"
-			end
-
-			if isDone then
-				rowHTML = rowHTML .. '<span class="text-emerald-400 text-xs">✓</span>'
-			end
-
-			-- Release date
-			if c.ReleasedAt then
-				local rawDate = ""
-				if type(c.ReleasedAt) == "table" and c.ReleasedAt.Format then
-					rawDate = c.ReleasedAt:Format("2006-01-02T15:04:05")
-				elseif type(c.ReleasedAt) == "string" then
-					rawDate = c.ReleasedAt
-				end
-				if rawDate ~= "" and string.sub(rawDate, 1, 4) ~= "0001" then
-					rowHTML = rowHTML
-						.. '<span class="text-xs text-neutral-500">'
-						.. h(formatDate(rawDate))
-						.. "</span>"
-				end
-			end
-			rowHTML = rowHTML .. "</span></a>"
-
-			-- Mark read button
-			rowHTML = rowHTML
-				.. '<form method="post" action="/action/mark-read/'
-				.. h(pluginID)
-				.. "/"
-				.. h(mangaID)
-				.. "/"
-				.. h(cID)
-				.. '">'
-				.. '<button type="submit" title="Mark read" class="size-7 inline-flex items-center justify-center rounded-md border border-neutral-700 hover:bg-neutral-800 text-sm" aria-label="Mark read"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="size-4"><polyline points="20 6 9 17 4 12"/></svg></button>'
-				.. "</form>"
-
-			-- Reset progress button
-			rowHTML = rowHTML
-				.. '<form method="post" action="/action/reset-progress/'
-				.. h(pluginID)
-				.. "/"
-				.. h(mangaID)
-				.. "/"
-				.. h(cID)
-				.. '">'
-				.. '<button type="submit" title="Reset progress" class="size-7 inline-flex items-center justify-center rounded-md border border-neutral-700 hover:bg-neutral-800 text-sm" aria-label="Reset progress" data-confirm="Are you sure?"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="size-4"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg></button>'
-				.. "</form>"
-
-			-- Mark range button
-			rowHTML = rowHTML
-				.. '<form method="post" action="/action/mark-read-range/'
-				.. h(pluginID)
-				.. "/"
-				.. h(mangaID)
-				.. "/"
-				.. h(firstID)
-				.. "/"
-				.. h(cID)
-				.. '">'
-				.. '<button type="submit" title="Mark up to here" class="size-7 inline-flex items-center justify-center rounded-md border border-neutral-700 hover:bg-neutral-800 text-sm" aria-label="Mark up to here"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="size-4"><path d="M18 6L7 17l-5-5"/><path d="M22 10l-7.5 7.5L13 16"/></svg></button>'
-				.. "</form>"
-
-			-- CBZ download button
-			rowHTML = rowHTML
-				.. '<form method="post" action="/action/export-cbz/'
-				.. h(pluginID)
-				.. "/"
-				.. h(mangaID)
-				.. "/"
-				.. h(cID)
-				.. '">'
-				.. '<input type="hidden" name="title" value="'
-				.. h(manga.Title or "")
-				.. " - Ch. "
-				.. h(formatChapterNum(chapterNum))
-				.. '">'
-				.. '<button type="submit" title="Download this chapter as .cbz" class="h-7 px-2 inline-flex items-center justify-center rounded-md border border-neutral-700 hover:bg-neutral-800 text-sm whitespace-nowrap">⬇ cbz</button>'
-				.. "</form></div>"
-
-			chaptersHTML = chaptersHTML .. rowHTML
-		end
-		body = body .. chaptersHTML .. "</div>"
-
-		-- Chapter pagination (bottom)
-		body = body
-			.. pagination({
-				Pagination = { Base = "", Param = "ChPage", Current = chPage, Total = chTotalPages },
-			})
-	end
+	body = body
+		.. detailChapters({
+			PluginID = pluginID,
+			MangaID = mangaID,
+			Manga = manga,
+			Chapters = chapters,
+			Progress = progress,
+			ChPage = chPage,
+			ChTotalPages = chTotalPages,
+		})
 
 	return body
 end

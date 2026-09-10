@@ -3,11 +3,19 @@
 BINARY := goisekai
 PKGS   := ./internal/... ./pkg/... ./cmd/...
 
-.PHONY: build dev devrun run open check fmt fmt-web fmt-lua test race modernize lint lint-web lint-lua br clean build-plugins install-plugins all
+.PHONY: build dev devrun run open check fmt fmt-web fmt-lua test race modernize lint lint-web lint-lua css br clean build-plugins install-plugins all
 
 ## build: compile the server binary (pure Go, CGO-free, cross-compilable).
-build: br
+build: css br
 	CGO_ENABLED=0 go build -o $(BINARY) ./cmd/goisekai
+
+## css: compile Tailwind CSS from the templates into the embedded stylesheet.
+## The input directive is transient; only the compiled output is committed.
+css:
+	@command -v npx >/dev/null 2>&1 || { echo "npx not found — keeping committed tailwind.css"; exit 0; }
+	@printf '@tailwind base;\n@tailwind components;\n@tailwind utilities;\n' > cmd/goisekai/frontend/lib/input.css
+	@npx --yes tailwindcss@3.4.17 -c tailwind.config.js -i cmd/goisekai/frontend/lib/input.css -o cmd/goisekai/frontend/lib/tailwind.css
+	@rm -f cmd/goisekai/frontend/lib/input.css cmd/goisekai/frontend/lib/input.css.br
 
 ## br: pre-compress frontend JS/CSS to .br (brotli) for embedded serving.
 ## Requires the `brotli` CLI. Run automatically before every build.

@@ -3,6 +3,7 @@ package httpserver
 import (
 	"net/http"
 	"sort"
+	"strconv"
 	"time"
 
 	"goisekai/internal/database"
@@ -45,7 +46,7 @@ func (s *Server) viewUpdates(w http.ResponseWriter, r *http.Request) {
 		statsMap[st.MangaID] = st
 	}
 
-	buildRow := func(m database.Manga) map[string]any {
+	buildRow := func(m database.Manga, typ, date string) map[string]any {
 		st := statsMap[m.ID]
 		name := pluginNameMap[m.PluginID]
 		if name == "" {
@@ -59,57 +60,49 @@ func (s *Server) viewUpdates(w http.ResponseWriter, r *http.Request) {
 			"ReadChapters":  st.ReadChapters,
 			"TotalChapters": st.TotalChapters,
 			"HasNew":        st.HasNew,
-			"NewSince":      st.NewSince,
-			"CreatedAt":     m.CreatedAt,
+			"Type":          typ,
+			"Date":          date,
 			"PluginName":    name,
 			"PluginIcon":    pluginIconMap[m.PluginID],
 		}
 	}
 
-	// Fresh updates: new_since set (cleared when the manga is opened).
-	var updMangas []database.Manga
+	// Merge fresh chapter updates (new_since set) and recently-added titles
+	// into one date-sorted feed, then paginate host-side.
+	var items []map[string]any
 	for _, st := range libStats {
 		if st.NewSince == nil {
 			continue
 		}
 		for _, m := range mangas {
 			if m.ID == st.MangaID {
-				updMangas = append(updMangas, m)
+				items = append(items, buildRow(m, "update", st.NewSince.UTC().Format(time.RFC3339)))
 				break
 			}
 		}
 	}
-	sort.SliceStable(updMangas, func(i, j int) bool {
-		return statsMap[updMangas[i].ID].NewSince.After(*statsMap[updMangas[j].ID].NewSince)
-	})
-	updates := make([]map[string]any, 0, len(updMangas))
-	for _, m := range updMangas {
-		updates = append(updates, buildRow(m))
-	}
-
-	// Recently added: library titles created in the last 7 days.
 	cutoff := time.Now().AddDate(0, 0, -7)
-	var recMangas []database.Manga
 	for _, m := range mangas {
 		if m.CreatedAt.After(cutoff) {
-			recMangas = append(recMangas, m)
+			items = append(items, buildRow(m, "recent", m.CreatedAt.UTC().Format(time.RFC3339)))
 		}
 	}
-	sort.SliceStable(recMangas, func(i, j int) bool {
-		return recMangas[i].CreatedAt.After(recMangas[j].CreatedAt)
+	sort.SliceStable(items, func(i, j int) bool {
+		return items[i]["Date"].(string) > items[j]["Date"].(string)
 	})
-	if len(recMangas) > 24 {
-		recMangas = recMangas[:24]
+
+	const pageSize = 24
+	page, _ := strconv.Atoi(r.URL.Query().Get("page"))
+	if page < 1 {
+		page = 1
 	}
-	recent := make([]map[string]any, 0, len(recMangas))
-	for _, m := range recMangas {
-		recent = append(recent, buildRow(m))
-	}
+	total := len(items)
+	start := min((page-1)*pageSize, total)
+	end := min(start+pageSize, total)
 
 	s.renderPage(w, r, "views/updates", "updates", map[string]any{
-		"Updates":      updates,
-		"Recent":       recent,
-		"UpdatesCount": len(updates),
-		"RecentCount":  len(recent),
+		"Items":      items[start:end],
+		"Page":       page,
+		"TotalPages": max((total+pageSize-1)/pageSize, 1),
 	})
 }

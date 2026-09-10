@@ -32,7 +32,20 @@ func (s *Server) viewHistory(w http.ResponseWriter, r *http.Request) {
 		}
 		entries = append(entries, h)
 	}
-	s.renderPage(w, r, "views/history", "history", map[string]any{"History": entries})
+
+	const pageSize = 24
+	page, _ := strconv.Atoi(r.URL.Query().Get("page"))
+	if page < 1 {
+		page = 1
+	}
+	total := len(entries)
+	start := min((page-1)*pageSize, total)
+	end := min(start+pageSize, total)
+	s.renderPage(w, r, "views/history", "history", map[string]any{
+		"History":    entries[start:end],
+		"Page":       page,
+		"TotalPages": max((total+pageSize-1)/pageSize, 1),
+	})
 }
 
 // viewSearch renders the search form and, when q+pluginID are present, results.

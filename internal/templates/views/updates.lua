@@ -2,27 +2,12 @@
 -- Updates page: flat list of fresh chapter updates + recently added library titles.
 -- Called as: updates(data) -> string (body HTML only, layout wraps it)
 
+local pagination = require("partials.pagination")
+
 return function(data)
-	local updates = data.Updates or {}
-	local recent = data.Recent or {}
-
-	-- Merge and sort all items by date (newest first).
-	local allItems = {}
-	for _, m in ipairs(updates) do
-		m._type = "update"
-		m._date = m.NewSince or m.CreatedAt or ""
-		allItems[#allItems + 1] = m
-	end
-	for _, m in ipairs(recent) do
-		m._type = "recent"
-		m._date = m.CreatedAt or ""
-		allItems[#allItems + 1] = m
-	end
-
-	-- Sort by date descending.
-	table.sort(allItems, function(a, b)
-		return a._date > b._date
-	end)
+	local allItems = data.Items or {}
+	local page = data.Page or 1
+	local totalPages = data.TotalPages or 1
 
 	if #allItems == 0 then
 		return [[
@@ -46,14 +31,14 @@ return function(data)
 		local tsAttr = ""
 		local formattedDate = ""
 
-		if entry._type == "update" then
+		if entry.Type == "update" then
 			badge = '<span class="shrink-0 text-[10px] px-1.5 py-0.5 rounded-full bg-red-500 text-white font-medium">New</span>'
-			tsAttr = h(tostring(entry.NewSince or entry.CreatedAt or ""))
-			formattedDate = h(formatDate(tostring(entry.NewSince or entry.CreatedAt or "")))
+			tsAttr = h(tostring(entry.Date or ""))
+			formattedDate = h(formatDate(tostring(entry.Date or "")))
 		else
 			badge = '<span class="shrink-0 text-[10px] px-1.5 py-0.5 rounded-full bg-indigo-500/15 text-indigo-400">New title</span>'
-			tsAttr = h(tostring(entry.CreatedAt or ""))
-			formattedDate = h(formatDate(tostring(entry.CreatedAt or "")))
+			tsAttr = h(tostring(entry.Date or ""))
+			formattedDate = h(formatDate(tostring(entry.Date or "")))
 		end
 
 		local coverHtml
@@ -110,7 +95,7 @@ return function(data)
 		)
 	end
 
-	return string.format(
+	local listHTML = string.format(
 		[[
 <h1 class="text-xl font-semibold mb-6">Updates</h1>
 <div class="divide-y divide-neutral-800">
@@ -132,4 +117,13 @@ setInterval(refreshRelativeTimes, 60000);
 </script>]],
 		table.concat(rows, "\n")
 	)
+
+	local pag = ""
+	if totalPages > 1 then
+		pag = pagination({
+			Pagination = { Base = "/view/updates", Param = "page", Current = page, Total = totalPages },
+		})
+	end
+
+	return listHTML .. pag
 end
