@@ -20,6 +20,7 @@ return function(data, content)
 		'    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>',
 		'    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">',
 		"    <style>",
+		"        html { font-size: 17.5px; }",
 		"        :where(a, button, input, select, textarea, summary):focus-visible {",
 		"            outline: 2px solid #6366f1;",
 		"            outline-offset: 2px;",

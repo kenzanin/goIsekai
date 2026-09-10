@@ -95,6 +95,14 @@ return function(data)
 					)
 			end
 
+			-- Finished overlay: green check when every chapter is read
+			local finishedOverlay = ""
+			if statsObj and statsObj.TotalChapters > 0 and (statsObj.ReadChapters or 0) >= statsObj.TotalChapters then
+				finishedOverlay = '<span class="absolute top-2 right-2 w-6 h-6 rounded-full bg-emerald-500/90 backdrop-blur flex items-center justify-center" title="Semua chapter sudah dibaca">'
+					.. '<svg class="w-3.5 h-3.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"></path></svg>'
+					.. "</span>"
+			end
+
 			mangaCards = mangaCards
 				.. '<a href="/view/manga/'
 				.. h(pluginID)
@@ -110,6 +118,7 @@ return function(data)
 				.. '<div class="lib-dim" style="display:none;position:absolute;inset:0;background:rgba(0,0,0,0.82);border-radius:0.5rem;"></div>'
 				.. statusBadge
 				.. pluginBadge
+				.. finishedOverlay
 				.. "</div>"
 				.. '<div class="p-3 flex flex-col gap-1">'
 				.. '<div class="text-sm font-medium line-clamp-2" title="'
