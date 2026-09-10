@@ -2,8 +2,8 @@ package httpserver
 
 import (
 	"context"
-	"embed"
 	"fmt"
+	"io/fs"
 	"log/slog"
 	"net/http"
 	"net/url"
@@ -22,14 +22,14 @@ type Server struct {
 	Router  *chi.Mux
 	http    *http.Server
 	logger  *slog.Logger
-	assets  embed.FS
+	assets  fs.FS
 	service *bridge.AppService
 	engine  *templates.Engine
 	apiKey  string
 }
 
 // New creates a new Server with Chi middleware and all routes registered.
-func New(host string, port int, apiKey string, assets embed.FS, svc *bridge.AppService, logger *slog.Logger, engine *templates.Engine) *Server {
+func New(host string, port int, apiKey string, assets fs.FS, svc *bridge.AppService, logger *slog.Logger, engine *templates.Engine) *Server {
 
 	r := chi.NewRouter()
 	r.Use(middleware.Recoverer)

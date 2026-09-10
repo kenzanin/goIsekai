@@ -3,16 +3,13 @@
 package templates
 
 import (
-	"embed"
 	"io"
+	"io/fs"
 	"sort"
 	"strconv"
 	"strings"
 	"time"
 )
-
-//go:embed layouts views partials
-var templatesFS embed.FS
 
 // dateLayouts are tried in order by formatDate.
 var dateLayouts = []string{time.RFC3339Nano, time.RFC3339, "2006-01-02T15:04:05", "2006-01-02 15:04:05", "2006-01-02"}
@@ -22,8 +19,10 @@ type Engine struct {
 	lua *LuaEngine
 }
 
-// New creates a LuaEngine from the embedded templates and returns an Engine wrapper.
-func New(devMode bool) (*Engine, error) {
+// New creates a LuaEngine over the given on-disk template tree and returns an
+// Engine wrapper. devMode re-reads and recompiles templates from disk on every
+// render, so template edits take effect without a rebuild or restart.
+func New(templatesFS fs.FS, devMode bool) (*Engine, error) {
 	luaEng, err := NewLuaEngine(templatesFS, devMode)
 	if err != nil {
 		return nil, err

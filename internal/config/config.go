@@ -22,6 +22,14 @@ type Config struct {
 	// <DataDir>/cache. Overridable in the [app] section of goisekai.ini.
 	CacheDir string
 
+	// [app] — on-disk asset and template locations (no more go:embed).
+	// FrontendDir serves the /static assets and TemplatesDir the Lua template
+	// tree, both read from disk at runtime so edits take effect without a
+	// rebuild. Relative paths resolve against the working directory (where
+	// goisekai.ini lives).
+	FrontendDir  string
+	TemplatesDir string
+
 	// HTTP server
 	Host string
 	Port int
@@ -75,6 +83,10 @@ func Default() *Config {
 		PruneOrphans:        true,
 	}
 	c.CacheDir = filepath.Join(c.DataDir, "cache")
+	// Source-tree locations (relative to the working dir) so template and
+	// frontend edits take effect without a rebuild.
+	c.FrontendDir = "cmd/goisekai/frontend"
+	c.TemplatesDir = "internal/templates"
 	return c
 }
 
@@ -89,6 +101,8 @@ func (c *Config) Save(path string) error {
 	fmt.Fprintf(&b, "width = %d\n", c.Width)
 	fmt.Fprintf(&b, "height = %d\n", c.Height)
 	fmt.Fprintf(&b, "cache_dir = %s\n", c.CacheDir)
+	fmt.Fprintf(&b, "frontend_dir = %s\n", c.FrontendDir)
+	fmt.Fprintf(&b, "templates_dir = %s\n", c.TemplatesDir)
 	fmt.Fprintf(&b, "host = %s\n", c.Host)
 	fmt.Fprintf(&b, "port = %d\n", c.Port)
 	fmt.Fprintf(&b, "api_key = %s\n", c.APIKey)

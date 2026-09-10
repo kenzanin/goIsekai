@@ -1,7 +1,6 @@
 package httpserver
 
 import (
-	"io/fs"
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
@@ -27,14 +26,13 @@ func (s *Server) routes() {
 	})
 }
 
-// registerStaticRoutes serves the embedded frontend dir under /static/.
+// registerStaticRoutes serves the on-disk frontend dir under /static/.
 func (s *Server) registerStaticRoutes() {
-	staticFS, err := fs.Sub(s.assets, "frontend")
-	if err != nil {
-		s.logger.Error("static assets unavailable", "error", err)
+	if s.assets == nil {
+		s.logger.Error("static assets unavailable", "error", "assets dir not configured")
 		return
 	}
-	fileServer := brHandler(http.FS(staticFS))
+	fileServer := brHandler(http.FS(s.assets))
 	s.Router.Handle("/static/*", http.StripPrefix("/static/", fileServer))
 }
 

@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"embed"
 	"flag"
 	"fmt"
 	"log"
@@ -24,9 +23,6 @@ import (
 	"goisekai/internal/pluginmanager"
 	"goisekai/internal/templates"
 )
-
-//go:embed all:frontend
-var assets embed.FS
 
 func main() {
 	// Handle "stop" subcommand before flag parsing.
@@ -231,12 +227,14 @@ func main() {
 	svc := bridge.NewAppService(db, mgr, proxy, cfgPath, cacheDir)
 	mgr.SetOnLoad(svc.SyncPluginMeta)
 
-	eng, err := templates.New(false)
+	// devMode=true: re-read + recompile Lua templates per render, so a .lua
+	// edit takes effect on refresh with no rebuild or restart.
+	eng, err := templates.New(os.DirFS(cfg.TemplatesDir), true)
 	if err != nil {
 		log.Fatalf("init templates: %v", err)
 	}
 
-	srv := httpserver.New(cfg.Host, cfg.Port, cfg.APIKey, assets, svc, slog.Default(), eng)
+	srv := httpserver.New(cfg.Host, cfg.Port, cfg.APIKey, os.DirFS(cfg.FrontendDir), svc, slog.Default(), eng)
 	if *open {
 		srv.OpenBrowser()
 	}

@@ -2,6 +2,7 @@ package templates
 
 import (
 	"bytes"
+	"os"
 	"strings"
 	"testing"
 
@@ -10,7 +11,7 @@ import (
 
 func mustEngine(t *testing.T) *Engine {
 	t.Helper()
-	e, err := New(false)
+	e, err := New(os.DirFS("."), false)
 	if err != nil {
 		t.Fatalf("New: %v", err)
 	}

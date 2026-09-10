@@ -280,7 +280,7 @@
         var msg = submitter?.getAttribute('data-confirm') || form.getAttribute('data-confirm');
         var list = form.getAttribute('data-confirm-actions');
         var field = form.querySelector('[name=action]');
-        if (!msg && list && field && field.value && list.split(',').indexOf(field.value) !== -1) {
+        if (!msg && list && field?.value && list.split(',').indexOf(field.value) !== -1) {
           msg = 'Are you sure?';
         }
         if (!msg) return;

@@ -115,6 +115,10 @@ func (c *Config) set(section, key, val string) {
 			}
 		case "cache_dir":
 			c.CacheDir = val
+		case "frontend_dir":
+			c.FrontendDir = val
+		case "templates_dir":
+			c.TemplatesDir = val
 		case "host":
 			c.Host = val
 		case "api_key":

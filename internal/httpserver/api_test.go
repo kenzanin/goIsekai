@@ -8,6 +8,7 @@ import (
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"path/filepath"
 	"testing"
 
@@ -48,7 +49,7 @@ func testServerFull(t *testing.T, apiKey string, registerViews bool) *Server {
 		apiKey:  apiKey,
 	}
 	if registerViews {
-		engine, engErr := templates.New(false)
+		engine, engErr := templates.New(os.DirFS("../templates"), false)
 		if engErr != nil {
 			t.Fatalf("new engine: %v", engErr)
 		}
