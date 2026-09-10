@@ -40,6 +40,11 @@ func (s *AppService) ClearMangaNew(pluginID, mangaID string) error {
 func (s *AppService) GetMangaDetails(pluginID, mangaID string) (types.Manga, []types.Chapter, error) {
 	rowID := mangaRowID(pluginID, mangaID)
 
+	// When the plugin manager is nil (e.g. test environment), fall back to cache.
+	if s.mgr == nil {
+		return s.cachedMangaFallback(pluginID, mangaID, rowID)
+	}
+
 	// Try live fetch first.
 	manga, err := s.mgr.GetMangaDetail(pluginID, mangaID)
 	if err == nil {
@@ -69,7 +74,7 @@ func (s *AppService) GetMangaDetails(pluginID, mangaID string) (types.Manga, []t
 			manga.Description = dbDesc
 		}
 		// Return live manga but fall back chapters.
-		mangaChapters := s.liveChaptersFallback(rowID, chaptersFromManga(mangaID, chapters, manga))
+		mangaChapters := s.liveChaptersFallback(rowID, chapters)
 		return manga, mangaChapters, nil
 	}
 
@@ -159,12 +164,6 @@ func mangaIDFromRow(rowID string) string {
 		}
 	}
 	return rowID
-}
-
-// chaptersFromManga creates types.Chapter from DB chapter model.
-func chaptersFromManga(mangaID string, _ []types.Chapter, _ types.Manga) []types.Chapter {
-	// Placeholder — not used in practice; DB fallback handles this.
-	return nil
 }
 
 // resolveChapterRowID maps a source chapter ID to the database row ID used

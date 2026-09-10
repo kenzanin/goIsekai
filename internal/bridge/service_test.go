@@ -13,6 +13,80 @@ import (
 	"goisekai/pkg/types"
 )
 
+// TestGetMangaDetailsNilManagerFallback tests that GetMangaDetails falls back
+// to cached DB data when the plugin manager is nil (simulating plugin-unreachable).
+func TestGetMangaDetailsNilManagerFallback(t *testing.T) {
+	t.Parallel()
+	db, err := database.Open(filepath.Join(t.TempDir(), "fallback.db"))
+	if err != nil {
+		t.Fatalf("open db: %v", err)
+	}
+	defer func() { _ = db.Close() }()
+
+	// Pre-populate DB with a cached manga + chapters.
+	if err := db.UpsertManga(database.Manga{
+		ID: "offline-plugin|src-99", PluginID: "offline-plugin", SourceMangaID: "src-99",
+		Title: "Offline Manga", CoverURL: "http://example.com/offline.jpg",
+		Description: "Offline description", Status: "Ongoing",
+	}); err != nil {
+		t.Fatalf("upsert manga: %v", err)
+	}
+	chapters := []database.Chapter{
+		{ID: "c1", MangaID: "offline-plugin|src-99", SourceChapterID: "ch-1", Title: "Ch1", ChapterNum: 1},
+		{ID: "c2", MangaID: "offline-plugin|src-99", SourceChapterID: "ch-2", Title: "Ch2", ChapterNum: 2},
+	}
+	for _, c := range chapters {
+		if err := db.UpsertChapter(c); err != nil {
+			t.Fatalf("upsert chapter %s: %v", c.ID, err)
+		}
+	}
+
+	// Build a service with nil manager — simulates plugin-unreachable state.
+	s := NewAppService(db, nil, hostnet.NewProxy(), "", "")
+
+	manga, mangaChapters, err := s.GetMangaDetails("offline-plugin", "src-99")
+	if err != nil {
+		t.Fatalf("GetMangaDetails (nil mgr): %v", err)
+	}
+	if manga.Title != "Offline Manga" {
+		t.Errorf("manga title = %q, want %q", manga.Title, "Offline Manga")
+	}
+	if manga.CoverURL != "http://example.com/offline.jpg" {
+		t.Errorf("manga cover = %q, want %q", manga.CoverURL, "http://example.com/offline.jpg")
+	}
+	if manga.Description != "Offline description" {
+		t.Errorf("manga desc = %q, want %q", manga.Description, "Offline description")
+	}
+	if len(mangaChapters) != 2 {
+		t.Fatalf("expected 2 cached chapters, got %d", len(mangaChapters))
+	}
+	// Chapters should be newest-first.
+	if mangaChapters[0].ChapterNum != 2 {
+		t.Errorf("chapter[0].ChapterNum = %v, want 2", mangaChapters[0].ChapterNum)
+	}
+	if mangaChapters[1].ChapterNum != 1 {
+		t.Errorf("chapter[1].ChapterNum = %v, want 1", mangaChapters[1].ChapterNum)
+	}
+}
+
+// TestGetMangaDetailsCacheMiss tests that GetMangaDetails returns an error
+// when the plugin manager is nil AND no cached data exists.
+func TestGetMangaDetailsCacheMiss(t *testing.T) {
+	t.Parallel()
+	db, err := database.Open(filepath.Join(t.TempDir(), "miss.db"))
+	if err != nil {
+		t.Fatalf("open db: %v", err)
+	}
+	defer func() { _ = db.Close() }()
+
+	s := NewAppService(db, nil, hostnet.NewProxy(), "", "")
+
+	_, _, err = s.GetMangaDetails("ghost-plugin", "ghost-src")
+	if err == nil {
+		t.Fatal("expected error for missing cached manga, got nil")
+	}
+}
+
 // newTestService builds an AppService backed by a throwaway SQLite file and a
 // real hostnet proxy. The plugin manager is left nil: every path exercised
 // below either delegates to the db/proxy or to the persist helper directly.
