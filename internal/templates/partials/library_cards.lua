@@ -1,16 +1,12 @@
 -- partials/library_cards.lua
--- Library page: manga grid/list cards with badges, stats and pagination.
+-- Library page: manga grid/list cards with badges and stats.
 -- Called as: library_cards(data) -> string
--- data.Mangas, data.LibraryStats, data.Ratios, data.Page, data.TotalPages
-
-local pagination = require("partials.pagination")
+-- data.Mangas, data.LibraryStats, data.Ratios
 
 return function(data)
 	local mangas = data.Mangas or {}
 	local libraryStats = data.LibraryStats or {}
 	local ratios = data.Ratios or {}
-	local page = data.Page or 1
-	local totalPages = data.TotalPages or 1
 
 	-- Build manga cards
 	local mangaCards = ""
@@ -80,27 +76,26 @@ return function(data)
 					.. "</span></span>"
 			end
 
-			-- read/total in the title area
+			-- read/total in the title area (finished = green check after the count)
 			local statsBadge = ""
+			local finishedMark = ""
 			if statsObj then
+				local total = statsObj.TotalChapters or 0
+				local read = statsObj.ReadChapters or 0
 				statsBadge = '<span class="text-sm font-semibold text-indigo-400">'
-					.. h(tostring(statsObj.ReadChapters or 0))
+					.. h(tostring(read))
 					.. '</span><span class="text-xs text-neutral-500">/</span><span class="text-sm font-medium text-neutral-300">'
-					.. h(tostring(statsObj.TotalChapters or 0))
+					.. h(tostring(total))
 					.. "</span>"
 					.. (
 						statsObj.HasNew
 							and ' <span class="text-[10px] px-1.5 py-0.5 rounded-full bg-red-500 text-white font-medium align-middle">New</span>'
 						or ""
 					)
-			end
-
-			-- Finished overlay: green check when every chapter is read
-			local finishedOverlay = ""
-			if statsObj and statsObj.TotalChapters > 0 and (statsObj.ReadChapters or 0) >= statsObj.TotalChapters then
-				finishedOverlay = '<span class="absolute top-2 right-2 w-6 h-6 rounded-full bg-emerald-500/90 backdrop-blur flex items-center justify-center" title="Semua chapter sudah dibaca">'
-					.. '<svg class="w-3.5 h-3.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"></path></svg>'
-					.. "</span>"
+				if total > 0 and read >= total then
+					finishedMark =
+						' <svg class="w-3.5 h-3.5 text-emerald-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" title="Semua chapter sudah dibaca"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"></path></svg>'
+				end
 			end
 
 			mangaCards = mangaCards
@@ -118,7 +113,6 @@ return function(data)
 				.. '<div class="lib-dim" style="display:none;position:absolute;inset:0;background:rgba(0,0,0,0.82);border-radius:0.5rem;"></div>'
 				.. statusBadge
 				.. pluginBadge
-				.. finishedOverlay
 				.. "</div>"
 				.. '<div class="p-3 flex flex-col gap-1">'
 				.. '<div class="text-sm font-medium line-clamp-2" title="'
@@ -128,6 +122,7 @@ return function(data)
 				.. "</div>"
 				.. '<div class="flex items-center gap-1">'
 				.. statsBadge
+				.. finishedMark
 				.. "</div>"
 				.. '<div class="view-meta hidden items-center gap-1.5 text-xs flex-wrap">'
 				.. (status ~= "" and ('<span class="px-1.5 py-0.5 rounded-full bg-neutral-700/50 text-neutral-400">' .. h(
@@ -139,11 +134,7 @@ return function(data)
 				.. "</div>"
 				.. "</div></a>"
 		end
-		mangaCards = mangaCards
-			.. "</div>"
-			.. pagination({
-				Pagination = { Base = "/", Param = "page", Current = page, Total = totalPages },
-			})
+		mangaCards = mangaCards .. "</div>"
 	end
 
 	return mangaCards

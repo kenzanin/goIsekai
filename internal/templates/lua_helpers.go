@@ -3,6 +3,8 @@ package templates
 import (
 	"fmt"
 	"html"
+	"net/url"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -228,20 +230,33 @@ func pageURLHelper(S *lua.State) lua.NativeFunc {
 		if strings.Contains(base, "?") {
 			sep = "&"
 		}
-		var url strings.Builder
-		url.WriteString(base + sep + param + "=" + p)
+		var b strings.Builder
+		b.WriteString(base + sep + param + "=" + p)
 
-		// Read Extra field and append as key=value pairs
+		// Read Extra field and append as key=value pairs. Extra is a flat
+		// array {key1, val1, key2, val2, ...} — pair consecutive entries so
+		// pagination links keep query params (q, pluginID) across pages.
 		if v, err := frame.Index(t.Value(), lua.String("Extra")); err == nil && v.Kind() == lua.TableKind {
 			if vt, ok := v.AsTable(); ok {
+				type kv struct{ k, val string }
+				var items []kv
 				nilVal := lua.Nil()
 				for k, val, ok, _ := vt.Next(nilVal); ok; k, val, ok, _ = vt.Next(k) {
-					ev, _ := frame.ToString(val)
-					url.WriteString("&" + ev)
+					ks, _ := frame.ToString(k)
+					vs, _ := frame.ToString(val)
+					items = append(items, kv{ks, vs})
+				}
+				sort.Slice(items, func(a, c int) bool {
+					ia, _ := strconv.Atoi(items[a].k)
+					ic, _ := strconv.Atoi(items[c].k)
+					return ia < ic
+				})
+				for i := 0; i+1 < len(items); i += 2 {
+					b.WriteString("&" + url.QueryEscape(items[i].val) + "=" + url.QueryEscape(items[i+1].val))
 				}
 			}
 		}
-		return frame.ReturnString(url.String())
+		return frame.ReturnString(b.String())
 	}
 }
 
