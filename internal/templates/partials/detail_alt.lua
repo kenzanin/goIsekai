@@ -1,5 +1,5 @@
 -- partials/detail_alt.lua
--- Detail page: alternative titles, alt summaries, origin summary, fetch forms.
+-- Detail page: alternative titles, alt synopses, origin synopsis, fetch forms.
 -- Called as: detail_alt(data) -> string (fragment, lives in the info column)
 -- data.PluginID, data.MangaID, data.CurrentTitle, data.AltTitles,
 -- data.AltTitleServers, data.AltSummaries, data.AltSummaryServers, data.Manga
@@ -111,17 +111,17 @@ return function(data)
 	end
 	body = body .. titlesFormHTML
 
-	-- Origin summary
+	-- Origin synopsis
 	if manga.Description and manga.Description ~= "" then
 		body = body
 			.. '<div class="mb-4 border-t border-neutral-800 pt-4">'
-			.. '<span class="text-xs font-semibold text-neutral-300 uppercase tracking-wide">Summary</span>'
+			.. '<span class="text-xs font-semibold text-neutral-300 uppercase tracking-wide">Synopsis</span>'
 			.. '<p class="text-sm text-neutral-400 mt-1.5">'
 			.. h(manga.Description)
 			.. "</p></div>"
 	end
 
-	-- Alternative summaries (collapsible)
+	-- Alternative synopses (collapsible)
 	local asCount = #altSummaries
 	local asBody = ""
 	if #altSummaries > 0 then
@@ -132,11 +132,11 @@ return function(data)
 				.. h(pluginID)
 				.. "/"
 				.. h(mangaID)
-				.. '" class="flex-1 min-w-0 group" data-confirm="Set this as the main summary?">'
+				.. '" class="flex-1 min-w-0 group" data-confirm="Set this as the main synopsis?">'
 				.. '<input type="hidden" name="description" value="'
 				.. h(a.Description or "")
 				.. '">'
-				.. '<button type="submit" title="Set as main summary" class="w-full text-left text-sm text-neutral-300 hover:text-indigo-300 transition">'
+				.. '<button type="submit" title="Set as main synopsis" class="w-full text-left text-sm text-neutral-300 hover:text-indigo-300 transition">'
 				.. h(a.Description or "")
 				.. "</button>"
 				.. "</form>"
@@ -152,7 +152,7 @@ return function(data)
 				.. '<input type="hidden" name="description" value="'
 				.. h(a.Description or "")
 				.. '">'
-				.. '<button type="submit" title="Remove alternative summary" aria-label="Remove" class="size-4 inline-flex items-center justify-center rounded-full text-neutral-500 hover:text-red-400 hover:bg-neutral-700" data-confirm="Remove this alternative summary?">&times;</button>'
+				.. '<button type="submit" title="Remove alternative summary" aria-label="Remove" class="size-4 inline-flex items-center justify-center rounded-full text-neutral-500 hover:text-red-400 hover:bg-neutral-700" data-confirm="Remove this alternative synopsis?">&times;</button>'
 				.. "</form></div></div>"
 		end
 	end
@@ -163,7 +163,7 @@ return function(data)
 		.. chevOnclick
 		.. '" class="flex items-center gap-1.5 cursor-pointer group select-none">'
 		.. '<svg class="size-3.5 text-neutral-500 chev transition-transform" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>'
-		.. '<span class="text-xs font-semibold text-neutral-300 uppercase tracking-wide">Alternative summaries'
+		.. '<span class="text-xs font-semibold text-neutral-300 uppercase tracking-wide">Alternative synopses'
 		.. (asCount > 0 and (' <span class="text-neutral-500 font-normal">(' .. asCount .. ")</span>") or "")
 		.. "</span></button>"
 		.. '<div id="alt-summaries-body" class="'
@@ -172,7 +172,7 @@ return function(data)
 		.. asBody
 		.. "</div></div>"
 
-	-- Fetch alt-summaries form
+	-- Fetch alt-synopses form
 	local summariesFormHTML = ""
 	if #altSummaryServers > 0 then
 		local sOptions = ""
@@ -189,10 +189,10 @@ return function(data)
 			.. "</select>"
 			.. '<button type="submit" class="border border-neutral-700 hover:bg-neutral-800 rounded-md px-3 py-1.5 text-xs font-medium inline-flex items-center gap-1.5">'
 			.. '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="size-3.5"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>'
-			.. " Get alternative summaries</button></form>"
+			.. " Get alternative synopses</button></form>"
 	else
 		summariesFormHTML =
-			'<p class="text-xs text-neutral-500">No alt-summary providers available — install a plugin that declares alt-summary servers.</p>'
+			'<p class="text-xs text-neutral-500">No alt-synopsis providers available — install a plugin that declares alt-synopsis servers.</p>'
 	end
 	body = body .. summariesFormHTML
 

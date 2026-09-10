@@ -108,22 +108,9 @@ return function(data)
 		body = body .. '<p class="text-sm text-neutral-400 mb-2">' .. h(manga.Author) .. "</p>"
 	end
 
-	-- Alternative titles / summaries + fetch forms (info column)
-	body = body
-		.. detailAlt({
-			PluginID = pluginID,
-			MangaID = mangaID,
-			CurrentTitle = currentTitle,
-			AltTitles = altTitles,
-			AltTitleServers = altTitleServers,
-			AltSummaries = altSummaries,
-			AltSummaryServers = altSummaryServers,
-			Manga = manga,
-		})
-		.. "</div></div>"
-
-	-- Action buttons: library + continue reading
-	local actionsHTML = '<div class="flex flex-wrap items-center gap-2 mb-4">'
+	-- Action buttons: library + continue reading. Moved into the info column so
+	-- they align with the alt-synopses section instead of dangling under cover.
+	local actionsHTML = '<div class="flex flex-wrap items-center gap-2 mt-4">'
 		.. '<form method="post" action="/action/toggle-library/'
 		.. h(pluginID)
 		.. "/"
@@ -160,7 +147,22 @@ return function(data)
 			.. h(label)
 			.. "</a>"
 	end
-	body = body .. actionsHTML .. "</div>"
+	actionsHTML = actionsHTML .. "</div>"
+
+	-- Alternative titles / synopses + fetch forms + actions (info column)
+	body = body
+		.. detailAlt({
+			PluginID = pluginID,
+			MangaID = mangaID,
+			CurrentTitle = currentTitle,
+			AltTitles = altTitles,
+			AltTitleServers = altTitleServers,
+			AltSummaries = altSummaries,
+			AltSummaryServers = altSummaryServers,
+			Manga = manga,
+		})
+		.. actionsHTML
+		.. "</div></div>"
 
 	-- Chapters section
 	body = body

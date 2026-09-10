@@ -23,9 +23,10 @@ return function(data)
 	if #chapters == 0 then
 		body = body .. '<div class="py-16 text-center text-neutral-500">No chapters yet</div>'
 	else
-		-- Action dropdown (bulk progress + cache)
-		body = body
-			.. '<form id="chapter-actions" method="post" action="/action/chapter-actions" class="flex flex-wrap items-center gap-2 mb-4" data-confirm-actions="mark-selected-unread,clear-up-to,mark-all-unread,clear-cache">'
+		-- Action dropdown (bulk progress + cache). Rendered inside the top
+		-- pagination row via its Inner slot so the dropdown shares a line with the
+		-- page numbers instead of sitting in its own row above them.
+		local actionsInner = '<form id="chapter-actions" method="post" action="/action/chapter-actions" class="flex flex-wrap items-center gap-2" data-confirm-actions="mark-selected-unread,clear-up-to,mark-all-unread,clear-cache">'
 			.. '<input type="hidden" name="pluginID" value="'
 			.. h(pluginID)
 			.. '">'
@@ -44,11 +45,23 @@ return function(data)
 			.. '<button type="submit" class="bg-indigo-600 hover:bg-indigo-500 text-white rounded-md px-3 py-1.5 text-sm font-medium">GO</button>'
 			.. "</form>"
 
-		-- Chapter pagination (top)
-		body = body
-			.. pagination({
-				Pagination = { Base = "", Param = "ChPage", Current = chPage, Total = chTotalPages },
-			})
+		-- Chapter pagination (top) — the dropdown is inline on the left, numbers on the right.
+		-- Fallback: with only one chapter page the pagination (and its Inner slot)
+		-- would render nothing, so the standalone form row is kept for that case.
+		if chTotalPages > 1 then
+			body = body
+				.. pagination({
+					Pagination = {
+						Base = "",
+						Param = "ChPage",
+						Current = chPage,
+						Total = chTotalPages,
+						Inner = actionsInner,
+					},
+				})
+		else
+			body = body .. '<div class="flex mb-4">' .. actionsInner .. "</div>"
+		end
 
 		-- Chapter list
 		local chaptersHTML = '<div class="divide-y divide-neutral-800">'

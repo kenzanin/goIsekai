@@ -2,7 +2,10 @@
 -- Numbered page navigation. Replaces partials/pagination.jet.
 -- Called as: pagination(data) -> string
 -- data.Pagination mirrors the Go Pagination struct:
---   { Base, Param, Current, Total, Extra }
+--   { Base, Param, Current, Total, Extra, Inner }
+-- Inner (optional): raw (already-escaped) HTML rendered at the LEFT of the
+-- page row so external controls (e.g. the chapter-actions dropdown) share the
+-- same line as the page numbers. Without Inner the numbers stay centered.
 
 local BTN_BASE = "border border-neutral-700 hover:bg-neutral-800 rounded-md px-2 py-1 text-sm"
 local BTN_NUM = "border border-neutral-700 hover:bg-neutral-800 text-neutral-300 rounded-md px-2.5 py-1 text-sm"
@@ -22,7 +25,15 @@ return function(data)
 		parts[#parts + 1] = s
 	end
 
-	emit('<div class="flex items-center justify-center gap-2 mt-4 mb-4">')
+	local inner = p.Inner or ""
+	if inner ~= "" then
+		-- Two-zone toolbar: [inner controls] on the left, page numbers on the right.
+		emit('<div class="flex items-center gap-3 mt-4 mb-4 flex-wrap">')
+		emit('<div class="flex items-center gap-2 flex-wrap shrink-0">' .. inner .. "</div>")
+		emit('<div class="ml-auto flex items-center gap-1.5 flex-wrap">')
+	else
+		emit('<div class="flex items-center justify-center gap-2 mt-4 mb-4">')
+	end
 
 	-- prev
 	if p.Current > 1 then
@@ -51,5 +62,8 @@ return function(data)
 	end
 
 	emit("</div>")
+	if inner ~= "" then
+		emit("</div>")
+	end
 	return table.concat(parts, "\n")
 end
