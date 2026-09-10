@@ -59,6 +59,7 @@ func (s *Server) viewUpdates(w http.ResponseWriter, r *http.Request) {
 			"ReadChapters":  st.ReadChapters,
 			"TotalChapters": st.TotalChapters,
 			"HasNew":        st.HasNew,
+			"NewSince":      st.NewSince,
 			"CreatedAt":     m.CreatedAt,
 			"PluginName":    name,
 			"PluginIcon":    pluginIconMap[m.PluginID],

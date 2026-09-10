@@ -34,28 +34,137 @@ func (s *AppService) ClearMangaNew(pluginID, mangaID string) error {
 
 // GetMangaDetails fetches a manga and its chapter list from a plugin, persists
 // both to the database as a side effect (so progress can be tracked later),
-// and returns the original plugin types unchanged.
+// and returns the original plugin types unchanged. When the plugin is
+// unreachable (e.g. network offline, site down), falls back to cached DB
+// data so the detail page still renders.
 func (s *AppService) GetMangaDetails(pluginID, mangaID string) (types.Manga, []types.Chapter, error) {
+	rowID := mangaRowID(pluginID, mangaID)
+
+	// Try live fetch first.
 	manga, err := s.mgr.GetMangaDetail(pluginID, mangaID)
-	if err != nil {
+	if err == nil {
+		chapters, chapErr := s.mgr.GetChapterList(pluginID, mangaID)
+		if chapErr == nil {
+			if persistErr := s.persistMangaDetails(pluginID, manga, chapters); persistErr != nil {
+				logger.Warn("persist manga details", "error", persistErr)
+			}
+			// A user-set main title wins over the plugin-sourced one.
+			if dbTitle, custom, err := s.db.MangaTitleIfCustom(pluginID, mangaID); err == nil && custom {
+				manga.Title = dbTitle
+			}
+			// A user-set main description (via alt-summary swap) wins over the plugin-sourced one.
+			if dbDesc, custom, err := s.db.MangaDescriptionIfCustom(pluginID, mangaID); err == nil && custom {
+				manga.Description = dbDesc
+			}
+			return manga, chapters, nil
+		}
+		// Chapter list failed — still persist manga alone.
+		if persistErr := s.persistMangaDetails(pluginID, manga, nil); persistErr != nil {
+			logger.Warn("persist manga details", "error", persistErr)
+		}
+		if dbTitle, custom, err := s.db.MangaTitleIfCustom(pluginID, mangaID); err == nil && custom {
+			manga.Title = dbTitle
+		}
+		if dbDesc, custom, err := s.db.MangaDescriptionIfCustom(pluginID, mangaID); err == nil && custom {
+			manga.Description = dbDesc
+		}
+		// Return live manga but fall back chapters.
+		mangaChapters := s.liveChaptersFallback(rowID, chaptersFromManga(mangaID, chapters, manga))
+		return manga, mangaChapters, nil
+	}
+
+	// Plugin unreachable — fall back to cache.
+	logger.Warn("plugin unreachable, using cached data", "plugin", pluginID, "manga", mangaID, "error", err)
+	return s.cachedMangaFallback(pluginID, mangaID, rowID)
+}
+
+// liveChaptersFallback merges live chapters with DB progress when chapter
+// fetch fails. Returns DB-backed chapters with live chapter IDs for read tracking.
+func (s *AppService) liveChaptersFallback(rowID string, liveChapters []types.Chapter) []types.Chapter {
+	if len(liveChapters) > 0 {
+		return liveChapters
+	}
+	// No live chapters — fall back to DB cache.
+	dbChapters, err := s.db.ListChaptersCached(rowID)
+	if err != nil || len(dbChapters) == 0 {
+		return nil
+	}
+	// Map DB chapters to types.Chapter.
+	out := make([]types.Chapter, len(dbChapters))
+	for i, c := range dbChapters {
+		out[i] = types.Chapter{
+			ID:       c.SourceChapterID,
+			MangaID:  mangaIDFromRow(c.MangaID),
+			Title:    c.Title,
+			ChapterNum: c.ChapterNum,
+			VolumeNum: c.VolumeNum,
+			ReleasedAt: c.FetchedAt,
+		}
+	}
+	return out
+}
+
+// cachedMangaFallback returns cached manga + chapters from the database.
+func (s *AppService) cachedMangaFallback(pluginID, mangaID, rowID string) (types.Manga, []types.Chapter, error) {
+	// Fetch cached manga.
+	cachedManga, err := s.db.GetMangaCached(pluginID, mangaID)
+	if err != nil || cachedManga.ID == "" {
 		return types.Manga{}, nil, fmt.Errorf("bridge: get manga detail: %w", err)
 	}
-	chapters, err := s.mgr.GetChapterList(pluginID, mangaID)
-	if err != nil {
-		return types.Manga{}, nil, fmt.Errorf("bridge: get chapter list: %w", err)
+
+	// Convert DB manga to types.Manga.
+	manga := types.Manga{
+		ID:          cachedManga.SourceMangaID,
+		Title:       cachedManga.Title,
+		CoverURL:    cachedManga.CoverURL,
+		Description: cachedManga.Description,
+		Status:      cachedManga.Status,
 	}
-	if err := s.persistMangaDetails(pluginID, manga, chapters); err != nil {
-		return types.Manga{}, nil, fmt.Errorf("bridge: persist manga details: %w", err)
-	}
-	// A user-set main title wins over the plugin-sourced one.
+
+	// Apply user overrides.
 	if dbTitle, custom, err := s.db.MangaTitleIfCustom(pluginID, mangaID); err == nil && custom {
 		manga.Title = dbTitle
 	}
-	// A user-set main description (via alt-summary swap) wins over the plugin-sourced one.
 	if dbDesc, custom, err := s.db.MangaDescriptionIfCustom(pluginID, mangaID); err == nil && custom {
 		manga.Description = dbDesc
 	}
+
+	// Fetch cached chapters.
+	dbChapters, err := s.db.ListChaptersCached(rowID)
+	if err != nil || len(dbChapters) == 0 {
+		return manga, nil, nil
+	}
+
+	// Map DB chapters to types.Chapter.
+	chapters := make([]types.Chapter, len(dbChapters))
+	for i, c := range dbChapters {
+		chapters[i] = types.Chapter{
+			ID:         c.SourceChapterID,
+			MangaID:    mangaID,
+			Title:      c.Title,
+			ChapterNum: c.ChapterNum,
+			VolumeNum:  c.VolumeNum,
+			ReleasedAt: c.FetchedAt,
+		}
+	}
+
 	return manga, chapters, nil
+}
+
+// mangaIDFromRow extracts the source mangaID from a DB rowID.
+func mangaIDFromRow(rowID string) string {
+	for i := len(rowID) - 1; i >= 0; i-- {
+		if rowID[i] == '|' {
+			return rowID[i+1:]
+		}
+	}
+	return rowID
+}
+
+// chaptersFromManga creates types.Chapter from DB chapter model.
+func chaptersFromManga(mangaID string, _ []types.Chapter, _ types.Manga) []types.Chapter {
+	// Placeholder — not used in practice; DB fallback handles this.
+	return nil
 }
 
 // resolveChapterRowID maps a source chapter ID to the database row ID used

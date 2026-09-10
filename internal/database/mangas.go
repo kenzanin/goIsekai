@@ -71,6 +71,19 @@ func (d *DB) IsInLibrary(mangaID string) (bool, error) {
 	return rows[0].InLibrary == 1, err
 }
 
+// GetMangaCached fetches a cached manga from the database by plugin ID and source manga ID.
+// Returns (Manga, true) on cache hit, or (zero value, false) when absent.
+func (d *DB) GetMangaCached(pluginID, sourceMangaID string) (Manga, error) {
+	var out []model.Mangas
+	err := Mangas.SELECT(Mangas.AllColumns).
+		WHERE(Mangas.PluginID.EQ(String(pluginID)).AND(Mangas.SourceMangaID.EQ(String(sourceMangaID)))).
+		Query(d.db, &out)
+	if err != nil || len(out) == 0 {
+		return Manga{}, err
+	}
+	return mangaFromModel(out[0]), nil
+}
+
 // PluginCount is one row of the per-plugin library title counts.
 type PluginCount struct {
 	PluginID string `alias:"mangas.plugin_id"`

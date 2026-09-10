@@ -3,6 +3,7 @@ package database
 import (
 	"math"
 
+	"goisekai/internal/database/.gen/model"
 	. "goisekai/internal/database/.gen/table"
 
 	. "github.com/go-jet/jet/v2/sqlite"
@@ -136,4 +137,43 @@ func (d *DB) resetProgress(where BoolExpression) error {
 		WHERE(where).
 		Exec(d.db)
 	return err
+}
+
+// ListChaptersCached returns all chapters for a manga from the database cache,
+// ordered newest-first (descending chapter_num, then by ID for ties). Returns
+// an empty slice (not nil) when no chapters are cached.
+func (d *DB) ListChaptersCached(mangaRowID string) ([]Chapter, error) {
+	var models []model.Chapters
+	err := Chapters.SELECT(Chapters.AllColumns).
+		WHERE(Chapters.MangaID.EQ(String(mangaRowID))).
+		ORDER_BY(Chapters.ChapterNum.DESC(), Chapters.ID.DESC()).
+		Query(d.db, &models)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]Chapter, len(models))
+	for i, m := range models {
+		out[i] = Chapter{
+			ID:              derefStr(m.ID),
+			MangaID:         m.MangaID,
+			SourceChapterID: m.SourceChapterID,
+			Title:           m.Title,
+			ChapterNum:      m.ChapterNum,
+			VolumeNum:       derefFloat(m.VolumeNum),
+			IsRead:          derefBool(m.IsRead),
+			LastPageRead:    int(derefFloatPtr(m.LastPageRead)),
+			TotalPages:      int(derefFloatPtr(m.TotalPages)),
+			DownloadStatus:  derefStr(m.DownloadStatus),
+			FetchedAt:       derefTime(m.FetchedAt),
+		}
+	}
+	return out, nil
+}
+
+// derefFloatPtr converts *int64 to float64 for int64 fields that we treat as floats.
+func derefFloatPtr(p *int64) float64 {
+	if p != nil {
+		return float64(*p)
+	}
+	return 0
 }

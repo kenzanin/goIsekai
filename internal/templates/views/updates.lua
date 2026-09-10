@@ -1,68 +1,135 @@
--- Updates page: fresh chapter updates + recently added library titles.
+-- views/updates.lua
+-- Updates page: flat list of fresh chapter updates + recently added library titles.
+-- Called as: updates(data) -> string (body HTML only, layout wraps it)
+
 return function(data)
 	local updates = data.Updates or {}
 	local recent = data.Recent or {}
 
-	local body = [[<div class="mb-6">
-    <h1 class="text-2xl font-semibold">Updates</h1>
-    <p class="text-sm text-neutral-400 mt-1">]] .. h(tostring(data.UpdatesCount)) .. [[ manga with new chapters · ]] .. h(
-		tostring(data.RecentCount)
-	) .. [[ added in the last 7 days</p>
+	-- Merge and sort all items by date (newest first).
+	local allItems = {}
+	for _, m in ipairs(updates) do
+		m._type = "update"
+		m._date = m.NewSince or m.CreatedAt or ""
+		allItems[#allItems + 1] = m
+	end
+	for _, m in ipairs(recent) do
+		m._type = "recent"
+		m._date = m.CreatedAt or ""
+		allItems[#allItems + 1] = m
+	end
+
+	-- Sort by date descending.
+	table.sort(allItems, function(a, b)
+		return a._date > b._date
+	end)
+
+	if #allItems == 0 then
+		return [[
+<div class="py-16 text-center text-neutral-500">
+    <p class="mb-2">No updates yet</p>
+    <a href="/view/library" class="text-indigo-400 hover:text-indigo-300 text-sm">Go to library</a>
 </div>]]
+	end
 
-	local function rowCard(m, badge)
-		local icon = ""
-		if m.PluginIcon and m.PluginIcon ~= "" then
-			icon = '<img src="' .. h(m.PluginIcon) .. '" alt="" class="h-3.5 w-3.5 rounded-sm object-cover shrink-0">'
-		end
-		local cover = ""
-		if m.CoverURL and m.CoverURL ~= "" then
-			cover = '<img src="/image?pluginID=' .. h(m.PluginID) .. "&amp;url=" .. h(m.CoverURL) .. '" alt="" class="w-full h-full object-cover">'
+	local rows = {}
+	for _, entry in ipairs(allItems) do
+		local title = entry.Title or ""
+		local pluginID = entry.PluginID or ""
+		local sourceMangaID = entry.MangaID or ""
+		local coverURL = entry.CoverURL or ""
+		local pluginIcon = entry.PluginIcon or ""
+		local pluginName = entry.PluginName or ""
+		local readChapters = entry.ReadChapters or 0
+		local totalChapters = entry.TotalChapters or 0
+		local badge = ""
+		local tsAttr = ""
+		local formattedDate = ""
+
+		if entry._type == "update" then
+			badge = '<span class="shrink-0 text-[10px] px-1.5 py-0.5 rounded-full bg-red-500 text-white font-medium">New</span>'
+			tsAttr = h(tostring(entry.NewSince or entry.CreatedAt or ""))
+			formattedDate = h(formatDate(tostring(entry.NewSince or entry.CreatedAt or "")))
 		else
-			cover = '<div class="w-full h-full bg-neutral-800 flex items-center justify-center text-neutral-500 text-lg font-semibold">' .. h(
-				getInitials(m.Title or "")
-			) .. "</div>"
+			badge = '<span class="shrink-0 text-[10px] px-1.5 py-0.5 rounded-full bg-indigo-500/15 text-indigo-400">New title</span>'
+			tsAttr = h(tostring(entry.CreatedAt or ""))
+			formattedDate = h(formatDate(tostring(entry.CreatedAt or "")))
 		end
-		local stats = ""
-		if m.TotalChapters and m.TotalChapters > 0 then
-			stats = '<span class="text-sm"><span class="font-semibold text-indigo-400">' .. h(tostring(m.ReadChapters or 0))
-				.. '</span><span class="text-neutral-500">/</span><span class="text-neutral-300">' .. h(tostring(m.TotalChapters)) .. "</span></span>"
+
+		local coverHtml
+		if coverURL ~= "" then
+			coverHtml = string.format(
+				'<img src="/image?pluginID=%s&amp;url=%s" alt="%s" class="w-16 aspect-[2/3] object-cover rounded shrink-0" loading="lazy" onerror="this.onerror=null;this.src=\'/static/img/placeholder.svg\';">',
+				h(pluginID),
+				h(coverURL),
+				h(title)
+			)
+		else
+			coverHtml = string.format(
+				'<div class="w-16 aspect-[2/3] bg-neutral-800 rounded flex items-center justify-center text-neutral-500 text-sm font-semibold shrink-0">%s</div>',
+				h(getInitials(title))
+			)
 		end
-		return '<a href="/view/manga/' .. h(m.PluginID) .. "/" .. h(m.MangaID) .. '" class="flex items-center gap-3 bg-neutral-900 border border-neutral-800 rounded-lg p-2.5 hover:border-neutral-700 transition">'
-			.. '<div class="w-12 h-16 rounded-md overflow-hidden shrink-0">' .. cover .. "</div>"
-			.. '<div class="flex-1 min-w-0">'
-			.. '<div class="flex items-center gap-2">'
-			.. (badge or "")
-			.. '<span class="text-sm font-medium truncate">' .. h(m.Title or "") .. "</span></div>"
-			.. '<div class="flex items-center gap-1.5 mt-1 text-xs text-neutral-400">'
-			.. icon
-			.. "<span>" .. h(m.PluginName or "") .. "</span>"
-			.. (stats ~= "" and ('<span class="text-neutral-600">·</span>' .. stats) or "")
-			.. "</div></div></a>"
+
+		local iconHtml = ""
+		if pluginIcon ~= "" then
+			iconHtml = string.format('<img src="%s" alt="" class="h-3.5 w-3.5 rounded-sm object-cover">', h(pluginIcon))
+		end
+
+		rows[#rows + 1] = string.format(
+			[[
+    <a href="/view/manga/%s/%s" class="flex items-center gap-4 py-4 -mx-2 px-2 rounded hover:bg-neutral-900 transition">
+        %s
+        <div class="flex-1 min-w-0">
+          <div class="flex items-center justify-between">
+            <div class="text-sm font-medium truncate">%s</div>
+            <div class="text-xs text-neutral-500 shrink-0 hidden sm:block" data-ts="%s" title="%s">%s</div>
+          </div>
+          <div class="flex items-center gap-2 mt-1">
+            <span class="text-xs text-neutral-400">%s/%s chapters</span>
+            <span class="inline-flex items-center gap-1.5 text-xs px-2 py-0.5 rounded-full bg-neutral-800 text-neutral-500">%s%s</span>
+            <div class="text-xs text-neutral-500 sm:hidden" data-ts="%s" title="%s">%s</div>
+          </div>
+        </div>
+    </a>]],
+			h(pluginID),
+			h(sourceMangaID),
+			coverHtml,
+			h(title),
+			tsAttr,
+			formattedDate,
+			formattedDate,
+			h(tostring(readChapters)),
+			h(tostring(totalChapters)),
+			badge,
+			iconHtml,
+			h(pluginName),
+			tsAttr,
+			formattedDate,
+			formattedDate
+		)
 	end
 
-	-- Updates section
-	if #updates > 0 then
-		body = body .. '<h2 class="text-lg font-semibold mb-3">New chapters</h2><div class="grid grid-cols-1 md:grid-cols-2 gap-2 mb-8">'
-		for _, m in ipairs(updates) do
-			body = body
-				.. rowCard(m, '<span class="shrink-0 text-[10px] px-1.5 py-0.5 rounded-full bg-red-500 text-white font-medium">New</span>')
-		end
-		body = body .. "</div>"
-	else
-		body = body
-			.. '<div class="mb-8 text-sm text-neutral-500">No new chapters — updates appear here after a library sync finds new chapters.</div>'
-	end
-
-	-- Recently added section
-	if #recent > 0 then
-		body = body .. '<h2 class="text-lg font-semibold mb-3">Added recently</h2><div class="grid grid-cols-1 md:grid-cols-2 gap-2">'
-		for _, m in ipairs(recent) do
-			body = body
-				.. rowCard(m, '<span class="shrink-0 text-[10px] px-1.5 py-0.5 rounded-full bg-indigo-500/15 text-indigo-400">New title</span>')
-		end
-		body = body .. "</div>"
-	end
-
-	return body
+	return string.format(
+		[[
+<h1 class="text-xl font-semibold mb-6">Updates</h1>
+<div class="divide-y divide-neutral-800">
+%s
+</div>
+<script>
+function refreshRelativeTimes() {
+  document.querySelectorAll('[data-ts]').forEach(el => {
+    const d = new Date(el.dataset.ts);
+    const diff = Date.now() - d.getTime();
+    const mins = Math.floor(diff/60000);
+    if (mins < 60) el.textContent = mins + 'm ago';
+    else if (mins < 1440) el.textContent = Math.floor(mins/60) + 'h ago';
+    else el.textContent = Math.floor(mins/1440) + 'd ago';
+  });
+}
+refreshRelativeTimes();
+setInterval(refreshRelativeTimes, 60000);
+</script>]],
+		table.concat(rows, "\n")
+	)
 end
