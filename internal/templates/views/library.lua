@@ -268,6 +268,10 @@ return function(data)
 				.. '<div class="flex items-center gap-1">'
 				.. statsBadge
 				.. "</div>"
+				.. '<div class="view-meta hidden items-center gap-1.5 text-xs flex-wrap">'
+				.. (status ~= "" and ('<span class="px-1.5 py-0.5 rounded-full bg-neutral-700/50 text-neutral-400">' .. h(status) .. "</span>") or "")
+				.. (pluginName ~= "" and ('<span class="inline-flex items-center gap-1 text-neutral-400">' .. (pluginIcon ~= "" and ('<img src="' .. h(pluginIcon) .. '" alt="" class="h-3 w-3 rounded-sm object-cover shrink-0">') or "") .. h(pluginName) .. "</span>") or "")
+				.. "</div>"
 				.. "</div></a>"
 		end
 		mangaCards = mangaCards
@@ -344,6 +348,13 @@ return function(data)
   }
   .view-container[data-view-mode="list"] .view-item:hover {
     transform: none;
+  }
+  .view-container[data-view-mode="list"] .view-item .view-meta {
+    display: flex;
+  }
+  .view-container[data-view-mode="list"] .view-item .absolute.top-2,
+  .view-container[data-view-mode="list"] .view-item .absolute.bottom-2 {
+    display: none;
   }
   .view-mode-toggle button[aria-pressed="true"] svg,
   .view-mode-toggle button.active svg {

@@ -32,6 +32,7 @@ return function(data)
 		"    </a>",
 		navLink("/", "library", "Library", active),
 		navLink("/view/search", "search", "Search", active),
+		navLink("/view/updates", "updates", "Updates", active),
 		navLink("/view/history", "history", "History", active),
 		navLink("/view/plugins", "plugins", "Plugins", active),
 		navLink("/view/settings", "settings", "Settings", active),

@@ -48,6 +48,7 @@ func (s *Server) registerViewRoutes() {
 	s.Router.Get("/view/settings", s.viewSettings)
 	s.Router.Get("/view/logs", s.viewLogs)
 	s.Router.Get("/view/history", s.viewHistory)
+	s.Router.Get("/view/updates", s.viewUpdates)
 }
 
 // renderPage renders a Lua template with the `active` nav var set.
