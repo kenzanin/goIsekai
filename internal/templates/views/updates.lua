@@ -32,11 +32,13 @@ return function(data)
 		local formattedDate = ""
 
 		if entry.Type == "update" then
-			badge = '<span class="shrink-0 text-[10px] px-1.5 py-0.5 rounded-full bg-red-500 text-white font-medium">New</span>'
+			badge =
+				'<span class="shrink-0 text-[10px] px-1.5 py-0.5 rounded-full bg-red-500 text-white font-medium">New</span>'
 			tsAttr = h(tostring(entry.Date or ""))
 			formattedDate = h(formatDate(tostring(entry.Date or "")))
 		else
-			badge = '<span class="shrink-0 text-[10px] px-1.5 py-0.5 rounded-full bg-indigo-500/15 text-indigo-400">New title</span>'
+			badge =
+				'<span class="shrink-0 text-[10px] px-1.5 py-0.5 rounded-full bg-indigo-500/15 text-indigo-400">New title</span>'
 			tsAttr = h(tostring(entry.Date or ""))
 			formattedDate = h(formatDate(tostring(entry.Date or "")))
 		end

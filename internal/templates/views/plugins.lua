@@ -14,8 +14,8 @@ return function(data)
 	local activeCount = 0
 	for _, p in ipairs(plugins) do
 		if p.IsActive then
-				activeCount = activeCount + 1
-			end
+			activeCount = activeCount + 1
+		end
 	end
 
 	return '<div class="flex items-center gap-3 flex-wrap mb-6">'

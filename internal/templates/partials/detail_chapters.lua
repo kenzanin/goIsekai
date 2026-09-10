@@ -1,5 +1,5 @@
 -- partials/detail_chapters.lua
--- Detail page: chapter list with bulk actions, per-row actions, pagination.
+-- Detail page: chapter list with a bulk-action dropdown, per-row actions and pagination.
 -- Called as: detail_chapters(data) -> string (fragment)
 -- data.PluginID, data.MangaID, data.Manga, data.Chapters, data.Progress,
 -- data.ChPage, data.ChTotalPages
@@ -23,32 +23,26 @@ return function(data)
 	if #chapters == 0 then
 		body = body .. '<div class="py-16 text-center text-neutral-500">No chapters yet</div>'
 	else
-		-- Bulk actions toolbar
+		-- Action dropdown (bulk progress + cache)
 		body = body
-			.. '<div class="flex flex-wrap items-center gap-2 mb-4">'
-			.. '<form id="mark-bulk" method="post" action="/action/mark-read-bulk">'
+			.. '<form id="chapter-actions" method="post" action="/action/chapter-actions" class="flex flex-wrap items-center gap-2 mb-4" data-confirm-actions="mark-selected-unread,clear-up-to,mark-all-unread,clear-cache">'
 			.. '<input type="hidden" name="pluginID" value="'
 			.. h(pluginID)
 			.. '">'
 			.. '<input type="hidden" name="mangaID" value="'
 			.. h(mangaID)
 			.. '">'
-			.. '<button type="submit" class="bg-indigo-600 hover:bg-indigo-500 text-white rounded-md px-3 py-1.5 text-sm font-medium">Mark selected as read</button>'
+			.. '<select name="action" class="bg-neutral-900 border border-neutral-700 text-neutral-200 rounded-md px-3 py-1.5 text-sm">'
+			.. '<option value="mark-selected-read">Mark selected as read</option>'
+			.. '<option value="mark-selected-unread">Mark selected as unread</option>'
+			.. '<option value="mark-up-to">Mark up to selected</option>'
+			.. '<option value="clear-up-to">Clear up to selected</option>'
+			.. '<option value="mark-all-read">Mark all as read</option>'
+			.. '<option value="mark-all-unread">Mark all as unread</option>'
+			.. '<option value="clear-cache">Clear cache</option>'
+			.. "</select>"
+			.. '<button type="submit" class="bg-indigo-600 hover:bg-indigo-500 text-white rounded-md px-3 py-1.5 text-sm font-medium">GO</button>'
 			.. "</form>"
-			.. '<form method="post" action="/action/reset-progress-all/'
-			.. h(pluginID)
-			.. "/"
-			.. h(mangaID)
-			.. '">'
-			.. '<button type="submit" title="Clear read progress for every chapter" class="bg-transparent border border-red-900/60 text-red-400 hover:bg-red-950/40 rounded-md px-3 py-1.5 text-sm" data-confirm="Are you sure?">↺ Reset all read status</button>'
-			.. "</form>"
-			.. '<form method="post" action="/action/clear-cache/'
-			.. h(pluginID)
-			.. "/"
-			.. h(mangaID)
-			.. '" data-confirm="Clear cached images for this manga?">'
-			.. '<button type="submit" title="Delete cached image files for this manga" class="bg-transparent border border-red-900/60 text-red-400 hover:bg-red-950/40 rounded-md px-3 py-1.5 text-sm">🗑 Clear cached images</button>'
-			.. "</form></div>"
 
 		-- Chapter pagination (top)
 		body = body
@@ -58,12 +52,8 @@ return function(data)
 
 		-- Chapter list
 		local chaptersHTML = '<div class="divide-y divide-neutral-800">'
-		local firstID = ""
 		for i, c in ipairs(chapters) do
 			local cID = c.ID or ""
-			if i == 1 then
-				firstID = cID
-			end
 			local cTitle = c.Title or ""
 			local chapterNum = c.ChapterNum or 0
 			local p = progress[cID] or {}
@@ -75,7 +65,7 @@ return function(data)
 			local rowHTML = '<div class="flex items-center gap-3 py-3 px-2 -mx-2 rounded hover:bg-neutral-900 transition">'
 				.. '<input type="checkbox" name="chapterIDs" value="'
 				.. h(cID)
-				.. '" form="mark-bulk" class="size-4 accent-indigo-600 shrink-0">'
+				.. '" form="chapter-actions" class="size-4 accent-indigo-600 shrink-0">'
 				.. '<a href="/view/read/'
 				.. h(pluginID)
 				.. "/"
@@ -153,20 +143,6 @@ return function(data)
 				.. h(cID)
 				.. '">'
 				.. '<button type="submit" title="Reset progress" class="size-7 inline-flex items-center justify-center rounded-md border border-neutral-700 hover:bg-neutral-800 text-sm" aria-label="Reset progress" data-confirm="Are you sure?"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="size-4"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg></button>'
-				.. "</form>"
-
-			-- Mark range button
-			rowHTML = rowHTML
-				.. '<form method="post" action="/action/mark-read-range/'
-				.. h(pluginID)
-				.. "/"
-				.. h(mangaID)
-				.. "/"
-				.. h(firstID)
-				.. "/"
-				.. h(cID)
-				.. '">'
-				.. '<button type="submit" title="Mark up to here" class="size-7 inline-flex items-center justify-center rounded-md border border-neutral-700 hover:bg-neutral-800 text-sm" aria-label="Mark up to here"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="size-4"><path d="M18 6L7 17l-5-5"/><path d="M22 10l-7.5 7.5L13 16"/></svg></button>'
 				.. "</form>"
 
 			-- CBZ download button

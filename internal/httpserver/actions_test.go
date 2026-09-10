@@ -44,28 +44,6 @@ func TestActionSaveSettings(t *testing.T) {
 	}
 }
 
-func TestActionMarkReadRange(t *testing.T) {
-	s := testServerFull(t, "", true)
-	// Route: /action/mark-read-range/{pluginID}/{mangaID}/{fromID}/{toID}
-	req := httptest.NewRequest("POST", "/action/mark-read-range/dummy/manga1/ch1/ch5", nil)
-	rec := httptest.NewRecorder()
-	s.Router.ServeHTTP(rec, req)
-	if rec.Code != 303 && rec.Code != 302 {
-		t.Fatalf("status = %d, want 303/302", rec.Code)
-	}
-}
-
-func TestActionResetMangaProgress(t *testing.T) {
-	s := testServerFull(t, "", true)
-	// Route: /action/reset-progress-all/{pluginID}/{mangaID}
-	req := httptest.NewRequest("POST", "/action/reset-progress-all/dummy/manga1", nil)
-	rec := httptest.NewRecorder()
-	s.Router.ServeHTTP(rec, req)
-	if rec.Code != 303 && rec.Code != 302 {
-		t.Fatalf("status = %d, want 303/302", rec.Code)
-	}
-}
-
 func TestActionClearAllCache(t *testing.T) {
 	s := testServerFull(t, "", true)
 	req := httptest.NewRequest("POST", "/action/clear-cache-all", nil)
@@ -91,19 +69,6 @@ func TestActionExportCBZNonexistent(t *testing.T) {
 	// No data — should handle gracefully (redirect or error page).
 	if rec.Code == 500 {
 		t.Logf("export-cbz returned 500 (acceptable with no data)")
-	}
-}
-
-func TestActionMarkReadBulk(t *testing.T) {
-	s := testServerFull(t, "", true)
-	form := "chapter_ids=c1,c2,c3"
-	req := httptest.NewRequest("POST", "/action/mark-read-bulk", strings.NewReader(form))
-	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-	rec := httptest.NewRecorder()
-	s.Router.ServeHTTP(rec, req)
-	// Missing manga_id field — may return 400 or redirect.
-	if rec.Code == 0 {
-		t.Fatal("expected a valid HTTP status code")
 	}
 }
 
@@ -149,5 +114,41 @@ func TestActionResetChapterProgress(t *testing.T) {
 	s.Router.ServeHTTP(rec, req)
 	if rec.Code != 303 && rec.Code != 302 {
 		t.Fatalf("status = %d, want 303/302", rec.Code)
+	}
+}
+
+func postChapterAction(t *testing.T, s *Server, form string) int {
+	t.Helper()
+	req := httptest.NewRequest("POST", "/action/chapter-actions", strings.NewReader(form))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	rec := httptest.NewRecorder()
+	s.Router.ServeHTTP(rec, req)
+	return rec.Code
+}
+
+// TestActionChapterActions exercises the chapter-list action dropdown endpoint.
+func TestActionChapterActions(t *testing.T) {
+	s := testServerFull(t, "", true)
+
+	cases := []struct {
+		name string
+		form string
+		want int
+	}{
+		{"mark selected read", "pluginID=dummy&mangaID=manga1&action=mark-selected-read&chapterIDs=cs1&chapterIDs=cs2", 303},
+		{"mark selected unread", "pluginID=dummy&mangaID=manga1&action=mark-selected-unread&chapterIDs=cs1", 303},
+		{"mark all read", "pluginID=dummy&mangaID=manga1&action=mark-all-read", 303},
+		{"mark all unread", "pluginID=dummy&mangaID=manga1&action=mark-all-unread", 303},
+		{"mark up to unknown chapter", "pluginID=dummy&mangaID=manga1&action=mark-up-to&chapterIDs=nope", 400},
+		{"selection required", "pluginID=dummy&mangaID=manga1&action=mark-selected-read", 400},
+		{"unknown action", "pluginID=dummy&mangaID=manga1&action=bogus", 400},
+		{"missing manga", "pluginID=dummy&action=mark-all-read", 400},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := postChapterAction(t, s, tc.form); got != tc.want {
+				t.Fatalf("status = %d, want %d", got, tc.want)
+			}
+		})
 	}
 }

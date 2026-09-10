@@ -81,11 +81,28 @@ func (s *AppService) MarkChapterRead(pluginID, mangaID, chapterID string) error 
 	return nil
 }
 
-// MarkChapterReadRange marks every chapter from fromChapterID up to (and
-// including) toChapterID as read, in chapter_num order (order-independent).
-func (s *AppService) MarkChapterReadRange(pluginID, mangaID, fromChapterID, toChapterID string) error {
-	if err := s.db.MarkChapterReadRange(mangaRowID(pluginID, mangaID), fromChapterID, toChapterID); err != nil {
-		return fmt.Errorf("bridge: mark chapter read range: %w", err)
+// SetChaptersRead marks (read=true) or unmarks (read=false) the given chapters,
+// addressed by source ids.
+func (s *AppService) SetChaptersRead(pluginID, mangaID string, chapterIDs []string, read bool) error {
+	if err := s.db.SetChaptersRead(mangaRowID(pluginID, mangaID), chapterIDs, read); err != nil {
+		return fmt.Errorf("bridge: set chapters read: %w", err)
+	}
+	return nil
+}
+
+// SetChaptersUpTo marks (or unmarks) every chapter up to the highest of the
+// given chapters.
+func (s *AppService) SetChaptersUpTo(pluginID, mangaID string, chapterIDs []string, read bool) error {
+	if err := s.db.SetChaptersUpTo(mangaRowID(pluginID, mangaID), chapterIDs, read); err != nil {
+		return fmt.Errorf("bridge: set chapters up to: %w", err)
+	}
+	return nil
+}
+
+// SetMangaChaptersRead marks (or unmarks) every chapter of a manga.
+func (s *AppService) SetMangaChaptersRead(pluginID, mangaID string, read bool) error {
+	if err := s.db.SetMangaChaptersRead(mangaRowID(pluginID, mangaID), read); err != nil {
+		return fmt.Errorf("bridge: set manga chapters read: %w", err)
 	}
 	return nil
 }
@@ -101,14 +118,6 @@ func (s *AppService) SetChapterTotalPages(pluginID, mangaID, chapterID string, t
 func (s *AppService) ResetChapterProgress(pluginID, mangaID, chapterID string) error {
 	if err := s.db.ResetChapterProgress(chapterRowID(pluginID, mangaID, chapterID)); err != nil {
 		return fmt.Errorf("bridge: reset chapter progress: %w", err)
-	}
-	return nil
-}
-
-// ResetMangaProgress clears read progress for every chapter of a manga.
-func (s *AppService) ResetMangaProgress(pluginID, mangaID string) error {
-	if err := s.db.ResetMangaProgress(mangaRowID(pluginID, mangaID)); err != nil {
-		return fmt.Errorf("bridge: reset manga progress: %w", err)
 	}
 	return nil
 }

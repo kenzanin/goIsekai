@@ -64,16 +64,20 @@ return function(data)
 
 			-- Badges overlaid on the thumbnail
 			local statusBadge = status ~= ""
-					and ('<span class="absolute top-2 left-2 bg-black/60 backdrop-blur rounded-full px-2 py-0.5 text-xs text-neutral-200">' .. h(status) .. "</span>")
+					and ('<span class="absolute top-2 left-2 bg-black/60 backdrop-blur rounded-full px-2 py-0.5 text-xs text-neutral-200">' .. h(
+						status
+					) .. "</span>")
 				or ""
 			local pluginBadge = ""
 			if pluginName ~= "" then
 				local pIcon = pluginIcon ~= ""
-					and ('<img src="' .. h(pluginIcon) .. '" alt="" class="h-3 w-3 rounded-sm object-cover">')
-				or ""
+						and ('<img src="' .. h(pluginIcon) .. '" alt="" class="h-3 w-3 rounded-sm object-cover">')
+					or ""
 				pluginBadge = '<span class="absolute bottom-2 left-2 bg-black/60 backdrop-blur rounded-full px-2 py-0.5 text-[11px] text-neutral-200 flex items-center gap-1 max-w-[90%]">'
 					.. pIcon
-					.. '<span class="truncate">' .. h(pluginName) .. "</span></span>"
+					.. '<span class="truncate">'
+					.. h(pluginName)
+					.. "</span></span>"
 			end
 
 			-- read/total in the title area
@@ -84,7 +88,11 @@ return function(data)
 					.. '</span><span class="text-xs text-neutral-500">/</span><span class="text-sm font-medium text-neutral-300">'
 					.. h(tostring(statsObj.TotalChapters or 0))
 					.. "</span>"
-					.. (statsObj.HasNew and ' <span class="text-[10px] px-1.5 py-0.5 rounded-full bg-red-500 text-white font-medium align-middle">New</span>' or "")
+					.. (
+						statsObj.HasNew
+							and ' <span class="text-[10px] px-1.5 py-0.5 rounded-full bg-red-500 text-white font-medium align-middle">New</span>'
+						or ""
+					)
 			end
 
 			mangaCards = mangaCards
@@ -113,8 +121,12 @@ return function(data)
 				.. statsBadge
 				.. "</div>"
 				.. '<div class="view-meta hidden items-center gap-1.5 text-xs flex-wrap">'
-				.. (status ~= "" and ('<span class="px-1.5 py-0.5 rounded-full bg-neutral-700/50 text-neutral-400">' .. h(status) .. "</span>") or "")
-				.. (pluginName ~= "" and ('<span class="inline-flex items-center gap-1 text-neutral-400">' .. (pluginIcon ~= "" and ('<img src="' .. h(pluginIcon) .. '" alt="" class="h-3 w-3 rounded-sm object-cover shrink-0">') or "") .. h(pluginName) .. "</span>") or "")
+				.. (status ~= "" and ('<span class="px-1.5 py-0.5 rounded-full bg-neutral-700/50 text-neutral-400">' .. h(
+					status
+				) .. "</span>") or "")
+				.. (pluginName ~= "" and ('<span class="inline-flex items-center gap-1 text-neutral-400">' .. (pluginIcon ~= "" and ('<img src="' .. h(
+					pluginIcon
+				) .. '" alt="" class="h-3 w-3 rounded-sm object-cover shrink-0">') or "") .. h(pluginName) .. "</span>") or "")
 				.. "</div>"
 				.. "</div></a>"
 		end

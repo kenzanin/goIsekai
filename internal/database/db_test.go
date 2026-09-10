@@ -257,77 +257,6 @@ func TestPersistenceAcrossRestart(t *testing.T) {
 	}
 }
 
-// TestMarkChapterReadRange covers range marking: mid-range chapters marked,
-// out-of-range untouched, order-independent (from > to still marks min..max),
-// and scoped to the manga.
-func TestMarkChapterReadRange(t *testing.T) {
-	db := openTestDB(t)
-
-	if err := db.UpsertManga(Manga{ID: "m1", PluginID: "p1", SourceMangaID: "s1", Title: "R"}); err != nil {
-		t.Fatalf("upsert manga: %v", err)
-	}
-	// A second manga shares a source chapter id to prove range scoping.
-	if err := db.UpsertManga(Manga{ID: "m2", PluginID: "p1", SourceMangaID: "s2", Title: "Other"}); err != nil {
-		t.Fatalf("upsert manga 2: %v", err)
-	}
-	chapters := []Chapter{
-		{ID: "c1", MangaID: "m1", SourceChapterID: "cs1", Title: "Ch1", ChapterNum: 1},
-		{ID: "c2", MangaID: "m1", SourceChapterID: "cs2", Title: "Ch2", ChapterNum: 2},
-		{ID: "c3", MangaID: "m1", SourceChapterID: "cs3", Title: "Ch3", ChapterNum: 3},
-		{ID: "c4", MangaID: "m1", SourceChapterID: "cs4", Title: "Ch4", ChapterNum: 4},
-		{ID: "c5", MangaID: "m1", SourceChapterID: "cs5", Title: "Ch5", ChapterNum: 5},
-		{ID: "d1", MangaID: "m2", SourceChapterID: "cs2", Title: "Other2", ChapterNum: 2},
-	}
-	for _, c := range chapters {
-		if err := db.UpsertChapter(c); err != nil {
-			t.Fatalf("upsert chapter %s: %v", c.ID, err)
-		}
-	}
-
-	assertRead := func(want map[string]bool) {
-		t.Helper()
-		rows, err := db.GetChapterProgressForManga("m1")
-		if err != nil {
-			t.Fatalf("GetChapterProgressForManga: %v", err)
-		}
-		if len(rows) != 5 {
-			t.Fatalf("want 5 rows, got %d", len(rows))
-		}
-		for _, p := range rows {
-			if p.IsRead != want[p.SourceChapterID] {
-				t.Errorf("chapter %s: is_read=%v, want %v", p.SourceChapterID, p.IsRead, want[p.SourceChapterID])
-			}
-		}
-	}
-
-	// Middle range: cs2..cs4 marks cs2, cs3, cs4; cs1 and cs5 untouched.
-	if err := db.MarkChapterReadRange("m1", "cs2", "cs4"); err != nil {
-		t.Fatalf("MarkChapterReadRange: %v", err)
-	}
-	assertRead(map[string]bool{"cs1": false, "cs2": true, "cs3": true, "cs4": true, "cs5": false})
-
-	// The other manga's chapter sharing a source id must be untouched.
-	var otherRead int
-	if err := db.db.QueryRow(`SELECT is_read FROM chapters WHERE id = ?`, "d1").Scan(&otherRead); err != nil {
-		t.Fatalf("scan other manga: %v", err)
-	}
-	if otherRead != 0 {
-		t.Fatalf("chapter in another manga was marked read")
-	}
-
-	// Order-independent: from > to still marks the min..max span.
-	if err := db.MarkChapterReadRange("m1", "cs5", "cs1"); err != nil {
-		t.Fatalf("MarkChapterReadRange reversed: %v", err)
-	}
-	assertRead(map[string]bool{"cs1": true, "cs2": true, "cs3": true, "cs4": true, "cs5": true})
-
-	// Single-chapter range marks just that chapter.
-	if err := db.MarkChapterReadRange("m1", "cs3", "cs3"); err != nil {
-		t.Fatalf("MarkChapterReadRange single: %v", err)
-	}
-	assertRead(map[string]bool{"cs1": true, "cs2": true, "cs3": true, "cs4": true, "cs5": true})
-}
-
 // TestMarkChapterRead covers the single-chapter mark-as-read path.
 func TestMarkChapterRead(t *testing.T) {
 	db := openTestDB(t)
@@ -350,6 +279,119 @@ func TestMarkChapterRead(t *testing.T) {
 	}
 	if lastPage != 0 {
 		t.Fatalf("last_page_read=%d, want 0 (mark-read must not touch page)", lastPage)
+	}
+}
+
+func chapterProgressBySource(t *testing.T, db *DB, mangaRowID string) map[string]ChapterProgress {
+	t.Helper()
+	rows, err := db.GetChapterProgressForManga(mangaRowID)
+	if err != nil {
+		t.Fatalf("GetChapterProgressForManga: %v", err)
+	}
+	m := make(map[string]ChapterProgress, len(rows))
+	for _, r := range rows {
+		m[r.SourceChapterID] = r
+	}
+	return m
+}
+
+// TestSetChaptersBulkRead covers the action dropdown's bulk toggles: an explicit
+// selection, the "up to" boundary (highest selected chapter), and whole-manga
+// toggles — all without disturbing per-chapter page progress.
+func TestSetChaptersBulkRead(t *testing.T) {
+	db := openTestDB(t)
+
+	if err := db.UpsertManga(Manga{ID: "m1", PluginID: "p1", SourceMangaID: "s1", Title: "B"}); err != nil {
+		t.Fatalf("upsert manga: %v", err)
+	}
+	for _, c := range []Chapter{
+		{ID: "c1", MangaID: "m1", SourceChapterID: "cs1", Title: "A", ChapterNum: 1},
+		{ID: "c2", MangaID: "m1", SourceChapterID: "cs2", Title: "B", ChapterNum: 2},
+		{ID: "c3", MangaID: "m1", SourceChapterID: "cs3", Title: "C", ChapterNum: 3},
+		{ID: "c4", MangaID: "m1", SourceChapterID: "cs4", Title: "D", ChapterNum: 4},
+	} {
+		if err := db.UpsertChapter(c); err != nil {
+			t.Fatalf("upsert chapter %s: %v", c.ID, err)
+		}
+	}
+	// Page progress must survive every one of these toggles.
+	if err := db.SetChapterProgress("c1", 5); err != nil {
+		t.Fatalf("set progress: %v", err)
+	}
+
+	// Explicit selection: only the listed chapters flip.
+	if err := db.SetChaptersRead("m1", []string{"cs1", "cs3"}, true); err != nil {
+		t.Fatalf("SetChaptersRead: %v", err)
+	}
+	p := chapterProgressBySource(t, db, "m1")
+	if !p["cs1"].IsRead || !p["cs3"].IsRead {
+		t.Fatalf("selected chapters should be read: %+v", p)
+	}
+	if p["cs2"].IsRead || p["cs4"].IsRead {
+		t.Fatalf("unselected chapters must be untouched: %+v", p)
+	}
+	if p["cs1"].LastPageRead != 5 {
+		t.Fatalf("page progress must survive mark-read: %+v", p["cs1"])
+	}
+
+	// Unmark restores the flag but keeps page progress.
+	if err := db.SetChaptersRead("m1", []string{"cs1"}, false); err != nil {
+		t.Fatalf("SetChaptersRead unread: %v", err)
+	}
+	p = chapterProgressBySource(t, db, "m1")
+	if p["cs1"].IsRead || p["cs1"].LastPageRead != 5 {
+		t.Fatalf("cs1 should be unread with progress intact: %+v", p["cs1"])
+	}
+
+	// "Up to" boundary is the highest chapter_num of the selection: from cs3
+	// that means cs1..cs3 become read, cs4 stays as-is.
+	if err := db.SetChaptersRead("m1", []string{"cs1", "cs3"}, false); err != nil {
+		t.Fatalf("reset flags: %v", err)
+	}
+	if err := db.SetChaptersUpTo("m1", []string{"cs3"}, true); err != nil {
+		t.Fatalf("SetChaptersUpTo: %v", err)
+	}
+	p = chapterProgressBySource(t, db, "m1")
+	for _, src := range []string{"cs1", "cs2", "cs3"} {
+		if !p[src].IsRead {
+			t.Fatalf("%s should be read by up-to cs3: %+v", src, p[src])
+		}
+	}
+	if p["cs4"].IsRead {
+		t.Fatalf("cs4 is past the boundary: %+v", p["cs4"])
+	}
+
+	// A multi-selection uses its maximum as the boundary (cs2,cs4 -> 4).
+	if err := db.SetChaptersUpTo("m1", []string{"cs2", "cs4"}, false); err != nil {
+		t.Fatalf("SetChaptersUpTo clear: %v", err)
+	}
+	p = chapterProgressBySource(t, db, "m1")
+	for src, c := range p {
+		if c.IsRead {
+			t.Fatalf("%s should be cleared by up-to cs4: %+v", src, c)
+		}
+	}
+	if err := db.SetChaptersUpTo("m1", []string{"cs9"}, true); err == nil {
+		t.Fatal("unknown chapter should error")
+	}
+
+	// Whole-manga toggle.
+	if err := db.SetMangaChaptersRead("m1", true); err != nil {
+		t.Fatalf("SetMangaChaptersRead: %v", err)
+	}
+	p = chapterProgressBySource(t, db, "m1")
+	for src, c := range p {
+		if !c.IsRead {
+			t.Fatalf("%s should be read: %+v", src, c)
+		}
+	}
+	if err := db.SetMangaChaptersRead("m1", false); err != nil {
+		t.Fatalf("SetMangaChaptersRead unread: %v", err)
+	}
+	for src, c := range chapterProgressBySource(t, db, "m1") {
+		if c.IsRead {
+			t.Fatalf("%s should be unread: %+v", src, c)
+		}
 	}
 }
 
@@ -458,8 +500,10 @@ func TestChapterDoneDerivation(t *testing.T) {
 	}
 
 	// Reset clears both the full-read and the manual-read chapter.
-	if err := db.ResetMangaProgress("m1"); err != nil {
-		t.Fatalf("reset manga progress: %v", err)
+	for _, id := range []string{"c1", "c2"} {
+		if err := db.ResetChapterProgress(id); err != nil {
+			t.Fatalf("reset chapter progress %s: %v", id, err)
+		}
 	}
 	for _, src := range []string{"cs1", "cs2", "cs3"} {
 		p := get()[src]

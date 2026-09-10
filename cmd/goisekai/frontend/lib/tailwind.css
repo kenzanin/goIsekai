@@ -1341,10 +1341,6 @@ video {
   border-color: rgb(153 27 27 / 0.5);
 }
 
-.border-red-900\/60 {
-  border-color: rgb(127 29 29 / 0.6);
-}
-
 .border-t-indigo-500 {
   --tw-border-opacity: 1;
   border-top-color: rgb(99 102 241 / var(--tw-border-opacity, 1));
@@ -1464,10 +1460,6 @@ video {
 
 .bg-sky-500\/15 {
   background-color: rgb(14 165 233 / 0.15);
-}
-
-.bg-transparent {
-  background-color: transparent;
 }
 
 .object-cover {
@@ -1921,10 +1913,6 @@ video {
 .hover\:bg-red-600:hover {
   --tw-bg-opacity: 1;
   background-color: rgb(220 38 38 / var(--tw-bg-opacity, 1));
-}
-
-.hover\:bg-red-950\/40:hover {
-  background-color: rgb(69 10 10 / 0.4);
 }
 
 .hover\:text-indigo-300:hover {

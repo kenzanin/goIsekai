@@ -38,18 +38,6 @@ func (s *Server) handleExportCBZ(w http.ResponseWriter, r *http.Request) {
 	http.ServeFile(w, r, path)
 }
 
-// handleClearMangaCache removes every cached image for one manga.
-func (s *Server) handleClearMangaCache(w http.ResponseWriter, r *http.Request) {
-	pluginID := param(r, "pluginID")
-	mangaID := param(r, "mangaID")
-	if err := s.service.ClearMangaCache(pluginID, mangaID); err != nil {
-		s.logger.Error("clear manga cache", "pluginID", pluginID, "mangaID", mangaID, "error", err)
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
-	}
-	s.hxRedirect(w, "/view/manga/"+pluginID+"/"+mangaID)
-}
-
 // handleClearAllCache removes the entire image cache directory.
 func (s *Server) handleClearAllCache(w http.ResponseWriter, _ *http.Request) {
 	if err := s.service.ClearAllCache(); err != nil {

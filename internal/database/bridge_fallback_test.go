@@ -142,7 +142,7 @@ func TestMangaDescriptionIfCustom(t *testing.T) {
 	}
 
 	// No custom description yet.
-	dbDesc, custom, err := db.MangaDescriptionIfCustom("p1", "s1")
+	_, custom, err := db.MangaDescriptionIfCustom("p1", "s1")
 	if err != nil {
 		t.Fatalf("MangaDescriptionIfCustom: %v", err)
 	}
@@ -160,7 +160,7 @@ func TestMangaDescriptionIfCustom(t *testing.T) {
 	}
 
 	// Now the custom description should be returned.
-	dbDesc, custom, err = db.MangaDescriptionIfCustom("p1", "s1")
+	dbDesc, custom, err := db.MangaDescriptionIfCustom("p1", "s1")
 	if err != nil {
 		t.Fatalf("MangaDescriptionIfCustom after swap: %v", err)
 	}
@@ -179,7 +179,7 @@ func TestMangaDescriptionIfCustom(t *testing.T) {
 		t.Fatalf("upsert with new data: %v", err)
 	}
 
-	dbDesc, custom, err = db.MangaDescriptionIfCustom("p1", "s1")
+	dbDesc, _, err = db.MangaDescriptionIfCustom("p1", "s1")
 	if err != nil {
 		t.Fatalf("MangaDescriptionIfCustom after re-upsert: %v", err)
 	}

@@ -98,11 +98,11 @@ func (s *AppService) liveChaptersFallback(rowID string, liveChapters []types.Cha
 	out := make([]types.Chapter, len(dbChapters))
 	for i, c := range dbChapters {
 		out[i] = types.Chapter{
-			ID:       c.SourceChapterID,
-			MangaID:  mangaIDFromRow(c.MangaID),
-			Title:    c.Title,
+			ID:         c.SourceChapterID,
+			MangaID:    mangaIDFromRow(c.MangaID),
+			Title:      c.Title,
 			ChapterNum: c.ChapterNum,
-			VolumeNum: c.VolumeNum,
+			VolumeNum:  c.VolumeNum,
 			ReleasedAt: c.FetchedAt,
 		}
 	}

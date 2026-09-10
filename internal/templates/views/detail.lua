@@ -46,7 +46,9 @@ return function(data)
 	end
 
 	-- Manga header grid
-	body = body .. '<div class="flex flex-col md:flex-row gap-6 mb-4 items-start">' .. '<div class="md:w-[200px] md:shrink-0">'
+	body = body
+		.. '<div class="flex flex-col md:flex-row gap-6 mb-4 items-start">'
+		.. '<div class="md:w-[200px] md:shrink-0">'
 
 	-- Cover or placeholder
 	local coverHTML = ""

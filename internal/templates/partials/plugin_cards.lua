@@ -158,7 +158,7 @@ return function(data)
 					.. "<li>Click the first request → Request Headers → find the <code>cookie:</code> line.</li>"
 					.. "<li>Right-click → Copy value.</li>"
 					.. "<li>Paste everything into the box above.</li>"
-					.. '</div></details></div>'
+					.. "</div></details></div>"
 			end
 
 			cardHTML = cardHTML .. "</div>"

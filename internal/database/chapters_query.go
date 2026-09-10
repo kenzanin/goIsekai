@@ -1,7 +1,7 @@
 package database
 
 import (
-	"math"
+	"fmt"
 
 	"goisekai/internal/database/.gen/model"
 	. "goisekai/internal/database/.gen/table"
@@ -41,34 +41,71 @@ func (d *DB) MarkChapterRead(chapterRowID string) error {
 	return err
 }
 
-// MarkChapterReadRange marks every chapter of the manga whose chapter_num
-// falls between the two referenced source chapter ids as read (inclusive and
-// order-independent: from > to still marks the min..max span). The two bound
-// chapter numbers are fetched first, then a single jet UPDATE applies the span.
-func (d *DB) MarkChapterReadRange(mangaRowID string, fromSourceID, toSourceID string) error {
-	var bounds []struct {
-		ChapterNum float64
+// readFlag converts a read/unread bool to the integer stored in chapters.is_read.
+func readFlag(read bool) int64 {
+	if read {
+		return 1
 	}
+	return 0
+}
+
+// SetChaptersRead marks (read=true) or unmarks (read=false) the given source
+// chapters of a manga, leaving per-chapter page progress untouched.
+func (d *DB) SetChaptersRead(mangaRowID string, sourceIDs []string, read bool) error {
+	if len(sourceIDs) == 0 {
+		return nil
+	}
+	ids := make([]Expression, 0, len(sourceIDs))
+	for _, id := range sourceIDs {
+		ids = append(ids, String(id))
+	}
+	_, err := Chapters.UPDATE().
+		SET(Chapters.IsRead.SET(Int(readFlag(read)))).
+		WHERE(Chapters.MangaID.EQ(String(mangaRowID)).AND(Chapters.SourceChapterID.IN(ids...))).
+		Exec(d.db)
+	return err
+}
+
+// SetChaptersUpTo marks (or unmarks) every chapter of a manga whose chapter_num
+// is <= the highest chapter_num among the given source chapters.
+func (d *DB) SetChaptersUpTo(mangaRowID string, sourceIDs []string, read bool) error {
+	if len(sourceIDs) == 0 {
+		return fmt.Errorf("set chapters up to: no chapters given")
+	}
+	ids := make([]Expression, 0, len(sourceIDs))
+	for _, id := range sourceIDs {
+		ids = append(ids, String(id))
+	}
+	var nums []struct{ ChapterNum float64 }
 	err := SELECT(Chapters.ChapterNum.AS("chapter_num")).
 		FROM(Chapters).
-		WHERE(Chapters.MangaID.EQ(String(mangaRowID)).AND(
-			Chapters.SourceChapterID.IN(String(fromSourceID), String(toSourceID)))).
-		Query(d.db, &bounds)
+		WHERE(Chapters.MangaID.EQ(String(mangaRowID)).AND(Chapters.SourceChapterID.IN(ids...))).
+		Query(d.db, &nums)
 	if err != nil {
 		return err
 	}
-	if len(bounds) == 0 {
-		return nil // neither bound exists; nothing to mark
+	if len(nums) == 0 {
+		return fmt.Errorf("set chapters up to: no matching chapters")
 	}
-	lo, hi := bounds[0].ChapterNum, bounds[0].ChapterNum
-	if len(bounds) > 1 {
-		lo = math.Min(bounds[0].ChapterNum, bounds[1].ChapterNum)
-		hi = math.Max(bounds[0].ChapterNum, bounds[1].ChapterNum)
+	bound := nums[0].ChapterNum
+	for _, n := range nums[1:] {
+		if n.ChapterNum > bound {
+			bound = n.ChapterNum
+		}
 	}
 	_, err = Chapters.UPDATE().
-		SET(Chapters.IsRead.SET(Int(1))).
-		WHERE(Chapters.MangaID.EQ(String(mangaRowID)).AND(
-			Chapters.ChapterNum.BETWEEN(Float(lo), Float(hi)))).
+		SET(Chapters.IsRead.SET(Int(readFlag(read)))).
+		WHERE(Chapters.MangaID.EQ(String(mangaRowID)).AND(Chapters.ChapterNum.LT_EQ(Float(bound)))).
+		Exec(d.db)
+	return err
+}
+
+// SetMangaChaptersRead marks (or unmarks) every chapter of a manga, leaving
+// per-chapter page progress untouched.
+func (d *DB) SetMangaChaptersRead(mangaRowID string, read bool) error {
+	_, err := Chapters.UPDATE().
+		SET(Chapters.IsRead.SET(Int(readFlag(read)))).
+		WHERE(Chapters.MangaID.EQ(String(mangaRowID))).
 		Exec(d.db)
 	return err
 }
@@ -121,11 +158,6 @@ func (d *DB) CountChaptersForManga(mangaRowID string) (int, error) {
 // read state).
 func (d *DB) ResetChapterProgress(chapterRowID string) error {
 	return d.resetProgress(Chapters.ID.EQ(String(chapterRowID)))
-}
-
-// ResetMangaProgress clears read progress for every chapter of a manga.
-func (d *DB) ResetMangaProgress(mangaRowID string) error {
-	return d.resetProgress(Chapters.MangaID.EQ(String(mangaRowID)))
 }
 
 func (d *DB) resetProgress(where BoolExpression) error {

@@ -278,6 +278,11 @@
         var form = e.target;
         var submitter = e.submitter;
         var msg = submitter?.getAttribute('data-confirm') || form.getAttribute('data-confirm');
+        var list = form.getAttribute('data-confirm-actions');
+        var field = form.querySelector('[name=action]');
+        if (!msg && list && field && field.value && list.split(',').indexOf(field.value) !== -1) {
+          msg = 'Are you sure?';
+        }
         if (!msg) return;
 
         // Fail open if Alpine/store not ready
@@ -483,13 +488,13 @@
     document.querySelectorAll('[data-key]').forEach((wrap) => {
       const dim = wrap.querySelector('.lib-dim');
       if (!dim || !wrap.dataset.key) return;
-      const on = localStorage.getItem('gsk:cover-dim:' + wrap.dataset.key) === '1';
+      const on = localStorage.getItem(`gsk:cover-dim:${wrap.dataset.key}`) === '1';
       dim.style.display = on ? 'block' : 'none';
     });
     const btn = document.getElementById('cover-dim-btn');
     const wrap = document.getElementById('cover-wrap');
-    if (btn && wrap && wrap.dataset.key) {
-      const on = localStorage.getItem('gsk:cover-dim:' + wrap.dataset.key) === '1';
+    if (btn && wrap?.dataset.key) {
+      const on = localStorage.getItem(`gsk:cover-dim:${wrap.dataset.key}`) === '1';
       btn.dataset.on = on ? '1' : '0';
       btn.textContent = on ? 'Show cover' : 'Hide cover';
     }
@@ -509,7 +514,7 @@
     container.dataset.viewMode = mode;
     const gridBtn = document.getElementById('view-grid-btn');
     const listBtn = document.getElementById('view-list-btn');
-    const setActive = (btn, on, other) => {
+    const setActive = (btn, on) => {
       btn.classList.toggle('bg-neutral-700', on);
       btn.setAttribute('aria-pressed', on ? 'true' : 'false');
       btn.querySelector('svg').style.color = on ? '#818cf8' : '';

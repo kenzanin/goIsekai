@@ -18,10 +18,12 @@ return function(data)
 		local statCards = ""
 		local function addStat(value, label, color, longText, accent)
 			local cls = color and (' class="text-sm font-medium ' .. h(color) .. '"')
-				or (longText and ' class="text-sm font-medium"' or (accent and ' class="text-2xl font-bold"' or ' class="text-lg font-semibold"'))
-			local outer = accent
-					and 'bg-neutral-900 border border-indigo-500/30 rounded-lg px-4 py-3'
-				or 'bg-neutral-900 border border-neutral-800 rounded-lg px-4 py-3'
+				or (
+					longText and ' class="text-sm font-medium"'
+					or (accent and ' class="text-2xl font-bold"' or ' class="text-lg font-semibold"')
+				)
+			local outer = accent and "bg-neutral-900 border border-indigo-500/30 rounded-lg px-4 py-3"
+				or "bg-neutral-900 border border-neutral-800 rounded-lg px-4 py-3"
 			statCards = statCards
 				.. '<div class="'
 				.. outer

@@ -42,46 +42,6 @@ func (s *Server) handleMarkChapterRead(w http.ResponseWriter, r *http.Request) {
 	s.hxRedirect(w, "/view/manga/"+pluginID+"/"+mangaID)
 }
 
-// handleMarkChaptersReadBulk marks every chapter listed in the repeated
-// chapterIDs form field as read.
-func (s *Server) handleMarkChaptersReadBulk(w http.ResponseWriter, r *http.Request) {
-	if err := r.ParseForm(); err != nil {
-		s.logger.Error("mark chapters read: parse form", "error", err)
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
-	}
-	pluginID := r.FormValue("pluginID")
-	mangaID := r.FormValue("mangaID")
-	ids := r.Form["chapterIDs"]
-	if len(ids) == 0 {
-		http.Error(w, "no chapters selected", http.StatusBadRequest)
-		return
-	}
-	for _, id := range ids {
-		if err := s.service.MarkChapterRead(pluginID, mangaID, id); err != nil {
-			s.logger.Error("mark chapter read", "pluginID", pluginID, "mangaID", mangaID, "chapterID", id, "error", err)
-			http.Error(w, err.Error(), http.StatusBadRequest)
-			return
-		}
-	}
-	s.hxRedirect(w, "/view/manga/"+pluginID+"/"+mangaID)
-}
-
-// handleMarkChapterReadRange marks every chapter from the first referenced id
-// up to and including the second, in chapter_num order.
-func (s *Server) handleMarkChapterReadRange(w http.ResponseWriter, r *http.Request) {
-	pluginID := param(r, "pluginID")
-	mangaID := param(r, "mangaID")
-	fromID := param(r, "fromID")
-	toID := param(r, "toID")
-	if err := s.service.MarkChapterReadRange(pluginID, mangaID, fromID, toID); err != nil {
-		s.logger.Error("mark chapter read range", "pluginID", pluginID, "mangaID", mangaID, "fromID", fromID, "toID", toID, "error", err)
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
-	}
-	s.hxRedirect(w, "/view/manga/"+pluginID+"/"+mangaID)
-}
-
 // handleResetChapterProgress clears a single chapter's read progress.
 func (s *Server) handleResetChapterProgress(w http.ResponseWriter, r *http.Request) {
 	pluginID := param(r, "pluginID")
@@ -95,12 +55,47 @@ func (s *Server) handleResetChapterProgress(w http.ResponseWriter, r *http.Reque
 	s.hxRedirect(w, "/view/manga/"+pluginID+"/"+mangaID)
 }
 
-// handleResetMangaProgress clears read progress for every chapter of a manga.
-func (s *Server) handleResetMangaProgress(w http.ResponseWriter, r *http.Request) {
-	pluginID := param(r, "pluginID")
-	mangaID := param(r, "mangaID")
-	if err := s.service.ResetMangaProgress(pluginID, mangaID); err != nil {
-		s.logger.Error("reset manga progress", "pluginID", pluginID, "mangaID", mangaID, "error", err)
+// handleChapterActions dispatches the chapter-list action dropdown onto the
+// matching bulk progress or cache operation.
+func (s *Server) handleChapterActions(w http.ResponseWriter, r *http.Request) {
+	if err := r.ParseForm(); err != nil {
+		s.logger.Error("chapter actions: parse form", "error", err)
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	pluginID := r.FormValue("pluginID")
+	mangaID := r.FormValue("mangaID")
+	action := r.FormValue("action")
+	chapterIDs := r.Form["chapterIDs"]
+	if pluginID == "" || mangaID == "" {
+		http.Error(w, "missing pluginID or mangaID", http.StatusBadRequest)
+		return
+	}
+
+	var err error
+	switch action {
+	case "mark-selected-read", "mark-selected-unread":
+		if len(chapterIDs) == 0 {
+			http.Error(w, "no chapters selected", http.StatusBadRequest)
+			return
+		}
+		err = s.service.SetChaptersRead(pluginID, mangaID, chapterIDs, action == "mark-selected-read")
+	case "mark-up-to", "clear-up-to":
+		if len(chapterIDs) == 0 {
+			http.Error(w, "no chapters selected", http.StatusBadRequest)
+			return
+		}
+		err = s.service.SetChaptersUpTo(pluginID, mangaID, chapterIDs, action == "mark-up-to")
+	case "mark-all-read", "mark-all-unread":
+		err = s.service.SetMangaChaptersRead(pluginID, mangaID, action == "mark-all-read")
+	case "clear-cache":
+		err = s.service.ClearMangaCache(pluginID, mangaID)
+	default:
+		http.Error(w, "invalid action", http.StatusBadRequest)
+		return
+	}
+	if err != nil {
+		s.logger.Error("chapter action", "pluginID", pluginID, "mangaID", mangaID, "action", action, "error", err)
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
