@@ -86,6 +86,11 @@ func (m *Manager) loadJS(id, dir string) (*loadedPlugin, error) {
 		return nil, fmt.Errorf("js plugin %s: set http_request: %w", id, err)
 	}
 
+	// Register host.* helpers (text/codecs/crypto) — same surface as the Lua runtime.
+	if err := registerJSHostNatives(vm); err != nil {
+		return nil, fmt.Errorf("js plugin %s: set host helpers: %w", id, err)
+	}
+
 	// Register a sandboxed require() that only loads sibling .js files from
 	// the plugin folder. No node_modules, no parent traversal.
 	if err := vm.Set("require", func(call goja.FunctionCall) goja.Value {

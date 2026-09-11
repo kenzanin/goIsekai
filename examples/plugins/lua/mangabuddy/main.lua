@@ -15,8 +15,7 @@
 --   pages:   GET /series/{slug}.{zid}/{chapter-slug} -> HTML; data-src CDN webp imgs
 --
 -- Layout (split to make copying to a new plugin trivial):
---   helpers.lua  generic helpers  (normalizeStatus, url_encode, http_get,
---                decode_entities, lua_escape, titlecase) — copy unchanged
+--   helpers.lua  generic helpers  (normalizeStatus, http_get, lua_escape) — copy unchanged
 --   enrich.lua   generic alt-title/alt-summary providers (MangaDex +
 --                MangaUpdates via getAltTitles/getAltSummary) — copy unchanged,
 --                then declare the servers you want in PLUGIN.alt_title_servers
@@ -70,7 +69,7 @@ function search_manga(arg)
     log.debug("search q=" .. query)
     -- /home?keyword= renders the plain home feed (no server-side filtering);
     -- the search modal calls /api/search?search=Q instead.
-    local resp = http_get(BASE .. "/api/search?search=" .. url_encode(query), true)
+    local resp = http_get(BASE .. "/api/search?search=" .. host.text.url_encode(query), true)
     if not resp or resp.status ~= 200 then
         return json.encode({})
     end
@@ -107,13 +106,13 @@ function get_manga_detail(arg)
     title = title:gsub("%s*|%s*MangaBuddy%s*$", "")
     title = title:gsub("%s+Online$", "")
     title = title:gsub("%s+(Manga|Manhwa|Comic)$", "")
-    title = decode_entities(title)
+    title = host.text.html_decode(title)
 
     local cover = string.match(html, '<meta property="og:image" content="([^"]*)"') or ""
 
     local desc = string.match(html, '<meta name="description" content="([^"]*)"') or ""
     desc = desc:gsub("^Read%s+[^.]+%.%s*", ""):gsub("%s*Read the latest chapters online for free at MangaBuddy%.?%s*$", "")
-    desc = decode_entities(desc)
+    desc = host.text.html_decode(desc)
 
     local status = label_value(html, "Status", "/series?status=")
     local author = label_value(html, "Author", "/author/")

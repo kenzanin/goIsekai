@@ -45,12 +45,6 @@ local function http_post(url)
     return resp.body
 end
 
-local function url_encode(s)
-    return (s:gsub("([^%w%-%.%_%~])", function(c)
-        return string.format("%%%02X", string.byte(c))
-    end))
-end
-
 -- decode HTML entities found in titles
 local function unescape(s)
     if not s then return s end
@@ -73,7 +67,7 @@ function search_manga(arg)
     local query = args.query or ""
     local page = args.page or 1
 
-    local url = BASE .. "/?s=" .. url_encode(query) .. "&post_type=wp-manga"
+    local url = BASE .. "/?s=" .. host.text.url_encode(query) .. "&post_type=wp-manga"
     if page > 1 then
         url = url .. "&paged=" .. tostring(page)
     end

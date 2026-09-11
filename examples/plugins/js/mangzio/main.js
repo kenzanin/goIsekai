@@ -85,12 +85,6 @@ function findJSONObject(chunks, key) {
     return null;
 }
 
-// Strip HTML tags from a string.
-function stripHTML(s) {
-    if (!s) return "";
-    return s.replace(/<[^>]*>/g, "").trim();
-}
-
 // ---------------------------------------------------------------------------
 // ABI functions
 // ---------------------------------------------------------------------------
@@ -188,7 +182,7 @@ function getMangaDetail(arg) {
         id: manga.slug || slug,
         title: manga.title || "",
         author: manga.author || "",
-        description: stripHTML(synopsis),
+        description: host.text.strip_html(synopsis),
         cover_url: manga.coverImageUrl ? (manga.coverImageUrl.indexOf("http") === 0 ? manga.coverImageUrl : BASE + manga.coverImageUrl) : "",
         genres: manga.genres || [],
         status: normalizeStatus(manga.status || ""),

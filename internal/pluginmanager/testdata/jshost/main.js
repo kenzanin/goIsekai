@@ -1,0 +1,30 @@
+var PLUGIN = { contract_version: 1, name: "JS host natives" };
+
+function payload() {
+  return [
+    host.text.url_encode("a b"),
+    host.text.url_decode("a%20b"),
+    host.text.html_decode("&amp;"),
+    host.text.strip_html("<p>hi</p>"),
+    host.text.strip_markdown("**bold** [x](y)"),
+    host.text.titlecase("abc"),
+    host.codecs.base64_encode("hi"),
+    host.codecs.base64_decode("aGk="),
+    host.codecs.base64url_encode("a?b"),
+    host.codecs.hex_encode("hi"),
+    host.codecs.hex_decode("6869"),
+    host.crypto.sha256_hex("abc"),
+    host.crypto.md5_hex("abc"),
+    host.crypto.hmac_sha256_hex("key", "The quick brown fox jumps over the lazy dog"),
+  ].join("|");
+}
+
+function searchManga(a) { return "[]"; }
+
+function getMangaDetail(a) {
+  return JSON.stringify({ id: "H1", title: "payload", description: payload() });
+}
+
+function getChapterList(a) { return "[]"; }
+
+function getPageList(a) { return "[]"; }

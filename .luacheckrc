@@ -8,6 +8,7 @@ exclude_files = {
 }
 read_globals = {
     "h",
+    "host",
     "formatDate",
     "getInitials",
     "formatBytes",

@@ -98,5 +98,7 @@ func (m *Manager) setupGlobals(state *lua.State, id string) error {
 	})
 	_ = state.RawSetGlobal("http_request", httpFn.Value())
 
+	registerHostNatives(state)
+
 	return nil
 }

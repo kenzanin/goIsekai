@@ -25,12 +25,6 @@ local function trim(s)
     return (s:gsub("^%s+", ""):gsub("%s+$", ""))
 end
 
-local function url_encode(s)
-    return (s:gsub("([^%w%-%.%_%~])", function(c)
-        return string.format("%%%02X", string.byte(c))
-    end))
-end
-
 local function unescape(s)
     if not s then return s end
     local map = { quot = '"', amp = "&", lt = "<", gt = ">", apos = "'", nbsp = " ",
@@ -74,7 +68,7 @@ function search_manga(arg)
     local page = args.page or 1
 
     -- Madara GET search: admin-ajax.php returns 0 bytes, use server-rendered GET instead
-    local url = BASE .. "/?s=" .. url_encode(query) .. "&post_type=wp-manga"
+    local url = BASE .. "/?s=" .. host.text.url_encode(query) .. "&post_type=wp-manga"
     local body = http_get(url)
     if not body or body == "" then
         log.error("mangasushi search empty response")

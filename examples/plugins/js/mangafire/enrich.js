@@ -23,42 +23,6 @@
 //     server values handled: "mangadex", "mangaupdates"
 //     unknown server -> empty result for the requested kind
 
-// Decode limited percent-encoded sequences (non-ASCII chars in MU descriptions).
-function urlDecodeText(s) {
-    if (!s) return s;
-    try {
-        return decodeURIComponent(s);
-    } catch (e) {
-        // Malformed %-sequence — decode what we can as raw bytes.
-        return s.replace(/%([0-9A-Fa-f]{2})/g, function (_, h) {
-            return String.fromCharCode(parseInt(h, 16));
-        });
-    }
-}
-
-// Strip markdown: **bold**, *italic*, __underline__, [text](url).
-function stripMarkdown(s) {
-    if (!s) return s;
-    // [text](url) -> text
-    s = s.replace(/\[([^\]]*)\]\([^)]*\)/g, '$1');
-    // <url> -> url
-    s = s.replace(/<(https?:\/\/[^>]+)>/g, '$1');
-    // bold/italic markers
-    s = s.replace(/\*\*([^*]+)\*\*/g, '$1');
-    s = s.replace(/__([^_]+)__/g, '$1');
-    s = s.replace(/\*([^*]+)\*/g, '$1');
-    s = s.replace(/_([^_]+)_/g, '$1');
-    // headings and horizontal rules
-    s = s.replace(/^#+\s*/gm, '');
-    s = s.replace(/^___+\s*$/gm, '');
-    s = s.replace(/^---+\s*$/gm, '');
-    // collapse 3+ newlines
-    s = s.replace(/\n{3,}/g, '\n\n');
-    // trim trailing spaces per line
-    s = s.replace(/[ \t]+\n/g, '\n');
-    return s;
-}
-
 // Local GET/POST over the sandbox http_request global.
 function enrichHttp(url, opts) {
     var method = (opts && opts.method) || "GET";
@@ -141,7 +105,7 @@ function mangaupdatesAltTitles(title) {
     var out = [], seen = {};
     for (var i = 0; i < detail.associated.length; i++) {
         var t = detail.associated[i].title;
-        t = urlDecodeText(t);
+        t = host.text.url_decode(t);
         if (t && !seen[t]) { seen[t] = true; out.push(t); }
     }
     return JSON.stringify({ source: "MangaUpdates", titles: out });
@@ -178,5 +142,5 @@ function getAltSummary(arg) {
         if (detail) desc = detail.description || "";
     }
     if (!desc) return JSON.stringify({ source: "MangaUpdates", summaries: [] });
-    return JSON.stringify({ source: "MangaUpdates", summaries: [stripMarkdown(urlDecodeText(desc))] });
+    return JSON.stringify({ source: "MangaUpdates", summaries: [host.text.strip_markdown(host.text.url_decode(desc))] });
 }

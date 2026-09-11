@@ -193,26 +193,6 @@ function vrfURL(apiPath, params) {
 // Text helpers (mirror WASM main.go)
 // ---------------------------------------------------------------------------
 
-function stripHTML(s) {
-    if (!s) return "";
-    s = s.split("<br>").join("\n");
-    s = s.split("<br/>").join("\n");
-    s = s.split("<br />").join("\n");
-    s = s.split("&quot;").join('"');
-    s = s.split("&#039;").join("'");
-    s = s.split("&amp;").join("&");
-    s = s.split("&lt;").join("<");
-    s = s.split("&gt;").join(">");
-    var out = "", inTag = false;
-    for (var i = 0; i < s.length; i++) {
-        var c = s.charAt(i);
-        if (c === "<") { inTag = true; continue; }
-        if (c === ">") { inTag = false; continue; }
-        if (!inTag) out += c;
-    }
-    return out.replace(/^\s+|\s+$/g, "");
-}
-
 function normalizeStatus(s) {
     if (s === "releasing") return "Ongoing";
     if (s === "finished") return "Completed";
@@ -292,7 +272,7 @@ function getMangaDetail(arg) {
     return JSON.stringify({
         id: d.hid || hid,
         title: sanitizeTitle(d.title),
-        description: stripHTML(d.synopsisHtml),
+        description: host.text.strip_html(d.synopsisHtml),
         cover_url: d.poster && d.poster.medium || "",
         status: normalizeStatus(d.status),
         genres: genres,

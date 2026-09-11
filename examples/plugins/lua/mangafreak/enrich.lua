@@ -21,54 +21,6 @@
 --     server values handled: "mangadex", "mangaupdates"
 --     unknown server -> empty result for the requested kind
 
--- ─── local url_encode (percent-encode; sandbox has no global) ───────────────
-
-local function url_encode(s)
-    return (s:gsub("([^%w%-%.%_%~])", function(c)
-        return string.format("%%%02X", string.byte(c))
-    end))
-end
-
--- ─── markdown/URL cleanup for enrichment text ──────────────────────────────
-
--- Decode a limited set of percent-encoded sequences that show up in
--- MangaUpdates descriptions (non-ASCII titles, punctuation).
-local function url_decode_text(s)
-    local decoded = s:gsub("%%(%x%x)", function(h)
-        local byte = tonumber(h, 16)
-        if byte and byte >= 32 and byte < 127 then
-            return string.char(byte)
-        end
-        -- Keep non-ASCII bytes as-is (UTF-8 multibyte) — return original.
-        return "%%" .. h
-    end)
-    return decoded
-end
-
--- Strip markdown formatting: **bold**, *italic*, __underline__, [text](url).
--- Links become just their display text. Multiple blank lines collapse to one.
-local function strip_markdown(s)
-    if not s or s == "" then return s end
-    -- [text](url) -> text (do first so bold markers inside link text are handled)
-    s = s:gsub("%[([^%]]*)%]%([^)]*%)", "%1")
-    -- bare url in angle brackets
-    s = s:gsub("<(https?://[^>]+)>", "%1")
-    -- bold/italic markers
-    s = s:gsub("%*%*([^*]+)%*%*", "%1")
-    s = s:gsub("__([^_]+)__", "%1")
-    s = s:gsub("%*([^*]+)%*", "%1")
-    s = s:gsub("_([^_]+)_", "%1")
-    -- markdown headings and horizontal rules at line start
-    s = s:gsub("\n#+%s*", "\n")
-    s = s:gsub("\n___+\n", "\n\n")
-    s = s:gsub("\n%-%-%-+\n", "\n\n")
-    -- collapse 3+ newlines to 2
-    s = s:gsub("\n\n\n+", "\n\n")
-    -- trim trailing spaces per line
-    s = s:gsub("[ \t]+\n", "\n")
-    return s
-end
-
 -- ─── MangaUpdates helpers (local to this module) ───────────────────────────
 
 -- search the MangaUpdates v1 API by title; returns best-match record or nil.
@@ -113,7 +65,7 @@ end
 -- ─── MangaDex alt titles ───────────────────────────────────────────────────
 
 local function altTitles_mangadex(title)
-    local url = "https://api.mangadex.org/manga?title=" .. url_encode(title) ..
+    local url = "https://api.mangadex.org/manga?title=" .. host.text.url_encode(title) ..
         "&limit=5&includes[]=manga"
     local resp = http_request({url = url, method = "GET", headers = {}})
     if not resp or resp.status ~= 200 then
@@ -156,7 +108,7 @@ local function altTitles_mangaupdates(title)
     for _, item in ipairs(detail.associated) do
         if item.title and item.title ~= "" and not seen[item.title] then
             seen[item.title] = true
-        out[#out + 1] = url_decode_text(item.title)
+        out[#out + 1] = host.text.url_decode(item.title)
         end
     end
     return json.encode({source = "MangaUpdates", titles = out})
@@ -179,8 +131,8 @@ local function altSummary_mangaupdates(title)
     if desc == "" then
         return json.encode({source = "MangaUpdates", summaries = {}})
     end
-    desc = url_decode_text(desc)
-    desc = strip_markdown(desc)
+    desc = host.text.url_decode(desc)
+    desc = host.text.strip_markdown(desc)
     return json.encode({source = "MangaUpdates", summaries = {desc}})
 end
 

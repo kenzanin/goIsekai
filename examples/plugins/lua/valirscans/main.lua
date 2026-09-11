@@ -44,11 +44,6 @@ end
 
 -- ─── helpers ───────────────────────────────────────────────────────────────
 
-function url_encode(s)
-    return s:gsub("([^%w%-%.%_%~])", function(c)
-        return string.format("%%%02X", string.byte(c))
-    end)
-end
 
 -- Escape Lua pattern magic chars (slugs are [a-z0-9-], but '-' is the
 -- lazy quantifier — raw slugs in gmatch/find patterns silently fail).
@@ -115,7 +110,7 @@ function search_manga(arg)
     local args = json.decode(arg)
     local query = args.query or ""
     log.debug("search q=" .. query)
-    local resp = http_get(BASE .. "/api/search?q=" .. url_encode(query))
+    local resp = http_get(BASE .. "/api/search?q=" .. host.text.url_encode(query))
     if not resp or resp.status ~= 200 then
         return json.encode({})
     end

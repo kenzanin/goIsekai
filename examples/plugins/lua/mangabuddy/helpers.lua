@@ -6,10 +6,7 @@
 -- Globals provided:
 --   normalizeStatus(s)  raw status -> canonical (Ongoing/Completed/Hiatus/
 --                       Dropped/Upcoming); unknown passes through, empty -> "unknown"
---   url_encode(s)       percent-encode for query strings
 --   lua_escape(s)       escape Lua pattern magic chars for string.match/gsub
---   decode_entities(s)  HTML entity decode (&amp; &#039; &quot; &apos; …)
---   titlecase(s)        first character to upper
 --   http_get(url, opts) GET wrapper over http_request with logging
 --
 -- Site globals read at call time (optional; set them in main.lua):
@@ -39,34 +36,10 @@ function normalizeStatus(s)
     return s
 end
 
--- url_encode percent-encodes everything outside unreserved chars.
-function url_encode(s)
-    return (s:gsub("([^%w%-%.%_%~])", function(c)
-        return string.format("%%%02X", string.byte(c))
-    end))
-end
-
 -- lua_escape escapes Lua pattern magic chars in literals interpolated into
 -- patterns: [ - . + [ ] ( ) $ ^ % ? *
 function lua_escape(s)
     return (s:gsub("[%-%.%+%[%]%(%)%$%^%%%?%*]", "%%%0"))
-end
-
--- decode_entities decodes the common HTML entities. Also unwraps the
--- double-escaped forms some sites emit in <meta> tags ("&amp;#039;").
-function decode_entities(s)
-    if not s then return "" end
-    s = s:gsub("&amp;#0?39;", "'"):gsub("&amp;quot;", '"')
-    s = s:gsub("&#0?39;", "'"):gsub("&apos;", "'")
-    s = s:gsub("&quot;", '"')
-    s = s:gsub("&amp;", "&")
-    return s
-end
-
--- titlecase uppercases the first character only.
-function titlecase(s)
-    if s == nil then return "" end
-    return s:sub(1, 1):upper() .. s:sub(2)
 end
 
 local defaultUA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 Safari/537.36"
