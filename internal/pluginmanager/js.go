@@ -86,8 +86,8 @@ func (m *Manager) loadJS(id, dir string) (*loadedPlugin, error) {
 		return nil, fmt.Errorf("js plugin %s: set http_request: %w", id, err)
 	}
 
-	// Register host.* helpers (text/codecs/crypto) — same surface as the Lua runtime.
-	if err := registerJSHostNatives(vm); err != nil {
+	// Register host.* helpers (text/codecs/crypto/http) — same surface as the Lua runtime.
+	if err := registerJSHostNatives(vm, m, id); err != nil {
 		return nil, fmt.Errorf("js plugin %s: set host helpers: %w", id, err)
 	}
 

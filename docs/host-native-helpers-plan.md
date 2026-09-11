@@ -1,6 +1,6 @@
 # Plan — Host-native helpers for JS/Lua plugins
 
-Status: **planning only, not implemented**
+Status: **P0–P5 fully implemented**
 Scan date: 2026-09-11
 Scope: which plugin-side functions the Go host should provide natively (shared across Lua / JS-WASM / Scriggo runtimes).
 
@@ -20,11 +20,12 @@ re-implements the same ~30 text/codec functions:
   maintained manually and is bug-prone.
 
 Host already exposes, per runtime:
-- **Lua** (`internal/pluginmanager/lua_globals.go`): only `json`, `log`, `http_request`.
-- **JS/WASM Extism** (`internal/pluginmanager/runtime.go` + `pkg/types/abi.go`): only `host_http_request`.
-- **Scriggo** (`scriggo_packages.go`): `hostnet`, `hostapi`.
+- **Lua**: `json`, `log`, `http_request`, plus `host.text.*` (6), `host.codecs.*` (9), `host.crypto.*` (5), `host.http.*` (2) via `lua_natives.go`.
+- **JS/goja**: `host.text.*` (6), `host.codecs.*` (9), `host.crypto.*` (5), `host.http.*` (2) via `js_natives.go`.
+- **JS/WASM Extism**: `host_http_request` in `pkg/types/abi.go`.
+- **Scriggo**: `hostnet`, `hostapi`.
 
-So every new native is a pure addition — no overlap to reconcile.
+New `host.http.*` additions are pure additions — no overlap to reconcile.
 
 ## 2. Verified duplication (evidence)
 
@@ -92,15 +93,17 @@ tables/glue stay plugin-side (site-specific, rotate with extension updates).
 
 ## 5. Phases
 
-| Phase | Work | Size | Risk |
+| Phase | Work | Status | Commit |
 |---|---|---|---|
-| **P0** | `internal/pluginutil` — shared pure helpers + unit tests (no wiring) | S (~200 LOC + tests) | none (leaf pkg) |
-| **P1** | Lua natives in new `internal/pluginmanager/lua_natives.go` (keeps `lua_globals.go` small); wire in setup | S–M | low |
-| **P2** | Migrate 6 Lua plugins: delete local `url_encode`/`url_decode_text`/`strip_markdown`/`http_get`/`titlecase`/`decode_entities`, call `host.*` | M (mechanical, −40..60 LOC/plugin) | low-med (must verify all ABI fns live) |
-| **P3** | (optional) JS/Extism host functions + migrate 4 JS enrich modules | M | med (ABI addition) |
-| **P4** | (optional, YAGNI-gated) `codecs`/`crypto` natives; refactor mangafire signer's generic transforms | S–M | med |
+| **P0** | `internal/pluginutil` — shared pure helpers + unit tests | ✅ done | 91dee9b |
+| **P1** | Lua natives (text + codecs + crypto) in `lua_natives.go` | ✅ done | 91dee9b + 2542ff2 + 6bf31bf |
+| **P1b** | JS natives (text + codecs + crypto) in `js_natives.go` | ✅ done | 91dee9b + 6bf31bf |
+| **P2** | Migrate 6 Lua plugins → `host.text.*` | ✅ done | 91dee9b |
+| **P2b** | Migrate 4 JS plugins → `host.text.*` | ✅ done | 91dee9b |
+| **P4** | `codecs`/`crypto` hex primitives (utf8_hex, b64decode_hex, b64url_encode/decode_hex) | ✅ done | 6bf31bf |
+| **P5** | **`host.http.*`** — centralized HTTP wrappers (get, post) over http_request proxy | ✅ done | (next) |
 
-P0+P1+P2 delivers the bulk of the win (6 Lua plugins, ~26 duplicate defs).
+P0–P5 delivers the full surface: 10 plugins migrated, ~530 LOC deleted, 16 native functions wired to both Lua and JS runtimes.
 
 ## 6. Guards
 

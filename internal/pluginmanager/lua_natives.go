@@ -1,15 +1,17 @@
 package pluginmanager
 
 import (
+	"encoding/json"
+
 	lua "github.com/mmcdole/lunar"
 
 	"goisekai/internal/pluginutil"
 )
 
-// registerHostNatives installs the shared `host` table (text/codecs/crypto) on
-// the Lua state. Every plugin runtime exposes the same surface so helpers are
+// registerHostNatives installs the shared `host` table (text/codecs/crypto/http)
+// on the Lua state. Every plugin runtime exposes the same surface so helpers are
 // written once in Go instead of per plugin per language.
-func registerHostNatives(state *lua.State) {
+func registerHostNatives(state *lua.State, m *Manager, id string) {
 	text, _ := state.NewTable()
 	_ = text.RawSetString("url_encode", luaStr1(state, pluginutil.URLEncode))
 	_ = text.RawSetString("url_decode", luaStr1(state, pluginutil.URLDecode))
@@ -40,7 +42,87 @@ func registerHostNatives(state *lua.State) {
 	_ = host.RawSetString("text", text.Value())
 	_ = host.RawSetString("codecs", codecs.Value())
 	_ = host.RawSetString("crypto", crypto.Value())
+
+	// host.http — thin wrappers over http_request proxy.
+	http, _ := state.NewTable()
+	_ = http.RawSetString("get", luaHttpGet(state, m, id))
+	_ = http.RawSetString("post", luaHttpPost(state, m, id))
+
+	_ = host.RawSetString("http", http.Value())
 	_ = state.RawSetGlobal("host", host.Value())
+}
+
+// luaHttpGet wraps host.http.get(url, headers?) → {status, headers, body}.
+func luaHttpGet(state *lua.State, m *Manager, id string) lua.Value {
+	fn, _ := state.NewNativeFunction(func(frame lua.Frame) lua.Outcome {
+		url, _ := frame.String(0)
+		var headers any
+		if frame.ArgumentCount() > 1 {
+			arg, ok := frame.Argument(1)
+			if ok && frame.Kind(1) != lua.NilKind {
+				headers, _ = lunarToGo(arg)
+			}
+		}
+		req := map[string]any{"url": url, "method": "GET"}
+		if headers != nil {
+			req["headers"] = headers
+		}
+		reqJSON, err := json.Marshal(req)
+		if err != nil {
+			return frame.ReturnValue(errorTable(state, "http.get marshal: "+err.Error()))
+		}
+		respJSON, err := m.proxy.HandleRequest(id, string(reqJSON))
+		if err != nil {
+			return frame.ReturnValue(errorTable(state, err.Error()))
+		}
+		var respVal any
+		if err := json.Unmarshal([]byte(respJSON), &respVal); err != nil {
+			return frame.ReturnValue(errorTable(state, "decode response: "+err.Error()))
+		}
+		luaval, err := goLunarValue(state, respVal)
+		if err != nil {
+			return frame.ReturnValue(errorTable(state, "convert response: "+err.Error()))
+		}
+		return frame.ReturnValue(luaval)
+	})
+	return fn.Value()
+}
+
+// luaHttpPost wraps host.http.post(url, body, headers?) → {status, headers, body}.
+func luaHttpPost(state *lua.State, m *Manager, id string) lua.Value {
+	fn, _ := state.NewNativeFunction(func(frame lua.Frame) lua.Outcome {
+		url, _ := frame.String(0)
+		body, _ := frame.String(1)
+		var headers any
+		if frame.ArgumentCount() > 2 {
+			arg, ok := frame.Argument(2)
+			if ok && frame.Kind(2) != lua.NilKind {
+				headers, _ = lunarToGo(arg)
+			}
+		}
+		req := map[string]any{"url": url, "method": "POST", "body": body}
+		if headers != nil {
+			req["headers"] = headers
+		}
+		reqJSON, err := json.Marshal(req)
+		if err != nil {
+			return frame.ReturnValue(errorTable(state, "http.post marshal: "+err.Error()))
+		}
+		respJSON, err := m.proxy.HandleRequest(id, string(reqJSON))
+		if err != nil {
+			return frame.ReturnValue(errorTable(state, err.Error()))
+		}
+		var respVal any
+		if err := json.Unmarshal([]byte(respJSON), &respVal); err != nil {
+			return frame.ReturnValue(errorTable(state, "decode response: "+err.Error()))
+		}
+		luaval, err := goLunarValue(state, respVal)
+		if err != nil {
+			return frame.ReturnValue(errorTable(state, "convert response: "+err.Error()))
+		}
+		return frame.ReturnValue(luaval)
+	})
+	return fn.Value()
 }
 
 // luaStr1 wraps a string->string helper as a Lua native.
