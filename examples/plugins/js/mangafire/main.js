@@ -39,44 +39,25 @@ function httpGet(url) {
 }
 
 // ---------------------------------------------------------------------------
-// VRF signer (port of vrf.go) — byte arrays are plain JS number arrays
+// ---------------------------------------------------------------------------
+// VRF signer — algorithm runs in the host (host.crypto.vrf_sign); only the
+// current table set lives here as data. Rotate = update these constants only.
 // ---------------------------------------------------------------------------
 
-var B64CHARS = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
-var B64URL = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_";
+var VRF_K1 = "0Ec58JOY3uBzJK9m3zqIOpdlF7UFiax9DmA=";
+var VRF_T1 = "yINlmUNho8VYJT+ibTIP+9ESiULpVEtMOoD6U6lRE0R/xwXo/Xp9NrUgC4cw/Lmo33vUyjUE40kUoEWIr/fxfNNcq2s79ShQ5NhNrFnJ4hXPwOu/SuXzIbuTQKGFvfm08E9jvCfqAtoDqvQq3dVWPQFmJjgvkISBeXY3BgANR+yVnjGbcxZ47d6kLNfZPIayTq3/YGySb1KuVZodWp/WGNAO5pfMcpaK53Hhs0allBszaMaxuouOwdxbwgxIw6YunSsXjI05Yi0j9j4eHKfSXR8Ifo/Od+8iamRfCXTyvm7NGRGYdcQ0ywcK/u6RXhrbcCm4t2eCtrDgQVecJGkQ+A==";
+var VRF_K2 = "AAdjb1iPY8CiDmq9H34tKTBF8a3oDQ==";
+var VRF_T2 = "IUFltCxD3Oc2cwCgkJffthaOg9cgPUb0LgW6H/VtfcF0kc5F25t+aWj6JH9VOhOaY0rAFdUxlDnl5BLNvwEJvQtP5qcw7vdb/K+chnbwnspSHT8mz5lqwz41TezG0hkO06FTjJZhsyNuFLDpD2ZZxQj/QIRcF90zpmQ7Byu483WsQqUE0C342HL+JXngRB6fRzxRyVTaKu83h7UYTJ0QMt6ixFh6S3F8gqkKwrGTL3jHNBsD45UnifK8+RGtishQV2K3rujLKEkiZxpr2dYcudFW4oFsDKhad3CLBvuyTqsCo4B7mL5IKQ1vXo/MOOvq1I1d8ar9X6Ttu5KF4fZgiA==";
+var VRF_K3 = "DELOJgPsVaCcblDtTGMdHzM=";
+var VRF_T3 = "NQHlu1/wVO5EmkwQymF810qqY2xG1k2obcas4Z9mCsPEIFl9pRIjFxbJ7ybMHbBckT5Ton85E0FOeHezbh/mjlEYpmpnlXOS8dgrqeq2KfxImTh1YK9y0PeMNhzA1OQzSY9brYOJq/l2QnE/hwOeZIhPixVSKIUlDb5vLcH6RWKxkIEMuP0bDwIqQ71AJJaEaMJL7A6YtyIwoRT+L5v4aZzodN/0+3nOGsfblFjgxSfPzVDjNFeNl5P26+kEC/8AHgdrpAbt3hHz3HrRN1Y6e+JHgF7ncFWnoF0y3THL1S71WgWGCa6KtSzTCCG58n68nTyj2T3Sshk7utqCtMi/ZQ==";
 
-function b64decode(s) {
-    var out = [], buf = 0, bits = 0;
-    for (var i = 0; i < s.length; i++) {
-        var c = s.charAt(i);
-        if (c === "=") break;
-        var v = B64CHARS.indexOf(c);
-        if (v < 0) continue;
-        buf = (buf << 6) | v;
-        bits += 6;
-        if (bits >= 8) {
-            bits -= 8;
-            out.push((buf >> bits) & 0xFF);
-        }
-    }
-    return out;
-}
+var VRF_STAGES = [
+    { iv: 0x5A, key: VRF_K1, tbl: VRF_T1 },
+    { iv: 0x35, key: VRF_K2, tbl: VRF_T2 },
+    { iv: 0xBA, key: VRF_K3, tbl: VRF_T3 },
+];
 
-function b64urlEncode(bytes) {
-    var out = "";
-    for (var i = 0; i < bytes.length; i += 3) {
-        var b0 = bytes[i];
-        var b1 = i + 1 < bytes.length ? bytes[i + 1] : 0;
-        var b2 = i + 2 < bytes.length ? bytes[i + 2] : 0;
-        var n = (b0 << 16) | (b1 << 8) | b2;
-        out += B64URL.charAt((n >> 18) & 63) + B64URL.charAt((n >> 12) & 63);
-        if (i + 1 < bytes.length) out += B64URL.charAt((n >> 6) & 63);
-        if (i + 2 < bytes.length) out += B64URL.charAt(n & 63);
-    }
-    return out;
-}
-
-// Encode a JS string to its UTF-8 bytes (Go []byte(signStr) semantics).
+// Encode a JS string to its UTF-8 bytes (Go []byte(s) semantics).
 function utf8Bytes(str) {
     var out = [];
     for (var i = 0; i < str.length; i++) {
@@ -102,54 +83,6 @@ function utf8Bytes(str) {
         }
     }
     return out;
-}
-
-// VRF table/key constants (base64) — mirror vrf.go exactly.
-var VRF_K1 = "0Ec58JOY3uBzJK9m3zqIOpdlF7UFiax9DmA=";
-var VRF_T1 = "yINlmUNho8VYJT+ibTIP+9ESiULpVEtMOoD6U6lRE0R/xwXo/Xp9NrUgC4cw/Lmo33vUyjUE40kUoEWIr/fxfNNcq2s79ShQ5NhNrFnJ4hXPwOu/SuXzIbuTQKGFvfm08E9jvCfqAtoDqvQq3dVWPQFmJjgvkISBeXY3BgANR+yVnjGbcxZ47d6kLNfZPIayTq3/YGySb1KuVZodWp/WGNAO5pfMcpaK53Hhs0allBszaMaxuouOwdxbwgxIw6YunSsXjI05Yi0j9j4eHKfSXR8Ifo/Od+8iamRfCXTyvm7NGRGYdcQ0ywcK/u6RXhrbcCm4t2eCtrDgQVecJGkQ+A==";
-var VRF_K2 = "AAdjb1iPY8CiDmq9H34tKTBF8a3oDQ==";
-var VRF_T2 = "IUFltCxD3Oc2cwCgkJffthaOg9cgPUb0LgW6H/VtfcF0kc5F25t+aWj6JH9VOhOaY0rAFdUxlDnl5BLNvwEJvQtP5qcw7vdb/K+chnbwnspSHT8mz5lqwz41TezG0hkO06FTjJZhsyNuFLDpD2ZZxQj/QIRcF90zpmQ7Byu483WsQqUE0C342HL+JXngRB6fRzxRyVTaKu83h7UYTJ0QMt6ixFh6S3F8gqkKwrGTL3jHNBsD45UnifK8+RGtishQV2K3rujLKEkiZxpr2dYcudFW4oFsDKhad3CLBvuyTqsCo4B7mL5IKQ1vXo/MOOvq1I1d8ar9X6Ttu5KF4fZgiA==";
-var VRF_K3 = "DELOJgPsVaCcblDtTGMdHzM=";
-var VRF_T3 = "NQHlu1/wVO5EmkwQymF810qqY2xG1k2obcas4Z9mCsPEIFl9pRIjFxbJ7ybMHbBckT5Ton85E0FOeHezbh/mjlEYpmpnlXOS8dgrqeq2KfxImTh1YK9y0PeMNhzA1OQzSY9brYOJq/l2QnE/hwOeZIhPixVSKIUlDb5vLcH6RWKxkIEMuP0bDwIqQ71AJJaEaMJL7A6YtyIwoRT+L5v4aZzodN/0+3nOGsfblFjgxSfPzVDjNFeNl5P26+kEC/8AHgdrpAbt3hHz3HrRN1Y6e+JHgF7ncFWnoF0y3THL1S71WgWGCa6KtSzTCCG58n68nTyj2T3Sshk7utqCtMi/ZQ==";
-
-var VRF_STAGES = [
-    { iv: 0x5A, key: b64decode(VRF_K1), tbl: b64decode(VRF_T1) },
-    { iv: 0x35, key: b64decode(VRF_K2), tbl: b64decode(VRF_T2) },
-    { iv: 0xBA, key: b64decode(VRF_K3), tbl: b64decode(VRF_T3) },
-];
-
-// stage: out[i] = table[data[i] XOR key[i%len(key)] XOR prev]
-function stage(data, iv, key, tbl) {
-    var out = [], prev = iv, kl = key.length;
-    for (var i = 0; i < data.length; i++) {
-        var x = (data[i] ^ key[i % kl] ^ prev) & 0xFF;
-        var v = tbl[x];
-        out.push(v);
-        prev = v;
-    }
-    return out;
-}
-
-// Sign: signStr = apiPath (no /api) + "?" + sorted "k=v" (values raw).
-function vrfSign(apiPath, params) {
-    var signStr = apiPath;
-    if (signStr.indexOf("/api") === 0) signStr = signStr.substring(4);
-    var keys = [];
-    for (var k in params) keys.push(k);
-    keys.sort();
-    if (keys.length > 0) {
-        var parts = [];
-        for (var i = 0; i < keys.length; i++) {
-            parts.push(keys[i] + "=" + params[keys[i]]);
-        }
-        signStr += "?" + parts.join("&");
-    }
-    var data = utf8Bytes(signStr);
-    for (var j = 0; j < VRF_STAGES.length; j++) {
-        var st = VRF_STAGES[j];
-        data = stage(data, st.iv, st.key, st.tbl);
-    }
-    return b64urlEncode(data);
 }
 
 // Go net/url QueryEscape semantics (space -> "+", unreserved kept).
@@ -182,7 +115,7 @@ function qs(params) {
 }
 
 function vrfURL(apiPath, params) {
-    var sig = vrfSign(apiPath, params);
+    var sig = host.crypto.vrf_sign(apiPath, params, VRF_STAGES);
     var u = API_URL + apiPath;
     var query = params ? qs(params) : "";
     if (query) return u + "?" + query + "&vrf=" + sig;
