@@ -5,29 +5,28 @@ import (
 	"goisekai/internal/logger"
 	"os"
 	"path/filepath"
-	"strings"
 )
 
-// Install copies a plugin file (wasm) or folder (lua, containing main.lua)
+// Install copies a plugin folder (lua, js, or yaegi containing main.lua/main.js/main.go)
 // into pluginsDir, hot-loads it, and registers it under its base name. It
 // must be called after Discover. It returns the path of the copy inside
-// pluginsDir, which the caller should persist as the plugin's WasmPath.
-func (m *Manager) Install(wasmPath string) (string, error) {
+// pluginsDir (stored as WasmPath in the DB).
+func (m *Manager) Install(dirPath string) (string, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	if m.plugins == nil {
 		return "", fmt.Errorf("Discover must be called before Install")
 	}
-	id := strings.TrimSuffix(filepath.Base(wasmPath), ".wasm")
+	var id string
 
 	// Lua plugin: source is a folder containing main.lua; copy it recursively.
-	mainLua := filepath.Join(wasmPath, "main.lua")
+	mainLua := filepath.Join(dirPath, "main.lua")
 	if info, err := os.Stat(mainLua); err == nil && !info.IsDir() {
-		id = filepath.Base(wasmPath)
+		id = filepath.Base(dirPath)
 		destDir := filepath.Join(m.pluginsDir, id)
-		logger.Debug("installing lua plugin", "source", wasmPath, "dest", destDir)
-		if filepath.Clean(wasmPath) != filepath.Clean(destDir) {
-			if err := copyDir(wasmPath, destDir); err != nil {
+		logger.Debug("installing lua plugin", "source", dirPath, "dest", destDir)
+		if filepath.Clean(dirPath) != filepath.Clean(destDir) {
+			if err := copyDir(dirPath, destDir); err != nil {
 				return "", fmt.Errorf("copy lua plugin %s: %w", id, err)
 			}
 		}
@@ -42,14 +41,15 @@ func (m *Manager) Install(wasmPath string) (string, error) {
 		logger.Debug("lua plugin installed", "id", id)
 		return filepath.Join(destDir, "main.lua"), nil
 	}
+
 	// JS plugin: source is a folder containing main.js; copy it recursively.
-	mainJS := filepath.Join(wasmPath, "main.js")
+	mainJS := filepath.Join(dirPath, "main.js")
 	if info, err := os.Stat(mainJS); err == nil && !info.IsDir() {
-		id = filepath.Base(wasmPath)
+		id = filepath.Base(dirPath)
 		destDir := filepath.Join(m.pluginsDir, id)
-		logger.Debug("installing js plugin", "source", wasmPath, "dest", destDir)
-		if filepath.Clean(wasmPath) != filepath.Clean(destDir) {
-			if err := copyDir(wasmPath, destDir); err != nil {
+		logger.Debug("installing js plugin", "source", dirPath, "dest", destDir)
+		if filepath.Clean(dirPath) != filepath.Clean(destDir) {
+			if err := copyDir(dirPath, destDir); err != nil {
 				return "", fmt.Errorf("copy js plugin %s: %w", id, err)
 			}
 		}
@@ -65,50 +65,34 @@ func (m *Manager) Install(wasmPath string) (string, error) {
 		return filepath.Join(destDir, "main.js"), nil
 	}
 
-	// Scriggo plugin: source is a folder containing main.go; copy it recursively.
-	mainGo := filepath.Join(wasmPath, "main.go")
+	// Yaegi plugin: source is a folder containing main.go; copy it recursively.
+	mainGo := filepath.Join(dirPath, "main.go")
 	if info, err := os.Stat(mainGo); err == nil && !info.IsDir() {
-		id = filepath.Base(wasmPath)
+		id = filepath.Base(dirPath)
 		destDir := filepath.Join(m.pluginsDir, id)
-		logger.Debug("installing scriggo plugin", "source", wasmPath, "dest", destDir)
-		if filepath.Clean(wasmPath) != filepath.Clean(destDir) {
-			if err := copyDir(wasmPath, destDir); err != nil {
-				return "", fmt.Errorf("copy scriggo plugin %s: %w", id, err)
+		logger.Debug("installing yaegi plugin", "source", dirPath, "dest", destDir)
+		if filepath.Clean(dirPath) != filepath.Clean(destDir) {
+			if err := copyDir(dirPath, destDir); err != nil {
+				return "", fmt.Errorf("copy yaegi plugin %s: %w", id, err)
 			}
 		}
-		p, err := m.loadScriggo(id, destDir)
+		p, err := m.loadYaegi(id, destDir)
 		if err != nil {
-			logger.Error("scriggo plugin install failed", "id", id, "error", err)
-			return "", fmt.Errorf("install scriggo plugin %s: %w", id, err)
+			logger.Error("yaegi plugin install failed", "id", id, "error", err)
+			return "", fmt.Errorf("install yaegi plugin %s: %w", id, err)
 		}
 		m.plugins[id] = p
 		m.proxy.SetNeedsJS(id, p.meta.NeedsJS)
 		m.proxy.SetHTTPProfiles(id, p.meta.HTTPProfiles)
-		logger.Debug("scriggo plugin installed", "id", id)
+		logger.Debug("yaegi plugin installed", "id", id)
 		return filepath.Join(destDir, "main.go"), nil
 	}
 
-	dest := filepath.Join(m.pluginsDir, id+".wasm")
-	logger.Debug("installing plugin", "source", wasmPath, "dest", dest)
-	if filepath.Clean(wasmPath) != filepath.Clean(dest) {
-		if err := copyFile(wasmPath, dest); err != nil {
-			return "", fmt.Errorf("copy plugin %s: %w", id, err)
-		}
-	}
-	p, err := m.load(id, dest)
-	if err != nil {
-		logger.Error("plugin install failed", "id", id, "error", err)
-		return "", fmt.Errorf("install plugin %s: %w", id, err)
-	}
-	m.plugins[id] = p
-	m.proxy.SetNeedsJS(id, p.meta.NeedsJS)
-	m.proxy.SetHTTPProfiles(id, p.meta.HTTPProfiles)
-	logger.Debug("plugin installed", "id", id)
-	return dest, nil
+	return "", fmt.Errorf("no main.lua, main.js, or main.go found at %s", dirPath)
 }
 
-// LoadPlugin hot-loads a single plugin from a file (.wasm) or folder
-// (containing main.lua or main.js). The plugin is registered immediately.
+// LoadPlugin hot-loads a single plugin folder (containing main.lua, main.js, or main.go).
+// The plugin is registered immediately.
 func (m *Manager) LoadPlugin(path string) (string, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -157,32 +141,16 @@ func (m *Manager) LoadPlugin(path string) (string, error) {
 		if _, dup := m.plugins[id]; dup {
 			return "", fmt.Errorf("plugin %q already loaded", id)
 		}
-		p, err := m.loadScriggo(id, path)
+		p, err := m.loadYaegi(id, path)
 		if err != nil {
 			return "", err
 		}
 		m.plugins[id] = p
 		m.proxy.SetNeedsJS(id, p.meta.NeedsJS)
 		m.proxy.SetHTTPProfiles(id, p.meta.HTTPProfiles)
-		logger.Info("plugin loaded (hot)", "id", id, "kind", "scriggo")
+		logger.Info("plugin loaded (hot)", "id", id, "kind", "yaegi")
 		return id, nil
 	}
 
-	// WASM: path must be a .wasm file
-	if !strings.HasSuffix(path, ".wasm") {
-		return "", fmt.Errorf("no main.lua, main.js, main.go, or .wasm found at %s", path)
-	}
-	id := strings.TrimSuffix(filepath.Base(path), ".wasm")
-	if _, dup := m.plugins[id]; dup {
-		return "", fmt.Errorf("plugin %q already loaded", id)
-	}
-	p, err := m.load(id, path)
-	if err != nil {
-		return "", err
-	}
-	m.plugins[id] = p
-	m.proxy.SetNeedsJS(id, p.meta.NeedsJS)
-	m.proxy.SetHTTPProfiles(id, p.meta.HTTPProfiles)
-	logger.Info("plugin loaded (hot)", "id", id, "kind", "wasm")
-	return id, nil
+	return "", fmt.Errorf("no main.lua, main.js, or main.go found at %s", path)
 }

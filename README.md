@@ -1,6 +1,6 @@
 # goIsekai
 
-A self-hosted manga reader with sandboxed plugins. Four runtimes — hardened **WASM**, zero-toolchain **Lua**, pure-Go **JS** (goja), and native **Go** (.so) — power your sources; one fast server-rendered UI reads them all.
+A self-hosted manga reader with sandboxed plugins. Three source runtimes — zero-toolchain **Lua**, pure-Go **JS** (goja), and **Yaegi** (interpreted Go) — power your sources; one fast server-rendered UI reads them all.
 
 goIsekai is a single static Go binary that serves a chi + Lua template engine + Alpine.js SPA with Tailwind CSS. Manga sources are plugins executed in isolated sandboxes, so a crashing or malicious plugin can never take down the host. All network traffic goes through a Chrome-fingerprinted TLS client with an automatic profile-ladder that rotates fingerprints on WAF blocks — with an automatic browser fallback (CDP) when a challenge appears anyway.
 
@@ -21,9 +21,9 @@ flowchart LR
         Bridge[AppService bridge]
         PM[pluginmanager<br/>lazy-load]
         subgraph Sandboxes
-            WASM[Extism WASM<br/>64 MB / 15 s]
             Lua[lunar<br/>safe stdlib]
             JS[goja<br/>ES5.1]
+            YG[yaegi<br/>interpreted Go]
             GO[go plugin<br/>.so]
         end
         HostNet["hostnet proxy<br/>profile ladder"]
@@ -43,11 +43,10 @@ flowchart LR
     HTTP --> API
     API --> Bridge
     Bridge --> PM
-    PM --> WASM
     PM --> Lua
     PM --> JS
+    PM --> YG
     PM --> GO
-    WASM --> HostNet
     Lua --> HostNet
     JS --> HostNet
     HostNet -->|profile ladder| Sites
@@ -60,7 +59,7 @@ flowchart LR
 
 ## Features
 
-- **Four plugin runtimes** — sandboxed **WASM** (64 MB cap, 15 s timeout, panic isolation), **Lua** (lunar, plain text, no toolchain), **JS** (goja, ES5.1, JSON native), and native **Go** (.so). All share one ABI; plugins are lazy-loaded on first use
+- **Three source runtimes** — **Lua** (lunar, plain text, no toolchain), **JS** (goja, ES5.1, JSON native), and **Yaegi** (interpreted Go, stdlib + `hostnet` sandbox). Native **Go** (.so) plugins remain supported. All share one ABI; plugins are lazy-loaded on first use
 - **API-first** — every feature has a JSON endpoint under `/api` with constant-time API-key auth; the HTML UI and any future client consume the same bridge
 - **TLS profile ladder** — `bogdanfinn/tls-client` with a rotation ladder of 7+ browser profiles (Chrome, Firefox, Safari, Edge, Brave); WAF block on one profile triggers escalation to the next, first success is pinned per plugin and persisted to DB
 - **Automatic anti-bot fallback** — when a site returns a Cloudflare challenge, the host spawns a CDP browser (lightpanda or Chrome), solves it, harvests the cookies back into the jar, and retries the fast path — no manual paste
@@ -92,15 +91,7 @@ Host/port come from CLI flags or `goisekai.ini` (flags win):
 
 ## Plugins
 
-Plugins implement a small ABI (`Init`, `SearchManga`, `GetMangaDetails`, `GetChapterList`, `GetPageList`, optional `GetAltTitles`, optional `GetAltSummary`) and call the host function `http_request` for all networking. All runtimes are interchangeable — pick WASM for hardened plugins, Lua for quick ones, JS for JSON-heavy ones.
-
-### WASM plugins
-
-```sh
-tinygo build -o plugins/mangadex.wasm -target wasm ./plugins/mangadex/
-```
-
-Install a `.wasm` from the Plugins screen in the UI. See `examples/plugins/wasm/mangadex/` for a complete TinyGo plugin.
+Plugins implement a small ABI (`Init`, `SearchManga`, `GetMangaDetails`, `GetChapterList`, `GetPageList`, optional `GetAltTitles`, optional `GetAltSummary`) and call the host function `http_request` for all networking. All runtimes are interchangeable — pick Lua for quick ones, JS for JSON-heavy ones, Yaegi when Go stdlib matters.
 
 ### Lua plugins (no toolchain needed)
 
@@ -124,7 +115,7 @@ function search_manga(filter_json)
 end
 ```
 
-`main.lua` declares a `PLUGIN` table and ABI globals (`search_manga`, `get_manga_detail`, `get_chapter_list`, `get_page_list`, optional `get_alt_titles`, `get_alt_summary`). Each takes one JSON-string argument and returns a Lua table. Networking goes through `http_request({url=..., method=..., headers=...})`, which rides the same TLS-fingerprinted, cookie-jarred, rate-paced session as WASM plugins. `json.encode`/`json.decode` are provided. Available stdlib: `string`, `table`, `math`, `os.time/date/clock` — no `io`, no `os.execute`.
+`main.lua` declares a `PLUGIN` table and ABI globals (`search_manga`, `get_manga_detail`, `get_chapter_list`, `get_page_list`, optional `get_alt_titles`, `get_alt_summary`). Each takes one JSON-string argument and returns a Lua table. Networking goes through `http_request({url=..., method=..., headers=...})`, which rides the same TLS-fingerprinted, cookie-jarred, rate-paced session as all other runtimes. `json.encode`/`json.decode` are provided. Available stdlib: `string`, `table`, `math`, `os.time/date/clock` — no `io`, no `os.execute`.
 
 Reusable modules (`helpers.lua`, `enrich.lua`) can be copied across plugins for shared utilities and enrichment logic. See `examples/plugins/lua/mangabuddy/` for a complete example.
 
@@ -153,6 +144,23 @@ function search_manga(filterJson) {
 ```
 
 Same ABI as Lua — `PLUGIN` metadata + PascalCase globals. `http_request` takes a JSON string, returns a JSON string. `json` is native JS. A shared `enrich.js` module handles MangaUpdates enrichment. See `examples/plugins/js/mangadex/` for a complete example.
+
+### Yaegi plugins (interpreted Go)
+
+One folder per site under `plugins/yaegi/<id>/`, with `main.go` as the entry point. The host interprets the source with Yaegi — no toolchain required.
+
+```go
+func Init() string {
+	return `{"name":"Demo","thumb_ratio":0.7}`
+}
+
+func Search(arg string) (string, error) {
+	body, err := hostnet.Get("https://example.com/search?q=" + arg)
+	return body, err
+}
+```
+
+ABI functions take one string arg and return `(string, error)`; `Init` takes no arg. Networking goes through the synthetic `hostnet` package (`hostnet.Get`/`hostnet.Post`), which routes through the same TLS-fingerprinted per-plugin proxy. Sandbox: the Go stdlib is available, but any third-party (`github.com/...`) or `goisekai/...` import is rejected at load time. See `examples/plugins/yaegi/yaegidemo/` for a complete example.
 
 ```sh
 make install-plugins   # copies all plugin sources → app_data/plugins/

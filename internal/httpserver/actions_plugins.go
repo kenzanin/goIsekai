@@ -1,9 +1,11 @@
 package httpserver
 
 import (
+	"archive/zip"
 	"io"
 	"net/http"
 	"os"
+	"path/filepath"
 )
 
 // handleTestProfile runs a single GET against the plugin's site URL (or an
@@ -39,8 +41,8 @@ func (s *Server) handleResetProfile(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{"ok": true})
 }
 
-// handleInstallPlugin saves the uploaded .wasm to a temp file and installs it
-// through the bridge.
+// handleInstallPlugin accepts an uploaded .zip file (plugin folder),
+// extracts it to a temp directory, and installs it through the bridge.
 func (s *Server) handleInstallPlugin(w http.ResponseWriter, r *http.Request) {
 	if err := r.ParseMultipartForm(32 << 20); err != nil {
 		s.logger.Error("install plugin: parse form", "error", err)
@@ -55,28 +57,79 @@ func (s *Server) handleInstallPlugin(w http.ResponseWriter, r *http.Request) {
 	}
 	defer func() { _ = file.Close() }()
 
-	tmp, err := os.CreateTemp("", "goisekai-plugin-*.wasm")
+	// Create a temp directory for extraction.
+	tmpDir, err := os.MkdirTemp("", "goisekai-plugin-*.zip")
 	if err != nil {
-		s.logger.Error("install plugin: create temp", "error", err)
+		s.logger.Error("install plugin: create temp dir", "error", err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	tmpPath := tmp.Name()
-	defer func() { _ = os.Remove(tmpPath) }() // bridge copies the wasm into its own dir
+	defer func() { _ = os.RemoveAll(tmpDir) }()
 
-	if _, err := io.Copy(tmp, file); err != nil {
-		_ = tmp.Close()
-		s.logger.Error("install plugin: copy upload", "error", err)
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
-	}
-	if err := tmp.Close(); err != nil {
-		s.logger.Error("install plugin: close temp", "error", err)
+	// Read the file into a buffer.
+	buf, err := io.ReadAll(file)
+	if err != nil {
+		s.logger.Error("install plugin: read upload", "error", err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	if err := s.service.InstallPlugin(tmpPath); err != nil {
+	// Open as zip.
+	bufReader := &bytesBuffer{data: buf}
+	zipReader, err := zip.NewReader(bufReader, int64(len(buf)))
+	if err != nil {
+		_ = os.Remove(tmpDir)
+		s.logger.Error("install plugin: not a valid zip", "error", err)
+		http.Error(w, "invalid zip file", http.StatusBadRequest)
+		return
+	}
+
+	// Extract all files.
+	for _, zf := range zipReader.File {
+		dstPath := filepath.Join(tmpDir, zf.Name)
+		if zf.Name == "." || zf.Name == "/" {
+			continue
+		}
+		if zf.FileInfo().IsDir() {
+			if err := os.MkdirAll(dstPath, 0o755); err != nil {
+				s.logger.Error("install plugin: mkdir", "error", err)
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
+			continue
+		}
+		rc, err := zf.Open()
+		if err != nil {
+			s.logger.Error("install plugin: open zip file", "error", err)
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		if err := os.MkdirAll(filepath.Dir(dstPath), 0o755); err != nil {
+			_ = rc.Close()
+			s.logger.Error("install plugin: mkdir parent", "error", err)
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		dst, err := os.Create(dstPath)
+		if err != nil {
+			_ = rc.Close()
+			s.logger.Error("install plugin: create file", "error", err)
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		if _, err := io.Copy(dst, rc); err != nil {
+			_ = dst.Close()
+			_ = rc.Close()
+			s.logger.Error("install plugin: write file", "error", err)
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		_ = dst.Close()
+		_ = rc.Close()
+	}
+
+	// Pass the extracted directory to the bridge.
+	if err := s.service.InstallPlugin(tmpDir); err != nil {
 		s.logger.Error("install plugin", "error", err)
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
@@ -109,4 +162,17 @@ func (s *Server) handleSaveVerify(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s.hxRedirect(w, "/view/plugins")
+}
+
+// bytesBuffer wraps a byte slice to satisfy io.ReaderAt.
+type bytesBuffer struct {
+	data []byte
+}
+
+func (b *bytesBuffer) ReadAt(p []byte, off int64) (n int, err error) {
+	if off >= int64(len(b.data)) {
+		return 0, io.EOF
+	}
+	n = copy(p, b.data[off:])
+	return n, nil
 }

@@ -3,39 +3,15 @@ package pluginmanager
 import (
 	"goisekai/internal/logger"
 	"path/filepath"
-	"strings"
 )
 
-// Discover scans pluginsDir and registers every *.wasm file and every
-// folder containing main.lua or main.js, WITHOUT instantiating any runtime.
-// Plugins are lazily instantiated on first use via ensureLoaded. A folder
-// that collides with an already-registered id is logged and skipped rather
-// than aborting discovery.
+// Discover scans pluginsDir and registers every folder containing main.lua,
+// main.js, or main.go, WITHOUT instantiating any runtime. Plugins are lazily
+// instantiated on first use via ensureLoaded. A folder that collides with an
+// already-registered id is logged and skipped rather than aborting discovery.
 func (m *Manager) Discover() error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-
-	// WASM plugins: one .wasm file per plugin, filename (minus .wasm) = id.
-	pattern := filepath.Join(m.pluginsDir, "*.wasm")
-	matches, err := filepath.Glob(pattern)
-	if err != nil {
-		return err
-	}
-	logger.Debug("discovering plugins", "dir", m.pluginsDir, "count", len(matches))
-
-	for _, path := range matches {
-		id := strings.TrimSuffix(filepath.Base(path), ".wasm")
-		if _, dup := m.plugins[id]; dup {
-			logger.Error("plugin id collision, skipping", "id", id, "kind", "wasm")
-			continue
-		}
-		m.plugins[id] = &loadedPlugin{
-			id:       id,
-			wasmPath: path,
-			kind:     "wasm",
-		}
-		logger.Debug("plugin registered", "id", id, "path", path)
-	}
 
 	// Lua plugins: one folder per plugin, main.lua entry, folder name = id.
 	luaMatches, err := filepath.Glob(filepath.Join(m.pluginsDir, "*", "main.lua"))
@@ -75,23 +51,23 @@ func (m *Manager) Discover() error {
 		logger.Debug("js plugin registered", "id", id, "path", path)
 	}
 
-	// Scriggo plugins: one folder per plugin, main.go entry, folder name = id.
-	scriggoMatches, err := filepath.Glob(filepath.Join(m.pluginsDir, "*", "main.go"))
+	// Yaegi plugins: one folder per plugin, main.go entry, folder name = id.
+	yaegiMatches, err := filepath.Glob(filepath.Join(m.pluginsDir, "*", "main.go"))
 	if err != nil {
 		return err
 	}
-	for _, path := range scriggoMatches {
+	for _, path := range yaegiMatches {
 		id := filepath.Base(filepath.Dir(path))
 		if _, dup := m.plugins[id]; dup {
-			logger.Error("plugin id collision, skipping", "id", id, "kind", "scriggo")
+			logger.Error("plugin id collision, skipping", "id", id, "kind", "yaegi")
 			continue
 		}
 		m.plugins[id] = &loadedPlugin{
 			id:       id,
 			wasmPath: filepath.Dir(path),
-			kind:     "scriggo",
+			kind:     "yaegi",
 		}
-		logger.Debug("scriggo plugin registered", "id", id, "path", path)
+		logger.Debug("yaegi plugin registered", "id", id, "path", path)
 	}
 
 	// Go native plugins: one .so file per plugin, filename (minus .so) = id.

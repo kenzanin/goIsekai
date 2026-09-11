@@ -3,21 +3,20 @@ package bridge
 import (
 	"fmt"
 	"path/filepath"
-	"strings"
 
 	"goisekai/internal/database"
 )
 
-// InstallPlugin copies a plugin wasm into the managed plugins directory,
+// InstallPlugin copies a plugin folder into the managed plugins directory,
 // hot-loads it, and registers it in the database as active. The plugin id is
-// derived from the file basename (minus the .wasm extension); WasmPath points
+// derived from the folder basename; WasmPath points
 // at the copy inside the plugins directory so it survives a restart.
-func (s *AppService) InstallPlugin(wasmPath string) error {
-	dest, err := s.mgr.Install(wasmPath)
+func (s *AppService) InstallPlugin(dirPath string) error {
+	dest, err := s.mgr.Install(dirPath)
 	if err != nil {
 		return fmt.Errorf("bridge: install plugin: %w", err)
 	}
-	id := strings.TrimSuffix(filepath.Base(dest), ".wasm")
+	id := filepath.Base(dest)
 	if err := s.db.RegisterPlugin(database.Plugin{
 		ID:       id,
 		Name:     id,

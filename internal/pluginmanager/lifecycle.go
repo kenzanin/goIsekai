@@ -23,28 +23,25 @@ func (m *Manager) ensureLoaded(id string) error {
 	var loaded *loadedPlugin
 	var err error
 	switch p.kind {
-	case "wasm":
-		loaded, err = m.load(p.id, p.wasmPath)
 	case "lua":
 		loaded, err = m.loadLua(p.id, p.wasmPath)
 	case "js":
 		loaded, err = m.loadJS(p.id, p.wasmPath)
 	case "go":
 		loaded, err = m.loadGo(p.id, p.wasmPath)
-	case "scriggo":
-		loaded, err = m.loadScriggo(p.id, p.wasmPath)
+	case "yaegi":
+		loaded, err = m.loadYaegi(p.id, p.wasmPath)
 	default:
 		return fmt.Errorf("plugin %q: unknown kind %q", id, p.kind)
 	}
 	if err != nil {
 		return fmt.Errorf("lazy-load plugin %s: %w", id, err)
 	}
-	p.extismPlugin = loaded.extismPlugin
 	p.lunar = loaded.lunar
 	p.js = loaded.js
 	p.goPlugin = loaded.goPlugin
 	p.goFns = loaded.goFns
-	p.scriggo = loaded.scriggo
+	p.yaegi = loaded.yaegi
 	p.contractVersion = loaded.contractVersion
 	p.meta = loaded.meta
 	p.loaded = true

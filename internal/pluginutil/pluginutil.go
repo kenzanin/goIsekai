@@ -1,5 +1,5 @@
 // Package pluginutil holds pure helpers shared by every plugin runtime
-// (Lua/Lunar, JS/goja, WASM/Extism, Scriggo). The host exposes these as
+// (Lua/Lunar, JS/goja, Yaegi). The host exposes these as
 // natives so the same logic is not re-implemented per plugin per language.
 package pluginutil
 
@@ -185,7 +185,7 @@ func HMACSHA256Hex(key, msg string) string {
 func XOR(a, b []byte) []byte {
 	out := make([]byte, len(a))
 	n := min(len(b), len(a))
-	for i := 0; i < n; i++ {
+	for i := range n {
 		out[i] = a[i] ^ b[i]
 	}
 	return out

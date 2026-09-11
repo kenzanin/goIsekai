@@ -9,8 +9,6 @@ import (
 	"time"
 
 	"github.com/dop251/goja"
-	extism "github.com/extism/go-sdk"
-
 	lunar "github.com/mmcdole/lunar"
 
 	"goisekai/internal/hostnet"
@@ -18,32 +16,28 @@ import (
 )
 
 const (
-	// memoryLimitPages caps a plugin's linear memory at 64 MB (1024 * 64 KiB).
-	memoryLimitPages = 1024
 	// invokeTimeout bounds a single plugin invocation (5.3: 15 s).
 	invokeTimeout = 15 * time.Second
 )
 
 // loadedPlugin is a compiled and instantiated plugin and its resolved ABI
-// entry points. kind is "wasm", "lua", "js", "go", or "scriggo"; only the
-// relevant fields are set.
+// entry points. kind is "lua", "js", "go", or "yaegi"; only the relevant
+// fields are set.
 type loadedPlugin struct {
 	id       string
-	wasmPath string
-	kind     string // "wasm", "lua", "js", "go", or "scriggo"
+	wasmPath string // path to the plugin directory (or main.lua/main.js entry)
+	kind     string // "lua", "js", "go", or "yaegi"
 	loaded   bool   // true after the runtime has been instantiated
-	// extismPlugin holds the Extism plugin instance for wasm-kind plugins (nil otherwise).
-	extismPlugin *extism.Plugin
-	// lunar holds the Lunar VM for lua-kind plugins (nil for wasm/js).
+	// lunar holds the Lunar VM for lua-kind plugins.
 	lunar *lunar.State
-	// goPlugin holds the opened .so handle for go-kind plugins (nil otherwise).
+	// goPlugin holds the opened .so handle for go-kind plugins.
 	goPlugin *plugin.Plugin
 	// goFns caches resolved ABI symbols for go-kind plugins.
 	goFns map[string]any
-	// js holds the goja VM for js-kind plugins (nil otherwise).
+	// js holds the goja VM for js-kind plugins.
 	js *goja.Runtime
-	// scriggo holds the compiled Scriggo program for scriggo-kind plugins (nil otherwise).
-	scriggo *scriggoPlugin
+	// yaegi holds the Yaegi interpreter for yaegi-kind plugins.
+	yaegi *yaegiPlugin
 	// contractVersion is the plugin's resolved contract_version.
 	contractVersion int32
 	// meta is the metadata the plugin declared in its optional Init export.
@@ -52,9 +46,8 @@ type loadedPlugin struct {
 	mu sync.Mutex
 }
 
-// Manager loads WASM source plugins and exposes their search/detail operations
-// to the host. It wires host_http_request to
-// the hostnet proxy.
+// Manager loads Lua/JS/Yaegi plugins and exposes their search/detail operations
+// to the host. It wires host_http_request to the hostnet proxy.
 type Manager struct {
 	proxy      *hostnet.Proxy
 	pluginsDir string
@@ -89,7 +82,7 @@ type LoadedPlugin struct {
 	ID               string
 	Version          string // ABI contract version (e.g. "1")
 	Loaded           bool   // true when the runtime is instantiated
-	WasmPath         string
+	WasmPath         string // path to the plugin directory or entry file
 	VerifyURL        string // from the plugin's optional Init metadata
 	NeedsHumanVerify bool
 	ThumbRatio       float64

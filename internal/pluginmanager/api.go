@@ -34,17 +34,10 @@ func (m *Manager) call(p *loadedPlugin, fnName, inputJSON string) (string, error
 	if p.kind == "go" {
 		return callGo(p, fnName, inputJSON)
 	}
-	if p.kind == "scriggo" {
-		return callScriggo(p, fnName, inputJSON)
+	if p.kind == "yaegi" {
+		return callYaegi(m, p, fnName, inputJSON)
 	}
-	p.mu.Lock()
-	defer p.mu.Unlock()
-
-	_, out, err := p.extismPlugin.Call(fnName, []byte(inputJSON))
-	if err != nil {
-		return "", fmt.Errorf("plugin %s %s: %w", p.id, fnName, err)
-	}
-	return string(out), nil
+	return "", fmt.Errorf("plugin %s %s: unsupported kind %q", p.id, fnName, p.kind)
 }
 
 // Search runs a plugin's Search function and decodes its result.

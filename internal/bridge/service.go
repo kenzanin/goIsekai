@@ -145,8 +145,8 @@ func (s *AppService) QueryMangaPluginIDs() ([]database.MangaPluginIDRow, error) 
 }
 
 // PluginDir returns the directory containing the plugin's main file, or "" if
-// not found. Folder-based plugins (lua/js/scriggo) have WasmPath pointing at
-// the folder itself; wasm plugins have it pointing at the .wasm file.
+// not found. Folder-based plugins (lua/js/yaegi) have WasmPath pointing at
+// the plugin folder directly.
 func (s *AppService) PluginDir(pluginID string) string {
 	for _, p := range s.mgr.LoadedPlugins() {
 		if p.ID != pluginID || p.WasmPath == "" {

@@ -216,24 +216,6 @@ function get_page_list(a) return "[]" end
 	}
 }
 
-func TestLuaPluginIDCollisionWithWasm(t *testing.T) {
-	// A wasm file and lua folder with the same id — discover logs and skips the duplicate.
-	dir := luaPluginsDir(t)
-	wasmPath := buildFixture(t, "plugin") // plugin.wasm
-	if err := copyFile(wasmPath, filepath.Join(dir, "luatest.wasm")); err != nil {
-		t.Fatal(err)
-	}
-	mgr := NewManager(hostnet.NewProxy(), dir)
-	if err := mgr.Discover(); err != nil {
-		t.Fatalf("Discover: %v", err)
-	}
-	defer func() { _ = mgr.Close() }()
-	// Only one of the two should be registered (wasm wins, lua skipped).
-	if _, ok := mgr.plugins["luatest"]; !ok {
-		t.Fatal("wasm plugin should be registered")
-	}
-}
-
 func TestLuaPluginInstallFolder(t *testing.T) {
 	// Install a lua folder from outside pluginsDir; hot-load must work.
 	base := t.TempDir()
