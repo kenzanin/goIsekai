@@ -17,6 +17,10 @@ function payload() {
     host.crypto.md5_hex("abc"),
     host.crypto.hmac_sha256_hex("key", "The quick brown fox jumps over the lazy dog"),
     host.crypto.xor("6162", "6364"),
+    host.crypto.utf8_hex("hi"),
+    host.codecs.b64_decode_hex("aGk="),
+    host.codecs.b64url_encode_hex("6869"),
+    host.codecs.b64url_decode_hex("aGk"),
   ].join("|");
 }
 

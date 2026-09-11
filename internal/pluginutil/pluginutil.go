@@ -206,6 +206,38 @@ func XORHex(a, b string) (string, error) {
 	return hex.EncodeToString(XOR(aa, bb)), nil
 }
 
+// UTF8Hex encodes a string as its UTF-8 bytes, returned as lowercase hex.
+func UTF8Hex(s string) string {
+	return hex.EncodeToString([]byte(s))
+}
+
+// B64DecodeHex decodes standard padded base64 and returns the result as hex.
+func B64DecodeHex(s string) (string, error) {
+	b, err := base64.StdEncoding.DecodeString(s)
+	if err != nil {
+		return "", err
+	}
+	return hex.EncodeToString(b), nil
+}
+
+// B64URLEncodeHex encodes a hex string as bytes and returns base64url (unpadded).
+func B64URLEncodeHex(h string) (string, error) {
+	b, err := hex.DecodeString(h)
+	if err != nil {
+		return "", err
+	}
+	return base64.RawURLEncoding.EncodeToString(b), nil
+}
+
+// B64URLDecodeHex decodes unpadded base64url and returns the result as hex.
+func B64URLDecodeHex(s string) (string, error) {
+	b, err := base64.RawURLEncoding.DecodeString(strings.TrimRight(s, "="))
+	if err != nil {
+		return "", err
+	}
+	return hex.EncodeToString(b), nil
+}
+
 func hexVal(c byte) (byte, bool) {
 	switch {
 	case c >= '0' && c <= '9':

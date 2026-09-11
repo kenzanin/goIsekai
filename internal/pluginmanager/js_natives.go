@@ -22,18 +22,22 @@ func registerJSHostNatives(vm *goja.Runtime) error {
 			"titlecase":      jsStr1(vm, pluginutil.Titlecase),
 		}},
 		{"codecs", map[string]any{
-			"base64_encode":    jsStr1(vm, pluginutil.Base64Encode),
-			"base64_decode":    jsStr1Err(vm, pluginutil.Base64Decode),
-			"base64url_encode": jsStr1(vm, pluginutil.Base64URLEncode),
-			"base64url_decode": jsStr1Err(vm, pluginutil.Base64URLDecode),
-			"hex_encode":       jsStr1(vm, pluginutil.HexEncode),
-			"hex_decode":       jsStr1Err(vm, pluginutil.HexDecode),
+			"base64_encode":     jsStr1(vm, pluginutil.Base64Encode),
+			"base64_decode":     jsStr1Err(vm, pluginutil.Base64Decode),
+			"base64url_encode":  jsStr1(vm, pluginutil.Base64URLEncode),
+			"base64url_decode":  jsStr1Err(vm, pluginutil.Base64URLDecode),
+			"hex_encode":        jsStr1(vm, pluginutil.HexEncode),
+			"hex_decode":        jsStr1Err(vm, pluginutil.HexDecode),
+			"b64_decode_hex":    jsStr1Err(vm, pluginutil.B64DecodeHex),
+			"b64url_encode_hex": jsStr1Err(vm, pluginutil.B64URLEncodeHex),
+			"b64url_decode_hex": jsStr1Err(vm, pluginutil.B64URLDecodeHex),
 		}},
 		{"crypto", map[string]any{
 			"sha256_hex":      jsStr1(vm, pluginutil.SHA256Hex),
 			"md5_hex":         jsStr1(vm, pluginutil.MD5Hex),
 			"hmac_sha256_hex": jsStr2(vm, pluginutil.HMACSHA256Hex),
 			"xor":             jsStr2Err(vm, pluginutil.XORHex),
+			"utf8_hex":        jsStr1(vm, pluginutil.UTF8Hex),
 		}},
 	}
 

@@ -25,12 +25,16 @@ func registerHostNatives(state *lua.State) {
 	_ = codecs.RawSetString("base64url_decode", luaStr1Err(state, pluginutil.Base64URLDecode))
 	_ = codecs.RawSetString("hex_encode", luaStr1(state, pluginutil.HexEncode))
 	_ = codecs.RawSetString("hex_decode", luaStr1Err(state, pluginutil.HexDecode))
+	_ = codecs.RawSetString("b64_decode_hex", luaStr1Err(state, pluginutil.B64DecodeHex))
+	_ = codecs.RawSetString("b64url_encode_hex", luaStr1Err(state, pluginutil.B64URLEncodeHex))
+	_ = codecs.RawSetString("b64url_decode_hex", luaStr1Err(state, pluginutil.B64URLDecodeHex))
 
 	crypto, _ := state.NewTable()
 	_ = crypto.RawSetString("sha256_hex", luaStr1(state, pluginutil.SHA256Hex))
 	_ = crypto.RawSetString("md5_hex", luaStr1(state, pluginutil.MD5Hex))
 	_ = crypto.RawSetString("hmac_sha256_hex", luaStr2(state, pluginutil.HMACSHA256Hex))
 	_ = crypto.RawSetString("xor", luaStr2Err(state, pluginutil.XORHex))
+	_ = crypto.RawSetString("utf8_hex", luaStr1(state, pluginutil.UTF8Hex))
 
 	host, _ := state.NewTable()
 	_ = host.RawSetString("text", text.Value())
