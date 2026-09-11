@@ -33,6 +33,7 @@ func registerJSHostNatives(vm *goja.Runtime) error {
 			"sha256_hex":      jsStr1(vm, pluginutil.SHA256Hex),
 			"md5_hex":         jsStr1(vm, pluginutil.MD5Hex),
 			"hmac_sha256_hex": jsStr2(vm, pluginutil.HMACSHA256Hex),
+			"xor":             jsStr2Err(vm, pluginutil.XORHex),
 		}},
 	}
 
@@ -70,5 +71,15 @@ func jsStr1Err(vm *goja.Runtime, fn func(string) (string, error)) func(goja.Func
 func jsStr2(vm *goja.Runtime, fn func(string, string) string) func(goja.FunctionCall) goja.Value {
 	return func(call goja.FunctionCall) goja.Value {
 		return vm.ToValue(fn(call.Argument(0).String(), call.Argument(1).String()))
+	}
+}
+
+func jsStr2Err(vm *goja.Runtime, fn func(string, string) (string, error)) func(goja.FunctionCall) goja.Value {
+	return func(call goja.FunctionCall) goja.Value {
+		out, err := fn(call.Argument(0).String(), call.Argument(1).String())
+		if err != nil {
+			panic(vm.NewGoError(err))
+		}
+		return vm.ToValue(out)
 	}
 }

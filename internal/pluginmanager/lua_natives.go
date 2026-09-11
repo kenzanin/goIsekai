@@ -30,6 +30,7 @@ func registerHostNatives(state *lua.State) {
 	_ = crypto.RawSetString("sha256_hex", luaStr1(state, pluginutil.SHA256Hex))
 	_ = crypto.RawSetString("md5_hex", luaStr1(state, pluginutil.MD5Hex))
 	_ = crypto.RawSetString("hmac_sha256_hex", luaStr2(state, pluginutil.HMACSHA256Hex))
+	_ = crypto.RawSetString("xor", luaStr2Err(state, pluginutil.XORHex))
 
 	host, _ := state.NewTable()
 	_ = host.RawSetString("text", text.Value())
@@ -66,6 +67,20 @@ func luaStr2(state *lua.State, fn func(string, string) string) lua.Value {
 		a, _ := frame.String(0)
 		b, _ := frame.String(1)
 		return frame.ReturnValue(lua.String(fn(a, b)))
+	})
+	return v.Value()
+}
+
+// luaStr2Err wraps a (string,string)->(string,error) helper.
+func luaStr2Err(state *lua.State, fn func(string, string) (string, error)) lua.Value {
+	v, _ := state.NewNativeFunction(func(frame lua.Frame) lua.Outcome {
+		a, _ := frame.String(0)
+		b, _ := frame.String(1)
+		out, err := fn(a, b)
+		if err != nil {
+			return frame.ReturnValues(lua.Nil(), lua.String(err.Error()))
+		}
+		return frame.ReturnValue(lua.String(out))
 	})
 	return v.Value()
 }

@@ -179,6 +179,33 @@ func HMACSHA256Hex(key, msg string) string {
 	return hex.EncodeToString(m.Sum(nil))
 }
 
+// XOR returns the byte-wise XOR of a and b as a new byte slice.
+// If lengths differ, XORs up to the shorter length.
+// ponytail: could accept varargs for multi-source XOR, add when mangafire needs it.
+func XOR(a, b []byte) []byte {
+	out := make([]byte, len(a))
+	n := min(len(b), len(a))
+	for i := 0; i < n; i++ {
+		out[i] = a[i] ^ b[i]
+	}
+	return out
+}
+
+// XORHex returns the byte-wise XOR of two hex-encoded strings as a new hex string.
+// If lengths differ, XORs up to the shorter length.
+// ponytail: could accept varargs for multi-source XOR, add when mangafire needs it.
+func XORHex(a, b string) (string, error) {
+	aa, err := hex.DecodeString(a)
+	if err != nil {
+		return "", err
+	}
+	bb, err := hex.DecodeString(b)
+	if err != nil {
+		return "", err
+	}
+	return hex.EncodeToString(XOR(aa, bb)), nil
+}
+
 func hexVal(c byte) (byte, bool) {
 	switch {
 	case c >= '0' && c <= '9':

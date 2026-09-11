@@ -16,6 +16,7 @@ function payload() {
     host.crypto.sha256_hex("abc"),
     host.crypto.md5_hex("abc"),
     host.crypto.hmac_sha256_hex("key", "The quick brown fox jumps over the lazy dog"),
+    host.crypto.xor("6162", "6364"),
   ].join("|");
 }
 

@@ -13,7 +13,8 @@ import (
 const wantHostPayload = "a%20b|a b|&|hi|bold x|Abc|aGk=|hi|YT9i|6869|hi|" +
 	"ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad|" +
 	"900150983cd24fb0d6963f7d28e17f72|" +
-	"f7bc83f430538424b13298e6aa6fb143ef4d59a14946175997479dbc2d1a3cd8"
+	"f7bc83f430538424b13298e6aa6fb143ef4d59a14946175997479dbc2d1a3cd8|" +
+	"0206"
 
 func TestLuaHostNatives(t *testing.T) {
 	dir := t.TempDir()
