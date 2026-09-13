@@ -24,7 +24,7 @@
 
 function normalizeStatus(s)
     if not s or s == "" then return "unknown" end
-    return host.text.normalize_status(nil, s)
+    return host.text.normalize_status[""]({}, s)
 end
 
 -- lua_escape escapes Lua pattern magic chars in literals interpolated into
