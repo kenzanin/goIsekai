@@ -29,7 +29,7 @@ func (m *Manager) Discover() error {
 			wasmPath: filepath.Dir(path),
 			kind:     "lua",
 		}
-		logger.Debug("lua plugin registered", "id", id, "path", path)
+		logger.Info("lua plugin registered", "id", id, "path", path)
 	}
 
 	// JS plugins: one folder per plugin, main.js entry, folder name = id.
@@ -48,7 +48,7 @@ func (m *Manager) Discover() error {
 			wasmPath: filepath.Dir(path),
 			kind:     "js",
 		}
-		logger.Debug("js plugin registered", "id", id, "path", path)
+		logger.Info("js plugin registered", "id", id, "path", path)
 	}
 
 	// Yaegi plugins: one folder per plugin, main.go entry, folder name = id.
@@ -67,7 +67,7 @@ func (m *Manager) Discover() error {
 			wasmPath: filepath.Dir(path),
 			kind:     "yaegi",
 		}
-		logger.Debug("yaegi plugin registered", "id", id, "path", path)
+		logger.Info("yaegi plugin registered", "id", id, "path", path)
 	}
 
 	// Go native plugins: one .so file per plugin, filename (minus .so) = id.

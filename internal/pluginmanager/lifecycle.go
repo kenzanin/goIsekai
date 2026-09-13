@@ -48,7 +48,7 @@ func (m *Manager) ensureLoaded(id string) error {
 	p.loaded = true
 	m.proxy.SetNeedsJS(id, p.meta.NeedsJS)
 	m.proxy.SetHTTPProfiles(id, p.meta.HTTPProfiles)
-	logger.Debug("plugin loaded (lazy)", "id", id, "version", p.contractVersion)
+	logger.Info("plugin loaded (lazy)", "id", id, "kind", p.kind, "version", p.contractVersion)
 
 	// Register plugin-declared enrichment providers so they're visible
 	// in the catalog as soon as the plugin is first invoked.
