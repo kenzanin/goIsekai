@@ -40,6 +40,43 @@ func (s *Server) apiHistory(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, entries)
 }
 
+// apiPluginsItem is the JSON shape for a single plugin in GET /plugins.
+type apiPluginsItem struct {
+	ID         string  `json:"id"`
+	Name       string  `json:"name"`
+	Version    string  `json:"version"`
+	IsActive   bool    `json:"is_active"`
+	ThumbRatio float64 `json:"thumb_ratio"`
+}
+
+// apiPlugins lists all registered plugins.
+func (s *Server) apiPlugins(w http.ResponseWriter, r *http.Request) {
+	plugins, err := s.service.ListPlugins()
+	if err != nil {
+		s.logger.Error("api plugins list", "error", err)
+		writeErr(w, http.StatusInternalServerError, "failed to load plugins")
+		return
+	}
+	metas := s.service.PluginMetas()
+	items := make([]apiPluginsItem, 0, len(plugins))
+	for _, p := range plugins {
+		item := apiPluginsItem{
+			ID:       p.ID,
+			Name:     p.Name,
+			Version:  p.Version,
+			IsActive: p.IsActive,
+		}
+		if m, ok := metas[p.ID]; ok {
+			item.ThumbRatio = m.ThumbRatio
+			if m.Name != "" {
+				item.Name = m.Name
+			}
+		}
+		items = append(items, item)
+	}
+	writeJSON(w, http.StatusOK, items)
+}
+
 // apiToggleLibrary mirrors handleToggleLibrary: flips in-library and reports state.
 func (s *Server) apiToggleLibrary(w http.ResponseWriter, r *http.Request) {
 	pluginID := param(r, "pluginID")

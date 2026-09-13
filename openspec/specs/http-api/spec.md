@@ -90,6 +90,13 @@ The system SHALL expose `PUT /api/manga/{pluginID}/{mangaID}/title` with `{"titl
 - **WHEN** `PUT /api/manga/p/m/title` is called with a stored alternative title
 - **THEN** the response is `200` and the manga's main title equals the requested value while the old main title appears among the alternatives
 
+### Requirement: Plugins list endpoint
+The system SHALL expose `GET /api/plugins` returning a JSON array of installed plugin objects. Each entry SHALL contain at minimum `id`, `name`, `version`, `is_active`, and `thumb_ratio`. The list MUST include all registered plugins regardless of load state.
+
+#### Scenario: List installed plugins
+- **WHEN** a client sends `GET /api/plugins`
+- **THEN** the response is `200` with a JSON array of plugin objects
+
 ### Requirement: Library search endpoint
 The system SHALL expose `GET /api/library/search?q=<query>` returning a JSON array of `{plugin_id, manga_id, title, score}` ranked by typo-tolerant relevance over main titles and stored alternative titles, using the full-text index for candidate retrieval.
 

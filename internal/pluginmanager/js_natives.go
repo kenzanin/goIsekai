@@ -52,6 +52,10 @@ func registerJSHostNatives(vm *goja.Runtime, m *Manager, id string) error {
 				return err
 			}
 		}
+		// Special case: host.text.normalize_status needs a .default property.
+		if g.name == "text" {
+			_ = obj.Set("normalize_status", jsNormalizeStatus(vm))
+		}
 		if err := host.Set(g.name, obj); err != nil {
 			return err
 		}
@@ -215,6 +219,35 @@ func jsStr2(vm *goja.Runtime, fn func(string, string) string) func(goja.Function
 	return func(call goja.FunctionCall) goja.Value {
 		return vm.ToValue(fn(call.Arguments[0].String(), call.Arguments[1].String()))
 	}
+}
+
+// jsNormalizeStatus creates a callable function with a .default property.
+// Usage: host.text.normalize_status(map, raw) or
+//
+//	host.text.normalize_status(host.text.normalize_status.default, raw).
+func jsNormalizeStatus(vm *goja.Runtime) *goja.Object {
+	fn := func(call goja.FunctionCall) goja.Value {
+		var m map[string]string
+		if len(call.Arguments) > 0 && !call.Arguments[0].SameAs(goja.Undefined()) && !call.Arguments[0].SameAs(goja.Null()) {
+			if obj, ok := call.Arguments[0].(*goja.Object); ok {
+				m = make(map[string]string, 0)
+				for _, k := range obj.Keys() {
+					if v := obj.Get(k); v != nil {
+						m[k] = v.String()
+					}
+				}
+			}
+		}
+		raw := ""
+		if len(call.Arguments) > 1 {
+			raw = call.Arguments[1].String()
+		}
+		return vm.ToValue(pluginutil.NormalizeStatus(m, raw))
+	}
+	fnVal := vm.ToValue(fn)
+	fnObj := fnVal.ToObject(vm)
+	_ = fnObj.Set("default", vm.ToValue(pluginutil.DefaultStatusMap()))
+	return fnObj
 }
 
 func jsStr2Err(vm *goja.Runtime, fn func(string, string) (string, error)) func(goja.FunctionCall) goja.Value {

@@ -1,6 +1,7 @@
 package database
 
 import (
+	"encoding/json"
 	"slices"
 	"time"
 
@@ -197,4 +198,38 @@ func (d *DB) QueryMangaPluginIDs() ([]MangaPluginIDRow, error) {
 		WHERE(Mangas.InLibrary.EQ(Int(1))).
 		Query(d.db, &out)
 	return out, err
+}
+
+// SetMangaGenres stores a user-defined genre override as a JSON text array.
+// Pass nil to clear the override (return to plugin-supplied genres).
+func (d *DB) SetMangaGenres(mangaRowID string, genres []string) error {
+	var payload *string
+	if genres != nil {
+		raw, err := json.Marshal(genres)
+		if err != nil {
+			return err
+		}
+		s := string(raw)
+		payload = &s
+	}
+	_, err := d.db.Exec(`UPDATE mangas SET genres = ? WHERE id = ?`, payload, mangaRowID)
+	return err
+}
+
+// GetMangaGenres returns the stored genre override for a manga.
+// Returns the genre list and true on success; returns (nil, false) when no override exists.
+func (d *DB) GetMangaGenres(mangaRowID string) ([]string, bool, error) {
+	var genresJSON *string
+	err := d.db.QueryRow(`SELECT genres FROM mangas WHERE id = ?`, mangaRowID).Scan(&genresJSON)
+	if err != nil {
+		return nil, false, err
+	}
+	if genresJSON == nil || *genresJSON == "" {
+		return nil, false, nil
+	}
+	var genres []string
+	if err := json.Unmarshal([]byte(*genresJSON), &genres); err != nil {
+		return nil, false, err
+	}
+	return genres, true, nil
 }

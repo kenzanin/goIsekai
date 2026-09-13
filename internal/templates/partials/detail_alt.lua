@@ -1,8 +1,8 @@
--- partials/detail_alt.lua
--- Detail page: alternative titles, alt synopses, origin synopsis, fetch forms.
--- Called as: detail_alt(data) -> string (fragment, lives in the info column)
--- data.PluginID, data.MangaID, data.CurrentTitle, data.AltTitles,
--- data.AltTitleServers, data.AltSummaries, data.AltSummaryServers, data.Manga
+--- partials/detail_alt.lua
+--  Detail page: Alpine.js-powered enrichment panel — interactive genres & related toggles.
+--  data.PluginID, data.MangaID, data.CurrentTitle, data.AltTitles,
+--  data.AltTitleServers, data.AltSummaries, data.AltSummaryServers, data.Manga
+--  data.Categories, data.Related, data.Genres (current active genres for highlighting)
 
 return function(data)
 	local pluginID = data.PluginID or ""
@@ -13,17 +13,82 @@ return function(data)
 	local altSummaries = data.AltSummaries or {}
 	local altSummaryServers = data.AltSummaryServers or {}
 	local manga = data.Manga or {}
+	local cats = data.Categories or {}
+	local rels = data.Related or {}
+	local genres = data.Genres or {}
+
+	-- Use &quot; for JSON double-quotes so they don't break the HTML attribute.
+	-- The browser decodes &quot; → " before Alpine sees the x-data expression.
+	local jq = '&quot;'
+
+	-- Build x-data: genres list and related list for Alpine reactive highlighting.
+	-- Individual values are HTML-escaped with h(); the JSON structure uses &quot;.
+	local genresJSON = '['
+	for i, g in ipairs(genres) do
+		if i > 1 then genresJSON = genresJSON .. ',' end
+		genresJSON = genresJSON .. jq .. h(g) .. jq
+	end
+	genresJSON = genresJSON .. ']'
+
+	local relsJSON = '['
+	for i, r in ipairs(rels) do
+		if i > 1 then relsJSON = relsJSON .. ',' end
+		relsJSON = relsJSON .. jq .. h(r.Value or '') .. jq
+	end
+	relsJSON = relsJSON .. ']'
+
+	local xData = "x-data=\"{ loading: false, currentGenres: " .. genresJSON .. ", currentRelated: " .. relsJSON .. " }\""
+
+	local chevOnClick =
+		"this.nextElementSibling.classList.toggle(&quot;hidden&quot;);this.querySelector(&quot;.chev&quot;).classList.toggle(&quot;rotate-90&quot;)"
 
 	local body = ""
 
-	-- Alternative titles (collapsible)
-	local atCount = #altTitles
-	local chevOnclick =
-		"this.nextElementSibling.classList.toggle(&quot;hidden&quot;);this.querySelector(&quot;.chev&quot;).classList.toggle(&quot;rotate-90&quot;)"
-	local atBody = ""
+	-- Enrichment collapsible header
+	body = body
+		.. '<div class="mb-4 border-t border-neutral-800 pt-4">'
+		.. '<button type="button" onclick="'
+		.. chevOnClick
+		.. '" class="flex items-center gap-1.5 cursor-pointer group select-none">'
+		.. '<svg class="size-3.5 text-neutral-500 chev transition-transform" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>'
+		.. '<span class="text-xs font-semibold text-neutral-300 uppercase tracking-wide">Enrichment</span>'
+		.. "</button>"
+		.. '<div id="enrichment-body" class="hidden" ' .. xData .. '>'
 
-	if #altTitles > 0 then
-		atBody = '<div class="flex flex-wrap gap-1.5 mb-2">'
+	-- Fetch button with spinner + Reset button side by side
+	body = body
+		.. '<div class="mb-3 flex items-center gap-2">'
+		.. '<form method="post" action="/action/fetch-enrichment/'
+		.. h(pluginID)
+		.. "/"
+		.. h(mangaID)
+		.. '">'
+		.. '<input type="hidden" name="manga_title" value="'
+		.. h(data.CurrentTitle or manga.Title or "")
+		.. '">'
+		.. '<button type="submit" class="border border-indigo-600/50 text-indigo-300 hover:bg-indigo-600/20 rounded-md px-3 py-1.5 text-xs font-medium inline-flex items-center gap-1.5" :disabled="loading">'
+		.. '<svg x-show="loading" class="size-3.5 animate-spin" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-6.219-8.56"/><path d="M3.5 12h3.5"/><path d="M12 3.5v3.5"/></svg>'
+		.. '<span x-text="loading ? &quot;Fetching...&quot; : &quot;Fetch Details&quot;">Fetch Details</span>'
+		.. "</button>"
+		.. "</form>"
+		.. '<form method="post" action="/action/reset-enrichment/'
+		.. h(pluginID)
+		.. "/"
+		.. h(mangaID)
+		.. '">'
+		.. '<button type="submit" class="border border-red-600/50 text-red-400 hover:bg-red-500/10 rounded-md px-3 py-1.5 text-xs font-medium" data-confirm="Reset all enrichment data to original plugin values?">Reset to Original</button>'
+		.. '</form>'
+		.. '</div>'
+
+	-- Alt titles — click to set (no confirm)
+	local atCount = #altTitles
+	if atCount > 0 then
+		body = body
+			.. '<div class="mb-3">'
+			.. '<span class="text-[11px] font-semibold text-neutral-400 uppercase">Alternative titles ('
+			.. atCount
+			.. ')</span>'
+		local atBody = '<div class="flex flex-wrap gap-1.5 mt-1">'
 		-- Current title badge
 		atBody = atBody
 			.. '<span class="inline-flex items-center gap-1.5 rounded-full bg-neutral-800 border border-indigo-700/60 pl-2.5 pr-1 py-0.5 text-xs">'
@@ -45,9 +110,10 @@ return function(data)
 				.. '<input type="hidden" name="title" value="'
 				.. h(t.Title or "")
 				.. '">'
-				.. '<button type="submit" title="Set as main title" class="text-neutral-300 hover:text-indigo-300" data-confirm="Set as main title?">'
+				.. '<input type="hidden" name="_label" value="Set as main title">'
+				.. '<span class="text-neutral-300 hover:text-indigo-300 cursor-pointer transition" @click="submitForm($el.closest(&apos;form&apos;))">'
 				.. h(t.Title or "")
-				.. "</button>"
+				.. "</span>"
 				.. "</form>"
 				.. (t.Source and t.Source ~= "" and ('<span class="text-[10px] px-1.5 py-0.5 rounded-full bg-neutral-700/50 text-neutral-400">via ' .. h(
 					t.Source
@@ -60,85 +126,35 @@ return function(data)
 				.. '<input type="hidden" name="title" value="'
 				.. h(t.Title or "")
 				.. '">'
-				.. '<button type="submit" title="Remove alternative title" aria-label="Remove" class="size-4 inline-flex items-center justify-center rounded-full text-neutral-500 hover:text-red-400 hover:bg-neutral-700" data-confirm="Are you sure?">&times;</button>'
+				.. '<button type="submit" title="Remove alternative title" aria-label="Remove" class="size-4 inline-flex items-center justify-center rounded-full text-neutral-500 hover:text-red-400 hover:bg-neutral-700" data-confirm="Remove this alternative title?">&times;</button>'
 				.. "</form></span>"
 		end
 		atBody = atBody .. "</div>"
+		body = body .. atBody .. "</div>"
 	end
 
-	body = body
-		.. '<div class="mb-4">'
-		.. '<button type="button" onclick="'
-		.. chevOnclick
-		.. '" class="flex items-center gap-1.5 cursor-pointer group select-none">'
-		.. '<svg class="size-3.5 text-neutral-500 chev transition-transform" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>'
-		.. '<span class="text-xs font-semibold text-neutral-300 uppercase tracking-wide">Alternative titles'
-		.. (atCount > 0 and (' <span class="text-neutral-500 font-normal">(' .. atCount .. ")</span>") or "")
-		.. "</span></button>"
-		.. '<div id="alt-titles-body" class="'
-		.. (atCount > 0 and "hidden" or "")
-		.. '">'
-		.. atBody
-		.. "</div>"
-		.. "</div>"
-
-	-- Fetch alt-titles form
-	local titlesFormHTML = ""
-	if #altTitleServers > 0 then
-		local optionsHTML = ""
-		for _, s in ipairs(altTitleServers) do
-			optionsHTML = optionsHTML
-				.. '<option value="'
-				.. h(s.ServerID or "")
-				.. '">'
-				.. h(s.Name or "")
-				.. "</option>"
-		end
-		titlesFormHTML = '<form method="post" action="/action/fetch-alt-titles/'
-			.. h(pluginID)
-			.. "/"
-			.. h(mangaID)
-			.. '" class="flex flex-wrap items-center gap-2">'
-			.. '<select name="server" class="bg-neutral-900 border border-neutral-700 rounded-md px-2 py-1.5 text-xs text-neutral-300 focus:outline-none focus:border-indigo-500">'
-			.. optionsHTML
-			.. "</select>"
-			.. '<button type="submit" class="border border-neutral-700 hover:bg-neutral-800 rounded-md px-3 py-1.5 text-xs font-medium inline-flex items-center gap-1.5">'
-			.. '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="size-3.5"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>'
-			.. " Get alternative titles</button></form>"
-	else
-		titlesFormHTML =
-			'<p class="text-xs text-neutral-500">No alt-title providers available — install a plugin that declares alt-title servers.</p>'
-	end
-	body = body .. titlesFormHTML
-
-	-- Origin synopsis
-	if manga.Description and manga.Description ~= "" then
-		body = body
-			.. '<div class="mb-4 border-t border-neutral-800 pt-4">'
-			.. '<span class="text-xs font-semibold text-neutral-300 uppercase tracking-wide">Synopsis</span>'
-			.. '<p class="text-sm text-neutral-400 mt-1.5">'
-			.. h(manga.Description)
-			.. "</p></div>"
-	end
-
-	-- Alternative synopses (collapsible)
+	-- Alt synopses — click to set (no confirm)
 	local asCount = #altSummaries
-	local asBody = ""
-	if #altSummaries > 0 then
+	if asCount > 0 then
+		body = body
+			.. '<div class="mb-3">'
+			.. '<span class="text-[11px] font-semibold text-neutral-400 uppercase">Alternative synopses ('
+			.. asCount
+			.. ')</span>'
 		for _, a in ipairs(altSummaries) do
-			asBody = asBody
+			body = body
 				.. '<div class="flex items-start gap-2 py-1">'
 				.. '<form method="post" action="/action/set-summary/'
 				.. h(pluginID)
 				.. "/"
 				.. h(mangaID)
-				.. '" class="flex-1 min-w-0 group" data-confirm="Set this as the main synopsis?">'
+				.. '" class="flex-1 min-w-0 group">'
 				.. '<input type="hidden" name="description" value="'
 				.. h(a.Description or "")
 				.. '">'
-				.. '<button type="submit" title="Set as main synopsis" class="w-full text-left text-sm text-neutral-300 hover:text-indigo-300 transition">'
+				.. '<span class="w-full text-left text-sm text-neutral-300 hover:text-indigo-300 transition cursor-pointer" @click="submitForm($el.closest(&apos;form&apos;))">'
 				.. h(a.Description or "")
-				.. "</button>"
+				.. "</span>"
 				.. "</form>"
 				.. '<div class="flex items-center gap-1.5 shrink-0 mt-0.5">'
 				.. (a.Source and a.Source ~= "" and ('<span class="text-[10px] px-1.5 py-0.5 rounded-full bg-neutral-700/50 text-neutral-400">via ' .. h(
@@ -155,46 +171,74 @@ return function(data)
 				.. '<button type="submit" title="Remove alternative summary" aria-label="Remove" class="size-4 inline-flex items-center justify-center rounded-full text-neutral-500 hover:text-red-400 hover:bg-neutral-700" data-confirm="Remove this alternative synopsis?">&times;</button>'
 				.. "</form></div></div>"
 		end
+		body = body .. "</div>"
 	end
 
-	body = body
-		.. '<div class="mb-4 border-t border-neutral-800 pt-4">'
-		.. '<button type="button" onclick="'
-		.. chevOnclick
-		.. '" class="flex items-center gap-1.5 cursor-pointer group select-none">'
-		.. '<svg class="size-3.5 text-neutral-500 chev transition-transform" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>'
-		.. '<span class="text-xs font-semibold text-neutral-300 uppercase tracking-wide">Alternative synopses'
-		.. (asCount > 0 and (' <span class="text-neutral-500 font-normal">(' .. asCount .. ")</span>") or "")
-		.. "</span></button>"
-		.. '<div id="alt-summaries-body" class="'
-		.. (asCount > 0 and "hidden" or "")
-		.. '">'
-		.. asBody
-		.. "</div></div>"
-
-	-- Fetch alt-synopses form
-	local summariesFormHTML = ""
-	if #altSummaryServers > 0 then
-		local sOptions = ""
-		for _, s in ipairs(altSummaryServers) do
-			sOptions = sOptions .. '<option value="' .. h(s.ServerID or "") .. '">' .. h(s.Name or "") .. "</option>"
+	-- Genres — toggle via add/remove endpoints, highlighted if currently active
+	if #cats > 0 then
+		body = body .. '<div class="mb-3">'
+		body = body .. '<span class="text-[11px] font-semibold text-neutral-400 uppercase">Categories / Genres</span>'
+		body = body .. '<div class="flex flex-wrap gap-1.5 mt-1">'
+		for _, c in ipairs(cats) do
+			if not c.Value or c.Value == "" then goto next end
+			local isCurrent = false
+			for _, g in ipairs(genres) do
+				if g == c.Value then isCurrent = true; break end
+			end
+			body = body
+				.. '<form method="post" action="'
+				.. (isCurrent and '/action/remove-category/' or '/action/add-category/')
+				.. h(pluginID)
+				.. "/"
+				.. h(mangaID)
+				.. '" class="inline">'
+				.. '<input type="hidden" name="category" value="'
+				.. h(c.Value)
+				.. '">'
+				.. '<span class="inline-flex items-center gap-1 rounded-full '
+				.. (isCurrent
+					and 'bg-indigo-500/20 border-indigo-600/60 text-indigo-300 cursor-pointer hover:bg-indigo-500/30'
+					or 'bg-neutral-800 border-neutral-700 text-neutral-300 cursor-pointer hover:bg-neutral-700')
+				.. '" @click="submitForm($el.closest(&apos;form&apos;))">'
+				.. h(c.Value)
+				.. '</span></form>'
+			::next::
 		end
-		summariesFormHTML = '<form method="post" action="/action/fetch-alt-summaries/'
-			.. h(pluginID)
-			.. "/"
-			.. h(mangaID)
-			.. '" class="flex flex-wrap items-center gap-2 mt-1">'
-			.. '<select name="server" class="bg-neutral-900 border border-neutral-700 rounded-md px-2 py-1.5 text-xs text-neutral-300 focus:outline-none focus:border-indigo-500">'
-			.. sOptions
-			.. "</select>"
-			.. '<button type="submit" class="border border-neutral-700 hover:bg-neutral-800 rounded-md px-3 py-1.5 text-xs font-medium inline-flex items-center gap-1.5">'
-			.. '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="size-3.5"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>'
-			.. " Get alternative synopses</button></form>"
-	else
-		summariesFormHTML =
-			'<p class="text-xs text-neutral-500">No alt-synopsis providers available — install a plugin that declares alt-synopsis servers.</p>'
-	end
-	body = body .. summariesFormHTML
+		body = body .. "</div></div>"
 
+	end
+
+	-- Related manga — clickable, highlighted if in current related
+	if #rels > 0 then
+		body = body .. '<div class="mb-3" data-related-section>'
+		body = body .. '<span class="text-[11px] font-semibold text-neutral-400 uppercase">Related / Recommended</span>'
+		body = body .. '<div class="flex flex-wrap gap-1.5 mt-1">'
+		for _, r in ipairs(rels) do
+			local rName = r.Value or ""
+			local isCur = false
+			for _, g in ipairs(genres) do
+				if g == rName then isCur = true; break end
+			end
+			body = body
+				.. '<form method="post" action="/action/remove-related/'
+				.. h(pluginID)
+				.. "/"
+				.. h(mangaID)
+				.. '" class="inline">'
+				.. '<input type="hidden" name="title" value="'
+				.. h(rName)
+				.. '">'
+				.. '<span class="inline-flex items-center gap-1 rounded-full '
+				.. (isCur
+					and 'bg-emerald-500/20 border-emerald-600/60 text-emerald-300 cursor-pointer hover:bg-emerald-500/30'
+					or 'bg-neutral-800 border-neutral-700 text-neutral-300 cursor-pointer hover:bg-neutral-700')
+				.. '" @click="submitForm($el.closest(&apos;form&apos;))">'
+				.. h(rName)
+				.. '</span></form>'
+		end
+		body = body .. "</div></div>"
+	end
+
+	body = body .. "</div></div>"
 	return body
 end

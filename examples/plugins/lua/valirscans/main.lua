@@ -29,17 +29,8 @@ PLUGIN = {
 BASE = "https://valirscans.org"
 MEDIA = "https://media.valirscans.org"
 
--- normalizeStatus maps a raw status string to a canonical host value.
--- Canonical set: Ongoing, Completed, Hiatus, Dropped, Upcoming.
--- Unknown values pass through as-is.
 local function normalizeStatus(s)
-    local raw = (s or ""):lower()
-    if raw:find("ongo") or raw:find("releas") or raw:find("publish") then return "Ongoing" end
-    if raw:find("complet") or raw:find("finish") then return "Completed" end
-    if raw:find("hiatus") or raw:find("on.?hold") or raw:find("onhold") then return "Hiatus" end
-    if raw:find("drop") or raw:find("cancel") then return "Dropped" end
-    if raw:find("upcom") or raw:find("not.?publish") then return "Upcoming" end
-    return s or ""
+    return host.text.normalize_status(nil, s or "")
 end
 
 -- ─── helpers ───────────────────────────────────────────────────────────────

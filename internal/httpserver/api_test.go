@@ -38,7 +38,7 @@ func testServerFull(t *testing.T, apiKey string, registerViews bool) *Server {
 	t.Cleanup(func() { _ = db.Close() })
 	proxy := hostnet.NewProxy()
 	pmgr := pluginmanager.NewManager(proxy, t.TempDir())
-	svc := bridge.NewAppService(db, pmgr, proxy, "", t.TempDir())
+	svc := bridge.NewAppService(db, pmgr, proxy, "", t.TempDir(), nil)
 	r := chi.NewRouter()
 	logger := slog.New(slog.NewTextHandler(&bytes.Buffer{}, nil))
 
@@ -377,9 +377,8 @@ func TestAPIPluginsEmpty(t *testing.T) {
 	req := httptest.NewRequest("GET", "/api/plugins", nil)
 	rec := httptest.NewRecorder()
 	s.Router.ServeHTTP(rec, req)
-	// No /api/plugins route registered — expect 404.
-	if rec.Code != 404 {
-		t.Fatalf("status = %d, want 404", rec.Code)
+	if rec.Code != 200 {
+		t.Fatalf("status = %d, want 200", rec.Code)
 	}
 }
 

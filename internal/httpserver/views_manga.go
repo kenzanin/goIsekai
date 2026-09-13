@@ -76,6 +76,15 @@ func (s *Server) viewMangaDetail(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 	}
+
+	// Fetch enrichment data (categories + related)
+	cats, _ := s.service.ListCategories(pluginID, mangaID)
+	rels, _ := s.service.ListRelated(pluginID, mangaID)
+	s.logger.Debug("enrichment cache", "plugin", pluginID, "manga", mangaID, "categories", len(cats), "related", len(rels))
+
+	// Fetch genre override for template highlighting/toggle logic.
+	overrideGenres, _, _ := s.service.GetMangaGenres(pluginID, mangaID)
+
 	// Host-side chapter pagination: slice the full chapter list (newest-first)
 	// so the detail page renders one page of chapters at a time.
 	const chapterPageSize = 50
@@ -87,25 +96,31 @@ func (s *Server) viewMangaDetail(w http.ResponseWriter, r *http.Request) {
 	chStart := min((chPage-1)*chapterPageSize, chTotal)
 	chEnd := min(chStart+chapterPageSize, chTotal)
 	s.renderPage(w, r, "views/detail", "", map[string]any{
-		"PluginID":          pluginID,
-		"PluginName":        pluginName,
-		"PluginIcon":        pluginIcon,
-		"MangaID":           mangaID,
-		"Manga":             manga,
-		"AltTitles":         altTitles,
-		"AltSummaries":      altSummaries,
-		"CurrentTitle":      manga.Title,
-		"AltTitleServers":   altTitleServers,
-		"AltSummaryServers": altSummaryServers,
-		"Chapters":          chapters[chStart:chEnd],
-		"Progress":          progress,
-		"Continue":          continueTo,
-		"InLibrary":         inLibrary,
-		"Challenge":         challenge,
-		"ChCurrentPage":     chPage,
-		"ChTotalPages":      max((chTotal+chapterPageSize-1)/chapterPageSize, 1),
-		"ChHasNext":         chEnd < chTotal,
-		"ChHasPrev":         chPage > 1,
+		"PluginID":             pluginID,
+		"PluginName":           pluginName,
+		"PluginIcon":           pluginIcon,
+		"MangaID":              mangaID,
+		"Manga":                manga,
+		"AltTitles":            altTitles,
+		"AltSummaries":         altSummaries,
+		"CurrentTitle":         manga.Title,
+		"AltTitleServers":      altTitleServers,
+		"AltSummaryServers":    altSummaryServers,
+		"Chapters":             chapters[chStart:chEnd],
+		"Progress":             progress,
+		"Continue":             continueTo,
+		"InLibrary":            inLibrary,
+		"Challenge":            challenge,
+		"ChCurrentPage":        chPage,
+		"ChTotalPages":         max((chTotal+chapterPageSize-1)/chapterPageSize, 1),
+		"ChHasNext":            chEnd < chTotal,
+		"ChHasPrev":            chPage > 1,
+		"Categories":           cats,
+		"Related":              rels,
+		"PluginGenres":         manga.RawGenres,
+		"OverrideGenres":       overrideGenres,
+		"Genres":               manga.Genres,
+
 	})
 }
 

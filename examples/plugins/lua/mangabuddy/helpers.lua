@@ -4,8 +4,8 @@
 -- call these at call time; no require() needed from other modules.
 --
 -- Globals provided:
---   normalizeStatus(s)  raw status -> canonical (Ongoing/Completed/Hiatus/
---                       Dropped/Upcoming); unknown passes through, empty -> "unknown"
+--   normalizeStatus(s)  raw status -> canonical via host.text.normalize_status;
+--                       empty -> "unknown", unknown passes through
 --   lua_escape(s)       escape Lua pattern magic chars for string.match/gsub
 --   http_get(url, opts) GET wrapper over http_request with logging
 --
@@ -22,18 +22,9 @@
 -- merge — this file pre-executes and later-loaded definitions win in the VM.
 -- Only sandbox globals are used (http_request, log); helpers has no deps.
 
--- normalizeStatus maps a raw status string to a canonical host value.
--- Canonical set: Ongoing, Completed, Hiatus, Dropped, Upcoming.
--- Unknown values pass through as-is.
 function normalizeStatus(s)
     if not s or s == "" then return "unknown" end
-    local raw = s:lower()
-    if raw:find("ongo") or raw:find("releas") or raw:find("publish") then return "Ongoing" end
-    if raw:find("complet") or raw:find("finish") then return "Completed" end
-    if raw:find("hiatus") or raw:find("on.?hold") or raw:find("onhold") then return "Hiatus" end
-    if raw:find("drop") or raw:find("cancel") then return "Dropped" end
-    if raw:find("upcom") or raw:find("not.?publish") then return "Upcoming" end
-    return s
+    return host.text.normalize_status(nil, s)
 end
 
 -- lua_escape escapes Lua pattern magic chars in literals interpolated into

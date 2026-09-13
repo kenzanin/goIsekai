@@ -31,7 +31,7 @@ func testServerFullDB(t *testing.T, apiKey string, registerViews bool) (*Server,
 	t.Cleanup(func() { _ = db.Close() })
 	proxy := hostnet.NewProxy()
 	pmgr := pluginmanager.NewManager(proxy, t.TempDir())
-	svc := bridge.NewAppService(db, pmgr, proxy, "", t.TempDir())
+	svc := bridge.NewAppService(db, pmgr, proxy, "", t.TempDir(), nil)
 	r := chi.NewRouter()
 	logger := slog.New(slog.NewTextHandler(&bytes.Buffer{}, nil))
 

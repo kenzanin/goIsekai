@@ -88,4 +88,25 @@ var migrations = []string{
 );`,
 	// Index 14: user-chosen main summary lock — UpsertManga must not overwrite it.
 	`ALTER TABLE mangas ADD COLUMN custom_description INTEGER NOT NULL DEFAULT 0;`,
+	// Index 15: enrichment categories/tags per manga.
+	`CREATE TABLE IF NOT EXISTS manga_categories (
+	    id INTEGER PRIMARY KEY AUTOINCREMENT,
+	    manga_row_id TEXT NOT NULL REFERENCES mangas(id) ON DELETE CASCADE,
+	    category TEXT NOT NULL,
+	    source TEXT NOT NULL DEFAULT 'mangadex',
+	    UNIQUE(manga_row_id, category)
+	);`,
+	// Index 16: related/recommended manga per manga.
+	`CREATE TABLE IF NOT EXISTS manga_related (
+	    id INTEGER PRIMARY KEY AUTOINCREMENT,
+	    manga_row_id TEXT NOT NULL REFERENCES mangas(id) ON DELETE CASCADE,
+	    title TEXT NOT NULL,
+	    url TEXT,
+	    source TEXT NOT NULL DEFAULT 'mangadex',
+	    UNIQUE(manga_row_id, title)
+	);`,
+	// Index 17: user override for manga genres (JSON text array); NULL means
+	// "use the plugin-supplied list". ponytail: when genre overrides grow
+	// into per-source tracking, replace the JSON column with a table.
+	`ALTER TABLE mangas ADD COLUMN genres TEXT;`,
 }

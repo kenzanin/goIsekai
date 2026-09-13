@@ -37,6 +37,13 @@ const (
 	// Plugins may omit this export entirely; only servers with kind
 	// "summaries" or "both" require it.
 	GetAltSummaryFunc = "GetAltSummary"
+	// GetEnrichmentFunc is an OPTIONAL enrichment export. When present, the
+	// plugin can fetch enrichment items (categories, related, etc.) for a
+	// manga title. Input: JSON {"title":string,"kind":string,"source":string}.
+	// Output: JSON array of items [{value,url,cover_url,source}, ...].
+	// This is the modern replacement for GetAltTitles/GetAltSummary:
+	// it supports any kind, not just titles and summaries.
+	GetEnrichmentFunc = "GetEnrichment"
 )
 
 // HostHTTPRequestFunc is the host-imported function available to plugins for

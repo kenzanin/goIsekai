@@ -42,7 +42,7 @@ func TestGetMangaDetailsNilManagerFallback(t *testing.T) {
 	}
 
 	// Build a service with nil manager — simulates plugin-unreachable state.
-	s := NewAppService(db, nil, hostnet.NewProxy(), "", "")
+	s := NewAppService(db, nil, hostnet.NewProxy(), "", "", nil)
 
 	manga, mangaChapters, err := s.GetMangaDetails("offline-plugin", "src-99")
 	if err != nil {
@@ -79,7 +79,7 @@ func TestGetMangaDetailsCacheMiss(t *testing.T) {
 	}
 	defer func() { _ = db.Close() }()
 
-	s := NewAppService(db, nil, hostnet.NewProxy(), "", "")
+	s := NewAppService(db, nil, hostnet.NewProxy(), "", "", nil)
 
 	_, _, err = s.GetMangaDetails("ghost-plugin", "ghost-src")
 	if err == nil {
@@ -97,7 +97,7 @@ func newTestService(t *testing.T) *AppService {
 		t.Fatalf("open db: %v", err)
 	}
 	t.Cleanup(func() { _ = db.Close() })
-	return NewAppService(db, nil, hostnet.NewProxy(), "", "")
+	return NewAppService(db, nil, hostnet.NewProxy(), "", "", nil)
 }
 
 func TestGetMangaDetailsPersists(t *testing.T) {

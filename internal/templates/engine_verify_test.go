@@ -51,6 +51,68 @@ func TestRenderActiveTab(t *testing.T) {
 	}
 }
 
+func TestRenderEnrichmentNoNestedForms(t *testing.T) {
+	e := mustEngine(t)
+	data := map[string]any{
+		"PluginID":     "demo",
+		"MangaID":      "m1",
+		"CurrentTitle": "Main Title",
+		"AltTitles": []map[string]any{
+			{"Title": "Alt One", "Source": "MangaDex"},
+			{"Title": "Alt Two", "Source": ""},
+		},
+		"AltSummaries": []map[string]any{
+			{"Description": "Some synopsis", "Source": "MangaUpdates"},
+		},
+		"Categories": []map[string]any{
+			{"Value": "Action"},
+			{"Value": "Comedy"},
+		},
+		"Related": []map[string]any{
+			{"Value": "Other Manga"},
+		},
+		"Genres": []string{"Action"},
+	}
+	if got := formNestingDepth(`<form><form></form></form>`); got != 2 {
+		t.Fatalf("formNestingDepth self-check = %d, want 2", got)
+	}
+	out := renderPartial(t, e, "partials/detail_alt", data)
+	if got := formNestingDepth(out); got > 1 {
+		t.Fatalf("nested <form> depth = %d, want <= 1\n%s", got, out)
+	}
+}
+
+func renderPartial(t *testing.T, e *Engine, name string, data map[string]any) string {
+	t.Helper()
+	var buf bytes.Buffer
+	if err := e.RenderPartial(&buf, name, data); err != nil {
+		t.Fatalf("RenderPartial %s: %v", name, err)
+	}
+	return buf.String()
+}
+
+// formNestingDepth returns the maximum simultaneous open <form> elements.
+func formNestingDepth(html string) int {
+	depth, max := 0, 0
+	for {
+		open := strings.Index(html, "<form")
+		close := strings.Index(html, "</form")
+		switch {
+		case open == -1 && close == -1:
+			return max
+		case close == -1 || (open != -1 && open < close):
+			depth++
+			if depth > max {
+				max = depth
+			}
+			html = html[open+len("<form"):]
+		default:
+			depth--
+			html = html[close+len("</form"):]
+		}
+	}
+}
+
 func TestHelpers(t *testing.T) {
 	if got := formatDate(""); got != "—" {
 		t.Errorf(`formatDate("") = %q, want —`, got)

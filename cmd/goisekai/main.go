@@ -17,6 +17,7 @@ import (
 	"goisekai/internal/bridge"
 	"goisekai/internal/config"
 	"goisekai/internal/database"
+	"goisekai/internal/enrich"
 	"goisekai/internal/hostnet"
 	"goisekai/internal/httpserver"
 	"goisekai/internal/logger"
@@ -224,8 +225,15 @@ func main() {
 		}
 	}
 
-	svc := bridge.NewAppService(db, mgr, proxy, cfgPath, cacheDir)
+	// Build enrichment registry: register built-in providers first,
+	// then let the plugin manager register plugin-declared providers on load.
+	enrichReg := enrich.NewRegistry()
+	enrichReg.Register(&enrich.MangaUpdatesProvider{})
+	enrichReg.Register(&enrich.MangaDexProvider{})
+
+	svc := bridge.NewAppService(db, mgr, proxy, cfgPath, cacheDir, enrichReg)
 	mgr.SetOnLoad(svc.SyncPluginMeta)
+	mgr.SetEnrichRegistry(enrichReg)
 
 	// devMode=true: re-read + recompile Lua templates per render, so a .lua
 	// edit takes effect on refresh with no rebuild or restart.
@@ -234,7 +242,7 @@ func main() {
 		log.Fatalf("init templates: %v", err)
 	}
 
-	srv := httpserver.New(cfg.Host, cfg.Port, cfg.APIKey, os.DirFS(cfg.FrontendDir), svc, slog.Default(), eng)
+	srv := httpserver.New(cfg.Host, cfg.Port, cfg.APIKey, os.DirFS(cfg.FrontendDir), svc, nil, slog.Default(), eng)
 	if *open {
 		srv.OpenBrowser()
 	}

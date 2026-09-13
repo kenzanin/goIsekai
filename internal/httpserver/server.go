@@ -14,6 +14,7 @@ import (
 	"github.com/go-chi/chi/v5/middleware"
 
 	"goisekai/internal/bridge"
+	"goisekai/internal/enrich"
 	"goisekai/internal/templates"
 )
 
@@ -26,10 +27,11 @@ type Server struct {
 	service *bridge.AppService
 	engine  *templates.Engine
 	apiKey  string
+	enrich  *enrich.Registry
 }
 
 // New creates a new Server with Chi middleware and all routes registered.
-func New(host string, port int, apiKey string, assets fs.FS, svc *bridge.AppService, logger *slog.Logger, engine *templates.Engine) *Server {
+func New(host string, port int, apiKey string, assets fs.FS, svc *bridge.AppService, enrichReg *enrich.Registry, logger *slog.Logger, engine *templates.Engine) *Server {
 
 	r := chi.NewRouter()
 	r.Use(middleware.Recoverer)
@@ -54,6 +56,7 @@ func New(host string, port int, apiKey string, assets fs.FS, svc *bridge.AppServ
 		service: svc,
 		engine:  engine,
 		apiKey:  apiKey,
+		enrich:  enrichReg,
 	}
 	warnIfOpenAPI(logger, host, apiKey)
 	s.routes()

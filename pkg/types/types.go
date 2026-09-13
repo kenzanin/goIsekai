@@ -16,6 +16,9 @@ type Manga struct {
 	Description string   `json:"description,omitempty"`
 	Status      string   `json:"status,omitempty"`
 	Genres      []string `json:"genres,omitempty"`
+	// RawGenres is the plugin-supplied genres, preserved before any user override.
+	// Internal use only — not part of the plugin ABI.
+	RawGenres []string `json:"-"`
 }
 
 // Chapter is a single chapter of a manga.
@@ -53,6 +56,13 @@ type AltTitleServer struct {
 	ID   string `json:"id"`
 	Name string `json:"name"`
 	Kind string `json:"kind,omitempty"`
+}
+
+// EnrichmentProvider declares a custom enrichment source offered by a plugin.
+type EnrichmentProvider struct {
+	ID    string   `json:"id"`
+	Name  string   `json:"name"`
+	Kinds []string `json:"kinds"`
 }
 
 // AltTitlesResult is what a GetAltTitles provider returns: the provider's own
@@ -95,6 +105,9 @@ type PluginMeta struct {
 	// alternative-title resolution. A non-empty list signals enricher
 	// capability — the host also expects a GetAltTitles export.
 	AltTitleServers []AltTitleServer `json:"alt_title_servers,omitempty"`
+	// EnrichmentProviders declares custom enrichment sources this plugin offers.
+	// Each provider has a stable ID, display name, and list of supported kinds.
+	EnrichmentProviders []EnrichmentProvider `json:"enrichment_providers,omitempty"`
 	// HTTPProfiles optionally declares the plugin's preferred TLS client
 	// profile ladder (ordered). Names map to tls-client profiles (e.g.
 	// "firefox_148", "chrome_131") or "stdlib" for Go's stock TLS + h2.

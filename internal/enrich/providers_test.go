@@ -21,7 +21,7 @@ func TestMangaDexProvider_FetchTitles(t *testing.T) {
 				{
 					ID: "md1",
 					Attributes: mangaDexMangaAttrs{
-						Title:    map[string]string{"ko": "나 혼자만 레벨업"},
+						Title: map[string]string{"ko": "나 혼자만 레벨업"},
 						AltTitles: []map[string]string{
 							{"ko": "나 혼자만 레벨업"},
 							{"ja": "独りだけレベルアップ"},
@@ -69,7 +69,7 @@ func TestMangaDexProvider_FetchCategories(t *testing.T) {
 						Tags: []mangaDexTag{
 							{ID: "1", Type: "tag", Attributes: mangaDexTagAttrs{Name: map[string]string{"en": "Action"}, Group: "genre"}},
 							{ID: "2", Type: "tag", Attributes: mangaDexTagAttrs{Name: map[string]string{"en": "Fantasy"}, Group: "genre"}},
-							{ID: "3", Type: "tag", Attributes: mangaDexTagAttrs{Name: map[string]string{"en": "Action"}, Group: "genre"}}, // dup
+							{ID: "3", Type: "tag", Attributes: mangaDexTagAttrs{Name: map[string]string{"en": "Action"}, Group: "genre"}},      // dup
 							{ID: "4", Type: "tag", Attributes: mangaDexTagAttrs{Name: map[string]string{"en": "Long Strip"}, Group: "format"}}, // skip
 						},
 					},
@@ -263,7 +263,7 @@ func TestMangaUpdatesProvider_FetchTitles(t *testing.T) {
 	mux.HandleFunc("/v1/series/search", func(w http.ResponseWriter, r *http.Request) {
 		// Verify POST body
 		body, _ := io.ReadAll(r.Body)
-		if string(body) != `{"title":"Solo Leveling"}` {
+		if string(body) != `{"search":"Solo Leveling"}` {
 			t.Errorf("unexpected body: %s", string(body))
 		}
 		resp := muSearchResponse{
@@ -399,8 +399,8 @@ func TestMangaUpdatesProvider_FetchEmpty(t *testing.T) {
 
 func TestMangaUpdatesProvider_Kinds(t *testing.T) {
 	p := NewMangaUpdatesProvider()
-	if len(p.Kinds()) != 3 {
-		t.Fatalf("expected 3 kinds, got %d", len(p.Kinds()))
+	if len(p.Kinds()) != 4 {
+		t.Fatalf("expected 4 kinds, got %d", len(p.Kinds()))
 	}
 }
 

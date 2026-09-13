@@ -11,6 +11,7 @@ import (
 	"github.com/dop251/goja"
 	lunar "github.com/mmcdole/lunar"
 
+	"goisekai/internal/enrich"
 	"goisekai/internal/hostnet"
 	"goisekai/pkg/types"
 )
@@ -21,8 +22,6 @@ const (
 )
 
 // loadedPlugin is a compiled and instantiated plugin and its resolved ABI
-// entry points. kind is "lua", "js", "go", or "yaegi"; only the relevant
-// fields are set.
 type loadedPlugin struct {
 	id       string
 	wasmPath string // path to the plugin directory (or main.lua/main.js entry)
@@ -55,7 +54,8 @@ type Manager struct {
 
 	mu      sync.RWMutex
 	plugins map[string]*loadedPlugin
-	onLoad  func(id string) // called after first successful load
+	onLoad  func(id string)  // called after first successful load
+	enrich  *enrich.Registry // optional enrichment registry; plugin providers registered on load
 }
 
 // SetOnLoad registers a callback that fires once per plugin after its first
@@ -64,6 +64,15 @@ func (m *Manager) SetOnLoad(fn func(id string)) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	m.onLoad = fn
+}
+
+// SetEnrichRegistry wires an enrichment registry so that plugin-declared
+// enrichment providers are registered with the registry when the plugin loads.
+// If no enrichment registry is provided, this is a no-op.
+func (m *Manager) SetEnrichRegistry(reg *enrich.Registry) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.enrich = reg
 }
 
 // NewManager returns a Manager that will load plugins from pluginsDir and route

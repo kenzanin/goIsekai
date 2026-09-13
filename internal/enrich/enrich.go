@@ -18,6 +18,8 @@ import (
 	"slices"
 	"strings"
 	"sync"
+
+	"goisekai/internal/logger"
 )
 
 // Kind is an enrichment category.
@@ -174,11 +176,13 @@ func (r *Registry) FetchAll(ctx context.Context, httpc *http.Client, title strin
 			}
 			items, err := p.Fetch(ctx, httpc, title, kind)
 			if err != nil {
+				logger.Debug("enrich fetch failed", "source", source, "kind", string(kind), "error", err)
 				continue
 			}
 			for i := range items {
 				items[i].Source = source
 			}
+			logger.Debug("enrich fetch ok", "source", source, "kind", string(kind), "count", len(items))
 			out[kind] = append(out[kind], items...)
 		}
 	}

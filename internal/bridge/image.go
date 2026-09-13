@@ -22,6 +22,7 @@ func (s *AppService) GetImage(pluginID, url string, headers map[string]string, m
 	s.imageMu.RLock()
 	if cached, ok := s.imageCache[url]; ok {
 		s.imageMu.RUnlock()
+		logger.Debug("image cache: L1 hit", "url", url)
 		return cached, nil
 	}
 	s.imageMu.RUnlock()
@@ -35,6 +36,7 @@ func (s *AppService) GetImage(pluginID, url string, headers map[string]string, m
 					s.imageMu.Lock()
 					s.imageCache[url] = data
 					s.imageMu.Unlock()
+					logger.Debug("image cache: L2 hit", "url", url, "ext", ext)
 					return data, nil
 				}
 				// Invalid cached image: delete stale file and treat as miss.

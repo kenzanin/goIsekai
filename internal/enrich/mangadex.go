@@ -35,14 +35,14 @@ type mangaDexSearchResponse struct {
 }
 
 type mangaDexManga struct {
-	ID            string            `json:"id"`
+	ID            string             `json:"id"`
 	Attributes    mangaDexMangaAttrs `json:"attributes"`
 	Relationships []mangaDexRelation `json:"relationships"`
 }
 
 type mangaDexMangaAttrs struct {
-	Title     map[string]string   `json:"title"`         // {en: "...", ko: "..."}
-	AltTitles []map[string]string `json:"altTitles"`    // [{ko:"..."}, {en:"..."}]
+	Title     map[string]string   `json:"title"`     // {en: "...", ko: "..."}
+	AltTitles []map[string]string `json:"altTitles"` // [{ko:"..."}, {en:"..."}]
 	Tags      []mangaDexTag       `json:"tags"`
 }
 

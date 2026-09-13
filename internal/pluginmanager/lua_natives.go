@@ -20,6 +20,7 @@ func registerHostNatives(state *lua.State, m *Manager, id string) {
 	_ = text.RawSetString("strip_html", luaStr1(state, pluginutil.StripHTML))
 	_ = text.RawSetString("strip_markdown", luaStr1(state, pluginutil.StripMarkdown))
 	_ = text.RawSetString("titlecase", luaStr1(state, pluginutil.Titlecase))
+	_ = text.RawSetString("normalize_status", luaNormalizeStatus(state))
 
 	codecs, _ := state.NewTable()
 	_ = codecs.RawSetString("base64_encode", luaStr1(state, pluginutil.Base64Encode))
@@ -52,6 +53,56 @@ func registerHostNatives(state *lua.State, m *Manager, id string) {
 
 	_ = host.RawSetString("http", http.Value())
 	_ = state.RawSetGlobal("host", host.Value())
+}
+
+// luaNormalizeStatus creates the callable table host.text.normalize_status.
+// Usage: host.text.normalize_status(map, raw) or
+//
+//	host.text.normalize_status(host.text.normalize_status.default, raw).
+//
+// The table itself has a .default field pointing to the host default map.
+func luaNormalizeStatus(state *lua.State) lua.Value {
+	// Build the callable: takes (map, raw) -> normalized string.
+	fnVal, _ := state.NewNativeFunction(func(frame lua.Frame) lua.Outcome {
+		var m map[string]string
+		if frame.ArgumentCount() > 0 && frame.Kind(0) != lua.NilKind {
+			arg, ok := frame.Argument(0)
+			if !ok {
+				return frame.ReturnValue(lua.String("normalize_status: missing map"))
+			}
+			gv, err := lunarToGo(arg)
+			if err != nil {
+				return frame.ReturnValue(lua.String("normalize_status map: " + err.Error()))
+			}
+			if mm, ok := gv.(map[string]any); ok {
+				m = make(map[string]string, len(mm))
+				for k, v := range mm {
+					if s, ok := v.(string); ok {
+						m[k] = s
+					}
+				}
+			}
+		}
+		raw := ""
+		if frame.ArgumentCount() > 1 {
+			raw, _ = frame.String(1)
+		}
+		return frame.ReturnValue(lua.String(pluginutil.NormalizeStatus(m, raw)))
+	})
+
+	// Build the callable table: the function + a .default property.
+	tbl, _ := state.NewTable()
+	dflt, _ := goLunarValue(state, func() map[string]any {
+		r := make(map[string]any)
+		for k, v := range pluginutil.DefaultStatusMap() {
+			r[k] = v
+		}
+		return r
+	}())
+	_ = tbl.RawSetString("default", dflt)
+	_ = tbl.RawSetString("", fnVal.Value()) // make it callable
+
+	return tbl.Value()
 }
 
 // luaVrfSign wraps host.crypto.vrf_sign(apiPath, params, stages) — VRF

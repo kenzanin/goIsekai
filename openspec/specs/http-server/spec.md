@@ -26,53 +26,53 @@ The system SHALL start a Chi HTTP server on the host and port specified by the `
 - **THEN** the server listens on `127.0.0.1:9090`
 
 ### Requirement: Static file serving
-The system SHALL serve static assets (CSS, JS, images, fonts) from `cmd/goisekai/frontend/` embedded via `go:embed` at `/static/`. The system SHALL serve the main layout template at `/` which includes HTMX and Tailwind CSS.
+The system SHALL serve static assets (CSS, JS, images, fonts) from `cmd/goisekai/frontend/` embedded via `go:embed` at `/static/`. The system SHALL serve the main layout template at `/` which includes Alpine.js and Tailwind CSS.
 
 #### Scenario: Root path serves main layout
 - **WHEN** a browser navigates to `http://localhost:8080/`
-- **THEN** the server renders the main layout Jet template with navigation and default view (library)
+- **THEN** the server renders the main layout Lua template with navigation and default view (library)
 
 #### Scenario: Static asset serving
 - **WHEN** a browser requests `http://localhost:8080/static/lib/tailwind.css`
 - **THEN** the server responds with the CSS file contents and `Content-Type: text/css`
 
-### Requirement: HTMX HTML fragment endpoints
-The system SHALL serve each view as an HTML fragment endpoint that HTMX requests via `hx-get`. Each endpoint SHALL render a Jet template and return an HTML fragment (not a full page). The system SHALL support the following views: library, search, detail (manga chapters), reader, plugins, settings, logs.
+### Requirement: HTMX/SPA HTML fragment endpoints
+The system SHALL serve each view as a full HTML page or as a partial `<main>` content extract (determined by an `X-Partial` header). Each endpoint SHALL execute a Lua template and return HTML. The system SHALL support the following views: library, search, detail (manga chapters), reader, plugins, settings, logs.
 
-#### Scenario: Library view fragment
-- **WHEN** HTMX sends `GET /view/library` with `HX-Request: true` header
-- **THEN** the server renders the library Jet template with manga data and returns an HTML fragment
+#### Scenario: Full page render
+- **WHEN** a browser navigates to `GET /view/library` without partial headers
+- **THEN** the server renders the complete page (layout + view) using Lua templates
 
-#### Scenario: Search view fragment
-- **WHEN** HTMX sends `GET /view/search?q=one+piece` with `HX-Request: true` header
-- **THEN** the server renders search results as an HTML fragment
+#### Scenario: Partial content extract for SPA navigation
+- **WHEN** a client sends `GET /view/library` with `X-Partial: true` header
+- **THEN** the server renders only `<main>` content (no layout wrapper) for client-side DOM morph
 
-#### Scenario: Detail view fragment
-- **WHEN** HTMX sends `GET /view/manga/mangadex/{mangaID}` with `HX-Request: true` header
-- **THEN** the server renders manga details and chapter list as an HTML fragment
+#### Scenario: Search view
+- **WHEN** a client requests `GET /view/search?q=one+piece`
+- **THEN** the server renders search results via Lua template
 
-#### Scenario: Full page fallback
-- **WHEN** a browser navigates directly to `http://localhost:8080/view/library` without HTMX headers
-- **THEN** the server renders the full page (layout + view)
+#### Scenario: Detail view
+- **WHEN** a client requests `GET /view/manga/mangadex/{mangaID}`
+- **THEN** the server renders manga details and chapter list via Lua template
 
 ### Requirement: HTMX form/action endpoints
-The system SHALL handle HTMX form submissions and actions via POST endpoints. Each endpoint SHALL perform the action and return an HTML fragment with the updated state.
+The system SHALL handle form submissions and actions via POST endpoints. Each endpoint SHALL perform the action and respond with JSON (status + optional data) instead of HTML fragments. The client-side Alpine.js components SHALL handle response display via toast notifications.
 
 #### Scenario: Install plugin
-- **WHEN** HTMX sends `POST /action/install-plugin` with plugin file data
-- **THEN** the server installs the plugin and returns an updated plugin list fragment
+- **WHEN** a client sends `POST /action/install-plugin` with plugin file data
+- **THEN** the server installs the plugin and returns `{"status": "ok"}` JSON
 
 #### Scenario: Toggle plugin
-- **WHEN** HTMX sends `POST /action/toggle-plugin/{pluginID}`
-- **THEN** the server toggles the plugin state and returns an updated plugin card fragment
+- **WHEN** a client sends `POST /action/toggle-plugin/{pluginID}`
+- **THEN** the server toggles the plugin state and returns `{"status": "ok", "active": true/false}` JSON
 
 #### Scenario: Toggle library item
-- **WHEN** HTMX sends `POST /action/toggle-library/{pluginID}/{mangaID}`
-- **THEN** the server toggles the library item and returns an updated library card fragment
+- **WHEN** a client sends `POST /action/toggle-library/{pluginID}/{mangaID}`
+- **THEN** the server toggles the library item and returns `{"status": "ok", "in_library": true/false}` JSON
 
 #### Scenario: Sync library
-- **WHEN** HTMX sends `POST /action/sync`
-- **THEN** the server syncs all library items and returns an updated library view fragment
+- **WHEN** a client sends `POST /action/sync`
+- **THEN** the server syncs all library items and returns `{"status": "ok"}` JSON
 
 ### Requirement: Binary image endpoint
 The system SHALL provide a dedicated endpoint `GET /image` that returns image bytes as a binary response. The system SHALL accept query parameters `pluginID`, `url`, `mangaID`, `chapterID` and request headers for proxy forwarding.

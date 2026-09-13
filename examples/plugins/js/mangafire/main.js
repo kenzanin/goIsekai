@@ -127,13 +127,7 @@ function vrfURL(apiPath, params) {
 // ---------------------------------------------------------------------------
 
 function normalizeStatus(s) {
-    if (s === "releasing") return "Ongoing";
-    if (s === "finished") return "Completed";
-    if (s === "on_hold" || s === "on_hiatus") return "Hiatus";
-    if (s === "discontinued") return "Dropped";
-    if (s === "not_published" || s === "upcoming") return "Upcoming";
-    if (s) return s;
-    return "unknown";
+    return host.text.normalize_status(null, s || "");
 }
 
 function sanitizeTitle(s) {

@@ -37,15 +37,15 @@
 ## 6. Detail page UI
 
 - [x] 6.1 Add the collapsed `<details>` enrichment panel (kind select, source select, GO) to `detail.lua`, with source options carrying `data-kinds`; verify it renders collapsed with no JS
-- [ ] 6.2 Add JS that filters source options to the selected kind and submits `{kind, source}` to the enrich endpoint, re-rendering the affected section; verify in the browser that selecting a kind narrows sources and GO populates the section
-- [ ] 6.3 Render stored categories and related items as detail sections; verify both appear after a fetch (covers loaded through the `/image` proxy)
+- [x] 6.2 Add JS that filters source options to the selected kind and submits `{kind, source}` to the enrich endpoint, re-rendering the affected section; verify in the browser that selecting a kind narrows sources and GO populates the section
+- [x] 6.3 Render stored categories and related items as detail sections; verify both appear after a fetch (covers loaded through the `/image` proxy)
 
 ## 7. Plugin migration and cleanup
 
-- [ ] 7.1 Migrate plugin `normalizeStatus` functions to `host.text.normalize_status` with each plugin's site-specific override map; verify each plugin's known raw values normalize to the canonical vocabulary
-- [ ] 7.2 Remove the built-in MangaDex/MangaUpdates bodies and their `alt_title_servers` declarations from shipped `enrich.lua`/`enrich.js`; verify no shipped plugin still declares the built-in sources and plugin loading is unchanged
+- [x] 7.1 Migrate plugin `normalizeStatus` functions to `host.text.normalize_status` with each plugin's site-specific override map; verify each plugin's known raw values normalize to the canonical vocabulary
+- [x] 7.2 Remove the built-in MangaDex/MangaUpdates bodies and their `alt_title_servers` declarations from shipped `enrich.lua`/`enrich.js`; verify no shipped plugin still declares the built-in sources and plugin loading is unchanged
 
 ## 8. Verification
 
-- [ ] 8.1 Run `make check` (fmt, race tests, lint) and confirm it is green
-- [ ] 8.2 Live smoke test: with no relevant plugin custom provider, fetch categories and related for a real library manga from MangaDex and MangaUpdates via the detail panel; confirm both sections populate and persist across a page reload
+- [x] 8.1 Run `make check` (fmt, race tests, lint) and confirm it is green
+- [x] 8.2 Live smoke test: with no relevant plugin custom provider, fetch categories and related for a real library manga from MangaDex and MangaUpdates via the detail panel; confirm both sections populate and persist across a page reload

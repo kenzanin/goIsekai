@@ -5,7 +5,9 @@
 package bridge
 
 import (
+	"context"
 	"fmt"
+	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
@@ -13,6 +15,7 @@ import (
 	"time"
 
 	"goisekai/internal/database"
+	"goisekai/internal/enrich"
 	"goisekai/internal/hostnet"
 	"goisekai/internal/logger"
 	"goisekai/internal/pluginmanager"
@@ -32,11 +35,12 @@ type AppService struct {
 	imgSem     chan struct{} // caps concurrent image fetches per host process
 	imgPaceMu  sync.Mutex
 	imgPace    map[string]time.Time // host -> earliest allowed next request (MD@Home pacing)
+	enrich     *enrich.Registry
 }
 
 // NewAppService returns an AppService backed by the supplied database, plugin
-// manager, and hostnet proxy.
-func NewAppService(db *database.DB, mgr *pluginmanager.Manager, proxy *hostnet.Proxy, cfgPath, cacheDir string) *AppService {
+// manager, hostnet proxy, and enrichment registry.
+func NewAppService(db *database.DB, mgr *pluginmanager.Manager, proxy *hostnet.Proxy, cfgPath, cacheDir string, enrichReg *enrich.Registry) *AppService {
 	return &AppService{
 		db:         db,
 		mgr:        mgr,
@@ -44,6 +48,7 @@ func NewAppService(db *database.DB, mgr *pluginmanager.Manager, proxy *hostnet.P
 		cfgPath:    cfgPath,
 		cacheDir:   cacheDir,
 		imageCache: make(map[string][]byte),
+		enrich:     enrichReg,
 	}
 }
 
@@ -174,4 +179,189 @@ func (s *AppService) SyncPluginMeta(id string) {
 	if err := s.db.UpdatePluginIdentity(id, meta.Name, iconURL); err != nil {
 		logger.Warn("sync plugin meta", "id", id, "error", err)
 	}
+}
+
+// ListCategories returns enrichment categories for a manga from the database.
+func (s *AppService) ListCategories(pluginID, mangaID string) ([]database.EnrichmentRow, error) {
+	rowID, err := s.db.ResolveMangaRowID(pluginID, mangaID)
+	if err != nil {
+		return nil, err
+	}
+	return s.db.ListEnrichment(rowID, "categories")
+}
+
+// ListRelated returns enrichment related/recommended manga for a manga from the database.
+func (s *AppService) ListRelated(pluginID, mangaID string) ([]database.EnrichmentRow, error) {
+	rowID, err := s.db.ResolveMangaRowID(pluginID, mangaID)
+	if err != nil {
+		return nil, err
+	}
+	return s.db.ListEnrichment(rowID, "related")
+}
+
+// FetchEnrichment fetches enrichment data from external sources and stores it.
+func (s *AppService) FetchEnrichment(pluginID, mangaID, title string, sources []string) error {
+	if s.enrich == nil {
+		return fmt.Errorf("enrichment provider not configured")
+	}
+	rowID, err := s.db.ResolveMangaRowID(pluginID, mangaID)
+	if err != nil {
+		return err
+	}
+	logger.Debug("enrich fetch start", "title", title, "sources", sources)
+	items := s.enrich.FetchAll(context.Background(), &http.Client{}, title, sources)
+
+	// Store categories.
+	if cats, ok := items[enrich.KindCategories]; ok && len(cats) > 0 {
+		names := make([]string, len(cats))
+		for i, c := range cats {
+			names[i] = c.Value
+		}
+		n, err := s.db.AddCategories(rowID, names, cats[0].Source)
+		if err != nil {
+			logger.Warn("store categories", "error", err)
+		} else {
+			logger.Info("enrich categories stored", "count", len(cats), "inserted", n, "source", cats[0].Source)
+		}
+	} else {
+		logger.Debug("enrich categories: none found")
+	}
+
+	// Store related manga.
+	if rels, ok := items[enrich.KindRelated]; ok && len(rels) > 0 {
+		rows := make([]database.RelatedRow, len(rels))
+		for i, r := range rels {
+			rows[i] = database.RelatedRow{Title: r.Value, URL: r.URL, Source: r.Source}
+		}
+		n, err := s.db.AddRelated(rowID, rows, rels[0].Source)
+		if err != nil {
+			logger.Warn("store related", "error", err)
+		} else {
+			logger.Info("enrich related stored", "count", len(rels), "inserted", n, "source", rels[0].Source)
+		}
+	} else {
+		logger.Debug("enrich related: none found")
+	}
+	return nil
+}
+
+// EnrichmentSources returns all registered enrichment source IDs.
+func (s *AppService) EnrichmentSources() []string {
+	if s.enrich == nil {
+		return nil
+	}
+	entries := s.enrich.Catalog("")
+	out := make([]string, len(entries))
+	for i, e := range entries {
+		out[i] = e.ID
+	}
+	return out
+}
+
+// EnrichmentResult holds all enrichment data for a manga.
+type EnrichmentResult struct {
+	AltTitles    []database.EnrichmentRow
+	AltSummaries []database.EnrichmentRow
+	Categories   []database.EnrichmentRow
+	Related      []database.EnrichmentRow
+}
+
+// EnrichmentCatalogEntry describes one enrichment source for the UI.
+type EnrichmentCatalogEntry struct {
+	ID    string   `json:"id"`
+	Name  string   `json:"name"`
+	Kinds []string `json:"kinds"`
+}
+
+// EnrichmentCatalog returns all registered enrichment sources (built-in +
+// plugin-declared). The caller passes an optional kind filter; empty string
+// returns all.
+func (s *AppService) EnrichmentCatalog(kind string) []EnrichmentCatalogEntry {
+	if s.enrich == nil {
+		return nil
+	}
+	entries := s.enrich.Catalog(enrich.Kind(kind))
+	out := make([]EnrichmentCatalogEntry, 0, len(entries))
+	for _, e := range entries {
+		kinds := make([]string, len(e.Kinds))
+		for i, k := range e.Kinds {
+			kinds[i] = string(k)
+		}
+		out = append(out, EnrichmentCatalogEntry{
+			ID:    e.ID,
+			Name:  e.Name,
+			Kinds: kinds,
+		})
+	}
+	return out
+}
+
+// RemoveCategory deletes a single category from a manga's stored enrichment data.
+func (s *AppService) RemoveCategory(pluginID, mangaID, category string) error {
+	rowID, err := s.db.ResolveMangaRowID(pluginID, mangaID)
+	if err != nil {
+		return err
+	}
+	return s.db.RemoveCategory(rowID, category)
+}
+
+// AddCategory adds a category to a manga's stored enrichment data.
+func (s *AppService) AddCategory(pluginID, mangaID, category string) error {
+	rowID, err := s.db.ResolveMangaRowID(pluginID, mangaID)
+	if err != nil {
+		return err
+	}
+	return s.db.AddCategory(rowID, category)
+}
+
+// RemoveRelated deletes a single related/recommended manga from storage.
+func (s *AppService) RemoveRelated(pluginID, mangaID, title string) error {
+	rowID, err := s.db.ResolveMangaRowID(pluginID, mangaID)
+	if err != nil {
+		return err
+	}
+	return s.db.RemoveRelated(rowID, title)
+}
+
+// GetEnrichment returns all enrichment data for a manga from the database.
+func (s *AppService) GetEnrichment(pluginID, mangaID string) (*EnrichmentResult, error) {
+	rowID, err := s.db.ResolveMangaRowID(pluginID, mangaID)
+	if err != nil {
+		return nil, err
+	}
+
+	res := &EnrichmentResult{}
+	res.AltTitles, err = s.db.ListEnrichment(rowID, "alt_titles")
+	if err != nil {
+		return nil, err
+	}
+	res.AltSummaries, err = s.db.ListEnrichment(rowID, "alt_summaries")
+	if err != nil {
+		return nil, err
+	}
+	res.Categories, err = s.db.ListEnrichment(rowID, "categories")
+	if err != nil {
+		return nil, err
+	}
+	res.Related, err = s.db.ListEnrichment(rowID, "related")
+	if err != nil {
+		return nil, err
+	}
+	return res, nil
+}
+
+// ResetEnrichment deletes all user enrichment data (alt titles, summaries,
+// categories, related) and restores title/synopsis/genres to original plugin values.
+func (s *AppService) ResetEnrichment(pluginID, mangaID string) error {
+	rowID, err := s.db.ResolveMangaRowID(pluginID, mangaID)
+	if err != nil {
+		return err
+	}
+	if err := s.db.ResetEnrichment(rowID); err != nil {
+		return fmt.Errorf("reset enrichment: %w", err)
+	}
+	if err := s.db.SetMangaGenres(rowID, nil); err != nil {
+		return fmt.Errorf("reset genres: %w", err)
+	}
+	return nil
 }

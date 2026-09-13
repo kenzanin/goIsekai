@@ -48,6 +48,9 @@ func (s *AppService) GetMangaDetails(pluginID, mangaID string) (types.Manga, []t
 	// Try live fetch first.
 	manga, err := s.mgr.GetMangaDetail(pluginID, mangaID)
 	if err == nil {
+		// Preserve raw plugin genres before any override.
+		manga.RawGenres = make([]string, len(manga.Genres))
+		copy(manga.RawGenres, manga.Genres)
 		chapters, chapErr := s.mgr.GetChapterList(pluginID, mangaID)
 		if chapErr == nil {
 			if persistErr := s.persistMangaDetails(pluginID, manga, chapters); persistErr != nil {
@@ -61,6 +64,10 @@ func (s *AppService) GetMangaDetails(pluginID, mangaID string) (types.Manga, []t
 			if dbDesc, custom, err := s.db.MangaDescriptionIfCustom(pluginID, mangaID); err == nil && custom {
 				manga.Description = dbDesc
 			}
+			// A user-set genre override wins over the plugin-sourced list.
+			if genres, has, err := s.GetMangaGenres(pluginID, mangaID); err == nil && has && len(genres) > 0 {
+				manga.Genres = genres
+			}
 			return manga, chapters, nil
 		}
 		// Chapter list failed — still persist manga alone.
@@ -72,6 +79,10 @@ func (s *AppService) GetMangaDetails(pluginID, mangaID string) (types.Manga, []t
 		}
 		if dbDesc, custom, err := s.db.MangaDescriptionIfCustom(pluginID, mangaID); err == nil && custom {
 			manga.Description = dbDesc
+		}
+		// A user-set genre override wins over the plugin-sourced list.
+		if genres, has, err := s.GetMangaGenres(pluginID, mangaID); err == nil && has && len(genres) > 0 {
+			manga.Genres = genres
 		}
 		// Return live manga but fall back chapters.
 		mangaChapters := s.liveChaptersFallback(rowID, chapters)
@@ -132,6 +143,10 @@ func (s *AppService) cachedMangaFallback(pluginID, mangaID, rowID string) (types
 	}
 	if dbDesc, custom, err := s.db.MangaDescriptionIfCustom(pluginID, mangaID); err == nil && custom {
 		manga.Description = dbDesc
+	}
+	// Apply user genre override.
+	if genres, has, err := s.GetMangaGenres(pluginID, mangaID); err == nil && has && len(genres) > 0 {
+		manga.Genres = genres
 	}
 
 	// Fetch cached chapters.
@@ -203,6 +218,7 @@ func (s *AppService) GetPageList(pluginID, chapterID string) ([]types.Page, erro
 func (s *AppService) GetPageListCached(pluginID, chapterID string) ([]types.Page, error) {
 	result, err := s.mgr.GetPageList(pluginID, chapterID)
 	if err == nil {
+		logger.Debug("page list cache: miss (online success)", "chapter", chapterID, "pages", len(result))
 		// Online path succeeded — persist for future offline use.
 		if raw, merr := json.Marshal(result); merr == nil {
 			if rowID := s.resolveChapterRowID(pluginID, chapterID); rowID != "" {
@@ -214,6 +230,7 @@ func (s *AppService) GetPageListCached(pluginID, chapterID string) ([]types.Page
 		return result, nil
 	}
 	// Plugin failed — try the local cache.
+	logger.Debug("page list cache: plugin failed, trying local cache", "chapter", chapterID, "plugin_err", err)
 	rowID := s.resolveChapterRowID(pluginID, chapterID)
 	if rowID == "" {
 		return nil, fmt.Errorf("bridge: get page list: %w", err)
@@ -224,13 +241,14 @@ func (s *AppService) GetPageListCached(pluginID, chapterID string) ([]types.Page
 		return nil, fmt.Errorf("bridge: get page list: %w", err)
 	}
 	if cached != nil {
-		logger.Warn("serving cached page list (plugin unreachable)", "chapter", chapterID, "plugin_err", err)
+		logger.Info("page list cache: hit (serving cached)", "chapter", chapterID)
 		var pages []types.Page
 		if uerr := json.Unmarshal(cached, &pages); uerr != nil {
 			return nil, fmt.Errorf("bridge: unmarshal cached pages: %w", uerr)
 		}
 		return pages, nil
 	}
+	logger.Debug("page list cache: miss (no cached data)", "chapter", chapterID)
 	return nil, fmt.Errorf("bridge: get page list: %w", err)
 }
 
@@ -252,4 +270,104 @@ func (s *AppService) ListLibrary() ([]database.Manga, error) {
 		return nil, fmt.Errorf("bridge: list library: %w", err)
 	}
 	return list, nil
+}
+
+// SetMangaGenres stores a user-defined genre override for a manga.
+// Pass nil to clear the override (return to plugin-supplied genres).
+func (s *AppService) SetMangaGenres(pluginID, mangaID string, genres []string) error {
+	rowID := mangaRowID(pluginID, mangaID)
+	if err := s.db.SetMangaGenres(rowID, genres); err != nil {
+		return fmt.Errorf("bridge: set manga genres: %w", err)
+	}
+	return nil
+}
+
+// GetMangaGenres returns the stored genre override for a manga.
+// Returns the genres and true when an override exists; (nil, false) otherwise.
+func (s *AppService) GetMangaGenres(pluginID, mangaID string) ([]string, bool, error) {
+	rowID := mangaRowID(pluginID, mangaID)
+	genres, has, err := s.db.GetMangaGenres(rowID)
+	if err != nil {
+		return nil, false, fmt.Errorf("bridge: get manga genres: %w", err)
+	}
+	return genres, has, nil
+}
+
+// AddGenre appends a genre to a manga's user-defined override.
+// Creates the override from the current plugin-supplied genres if none exists.
+func (s *AppService) AddGenre(pluginID, mangaID, genre string) error {
+	rowID := mangaRowID(pluginID, mangaID)
+	genres, has, err := s.db.GetMangaGenres(rowID)
+	if err != nil {
+		return fmt.Errorf("bridge: add genre: %w", err)
+	}
+	if !has {
+		genres = nil
+	}
+	for _, g := range genres {
+		if g == genre {
+			return nil
+		}
+	}
+	genres = append(genres, genre)
+	if err := s.db.SetMangaGenres(rowID, genres); err != nil {
+		return fmt.Errorf("bridge: add genre: %w", err)
+	}
+	return nil
+}
+
+// ToggleGenre adds a genre to the override if not present, or removes it if present.
+// Acts as a toggle: click adds → click removes.
+func (s *AppService) ToggleGenre(pluginID, mangaID, genre string) error {
+	rowID := mangaRowID(pluginID, mangaID)
+	genres, has, err := s.db.GetMangaGenres(rowID)
+	if err != nil {
+		return fmt.Errorf("bridge: toggle genre: %w", err)
+	}
+	if !has {
+		genres = nil
+	}
+	// Check if genre is already in the override
+	for i, g := range genres {
+		if g == genre {
+			// Remove it
+			genres = append(genres[:i], genres[i+1:]...)
+			if len(genres) == 0 {
+				genres = nil
+			}
+			if err := s.db.SetMangaGenres(rowID, genres); err != nil {
+				return fmt.Errorf("bridge: toggle genre: %w", err)
+			}
+			return nil
+		}
+	}
+	// Not in override — add it
+	genres = append(genres, genre)
+	if err := s.db.SetMangaGenres(rowID, genres); err != nil {
+		return fmt.Errorf("bridge: toggle genre: %w", err)
+	}
+	return nil
+}
+
+// RemoveGenre removes one genre from a manga's user-defined override.
+// If no override exists, it's a no-op (the X button won't appear).
+func (s *AppService) RemoveGenre(pluginID, mangaID, genre string) error {
+	rowID := mangaRowID(pluginID, mangaID)
+	genres, has, err := s.db.GetMangaGenres(rowID)
+	if err != nil {
+		return fmt.Errorf("bridge: remove genre: %w", err)
+	}
+	if !has || genres == nil {
+		return nil
+	}
+	filtered := make([]string, 0, len(genres))
+	for _, g := range genres {
+		if g != genre {
+			filtered = append(filtered, g)
+		}
+	}
+	if err := s.db.SetMangaGenres(rowID, filtered); err != nil {
+		return fmt.Errorf("bridge: remove genre: %w", err)
+	}
+	return nil
 }

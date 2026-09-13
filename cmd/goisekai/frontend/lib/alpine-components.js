@@ -12,6 +12,13 @@
     '.toast-leave{transform:translateX(100%);opacity:0}';
   (document.head || document.documentElement).appendChild(_style);
 
+  // Global helper: submit a form from an Alpine @click handler.
+  // Called as: @click="submitForm($el.closest('form'))"
+  window.submitForm = function (form) {
+    if (!form) return;
+    form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+  };
+
   // Expand a collapsible section (used after fetch-alt-* actions so freshly
   // fetched items are visible instead of re-collapsed by the re-render).
   const expandSection = (id) => {
@@ -271,6 +278,7 @@
     });
 
     // ---- 4.3 data-confirm delegated handler ------------------------------
+
     // Submit interception (capture) — mirrors old app.js logic exactly
     document.addEventListener(
       'submit',
@@ -351,7 +359,7 @@
       'submit',
       (e) => {
         var form = e.target;
-        if (!form?.tagName || form.tagName !== 'FORM' || e.isDefaultPrevented()) return;
+        if (!form?.tagName || form.tagName !== 'FORM' || e.defaultPrevented) return;
         var method = (form.getAttribute('method') || 'get').toLowerCase();
         if (method !== 'post') return;
         var action = (form.getAttribute('action') || '').trim();
@@ -373,24 +381,14 @@
           }
         };
 
-        // Follow redirects manually so we can keep X-Partial on the
-        // re-fetch — fetch() auto-follow drops custom headers on 303.
-        const followRedirects = (url, opts) =>
-          fetch(url, { ...opts, redirect: 'manual' }).then((resp) => {
-            if (resp.status >= 301 && resp.status <= 303) {
-              const loc = resp.headers.get('Location') || url;
-              return fetch(loc, {
-                method: 'GET',
-                headers: { 'X-Partial': 'true' },
-                credentials: 'same-origin',
-              });
-            }
-            return resp;
-          });
-
-        followRedirects(action, {
+        // Auto-follow redirects: a 303 must be followed by the browser
+        // itself. `redirect: 'manual'` yields an opaqueredirect (status 0,
+        // unreadable headers) which cannot be consumed.
+        fetch(action, {
           method: 'POST',
-          body: new FormData(form),
+          // URL-encoded, not FormData: the action handlers call
+          // r.ParseForm()+FormValue, which drops multipart bodies.
+          body: new URLSearchParams(new FormData(form)),
           headers: { 'X-Partial': 'true' },
           credentials: 'same-origin',
         })
@@ -480,140 +478,9 @@
   });
 
   // =====================================================================
-  // Enrichment panel form builder
-  // Populates #enrichment-form-container with kind/source dropdowns + AJAX fetch.
-  const syncEnrichmentPanel = () => {
-    const container = document.getElementById('enrichment-form-container');
-    if (!container || !container.children.length) return;
-
-    // Only build once per page load (the container is a singleton).
-    if (container.dataset.enrichmentBuilt === '1') return;
-    container.dataset.enrichmentBuilt = '1';
-
-    // Read the sources passed from the server (availableSources JSON).
-    const sourcesEl = document.getElementById('enrichment-sources');
-    if (!sourcesEl) return;
-    const sources = JSON.parse(sourcesEl.textContent);
-    if (!sources.length) return;
-
-    const pluginID = document.getElementById('enrichment-plugin-id')?.textContent || '';
-    const mangaID = document.getElementById('enrichment-manga-id')?.textContent || '';
-    const mangaTitle = document.getElementById('enrichment-manga-title')?.textContent || '';
-
-    // Collect unique kinds across all sources, preserving order.
-    const kindSet = new Set();
-    for (const s of sources) {
-      for (const k of s.kinds) kindSet.add(k);
-    }
-    const kinds = [...kindSet];
-
-    const allOptionsHTML = sources.map((s) => `<option value="${s.id}">${s.name}</option>`).join('');
-    const kindOptionsHTML = kinds.map((k) => `<option value="${k}">${k}</option>`).join('');
-
-    container.innerHTML = `
-      <form id="enrichment-form" class="flex flex-wrap items-center gap-2 mt-3">
-        <input type="hidden" name="manga_title" value="${encodeURIComponent(mangaTitle)}">
-        <select id="enrichment-kind" class="bg-neutral-900 border border-neutral-700 rounded-md px-2 py-1.5 text-xs text-neutral-300 focus:outline-none focus:border-indigo-500">
-          ${kindOptionsHTML}
-        </select>
-        <select id="enrichment-source" class="bg-neutral-900 border border-neutral-700 rounded-md px-2 py-1.5 text-xs text-neutral-300 focus:outline-none focus:border-indigo-500">
-          ${allOptionsHTML}
-        </select>
-        <button type="submit" id="enrichment-go" class="border border-neutral-700 hover:bg-neutral-800 rounded-md px-3 py-1.5 text-xs font-medium inline-flex items-center gap-1.5">
-          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="size-3.5"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
-          Fetch
-        </button>
-      </form>
-    `;
-
-    // Filter source options when kind changes.
-    const kindSel = document.getElementById('enrichment-kind');
-    const srcSel = document.getElementById('enrichment-source');
-    const updateSourceOptions = () => {
-      const selectedKind = kindSel.value;
-      const filtered = sources.filter((s) => s.kinds.includes(selectedKind));
-      srcSel.innerHTML = filtered.map((s) => `<option value="${s.id}">${s.name}</option>`).join('');
-    };
-    kindSel.addEventListener('change', updateSourceOptions);
-    updateSourceOptions();
-
-    // Submit via fetch, update DOM sections on success.
-    const form = document.getElementById('enrichment-form');
-    form.addEventListener('submit', async (e) => {
-      e.preventDefault();
-      const kind = kindSel.value;
-      const source = srcSel.value;
-      const btn = document.getElementById('enrichment-go');
-      btn.disabled = true;
-      btn.textContent = 'Fetching…';
-
-      try {
-        const resp = await fetch(`/api/manga/${pluginID}/${mangaID}/enrich?kind=${encodeURIComponent(kind)}&source=${encodeURIComponent(source)}&title=${encodeURIComponent(mangaTitle)}`);
-        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-        const data = await resp.json();
-        if (data.error) throw new Error(data.error);
-
-        // Update the appropriate section in enrichment-body.
-        const body = document.getElementById('enrichment-body');
-        if (!body) return;
-
-        if (kind === 'categories' && data.categories) {
-          const tagContainer = body.querySelector('.flex-wrap.gap-1\\.5');
-          if (tagContainer) {
-            tagContainer.innerHTML = data.categories
-              .map((c) => {
-                let tag = '<span class="inline-flex items-center gap-1 rounded bg-neutral-800 border border-neutral-700 px-2 py-0.5 text-[11px] text-neutral-300">';
-                if (c.Source) tag += `<span class="text-neutral-500">[${h(c.Source)}] </span>`;
-                tag += h(c.Value) + '</span>';
-                return tag;
-              })
-              .join(' ');
-          }
-        }
-
-        if (kind === 'related' && data.related) {
-          const relContainer = body.querySelectorAll('div.mb-3');
-          for (const div of relContainer) {
-            if (div.textContent.includes('Related / Recommended')) {
-              div.innerHTML = '<div class="mt-1">' + data.related
-                .map((r) => {
-                  let item = '<div class="flex items-start gap-2 py-1">';
-                  if (r.URL && r.URL !== '') {
-                    item += `<a href="${h(r.URL)}" target="_blank" class="flex-1 min-w-0 text-sm text-neutral-300 hover:text-indigo-300 transition">`;
-                  } else {
-                    item += '<div class="flex-1 min-w-0 text-sm text-neutral-300">';
-                  }
-                  if (r.Source) item += `<span class="text-neutral-500">[${h(r.Source)}] </span>`;
-                  item += h(r.Value) + '</div></div>';
-                  return item;
-                })
-                .join('') + '</div>';
-            }
-          }
-        }
-
-        // Update cached count.
-        const chevBtn = body.previousElementSibling;
-        if (chevBtn && chevBtn.querySelector('.chev')) {
-          const countSpan = chevBtn.querySelector('span.text-neutral-500');
-          if (countSpan) {
-            const cats = body.querySelectorAll('.flex-wrap.gap-1\\.5');
-            const total = cats.length + (body.querySelectorAll('div.mb-3').length > 1 ? 1 : 0);
-            countSpan.textContent = `(${total} cached)`;
-          }
-        }
-
-        toastStore.message = `Enrichment fetched from ${source}`;
-        toastStore.show = true;
-      } catch (err) {
-        toastStore.message = `Enrichment error: ${err.message}`;
-        toastStore.show = true;
-      } finally {
-        btn.disabled = false;
-        btn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="size-3.5"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg> Fetch`;
-      }
-    });
-  };
+  // Enrichment panel — form is now a plain HTMX POST in the template.
+  // Kept as no-op for callers that still reference it.
+  const syncEnrichmentPanel = () => {};
 
   // =====================================================================
   // Cover-dim restore (shared by detail + library templates)

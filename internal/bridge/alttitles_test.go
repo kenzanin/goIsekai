@@ -57,7 +57,7 @@ function getAltTitles(a){
 	}
 	t.Cleanup(func() { _ = mgr.Close() })
 
-	return NewAppService(db, mgr, hostnet.NewProxy(), "", "")
+	return NewAppService(db, mgr, hostnet.NewProxy(), "", "", nil)
 }
 
 func TestFetchAltTitlesMergeAndDedup(t *testing.T) {

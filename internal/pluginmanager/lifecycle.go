@@ -2,6 +2,7 @@ package pluginmanager
 
 import (
 	"fmt"
+	"goisekai/internal/enrich"
 	"goisekai/internal/logger"
 )
 
@@ -48,6 +49,25 @@ func (m *Manager) ensureLoaded(id string) error {
 	m.proxy.SetNeedsJS(id, p.meta.NeedsJS)
 	m.proxy.SetHTTPProfiles(id, p.meta.HTTPProfiles)
 	logger.Debug("plugin loaded (lazy)", "id", id, "version", p.contractVersion)
+
+	// Register plugin-declared enrichment providers so they're visible
+	// in the catalog as soon as the plugin is first invoked.
+	if m.enrich != nil {
+		for _, ep := range p.meta.EnrichmentProviders {
+			ks := make([]enrich.Kind, len(ep.Kinds))
+			for i, k := range ep.Kinds {
+				ks[i] = enrich.Kind(k)
+			}
+			m.enrich.Register(&pluginProvider{
+				pluginID: id,
+				id:       ep.ID,
+				name:     ep.Name,
+				kinds:    ks,
+				fetch:    m,
+			})
+		}
+	}
+
 	if m.onLoad != nil {
 		go m.onLoad(id)
 	}

@@ -25,7 +25,7 @@ func newTestServiceWithCache(t *testing.T) *AppService {
 		t.Fatalf("open db: %v", err)
 	}
 	t.Cleanup(func() { _ = db.Close() })
-	return NewAppService(db, nil, hostnet.NewProxy(), "", t.TempDir())
+	return NewAppService(db, nil, hostnet.NewProxy(), "", t.TempDir(), nil)
 }
 
 // serveImage starts an httptest server that returns payload with the given
