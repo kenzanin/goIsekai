@@ -19,6 +19,7 @@ type Chapters struct {
 	ChapterNum      float64
 	VolumeNum       *float64
 	IsRead          *int64
+	IsSkipped       *int64
 	LastPageRead    *int64
 	DownloadStatus  *string
 	FetchedAt       *time.Time

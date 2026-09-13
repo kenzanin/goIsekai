@@ -108,7 +108,7 @@ return function(data)
 	-- Show more toggle
 	local showMoreHTML = ""
 	if genreCount > maxVisible then
-		showMoreHTML = '<button type="button" id="genre-showmore" onclick="var tags=document.querySelectorAll(\'.genre-tag\');var btn=document.getElementById(\'genre-showmore\');for(var i=' .. maxVisible .. ';i<tags.length;i++){tags[i].style.display=btn.dataset.show==\'1\'?\'\':\'none\'}btn.dataset.show=btn.dataset.show==\'1\'?\'0\':\'1\';btn.textContent=btn.dataset.show==\'1\'?\'Show less\':\'Show more\';}" class="text-xs text-indigo-400 hover:text-indigo-300 ml-1 cursor-pointer" data-show="0">Show more</button>'
+		showMoreHTML = '<button type="button" id="genre-showmore" onclick="toggleGenreTags(\'genre-showmore\',' .. maxVisible .. ')" class="text-xs text-indigo-400 hover:text-indigo-300 ml-1 cursor-pointer" data-show="0">Show more</button>'
 	end
 	genreTagsHTML = genreTagsHTML .. showMoreHTML
 
@@ -243,6 +243,7 @@ return function(data)
 			AltSummaries = altSummaries,
 			AltSummaryServers = altSummaryServers,
 			Manga = manga,
+			Author = manga.Author,
 			Categories = cats,
 			Related = rels,
 			Genres = manga.Genres,

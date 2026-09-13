@@ -24,6 +24,7 @@ type chaptersTable struct {
 	ChapterNum      sqlite.ColumnFloat
 	VolumeNum       sqlite.ColumnFloat
 	IsRead          sqlite.ColumnInteger
+	IsSkipped       sqlite.ColumnInteger
 	LastPageRead    sqlite.ColumnInteger
 	DownloadStatus  sqlite.ColumnString
 	FetchedAt       sqlite.ColumnTimestamp
@@ -76,13 +77,14 @@ func newChaptersTableImpl(schemaName, tableName, alias string) chaptersTable {
 		ChapterNumColumn      = sqlite.FloatColumn("chapter_num")
 		VolumeNumColumn       = sqlite.FloatColumn("volume_num")
 		IsReadColumn          = sqlite.IntegerColumn("is_read")
+		IsSkippedColumn       = sqlite.IntegerColumn("is_skipped")
 		LastPageReadColumn    = sqlite.IntegerColumn("last_page_read")
 		DownloadStatusColumn  = sqlite.StringColumn("download_status")
 		FetchedAtColumn       = sqlite.TimestampColumn("fetched_at")
 		TotalPagesColumn      = sqlite.IntegerColumn("total_pages")
-		allColumns            = sqlite.ColumnList{IDColumn, MangaIDColumn, SourceChapterIDColumn, TitleColumn, ChapterNumColumn, VolumeNumColumn, IsReadColumn, LastPageReadColumn, DownloadStatusColumn, FetchedAtColumn, TotalPagesColumn}
-		mutableColumns        = sqlite.ColumnList{MangaIDColumn, SourceChapterIDColumn, TitleColumn, ChapterNumColumn, VolumeNumColumn, IsReadColumn, LastPageReadColumn, DownloadStatusColumn, FetchedAtColumn, TotalPagesColumn}
-		defaultColumns        = sqlite.ColumnList{IsReadColumn, LastPageReadColumn, DownloadStatusColumn, FetchedAtColumn, TotalPagesColumn}
+		allColumns            = sqlite.ColumnList{IDColumn, MangaIDColumn, SourceChapterIDColumn, TitleColumn, ChapterNumColumn, VolumeNumColumn, IsReadColumn, IsSkippedColumn, LastPageReadColumn, DownloadStatusColumn, FetchedAtColumn, TotalPagesColumn}
+		mutableColumns        = sqlite.ColumnList{MangaIDColumn, SourceChapterIDColumn, TitleColumn, ChapterNumColumn, VolumeNumColumn, IsReadColumn, IsSkippedColumn, LastPageReadColumn, DownloadStatusColumn, FetchedAtColumn, TotalPagesColumn}
+		defaultColumns        = sqlite.ColumnList{IsReadColumn, IsSkippedColumn, LastPageReadColumn, DownloadStatusColumn, FetchedAtColumn, TotalPagesColumn}
 	)
 
 	return chaptersTable{
@@ -96,6 +98,7 @@ func newChaptersTableImpl(schemaName, tableName, alias string) chaptersTable {
 		ChapterNum:      ChapterNumColumn,
 		VolumeNum:       VolumeNumColumn,
 		IsRead:          IsReadColumn,
+		IsSkipped:       IsSkippedColumn,
 		LastPageRead:    LastPageReadColumn,
 		DownloadStatus:  DownloadStatusColumn,
 		FetchedAt:       FetchedAtColumn,

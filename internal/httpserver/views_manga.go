@@ -10,14 +10,11 @@ import (
 	"strconv"
 )
 
-// viewMangaDetail renders a manga's info plus its chapter list.
-func (s *Server) viewMangaDetail(w http.ResponseWriter, r *http.Request) {
-	pluginID := param(r, "pluginID")
-	mangaID := param(r, "mangaID")
+// buildMangaDetailData assembles the data map for a manga detail view.
+// Used by both the GET handler and action handlers rendering inline.
+func (s *Server) buildMangaDetailData(r *http.Request, pluginID, mangaID string) map[string]any {
 	// Opening the detail page clears the library card's [New] badge.
-	if err := s.service.ClearMangaNew(pluginID, mangaID); err != nil {
-		s.logger.Warn("clear new badge", "plugin", pluginID, "manga", mangaID, "error", err)
-	}
+	_ = s.service.ClearMangaNew(pluginID, mangaID)
 	manga, chapters, err := s.service.GetMangaDetails(pluginID, mangaID)
 	challenge := false
 	if err != nil {
@@ -26,8 +23,7 @@ func (s *Server) viewMangaDetail(w http.ResponseWriter, r *http.Request) {
 			s.logger.Warn("manga detail blocked by challenge", "plugin", pluginID, "manga", mangaID)
 		} else {
 			s.logger.Error("manga detail", "error", err, "plugin", pluginID, "manga", mangaID)
-			http.Error(w, "failed to load manga: "+err.Error(), http.StatusBadGateway)
-			return
+			return nil
 		}
 	}
 	progress, err := s.service.GetChapterProgresses(pluginID, mangaID)
@@ -36,13 +32,11 @@ func (s *Server) viewMangaDetail(w http.ResponseWriter, r *http.Request) {
 		progress = map[string]database.ChapterProgress{}
 	}
 	continueTo := computeContinue(chapters, progress)
-	// Prefer most-recently-read chapter from history if it exists and isn't fully read
 	if lastCont := s.continueFromHistory(pluginID, mangaID, chapters, progress); lastCont != nil {
 		continueTo = lastCont
 	}
 	inLibrary := s.service.IsInLibrary(pluginID, mangaID)
 
-	// Plugin identity for the header badge: display name + small logo.
 	pluginName := pluginID
 	pluginIcon := ""
 	if m, ok := s.service.PluginMetas()[pluginID]; ok {
@@ -53,16 +47,8 @@ func (s *Server) viewMangaDetail(w http.ResponseWriter, r *http.Request) {
 			pluginIcon = resolveLogoURL(m.Logo, pluginID)
 		}
 	}
-	altTitles, altErr := s.service.ListAltTitles(pluginID, mangaID)
-	if altErr != nil {
-		s.logger.Warn("alt titles", "error", altErr, "manga", mangaID)
-		altTitles = nil
-	}
-	altSummaries, altSumErr := s.service.ListAltSummaries(pluginID, mangaID)
-	if altSumErr != nil {
-		s.logger.Warn("alt summaries", "error", altSumErr, "manga", mangaID)
-		altSummaries = nil
-	}
+	altTitles, _ := s.service.ListAltTitles(pluginID, mangaID)
+	altSummaries, _ := s.service.ListAltSummaries(pluginID, mangaID)
 	allServers := s.service.AltTitleServers()
 	var altTitleServers []pluginmanager.AltTitleServerEntry
 	var altSummaryServers []pluginmanager.AltTitleServerEntry
@@ -76,17 +62,11 @@ func (s *Server) viewMangaDetail(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 	}
-
-	// Fetch enrichment data (categories + related)
 	cats, _ := s.service.ListCategories(pluginID, mangaID)
 	rels, _ := s.service.ListRelated(pluginID, mangaID)
 	s.logger.Debug("enrichment cache", "plugin", pluginID, "manga", mangaID, "categories", len(cats), "related", len(rels))
-
-	// Fetch genre override for template highlighting/toggle logic.
 	overrideGenres, _, _ := s.service.GetMangaGenres(pluginID, mangaID)
 
-	// Host-side chapter pagination: slice the full chapter list (newest-first)
-	// so the detail page renders one page of chapters at a time.
 	const chapterPageSize = 50
 	chPage, _ := strconv.Atoi(r.URL.Query().Get("ChPage"))
 	if chPage < 1 {
@@ -95,7 +75,8 @@ func (s *Server) viewMangaDetail(w http.ResponseWriter, r *http.Request) {
 	chTotal := len(chapters)
 	chStart := min((chPage-1)*chapterPageSize, chTotal)
 	chEnd := min(chStart+chapterPageSize, chTotal)
-	s.renderPage(w, r, "views/detail", "", map[string]any{
+
+	return map[string]any{
 		"PluginID":             pluginID,
 		"PluginName":           pluginName,
 		"PluginIcon":           pluginIcon,
@@ -120,10 +101,27 @@ func (s *Server) viewMangaDetail(w http.ResponseWriter, r *http.Request) {
 		"PluginGenres":         manga.RawGenres,
 		"OverrideGenres":       overrideGenres,
 		"Genres":               manga.Genres,
-
-	})
+	}
 }
 
+// viewMangaDetail renders a manga's info plus its chapter list.
+func (s *Server) viewMangaDetail(w http.ResponseWriter, r *http.Request) {
+	pluginID := param(r, "pluginID")
+	mangaID := param(r, "mangaID")
+	data := s.buildMangaDetailData(r, pluginID, mangaID)
+	if data == nil {
+		http.Error(w, "failed to load manga details", http.StatusBadGateway)
+		return
+	}
+	// SPA: if X-Partial is set, render the partial directly instead of
+	// redirecting — the SPA fetch uses `redirect: 'manual'` so 303s are
+	// opaque and unreadable.
+	if r.Header.Get("X-Partial") == "true" {
+		s.renderPage(w, r, "views/detail", "", data)
+		return
+	}
+	s.renderPage(w, r, "views/detail", "", data)
+}
 // ContinuePoint names where the Continue button should resume.
 type ContinuePoint struct {
 	ChapterID string
@@ -145,6 +143,9 @@ func computeContinue(chapters []types.Chapter, progress map[string]database.Chap
 	var firstUnread *ContinuePoint
 	for _, c := range chapters {
 		p, ok := progress[c.ID]
+		if ok && p.IsSkipped {
+			continue // user explicitly skipped this chapter
+		}
 		if ok && p.LastPageRead > 0 {
 			if p.TotalPages == 0 || p.LastPageRead < p.TotalPages {
 				return &ContinuePoint{ChapterID: c.ID, ChapterN: c.ChapterNum, Page: p.LastPageRead, Started: true}

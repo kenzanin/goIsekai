@@ -101,6 +101,9 @@ func computeContinueAPI(chapters []types.Chapter, progress map[string]database.C
 	var firstUnread *apiContinuePoint
 	for _, c := range chapters {
 		p, ok := progress[c.ID]
+		if ok && p.IsSkipped {
+			continue // user explicitly skipped this chapter
+		}
 		if ok && p.LastPageRead > 0 {
 			if p.TotalPages == 0 || p.LastPageRead < p.TotalPages {
 				return &apiContinuePoint{ChapterID: c.ID, ChapterN: c.ChapterNum, Page: p.LastPageRead, Started: true}

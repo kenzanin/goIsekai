@@ -12,11 +12,55 @@
     '.toast-leave{transform:translateX(100%);opacity:0}';
   (document.head || document.documentElement).appendChild(_style);
 
-  // Global helper: submit a form from an Alpine @click handler.
+  // Global helper: submit a form via SPA fetch (same as submit event handler).
   // Called as: @click="submitForm($el.closest('form'))"
-  window.submitForm = function (form) {
+  window.submitForm = (form) => {
     if (!form) return;
-    form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+    var method = (form.getAttribute('method') || 'get').toLowerCase();
+    if (method !== 'post') return;
+    var action = (form.getAttribute('action') || '').trim();
+    if (action.indexOf('/action/') !== 0) return;
+    if (action.indexOf('export-cbz') !== -1) return;
+    if (action.indexOf('save-verify') !== -1) return;
+
+    fetch(action, {
+      method: 'POST',
+      body: new URLSearchParams(new FormData(form)),
+      headers: { 'X-Partial': 'true' },
+      credentials: 'same-origin',
+    })
+      .then((resp) => {
+        return resp.text().then((html) => {
+          if (!resp.ok) {
+            let m = html?.trim() || `Request failed (${resp.status})`;
+            if (/^</.test(m)) m = `Request failed (${resp.status})`;
+            if (typeof Alpine !== 'undefined' && Alpine.store('toast')) {
+              Alpine.store('toast').show(m, 'error');
+            }
+            return;
+          }
+          const main = document.getElementById('content');
+          if (!main || !html) return;
+          const match = html.match(/<main[^>]*id="content"[\s\S]*?>([\s\S]*?)<\/main>/i);
+          main.innerHTML = match ? match[1] : html;
+          if (window.Alpine && Alpine.initTree) {
+            Alpine.initTree(main);
+          }
+          if (window.syncCoverDim) syncCoverDim();
+          if (window.syncEnrichmentPanel) syncEnrichmentPanel();
+          const u = resp.url || action;
+          if (u && u.indexOf(window.location.origin) === 0) {
+            history.replaceState(history.state, '', u);
+          }
+          if (action.indexOf('fetch-alt-titles') !== -1) expandSection('alt-titles-body');
+          if (action.indexOf('fetch-alt-summaries') !== -1) expandSection('alt-summaries-body');
+        });
+      })
+      .catch(() => {
+        if (typeof Alpine !== 'undefined' && Alpine.store('toast')) {
+          Alpine.store('toast').show('Network error — check your connection', 'error');
+        }
+      });
   };
 
   // Expand a collapsible section (used after fetch-alt-* actions so freshly
@@ -358,7 +402,12 @@
     document.addEventListener(
       'submit',
       (e) => {
+        // Find the form: for native submit events bubbling from children
+        // (e.g. data-confirm flow), e.target may be a child element.
         var form = e.target;
+        if (form?.tagName !== 'FORM') {
+          form = e.target?.closest('form');
+        }
         if (!form?.tagName || form.tagName !== 'FORM' || e.defaultPrevented) return;
         var method = (form.getAttribute('method') || 'get').toLowerCase();
         if (method !== 'post') return;
@@ -412,8 +461,6 @@
               }
               if (window.syncCoverDim) syncCoverDim();
               if (window.syncEnrichmentPanel) syncEnrichmentPanel();
-              // Sync the address bar to the canonical re-rendered URL without
-              // adding a history entry — Back still leaves the detail page.
               const u = resp.url || action;
               if (u && u.indexOf(window.location.origin) === 0) {
                 history.replaceState(history.state, '', u);
@@ -421,7 +468,6 @@
               // After a fetch action, reveal the section that just grew.
               if (action.indexOf('fetch-alt-titles') !== -1) expandSection('alt-titles-body');
               if (action.indexOf('fetch-alt-summaries') !== -1) expandSection('alt-summaries-body');
-              if (action.indexOf('fetch-enrichment') !== -1) expandSection('enrichment-body');
             });
           })
           .catch(() => {
@@ -556,4 +602,32 @@
       Alpine.store('toast').show(msg, type);
     }
   };
+
+  // Toggle visibility of genre tags (show more/less)
+  window.toggleGenreTags = (btnId, maxVisible) => {
+    var tags = document.querySelectorAll('.genre-tag');
+    var btn = document.getElementById(btnId);
+    if (!btn) return;
+    var show = btn.dataset.show === '1';
+    for (var i = maxVisible; i < tags.length; i++) {
+      tags[i].style.display = show ? '' : 'none';
+    }
+    btn.dataset.show = show ? '0' : '1';
+    btn.textContent = show ? 'Show more' : 'Show less';
+  };
 })();
+
+  // =====================================================================
+  // Loading state helpers for buttons
+  // =====================================================================
+  window.setLoading = (btn, loading) => {
+    if (!btn) return;
+    btn.disabled = loading;
+    if (loading) {
+      btn.classList.add('opacity-70');
+    } else {
+      btn.classList.remove('opacity-70');
+    }
+  };
+})();
+

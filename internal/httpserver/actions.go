@@ -35,6 +35,7 @@ func (s *Server) registerActionRoutes() {
 	s.Router.Post("/action/set-chapter-progress", s.handleSetChapterProgress)
 	s.Router.Post("/action/mark-read/{pluginID}/{mangaID}/{chapterID}", s.handleMarkChapterRead)
 	s.Router.Post("/action/reset-progress/{pluginID}/{mangaID}/{chapterID}", s.handleResetChapterProgress)
+	s.Router.Post("/action/toggle-skip/{pluginID}/{mangaID}/{chapterID}", s.handleToggleChapterSkip)
 	s.Router.Post("/action/chapter-actions", s.handleChapterActions)
 	s.Router.Post("/action/save-settings", s.handleSaveSettings)
 	s.Router.Post("/action/save-verify/{pluginID}", s.handleSaveVerify)

@@ -41,6 +41,28 @@ func (d *DB) MarkChapterRead(chapterRowID string) error {
 	return err
 }
 
+// ToggleChapterSkip toggles the is_skipped flag for a chapter.
+func (d *DB) ToggleChapterSkip(chapterRowID string) error {
+	_, err := d.db.Exec(`UPDATE chapters SET is_skipped = 1 - is_skipped WHERE id = ?`, chapterRowID)
+	return err
+}
+
+// SetChaptersSkip sets the is_skipped flag for the given source chapters of a manga.
+func (d *DB) SetChaptersSkip(mangaRowID string, sourceIDs []string, skip bool) error {
+	if len(sourceIDs) == 0 {
+		return nil
+	}
+	ids := make([]Expression, 0, len(sourceIDs))
+	for _, id := range sourceIDs {
+		ids = append(ids, String(id))
+	}
+	_, err := Chapters.UPDATE().
+		SET(Chapters.IsSkipped.SET(Int(readFlag(skip)))).
+		WHERE(Chapters.MangaID.EQ(String(mangaRowID)).AND(Chapters.SourceChapterID.IN(ids...))).
+		Exec(d.db)
+	return err
+}
+
 // readFlag converts a read/unread bool to the integer stored in chapters.is_read.
 func readFlag(read bool) int64 {
 	if read {
@@ -118,8 +140,9 @@ func (d *DB) GetChapterProgressForManga(mangaRowID string) ([]ChapterProgress, e
 		LastPageRead    int64
 		TotalPages      int64
 		IsRead          int64
+		IsSkipped       int64
 	}
-	err := SELECT(Chapters.SourceChapterID.AS("source_chapter_id"), Chapters.LastPageRead.AS("last_page_read"), Chapters.TotalPages.AS("total_pages"), Chapters.IsRead.AS("is_read")).
+	err := SELECT(Chapters.SourceChapterID.AS("source_chapter_id"), Chapters.LastPageRead.AS("last_page_read"), Chapters.TotalPages.AS("total_pages"), Chapters.IsRead.AS("is_read"), Chapters.IsSkipped.AS("is_skipped")).
 		FROM(Chapters).
 		WHERE(Chapters.MangaID.EQ(String(mangaRowID))).
 		Query(d.db, &rows)
@@ -133,6 +156,7 @@ func (d *DB) GetChapterProgressForManga(mangaRowID string) ([]ChapterProgress, e
 			LastPageRead:    int(r.LastPageRead),
 			TotalPages:      int(r.TotalPages),
 			IsRead:          r.IsRead != 0,
+			IsSkipped:       r.IsSkipped != 0,
 		}
 		p.Done = p.IsRead || (p.TotalPages > 0 && p.LastPageRead >= p.TotalPages)
 		out = append(out, p)

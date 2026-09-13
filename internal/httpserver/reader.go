@@ -6,6 +6,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
+	"goisekai/internal/database"
 	"goisekai/pkg/types"
 )
 
@@ -17,20 +18,29 @@ func (s *Server) registerReaderRoutes(r chi.Router) {
 }
 
 // chapterNeighbors returns the chapter IDs before/after chapterID in the
-// plugin's chapter list (empty string when at either end).
+// plugin's chapter list (empty string when at either end), skipping any
+// chapters the user has marked as skipped.
 // chapterNeighbors resolves prev/next in READING order. Chapters arrive
 // newest-first (desc), so the older chapter (prev) sits at i+1 and the
 // newer chapter (next) at i-1.
-func chapterNeighbors(chapters []types.Chapter, chapterID string) (prev, next string) {
+func chapterNeighbors(chapters []types.Chapter, progress map[string]database.ChapterProgress, chapterID string) (prev, next string) {
 	for i, c := range chapters {
 		if c.ID != chapterID {
 			continue
 		}
-		if i+1 < len(chapters) {
-			prev = chapters[i+1].ID
+		for j := i + 1; j < len(chapters); j++ {
+			if progress[chapters[j].ID].IsSkipped {
+				continue
+			}
+			prev = chapters[j].ID
+			break
 		}
-		if i > 0 {
-			next = chapters[i-1].ID
+		for j := i - 1; j >= 0; j-- {
+			if progress[chapters[j].ID].IsSkipped {
+				continue
+			}
+			next = chapters[j].ID
+			break
 		}
 		return prev, next
 	}
@@ -59,7 +69,11 @@ func (s *Server) viewReader(w http.ResponseWriter, r *http.Request) {
 			s.logger.Error("reader chapter list fallback", "error", err, "plugin", pluginID, "manga", mangaID)
 		}
 	}
-	prev, next := chapterNeighbors(chapters, chapterID)
+	progress, err := s.service.GetChapterProgresses(pluginID, mangaID)
+	if err != nil {
+		s.logger.Warn("reader chapter progress", "error", err, "plugin", pluginID, "manga", mangaID)
+	}
+	prev, next := chapterNeighbors(chapters, progress, chapterID)
 	var currentChapter types.Chapter
 	for _, c := range chapters {
 		if c.ID == chapterID {
@@ -115,7 +129,11 @@ func (s *Server) readerData(w http.ResponseWriter, r *http.Request) {
 			s.logger.Error("reader chapter list fallback", "error", err, "plugin", pluginID, "manga", mangaID)
 		}
 	}
-	prev, next := chapterNeighbors(chapters, chapterID)
+	progress, err := s.service.GetChapterProgresses(pluginID, mangaID)
+	if err != nil {
+		s.logger.Warn("reader chapter progress", "error", err, "plugin", pluginID, "manga", mangaID)
+	}
+	prev, next := chapterNeighbors(chapters, progress, chapterID)
 	var chapterNum float64
 	var chapterTitle string
 	for _, c := range chapters {

@@ -211,6 +211,38 @@ func (s *AppService) FetchEnrichment(pluginID, mangaID, title string, sources []
 	logger.Debug("enrich fetch start", "title", title, "sources", sources)
 	items := s.enrich.FetchAll(context.Background(), &http.Client{}, title, sources)
 
+	// Store alt titles.
+	if titles, ok := items[enrich.KindTitles]; ok && len(titles) > 0 {
+		names := make([]string, len(titles))
+		for i, t := range titles {
+			names[i] = t.Value
+		}
+		n, err := s.db.AddAltTitles(rowID, names, titles[0].Source)
+		if err != nil {
+			logger.Warn("store titles", "error", err)
+		} else {
+			logger.Info("enrich titles stored", "count", len(titles), "inserted", n, "source", titles[0].Source)
+		}
+	} else {
+		logger.Debug("enrich titles: none found")
+	}
+
+	// Store alt summaries.
+	if summs, ok := items[enrich.KindSummaries]; ok && len(summs) > 0 {
+		names := make([]string, len(summs))
+		for i, s := range summs {
+			names[i] = s.Value
+		}
+		n, err := s.db.AddAltDescriptions(rowID, names, summs[0].Source)
+		if err != nil {
+			logger.Warn("store summaries", "error", err)
+		} else {
+			logger.Info("enrich summaries stored", "count", len(summs), "inserted", n, "source", summs[0].Source)
+		}
+	} else {
+		logger.Debug("enrich summaries: none found")
+	}
+
 	// Store categories.
 	if cats, ok := items[enrich.KindCategories]; ok && len(cats) > 0 {
 		names := make([]string, len(cats))

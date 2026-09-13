@@ -167,10 +167,10 @@ func (d *DB) ResolveMangaRowID(pluginID, sourceMangaID string) (string, error) {
 // ResetEnrichment deletes all enrichment data for a manga: alt titles, alt summaries,
 // categories, related, and clears genre/title/synopsis overrides.
 func (d *DB) ResetEnrichment(mangaRowID string) error {
-	if _, err := d.db.Exec(`DELETE FROM manga_alt_titles WHERE manga_row_id = ?`, mangaRowID); err != nil {
+	if _, err := d.db.Exec(`DELETE FROM alt_titles WHERE manga_row_id = ?`, mangaRowID); err != nil {
 		return err
 	}
-	if _, err := d.db.Exec(`DELETE FROM manga_alt_summaries WHERE manga_row_id = ?`, mangaRowID); err != nil {
+	if _, err := d.db.Exec(`DELETE FROM alt_descriptions WHERE manga_row_id = ?`, mangaRowID); err != nil {
 		return err
 	}
 	if _, err := d.db.Exec(`DELETE FROM manga_categories WHERE manga_row_id = ?`, mangaRowID); err != nil {
@@ -179,11 +179,11 @@ func (d *DB) ResetEnrichment(mangaRowID string) error {
 	if _, err := d.db.Exec(`DELETE FROM manga_related WHERE manga_row_id = ?`, mangaRowID); err != nil {
 		return err
 	}
-	if _, err := d.db.Exec(`DELETE FROM manga_chapters_read WHERE manga_row_id = ?`, mangaRowID); err != nil {
+	if _, err := d.db.Exec(`DELETE FROM read_history WHERE chapter_id IN (SELECT id FROM chapters WHERE manga_id = ?)`, mangaRowID); err != nil {
 		return err
 	}
 	// Restore title/synopsis to plugin originals.
-	if _, err := d.db.Exec(`UPDATE mangas SET custom_title = 0, custom_description = 0 WHERE id = ?`, mangaRowID); err != nil {
+	if _, err := d.db.Exec(`UPDATE mangas SET custom_title = 0, custom_description = 0, genres = NULL WHERE id = ?`, mangaRowID); err != nil {
 		return err
 	}
 	return nil

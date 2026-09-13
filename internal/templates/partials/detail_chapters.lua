@@ -36,6 +36,8 @@ return function(data)
 			.. '<select name="action" class="bg-neutral-900 border border-neutral-700 text-neutral-200 rounded-md px-3 py-1.5 text-sm">'
 			.. '<option value="mark-selected-read">Mark selected as read</option>'
 			.. '<option value="mark-selected-unread">Mark selected as unread</option>'
+			.. '<option value="mark-selected-show">Mark selected as show</option>'
+			.. '<option value="mark-selected-hide">Mark selected as hide</option>'
 			.. '<option value="mark-up-to">Mark up to selected</option>'
 			.. '<option value="clear-up-to">Clear up to selected</option>'
 			.. '<option value="mark-all-read">Mark all as read</option>'
@@ -173,6 +175,28 @@ return function(data)
 				.. h(formatChapterNum(chapterNum))
 				.. '">'
 				.. '<button type="submit" title="Download this chapter as .cbz" class="h-7 px-2 inline-flex items-center justify-center rounded-md border border-neutral-700 hover:bg-neutral-800 text-sm whitespace-nowrap">⬇ cbz</button>'
+				.. '</form>'
+			-- Skip toggle button (eye icon)
+			local isSkipped = p.IsSkipped or false
+			rowHTML = rowHTML
+				.. '<form method="post" action="/action/toggle-skip/'
+				.. h(pluginID)
+				.. "/"
+				.. h(mangaID)
+				.. "/"
+				.. h(cID)
+				.. '">'
+				.. '<button type="submit" title="'
+				.. (isSkipped and "Unskip this chapter" or "Skip this chapter")
+				.. '" class="size-7 inline-flex items-center justify-center rounded-md border transition text-sm '
+				.. (isSkipped and "border-amber-600/50 text-amber-400 bg-amber-500/10 hover:bg-amber-500/20" or "border-neutral-700 hover:bg-neutral-800 text-neutral-500 hover:text-neutral-300")
+				.. '" aria-label="'
+				.. (isSkipped and "Unskip" or "Skip")
+				.. '">'
+				.. (isSkipped
+					and '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="size-4"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>'
+					or '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="size-4"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>')
+				.. "</button>"
 				.. "</form></div>"
 
 			chaptersHTML = chaptersHTML .. rowHTML

@@ -40,6 +40,7 @@ var ddl = []string{
     chapter_num REAL NOT NULL,
     volume_num REAL,
     is_read INTEGER DEFAULT 0,
+    is_skipped INTEGER DEFAULT 0,
     last_page_read INTEGER DEFAULT 0,
     download_status TEXT DEFAULT 'NOT_DOWNLOADED',
     fetched_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,

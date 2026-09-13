@@ -1,5 +1,27 @@
 # goIsekai — Agent Guide
 
+## Tool Preferences (MANDATORY)
+
+**Always use these tools in this order of priority:**
+
+| Task                                         | Tool                  | Notes                                                            |
+| -------------------------------------------- | --------------------- | ---------------------------------------------------------------- |
+| Shell commands, builds, tests                | `bash`                | Default for all terminal operations                              |
+| Code exploration, find references, relations | `codebase-memory-mcp` | Use `search_graph`, `trace_path`, `get_code_snippet` before grep |
+| Memory management, session state             | `agentic-memory-mcp`  | Store/recall context across sessions                             |
+| Browse web pages, check UI                   | `obscura`             | Primary browser tool                                             |
+| Debug web pages (console, network)           | `playwright-cdp`      | Only when deep debugging needed                                  |
+| Look up API docs, library info               | `deepwiki`            | For GitHub repos and documentation                               |
+
+**Workflow:**
+
+1. Before editing code → `codebase-memory-mcp` to find all references and callers
+2. Before testing changes → `obscura` to verify UI behavior
+3. After completing task → `vestige-mcp` to store session context
+4. When stuck on API → `deepwiki` to check documentation
+
+---
+
 ## Project Overview
 
 **goIsekai** is a manga library manager and reader with an embedded HTTP server and browser UI. Plugins (Lua, JS, Go, or Yaegi) fetch manga from external sites. The host manages libraries, reading progress, image caching, and alt-title enrichment.
@@ -10,20 +32,20 @@ Module: `goisekai` · Go 1.27 · CGO-free · pure Go SQLite
 
 ## Commands
 
-| Command | What it does |
-|---|---|
-| `make build` | Full build (runs `css`, `br`, then `CGO_ENABLED=0 go build`) |
-| `make test` | Run all tests (`CGO_ENABLED=0 go test ./internal/... ./pkg/... ./cmd/...`) |
-| `make race` | Run tests with `-race` (`CGO_ENABLED=1`) |
-| `make lint` | `golangci-lint run ./internal/... ./pkg/... ./cmd/...` |
-| `make modernize` | `modernize -fix` on all packages |
-| `make check` | Full quality gate: fmt + race + modernize + lint + lint-web + lint-lua |
-| `make run` | Build + launch (`./goisekai -logLevel debug`) |
-| `make fmt` | `go fmt` on all packages |
-| `make fmt-web` | `biome check --write cmd/goisekai/frontend` |
-| `make fmt-lua` | `stylua internal/templates/` |
-| `make lint-web` | `biome check cmd/goisekai/frontend` (read-only) |
-| `make lint-lua` | `luacheck internal/templates/ --codes --no-unused --no-unused-args` |
+| Command          | What it does                                                               |
+| ---------------- | -------------------------------------------------------------------------- |
+| `make build`     | Full build (runs `css`, `br`, then `CGO_ENABLED=0 go build`)               |
+| `make test`      | Run all tests (`CGO_ENABLED=0 go test ./internal/... ./pkg/... ./cmd/...`) |
+| `make race`      | Run tests with `-race` (`CGO_ENABLED=1`)                                   |
+| `make lint`      | `golangci-lint run ./internal/... ./pkg/... ./cmd/...`                     |
+| `make modernize` | `modernize -fix` on all packages                                           |
+| `make check`     | Full quality gate: fmt + race + modernize + lint + lint-web + lint-lua     |
+| `make run`       | Build + launch (`./goisekai -logLevel debug`)                              |
+| `make fmt`       | `go fmt` on all packages                                                   |
+| `make fmt-web`   | `biome check --write cmd/goisekai/frontend`                                |
+| `make fmt-lua`   | `stylua internal/templates/`                                               |
+| `make lint-web`  | `biome check cmd/goisekai/frontend` (read-only)                            |
+| `make lint-lua`  | `luacheck internal/templates/ --codes --no-unused --no-unused-args`        |
 
 All Go commands use `CGO_ENABLED=0` by default (pure Go SQLite). Tests in `make race` set `CGO_ENABLED=1`.
 
@@ -46,9 +68,11 @@ pkg/types/*                   ← Plugin ABI contract, shared types
 ```
 
 **Data flow for a plugin search:**
+
 1. HTTP handler → `AppService.Search()` → `PluginManager.Search()` → instantiate plugin VM → call `Search()` export → parse JSON → return
 
 **Data flow for reading:**
+
 1. Reader loads chapters from DB → plugin's `GetPageList()` → pages downloaded → cached on disk → served through image proxy
 
 **Plugin ABI** (`pkg/types/abi.go`): Plugins export `Search`, `GetMangaDetail`, `GetChapterList`, `GetPageList` as JSON-over-string functions. Optional: `Init`, `GetAltTitles`, `GetAltSummary`. The host imports `host_http_request` for all network access.
@@ -66,10 +90,12 @@ pkg/types/*                   ← Plugin ABI contract, shared types
 - WAL mode enabled, busy timeout 5000ms
 
 **Jet DSL pattern** (from `chapters_query.go`):
+
 ```go
 Chapters.INSERT(Chapters.ID, Chapters.MangaID, ...).Exec(d.db)
 SELECT(Chapters.Title).FROM(Chapters).WHERE(Chapters.ID.EQ(String(id))).Query(d.db, &out)
 ```
+
 Note the dot-import of `. "github.com/go-jet/jet/v2/sqlite"` in query files — it's intentional and excluded from staticcheck.
 
 ---
@@ -78,12 +104,12 @@ Note the dot-import of `. "github.com/go-jet/jet/v2/sqlite"` in query files — 
 
 Four plugin kinds supported by `PluginManager`:
 
-| Kind | Runtime | Entry | Notes |
-|---|---|---|---|
-| `lua` | lunar VM | `main.lua` | Full Lua 5.4, host functions injected |
-| `js` | goja VM | `main.js` | ES5-compatible, host functions injected |
-| `go` | `plugin.Load` | `.so` | Native Go plugin, must match host ABI exactly |
-| `yaegi` | Yaegi interpreter | `.go` files | Go-like dialect, interpreted |
+| Kind    | Runtime           | Entry       | Notes                                         |
+| ------- | ----------------- | ----------- | --------------------------------------------- |
+| `lua`   | lunar VM          | `main.lua`  | Full Lua 5.4, host functions injected         |
+| `js`    | goja VM           | `main.js`   | ES5-compatible, host functions injected       |
+| `go`    | `plugin.Load`     | `.so`       | Native Go plugin, must match host ABI exactly |
+| `yaegi` | Yaegi interpreter | `.go` files | Go-like dialect, interpreted                  |
 
 Plugins are **lazily loaded**: first invocation instantiates the VM, subsequent calls reuse it. Each plugin is protected by a `sync.Mutex` to prevent interleaved invocations.
 
@@ -141,6 +167,7 @@ Plugin network calls route through `hostnet.Proxy` which handles TLS fingerprint
 ## Change Management (OpenSpec)
 
 Changes use the **openspec** workflow in `openspec/`:
+
 - `openspec/specs/` — current specs
 - `openspec/changes/` — active change proposals (delta specs)
 - `openspec/changes/archive/` — completed changes

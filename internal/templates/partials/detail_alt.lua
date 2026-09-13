@@ -16,6 +16,8 @@ return function(data)
 	local cats = data.Categories or {}
 	local rels = data.Related or {}
 	local genres = data.Genres or {}
+	local pluginGenres = data.PluginGenres or {}
+	local author = data.Author or ""
 
 	-- Use &quot; for JSON double-quotes so they don't break the HTML attribute.
 	-- The browser decodes &quot; → " before Alpine sees the x-data expression.
@@ -40,14 +42,18 @@ return function(data)
 	local xData = "x-data=\"{ loading: false, currentGenres: " .. genresJSON .. ", currentRelated: " .. relsJSON .. " }\""
 
 	local chevOnClick =
-		"this.nextElementSibling.classList.toggle(&quot;hidden&quot;);this.querySelector(&quot;.chev&quot;).classList.toggle(&quot;rotate-90&quot;)"
+		"var b=document.getElementById(&quot;enrichment-btn&quot;);var bd=document.getElementById(&quot;enrichment-body&quot;);bd.classList.toggle(&quot;hidden&quot;);b.querySelector(&quot;.chev&quot;).classList.toggle(&quot;rotate-90&quot;);try{localStorage.setItem(&quot;gsk:enrichment-open:&quot;+b.dataset.key,b.querySelector(&quot;.chev&quot;).classList.contains(&quot;rotate-90&quot;) ? &quot;1&quot; : &quot;0&quot;)}catch(e){}"
 
 	local body = ""
 
 	-- Enrichment collapsible header
 	body = body
 		.. '<div class="mb-4 border-t border-neutral-800 pt-4">'
-		.. '<button type="button" onclick="'
+		.. '<button type="button" id="enrichment-btn" data-key="'
+		.. h(pluginID)
+		.. ':'
+		.. h(mangaID)
+		.. '" onclick="'
 		.. chevOnClick
 		.. '" class="flex items-center gap-1.5 cursor-pointer group select-none">'
 		.. '<svg class="size-3.5 text-neutral-500 chev transition-transform" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>'
@@ -57,7 +63,8 @@ return function(data)
 
 	-- Fetch button with spinner + Reset button side by side
 	body = body
-		.. '<div class="mb-3 flex items-center gap-2">'
+	.. (author ~= "" and ('<p class="text-sm text-neutral-400 mb-2">' .. "Author: " .. h(author) .. "</p>") or "")
+	.. '<div class="mb-3 flex items-center gap-2">'
 		.. '<form method="post" action="/action/fetch-enrichment/'
 		.. h(pluginID)
 		.. "/"
@@ -182,7 +189,7 @@ return function(data)
 		for _, c in ipairs(cats) do
 			if not c.Value or c.Value == "" then goto next end
 			local isCurrent = false
-			for _, g in ipairs(genres) do
+			for _, g in ipairs(pluginGenres) do
 				if g == c.Value then isCurrent = true; break end
 			end
 			body = body

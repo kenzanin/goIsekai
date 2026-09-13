@@ -42,6 +42,7 @@ type ChapterProgress struct {
 	LastPageRead    int
 	TotalPages      int
 	IsRead          bool // manually marked read (mark-read actions)
+	IsSkipped       bool // user opted to skip this chapter
 	Done            bool // IsRead OR fully read (LastPageRead >= TotalPages > 0)
 	CachedPages     int  // page files present in the disk cache (populated by the bridge layer)
 }
@@ -171,6 +172,17 @@ func (d *DB) runMigrations() error {
 		if i == altTitlesMigration {
 			if err := migrateAltTitles(tx); err != nil {
 				return fmt.Errorf("applying migration %d: %w", i, err)
+			}
+			continue
+		}
+		if i == skipColumnMigration {
+			// Idempotent: check if column already exists (test DBs may have it from CREATE TABLE).
+			var cnt int
+			_ = tx.QueryRow(`SELECT COUNT(*) FROM pragma_table_info('chapters') WHERE name='is_skipped'`).Scan(&cnt)
+			if cnt == 0 {
+				if _, err := tx.Exec(migrations[i]); err != nil {
+					return fmt.Errorf("applying migration %d: %w", i, err)
+				}
 			}
 			continue
 		}

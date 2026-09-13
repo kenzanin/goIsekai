@@ -19,7 +19,7 @@ func (s *Server) handleFetchAltTitles(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusBadGateway)
 		return
 	}
-	s.hxRedirect(w, "/view/manga/"+pluginID+"/"+mangaID)
+	s.viewMangaDetail(w, r)
 }
 
 // handleSetTitle promotes the submitted title to be the manga's main title.
@@ -37,7 +37,7 @@ func (s *Server) handleSetTitle(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	s.hxRedirect(w, "/view/manga/"+pluginID+"/"+mangaID)
+	s.viewMangaDetail(w, r)
 }
 
 // handleRemoveAltTitle removes the submitted alternative title.
@@ -55,7 +55,7 @@ func (s *Server) handleRemoveAltTitle(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	s.hxRedirect(w, "/view/manga/"+pluginID+"/"+mangaID)
+	s.viewMangaDetail(w, r)
 }
 
 // handleFetchAltSummaries resolves alternative summaries via the provider
@@ -74,7 +74,7 @@ func (s *Server) handleFetchAltSummaries(w http.ResponseWriter, r *http.Request)
 		http.Error(w, err.Error(), http.StatusBadGateway)
 		return
 	}
-	s.hxRedirect(w, "/view/manga/"+pluginID+"/"+mangaID)
+	s.viewMangaDetail(w, r)
 }
 
 // handleRemoveAltSummary removes the submitted alternative description.
@@ -92,7 +92,7 @@ func (s *Server) handleRemoveAltSummary(w http.ResponseWriter, r *http.Request) 
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	s.hxRedirect(w, "/view/manga/"+pluginID+"/"+mangaID)
+	s.viewMangaDetail(w, r)
 }
 
 // handleSetSummary promotes the submitted alternative description to be
@@ -111,7 +111,7 @@ func (s *Server) handleSetSummary(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	s.hxRedirect(w, "/view/manga/"+pluginID+"/"+mangaID)
+	s.viewMangaDetail(w, r)
 }
 
 // handleFetchEnrichment fetches categories and related manga from enrichment
@@ -142,7 +142,7 @@ func (s *Server) handleFetchEnrichment(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusBadGateway)
 		return
 	}
-	s.hxRedirect(w, "/view/manga/"+pluginID+"/"+mangaID)
+	s.viewMangaDetail(w, r)
 }
 
 func (s *Server) handleRemoveGenre(w http.ResponseWriter, r *http.Request) {
@@ -159,7 +159,7 @@ func (s *Server) handleRemoveGenre(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	s.hxRedirect(w, "/view/manga/"+pluginID+"/"+mangaID)
+	s.viewMangaDetail(w, r)
 }
 
 func (s *Server) handleRemoveRelated(w http.ResponseWriter, r *http.Request) {
@@ -176,7 +176,7 @@ func (s *Server) handleRemoveRelated(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	s.hxRedirect(w, "/view/manga/"+pluginID+"/"+mangaID)
+	s.viewMangaDetail(w, r)
 }
 
 func (s *Server) handleRemoveCategory(w http.ResponseWriter, r *http.Request) {
@@ -196,7 +196,7 @@ func (s *Server) handleRemoveCategory(w http.ResponseWriter, r *http.Request) {
 	if err := s.service.ToggleGenre(pluginID, mangaID, category); err != nil {
 		s.logger.Error("toggle genre from category", "pluginID", pluginID, "mangaID", mangaID, "category", category, "error", err)
 	}
-	s.hxRedirect(w, "/view/manga/"+pluginID+"/"+mangaID)
+	s.viewMangaDetail(w, r)
 }
 
 // handleAddCategory adds a user-supplied category to a manga.
@@ -217,7 +217,7 @@ func (s *Server) handleAddCategory(w http.ResponseWriter, r *http.Request) {
 	if err := s.service.ToggleGenre(pluginID, mangaID, category); err != nil {
 		s.logger.Error("toggle genre from category", "pluginID", pluginID, "mangaID", mangaID, "category", category, "error", err)
 	}
-	s.hxRedirect(w, "/view/manga/"+pluginID+"/"+mangaID)
+	s.viewMangaDetail(w, r)
 }
 
 // handleAddGenre adds a user-supplied genre to a manga.
@@ -235,7 +235,7 @@ func (s *Server) handleAddGenre(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	s.hxRedirect(w, "/view/manga/"+pluginID+"/"+mangaID)
+	s.viewMangaDetail(w, r)
 }
 
 // handleResetEnrichment deletes all enrichment overrides and restores
@@ -248,5 +248,5 @@ func (s *Server) handleResetEnrichment(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	s.hxRedirect(w, "/view/manga/"+pluginID+"/"+mangaID)
+	s.viewMangaDetail(w, r)
 }

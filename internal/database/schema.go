@@ -5,6 +5,11 @@ package database
 // a plain DDL Exec.
 const altTitlesMigration = 9
 
+// skipColumnMigration is the index for the is_skipped ALTER TABLE migration.
+// It's special-cased because test databases may already have the column from
+// the CREATE TABLE DDL, making a plain ALTER TABLE fail with "duplicate column".
+const skipColumnMigration = 18
+
 // migrations is an ordered list of DDL statements applied in sequence.
 // Version is tracked via PRAGMA user_version; migrations[i] is applied when
 // user_version < len(migrations) so partial upgrades resume correctly.
@@ -30,6 +35,7 @@ var migrations = []string{
     chapter_num REAL NOT NULL,
     volume_num REAL,
     is_read INTEGER DEFAULT 0,
+    is_skipped INTEGER DEFAULT 0,
     last_page_read INTEGER DEFAULT 0,
     download_status TEXT DEFAULT 'NOT_DOWNLOADED',
     fetched_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -109,4 +115,7 @@ var migrations = []string{
 	// "use the plugin-supplied list". ponytail: when genre overrides grow
 	// into per-source tracking, replace the JSON column with a table.
 	`ALTER TABLE mangas ADD COLUMN genres TEXT;`,
+	// Index 18: skip flag for chapters — skipped chapters are excluded from
+	// "continue reading" navigation and reader auto-advance.
+	`ALTER TABLE chapters ADD COLUMN is_skipped INTEGER DEFAULT 0;`,
 }

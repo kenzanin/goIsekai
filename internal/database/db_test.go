@@ -573,3 +573,34 @@ func TestNewBadgeLifecycle(t *testing.T) {
 		t.Fatalf("badge must be off after the manga was opened: %+v", s)
 	}
 }
+
+func TestToggleChapterSkip(t *testing.T) {
+	db := openTestDB(t)
+	if err := db.UpsertManga(Manga{ID: "m1", PluginID: "p1", SourceMangaID: "s1", Title: "S"}); err != nil {
+		t.Fatalf("upsert manga: %v", err)
+	}
+	if err := db.UpsertChapter(Chapter{ID: "c1", MangaID: "m1", SourceChapterID: "cs1", Title: "Ch1", ChapterNum: 1}); err != nil {
+		t.Fatalf("upsert chapter: %v", err)
+	}
+	// Initial state: not skipped.
+	progress := chapterProgressBySource(t, db, "m1")
+	if progress["cs1"].IsSkipped {
+		t.Fatal("chapter should not be skipped initially")
+	}
+	// Toggle on.
+	if err := db.ToggleChapterSkip("c1"); err != nil {
+		t.Fatalf("ToggleChapterSkip: %v", err)
+	}
+	progress = chapterProgressBySource(t, db, "m1")
+	if !progress["cs1"].IsSkipped {
+		t.Fatal("chapter should be skipped after first toggle")
+	}
+	// Toggle off.
+	if err := db.ToggleChapterSkip("c1"); err != nil {
+		t.Fatalf("ToggleChapterSkip: %v", err)
+	}
+	progress = chapterProgressBySource(t, db, "m1")
+	if progress["cs1"].IsSkipped {
+		t.Fatal("chapter should not be skipped after second toggle")
+	}
+}

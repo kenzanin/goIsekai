@@ -55,6 +55,20 @@ func (s *Server) handleResetChapterProgress(w http.ResponseWriter, r *http.Reque
 	s.hxRedirect(w, "/view/manga/"+pluginID+"/"+mangaID)
 }
 
+
+// handleToggleChapterSkip toggles the skip flag on a single chapter.
+func (s *Server) handleToggleChapterSkip(w http.ResponseWriter, r *http.Request) {
+	pluginID := param(r, "pluginID")
+	mangaID := param(r, "mangaID")
+	chapterID := param(r, "chapterID")
+	if err := s.service.ToggleChapterSkip(pluginID, mangaID, chapterID); err != nil {
+		s.logger.Error("toggle chapter skip", "pluginID", pluginID, "mangaID", mangaID, "chapterID", chapterID, "error", err)
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	s.hxRedirect(w, "/view/manga/"+pluginID+"/"+mangaID)
+}
+
 // handleChapterActions dispatches the chapter-list action dropdown onto the
 // matching bulk progress or cache operation.
 func (s *Server) handleChapterActions(w http.ResponseWriter, r *http.Request) {
@@ -80,6 +94,12 @@ func (s *Server) handleChapterActions(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		err = s.service.SetChaptersRead(pluginID, mangaID, chapterIDs, action == "mark-selected-read")
+	case "mark-selected-show", "mark-selected-hide":
+		if len(chapterIDs) == 0 {
+			http.Error(w, "no chapters selected", http.StatusBadRequest)
+			return
+		}
+		err = s.service.SetChaptersSkip(pluginID, mangaID, chapterIDs, action == "mark-selected-hide")
 	case "mark-up-to", "clear-up-to":
 		if len(chapterIDs) == 0 {
 			http.Error(w, "no chapters selected", http.StatusBadRequest)

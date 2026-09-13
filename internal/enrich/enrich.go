@@ -159,7 +159,6 @@ func (r *Registry) Fetch(ctx context.Context, httpc *http.Client, source string,
 
 // FetchAll fetches every kind supported by the given sources for the title.
 // Returns a map[Kind][]Item. Items that fail to fetch are skipped (best-effort).
-// Titles/summaries are excluded since those are handled by the existing alt-titles system.
 func (r *Registry) FetchAll(ctx context.Context, httpc *http.Client, title string, sources []string) map[Kind][]Item {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
@@ -171,9 +170,6 @@ func (r *Registry) FetchAll(ctx context.Context, httpc *http.Client, title strin
 			continue
 		}
 		for _, kind := range p.Kinds() {
-			if kind == KindTitles || kind == KindSummaries {
-				continue
-			}
 			items, err := p.Fetch(ctx, httpc, title, kind)
 			if err != nil {
 				logger.Debug("enrich fetch failed", "source", source, "kind", string(kind), "error", err)

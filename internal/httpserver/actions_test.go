@@ -140,6 +140,8 @@ func TestActionChapterActions(t *testing.T) {
 		{"mark all read", "pluginID=dummy&mangaID=manga1&action=mark-all-read", 303},
 		{"mark all unread", "pluginID=dummy&mangaID=manga1&action=mark-all-unread", 303},
 		{"mark up to unknown chapter", "pluginID=dummy&mangaID=manga1&action=mark-up-to&chapterIDs=nope", 400},
+		{"mark selected show", "pluginID=dummy&mangaID=manga1&action=mark-selected-show&chapterIDs=cs1", 303},
+		{"mark selected hide", "pluginID=dummy&mangaID=manga1&action=mark-selected-hide&chapterIDs=cs1", 303},
 		{"selection required", "pluginID=dummy&mangaID=manga1&action=mark-selected-read", 400},
 		{"unknown action", "pluginID=dummy&mangaID=manga1&action=bogus", 400},
 		{"missing manga", "pluginID=dummy&action=mark-all-read", 400},
@@ -150,5 +152,16 @@ func TestActionChapterActions(t *testing.T) {
 				t.Fatalf("status = %d, want %d", got, tc.want)
 			}
 		})
+	}
+}
+
+func TestActionToggleChapterSkip(t *testing.T) {
+	s := testServerFull(t, "", true)
+	// Route: /action/toggle-skip/{pluginID}/{mangaID}/{chapterID}
+	req := httptest.NewRequest("POST", "/action/toggle-skip/dummy/manga1/chapter1", nil)
+	rec := httptest.NewRecorder()
+	s.Router.ServeHTTP(rec, req)
+	if rec.Code != 303 && rec.Code != 200 {
+		t.Fatalf("status = %d, want 303 or 200", rec.Code)
 	}
 }

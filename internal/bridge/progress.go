@@ -136,3 +136,19 @@ func (s *AppService) GetChapterProgresses(pluginID, mangaID string) (map[string]
 	}
 	return out, nil
 }
+
+// ToggleChapterSkip toggles the skip flag for a chapter.
+func (s *AppService) ToggleChapterSkip(pluginID, mangaID, chapterID string) error {
+	if err := s.db.ToggleChapterSkip(chapterRowID(pluginID, mangaID, chapterID)); err != nil {
+		return fmt.Errorf("bridge: toggle chapter skip: %w", err)
+	}
+	return nil
+}
+
+// SetChaptersSkip sets the skip flag for the given source chapters of a manga.
+func (s *AppService) SetChaptersSkip(pluginID, mangaID string, chapterIDs []string, skip bool) error {
+	if err := s.db.SetChaptersSkip(mangaRowID(pluginID, mangaID), chapterIDs, skip); err != nil {
+		return fmt.Errorf("bridge: set chapters skip: %w", err)
+	}
+	return nil
+}

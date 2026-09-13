@@ -145,7 +145,10 @@ func TestActionSetTitleParsesFormField(t *testing.T) {
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	rec := httptest.NewRecorder()
 	s.Router.ServeHTTP(rec, req)
-	if rec.Code != 303 {
-		t.Errorf("status = %d, want 303; body = %q", rec.Code, rec.Body.String())
+	if rec.Code != 200 {
+		t.Fatalf("status = %d, want 200", rec.Code)
+	}
+	if !strings.Contains(rec.Body.String(), "Some Alt Title") {
+		t.Error("response should contain the set title")
 	}
 }
