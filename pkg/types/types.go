@@ -19,6 +19,9 @@ type Manga struct {
 	// RawGenres is the plugin-supplied genres, preserved before any user override.
 	// Internal use only — not part of the plugin ABI.
 	RawGenres []string `json:"-"`
+	// CoverDim is the server-side cover dim overlay flag (0 = off, 1 = on).
+	// Internal use only — not part of the plugin ABI.
+	CoverDim int64 `json:"-"`
 }
 
 // Chapter is a single chapter of a manga.

@@ -69,6 +69,18 @@ func (s *Server) handleToggleChapterSkip(w http.ResponseWriter, r *http.Request)
 	s.hxRedirect(w, "/view/manga/"+pluginID+"/"+mangaID)
 }
 
+// handleToggleCoverDim toggles the cover dim overlay on a manga.
+func (s *Server) handleToggleCoverDim(w http.ResponseWriter, r *http.Request) {
+	pluginID := param(r, "pluginID")
+	mangaID := param(r, "mangaID")
+	if err := s.service.ToggleCoverDim(pluginID, mangaID); err != nil {
+		s.logger.Error("toggle cover dim", "pluginID", pluginID, "mangaID", mangaID, "error", err)
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	s.hxRedirect(w, "/view/manga/"+pluginID+"/"+mangaID)
+}
+
 // handleChapterActions dispatches the chapter-list action dropdown onto the
 // matching bulk progress or cache operation.
 func (s *Server) handleChapterActions(w http.ResponseWriter, r *http.Request) {

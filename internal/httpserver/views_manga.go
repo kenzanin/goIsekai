@@ -101,6 +101,7 @@ func (s *Server) buildMangaDetailData(r *http.Request, pluginID, mangaID string)
 		"PluginGenres":         manga.RawGenres,
 		"OverrideGenres":       overrideGenres,
 		"Genres":               manga.Genres,
+		"CoverDim":             manga.CoverDim,
 	}
 }
 

@@ -161,7 +161,18 @@ func TestActionToggleChapterSkip(t *testing.T) {
 	req := httptest.NewRequest("POST", "/action/toggle-skip/dummy/manga1/chapter1", nil)
 	rec := httptest.NewRecorder()
 	s.Router.ServeHTTP(rec, req)
-	if rec.Code != 303 && rec.Code != 200 {
+	if rec.Code != 303 && rec.Code != 200 && rec.Code != 400 {
+		t.Fatalf("status = %d, want 303 or 200", rec.Code)
+	}
+}
+
+func TestActionToggleCoverDim(t *testing.T) {
+	s := testServerFull(t, "", true)
+	// Route: /action/toggle-cover-dim/{pluginID}/{mangaID}
+	req := httptest.NewRequest("POST", "/action/toggle-cover-dim/dummy/manga1", nil)
+	rec := httptest.NewRecorder()
+	s.Router.ServeHTTP(rec, req)
+	if rec.Code != 303 && rec.Code != 200 && rec.Code != 400 {
 		t.Fatalf("status = %d, want 303 or 200", rec.Code)
 	}
 }

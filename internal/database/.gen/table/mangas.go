@@ -17,18 +17,21 @@ type mangasTable struct {
 	sqlite.Table
 
 	// Columns
-	ID            sqlite.ColumnString
-	PluginID      sqlite.ColumnString
-	SourceMangaID sqlite.ColumnString
-	Title         sqlite.ColumnString
-	CoverURL      sqlite.ColumnString
-	Description   sqlite.ColumnString
-	Status        sqlite.ColumnString
-	InLibrary     sqlite.ColumnInteger
-	CreatedAt     sqlite.ColumnTimestamp
-	UpdatedAt     sqlite.ColumnTimestamp
-	NewSince      sqlite.ColumnTimestamp
-	CustomTitle   sqlite.ColumnInteger
+	ID                sqlite.ColumnString
+	PluginID          sqlite.ColumnString
+	SourceMangaID     sqlite.ColumnString
+	Title             sqlite.ColumnString
+	CoverURL          sqlite.ColumnString
+	Description       sqlite.ColumnString
+	Status            sqlite.ColumnString
+	InLibrary         sqlite.ColumnInteger
+	CreatedAt         sqlite.ColumnTimestamp
+	UpdatedAt         sqlite.ColumnTimestamp
+	NewSince          sqlite.ColumnTimestamp
+	CustomTitle       sqlite.ColumnInteger
+	CustomDescription sqlite.ColumnInteger
+	Genres            sqlite.ColumnString
+	CoverDim          sqlite.ColumnInteger
 
 	AllColumns     sqlite.ColumnList
 	MutableColumns sqlite.ColumnList
@@ -70,39 +73,45 @@ func newMangasTable(schemaName, tableName, alias string) *MangasTable {
 
 func newMangasTableImpl(schemaName, tableName, alias string) mangasTable {
 	var (
-		IDColumn            = sqlite.StringColumn("id")
-		PluginIDColumn      = sqlite.StringColumn("plugin_id")
-		SourceMangaIDColumn = sqlite.StringColumn("source_manga_id")
-		TitleColumn         = sqlite.StringColumn("title")
-		CoverURLColumn      = sqlite.StringColumn("cover_url")
-		DescriptionColumn   = sqlite.StringColumn("description")
-		StatusColumn        = sqlite.StringColumn("status")
-		InLibraryColumn     = sqlite.IntegerColumn("in_library")
-		CreatedAtColumn     = sqlite.TimestampColumn("created_at")
-		UpdatedAtColumn     = sqlite.TimestampColumn("updated_at")
-		NewSinceColumn      = sqlite.TimestampColumn("new_since")
-		CustomTitleColumn   = sqlite.IntegerColumn("custom_title")
-		allColumns          = sqlite.ColumnList{IDColumn, PluginIDColumn, SourceMangaIDColumn, TitleColumn, CoverURLColumn, DescriptionColumn, StatusColumn, InLibraryColumn, CreatedAtColumn, UpdatedAtColumn, NewSinceColumn, CustomTitleColumn}
-		mutableColumns      = sqlite.ColumnList{PluginIDColumn, SourceMangaIDColumn, TitleColumn, CoverURLColumn, DescriptionColumn, StatusColumn, InLibraryColumn, CreatedAtColumn, UpdatedAtColumn, NewSinceColumn, CustomTitleColumn}
-		defaultColumns      = sqlite.ColumnList{InLibraryColumn, CreatedAtColumn, UpdatedAtColumn, CustomTitleColumn}
+		IDColumn                = sqlite.StringColumn("id")
+		PluginIDColumn          = sqlite.StringColumn("plugin_id")
+		SourceMangaIDColumn     = sqlite.StringColumn("source_manga_id")
+		TitleColumn             = sqlite.StringColumn("title")
+		CoverURLColumn          = sqlite.StringColumn("cover_url")
+		DescriptionColumn       = sqlite.StringColumn("description")
+		StatusColumn            = sqlite.StringColumn("status")
+		InLibraryColumn         = sqlite.IntegerColumn("in_library")
+		CreatedAtColumn         = sqlite.TimestampColumn("created_at")
+		UpdatedAtColumn         = sqlite.TimestampColumn("updated_at")
+		NewSinceColumn          = sqlite.TimestampColumn("new_since")
+		CustomTitleColumn       = sqlite.IntegerColumn("custom_title")
+		CustomDescriptionColumn = sqlite.IntegerColumn("custom_description")
+		GenresColumn            = sqlite.StringColumn("genres")
+		CoverDimColumn          = sqlite.IntegerColumn("cover_dim")
+		allColumns              = sqlite.ColumnList{IDColumn, PluginIDColumn, SourceMangaIDColumn, TitleColumn, CoverURLColumn, DescriptionColumn, StatusColumn, InLibraryColumn, CreatedAtColumn, UpdatedAtColumn, NewSinceColumn, CustomTitleColumn, CustomDescriptionColumn, GenresColumn, CoverDimColumn}
+		mutableColumns          = sqlite.ColumnList{PluginIDColumn, SourceMangaIDColumn, TitleColumn, CoverURLColumn, DescriptionColumn, StatusColumn, InLibraryColumn, CreatedAtColumn, UpdatedAtColumn, NewSinceColumn, CustomTitleColumn, CustomDescriptionColumn, GenresColumn, CoverDimColumn}
+		defaultColumns          = sqlite.ColumnList{InLibraryColumn, CreatedAtColumn, UpdatedAtColumn, CustomTitleColumn, CustomDescriptionColumn, CoverDimColumn}
 	)
 
 	return mangasTable{
 		Table: sqlite.NewTable(schemaName, tableName, alias, allColumns...),
 
 		//Columns
-		ID:            IDColumn,
-		PluginID:      PluginIDColumn,
-		SourceMangaID: SourceMangaIDColumn,
-		Title:         TitleColumn,
-		CoverURL:      CoverURLColumn,
-		Description:   DescriptionColumn,
-		Status:        StatusColumn,
-		InLibrary:     InLibraryColumn,
-		CreatedAt:     CreatedAtColumn,
-		UpdatedAt:     UpdatedAtColumn,
-		NewSince:      NewSinceColumn,
-		CustomTitle:   CustomTitleColumn,
+		ID:                IDColumn,
+		PluginID:          PluginIDColumn,
+		SourceMangaID:     SourceMangaIDColumn,
+		Title:             TitleColumn,
+		CoverURL:          CoverURLColumn,
+		Description:       DescriptionColumn,
+		Status:            StatusColumn,
+		InLibrary:         InLibraryColumn,
+		CreatedAt:         CreatedAtColumn,
+		UpdatedAt:         UpdatedAtColumn,
+		NewSince:          NewSinceColumn,
+		CustomTitle:       CustomTitleColumn,
+		CustomDescription: CustomDescriptionColumn,
+		Genres:            GenresColumn,
+		CoverDim:          CoverDimColumn,
 
 		AllColumns:     allColumns,
 		MutableColumns: mutableColumns,

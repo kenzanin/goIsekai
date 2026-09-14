@@ -81,6 +81,9 @@ var ddl = []string{
 	);`,
 	`CREATE VIRTUAL TABLE IF NOT EXISTS library_fts USING fts5(title, alt, plugin_id UNINDEXED, manga_row_id UNINDEXED);`,
 	`ALTER TABLE mangas ADD COLUMN custom_title INTEGER NOT NULL DEFAULT 0;`,
+	`ALTER TABLE mangas ADD COLUMN custom_description INTEGER NOT NULL DEFAULT 0;`,
+	`ALTER TABLE mangas ADD COLUMN genres TEXT;`,
+	`ALTER TABLE mangas ADD COLUMN cover_dim INTEGER DEFAULT 0;`,
 }
 
 func main() {

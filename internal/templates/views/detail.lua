@@ -63,9 +63,15 @@ return function(data)
 			.. '" alt="'
 			.. h(manga.Title or "")
 			.. '" class="w-full aspect-[2/3] rounded-xl object-cover">'
-			.. '<div id="cover-dim" class="lib-dim" style="display:none;position:absolute;top:0;left:0;right:0;bottom:0;border-radius:0.75rem;background:rgba(0,0,0,0.82);"></div>'
+			.. '<div id="cover-dim" class="lib-dim" style="display:'
+				.. (data.CoverDim == 1 and "block" or "none")
+				.. ';position:absolute;top:0;left:0;right:0;bottom:0;border-radius:0.75rem;background:rgba(0,0,0,0.82);"></div>'
 			.. '</div>'
-			.. '<button type="button" id="cover-dim-btn" title="Dim the cover image" onclick="var w=document.getElementById(&quot;cover-wrap&quot;);var d=document.getElementById(&quot;cover-dim&quot;);var b=document.getElementById(&quot;cover-dim-btn&quot;);if(b.dataset.on===&quot;1&quot;){b.dataset.on=&quot;0&quot;;d.style.display=&quot;none&quot;;localStorage.setItem(&quot;gsk:cover-dim:&quot;+w.dataset.key,&quot;0&quot;);b.textContent=&quot;Hide cover&quot;;}else{b.dataset.on=&quot;1&quot;;d.style.display=&quot;block&quot;;localStorage.setItem(&quot;gsk:cover-dim:&quot;+w.dataset.key,&quot;1&quot;);b.textContent=&quot;Show cover&quot;;}" class="mt-2 inline-flex items-center text-xs text-neutral-400 hover:text-neutral-200 transition cursor-pointer">Hide cover</button>'
+			.. '<button type="button" id="cover-dim-btn" title="Dim the cover image" onclick="this.onclick=null;var d=document.getElementById(&quot;cover-dim&quot;);var b=this;d.style.display=d.style.display===&quot;none&quot;?&quot;block&quot;:&quot;none&quot;;b.textContent=d.style.display===&quot;block&quot;?&quot;Show cover&quot;:&quot;Hide cover&quot;;fetch(&quot;/action/toggle-cover-dim/'
+				.. h(pluginID)
+				.. '&quot;,{method:&quot;POST&quot;});" class="mt-2 inline-flex items-center text-xs text-neutral-400 hover:text-neutral-200 transition cursor-pointer">'
+				.. (data.CoverDim == 1 and "Show cover" or "Hide cover")
+				.. '</button>'
 	else
 		coverHTML = '<div class="w-full aspect-[2/3] bg-neutral-800 rounded-xl flex items-center justify-center text-neutral-500 text-4xl font-semibold">'
 			.. h(getInitials(manga.Title or ""))

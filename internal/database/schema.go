@@ -118,4 +118,6 @@ var migrations = []string{
 	// Index 18: skip flag for chapters — skipped chapters are excluded from
 	// "continue reading" navigation and reader auto-advance.
 	`ALTER TABLE chapters ADD COLUMN is_skipped INTEGER DEFAULT 0;`,
+	// Index 19: user toggle to dim the manga cover image (persisted per manga).
+	`ALTER TABLE mangas ADD COLUMN cover_dim INTEGER DEFAULT 0;`,
 }

@@ -536,19 +536,12 @@
   // inline scripts entirely. This runs on load + after SPA content swaps.
   // =====================================================================
   const syncCoverDim = () => {
-    document.querySelectorAll('[data-key]').forEach((wrap) => {
-      const dim = wrap.querySelector('.lib-dim');
-      if (!dim || !wrap.dataset.key) return;
-      const on = localStorage.getItem(`gsk:cover-dim:${wrap.dataset.key}`) === '1';
-      dim.style.display = on ? 'block' : 'none';
-    });
     const btn = document.getElementById('cover-dim-btn');
-    const wrap = document.getElementById('cover-wrap');
-    if (btn && wrap?.dataset.key) {
-      const on = localStorage.getItem(`gsk:cover-dim:${wrap.dataset.key}`) === '1';
-      btn.dataset.on = on ? '1' : '0';
-      btn.textContent = on ? 'Show cover' : 'Hide cover';
-    }
+    const dim = document.getElementById('cover-dim');
+    if (!btn || !dim) return;
+    // Server sets the button text and dim visibility — just keep them in sync.
+    const show = btn.textContent.trim() === 'Show cover';
+    dim.style.display = show ? 'block' : 'none';
   };
   window.syncCoverDim = syncCoverDim;
   window.syncEnrichmentPanel = syncEnrichmentPanel;

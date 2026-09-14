@@ -12,16 +12,19 @@ import (
 )
 
 type Mangas struct {
-	ID            *string `sql:"primary_key"`
-	PluginID      string
-	SourceMangaID string
-	Title         string
-	CoverURL      *string
-	Description   *string
-	Status        *string
-	InLibrary     *int64
-	CreatedAt     *time.Time
-	UpdatedAt     *time.Time
-	NewSince      *time.Time
-	CustomTitle   int64
+	ID                *string `sql:"primary_key"`
+	PluginID          string
+	SourceMangaID     string
+	Title             string
+	CoverURL          *string
+	Description       *string
+	Status            *string
+	InLibrary         *int64
+	CreatedAt         *time.Time
+	UpdatedAt         *time.Time
+	NewSince          *time.Time
+	CustomTitle       int64
+	CustomDescription int64
+	Genres            *string
+	CoverDim          *int64
 }

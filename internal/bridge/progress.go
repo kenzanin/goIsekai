@@ -145,6 +145,19 @@ func (s *AppService) ToggleChapterSkip(pluginID, mangaID, chapterID string) erro
 	return nil
 }
 
+// ToggleCoverDim toggles the cover dim overlay flag on the manga.
+func (s *AppService) ToggleCoverDim(pluginID, mangaID string) error {
+	rowID := mangaRowID(pluginID, mangaID)
+	dim, _, err := s.db.GetMangaCoverDim(rowID)
+	if err != nil {
+		return fmt.Errorf("bridge: get cover_dim: %w", err)
+	}
+	if err := s.db.SetMangaCoverDim(rowID, 1-dim); err != nil {
+		return fmt.Errorf("bridge: set cover_dim: %w", err)
+	}
+	return nil
+}
+
 // SetChaptersSkip sets the skip flag for the given source chapters of a manga.
 func (s *AppService) SetChaptersSkip(pluginID, mangaID string, chapterIDs []string, skip bool) error {
 	if err := s.db.SetChaptersSkip(mangaRowID(pluginID, mangaID), chapterIDs, skip); err != nil {

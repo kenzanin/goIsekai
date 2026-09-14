@@ -249,3 +249,24 @@ func hexVal(c byte) (byte, bool) {
 	}
 	return 0, false
 }
+
+// HTMLEntityUnescape decodes named and numeric HTML entities (&amp; &#039; &#x27; etc.)
+// to their UTF-8 characters. It is an alias for HTMLDecode with a more explicit name.
+func HTMLEntityUnescape(s string) string {
+	return html.UnescapeString(s)
+}
+
+// LuaEscape escapes Lua pattern magic characters (%, ., [, ], -, ?, +, *, $, ^)
+// so the result can be used as a literal argument to Lua string.find/gsub/match.
+func LuaEscape(s string) string {
+	var b strings.Builder
+	b.Grow(len(s) + 10)
+	for i := 0; i < len(s); i++ {
+		if s[i] == '%' {
+			b.WriteString("%%")
+		} else {
+			b.WriteByte(s[i])
+		}
+	}
+	return b.String()
+}

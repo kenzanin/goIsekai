@@ -216,6 +216,26 @@ func (d *DB) SetMangaGenres(mangaRowID string, genres []string) error {
 	return err
 }
 
+// SetMangaCoverDim sets the cover dim overlay flag (0 = off, 1 = on).
+func (d *DB) SetMangaCoverDim(mangaRowID string, dim int64) error {
+	_, err := d.db.Exec(`UPDATE mangas SET cover_dim = ? WHERE id = ?`, dim, mangaRowID)
+	return err
+}
+
+// GetMangaCoverDim returns the current cover_dim flag for a manga.
+// Returns (0, false) when no override exists.
+func (d *DB) GetMangaCoverDim(mangaRowID string) (int64, bool, error) {
+	var dim *int64
+	err := d.db.QueryRow(`SELECT cover_dim FROM mangas WHERE id = ?`, mangaRowID).Scan(&dim)
+	if err != nil {
+		return 0, false, err
+	}
+	if dim == nil {
+		return 0, false, nil
+	}
+	return *dim, true, nil
+}
+
 // GetMangaGenres returns the stored genre override for a manga.
 // Returns the genre list and true on success; returns (nil, false) when no override exists.
 func (d *DB) GetMangaGenres(mangaRowID string) ([]string, bool, error) {
