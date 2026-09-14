@@ -17,6 +17,7 @@ type Manga struct {
 	CoverURL      string
 	Description   string
 	Status        string
+	CoverDim      int64
 	InLibrary     bool
 	CreatedAt     time.Time
 	UpdatedAt     time.Time

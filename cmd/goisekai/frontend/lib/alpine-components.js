@@ -46,7 +46,6 @@
           if (window.Alpine && Alpine.initTree) {
             Alpine.initTree(main);
           }
-          if (window.syncCoverDim) syncCoverDim();
           if (window.syncEnrichmentPanel) syncEnrichmentPanel();
           const u = resp.url || action;
           if (u && u.indexOf(window.location.origin) === 0) {
@@ -459,7 +458,6 @@
               if (window.Alpine && Alpine.initTree) {
                 Alpine.initTree(main);
               }
-              if (window.syncCoverDim) syncCoverDim();
               if (window.syncEnrichmentPanel) syncEnrichmentPanel();
               const u = resp.url || action;
               if (u && u.indexOf(window.location.origin) === 0) {
@@ -529,23 +527,8 @@
   const syncEnrichmentPanel = () => {};
 
   // =====================================================================
-  // Cover-dim restore (shared by detail + library templates)
-  // Dim state lives in localStorage as gsk:cover-dim:{pluginID}:{id}.
-  // Templates no longer inline restore <script> tags: HTML entities inside
-  // <script> are not decoded (JS syntax error) and innerHTML swaps skip
-  // inline scripts entirely. This runs on load + after SPA content swaps.
   // =====================================================================
-  const syncCoverDim = () => {
-    const btn = document.getElementById('cover-dim-btn');
-    const dim = document.getElementById('cover-dim');
-    if (!btn || !dim) return;
-    // Server sets the button text and dim visibility — just keep them in sync.
-    const show = btn.textContent.trim() === 'Show cover';
-    dim.style.display = show ? 'block' : 'none';
-  };
-  window.syncCoverDim = syncCoverDim;
   window.syncEnrichmentPanel = syncEnrichmentPanel;
-  syncCoverDim();
   syncEnrichmentPanel();
 
   // =====================================================================

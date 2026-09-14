@@ -35,6 +35,14 @@ func derefFloat(p *float64) float64 {
 	return 0
 }
 
+// derefInt64 returns the value pointed to by p, or 0 if p is nil.
+func derefInt64(p *int64) int64 {
+	if p != nil {
+		return *p
+	}
+	return 0
+}
+
 // derefTime returns the time pointed to by p, or the zero time if p is nil.
 func derefTime(p *time.Time) time.Time {
 	if p != nil {
@@ -53,6 +61,7 @@ func mangaFromModel(m model.Mangas) Manga {
 		CoverURL:      derefStr(m.CoverURL),
 		Description:   derefStr(m.Description),
 		Status:        derefStr(m.Status),
+		CoverDim:      derefInt64(m.CoverDim),
 		InLibrary:     derefBool(m.InLibrary),
 		CreatedAt:     derefTime(m.CreatedAt),
 		UpdatedAt:     derefTime(m.UpdatedAt),

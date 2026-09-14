@@ -104,13 +104,11 @@ return function(data)
 				.. "/"
 				.. h(sourceMangaID)
 				.. '" class="view-item bg-neutral-900 rounded-lg overflow-hidden relative hover:-translate-y-0.5 hover:shadow-lg hover:shadow-black/40 transition flex flex-col">'
-				.. '<div class="relative flex-1 min-w-0" data-key="'
-				.. h(pluginID)
-				.. ":"
-				.. h(sourceMangaID)
-				.. '">'
+				.. '<div class="relative flex-1 min-w-0">'
 				.. coverHTML
-				.. '<div class="lib-dim" style="display:none;position:absolute;inset:0;background:rgba(0,0,0,0.82);border-radius:0.5rem;"></div>'
+				.. '<div class="lib-dim" style="display:'
+					.. ((m.CoverDim ~= nil and m.CoverDim == 1) and "block" or "none")
+					.. ';position:absolute;inset:0;background:rgba(0,0,0,0.82);border-radius:0.5rem;"></div>'
 				.. statusBadge
 				.. pluginBadge
 				.. "</div>"
