@@ -1,4 +1,10 @@
-## ADDED Requirements
+# Plugin ABI Specification
+
+## Purpose
+
+Defines the contract between the host and a plugin: the JSON-in/JSON-out functions a plugin exports, the optional enrichment and batch capabilities layered on top of that contract, and how the host degrades when an optional capability is absent.
+
+## Requirements
 
 ### Requirement: Plugin enrichment provider contract
 
@@ -19,3 +25,27 @@ A plugin SHALL be able to declare enrichment providers in its metadata as a list
 #### Scenario: Malformed enrichment response
 - **WHEN** a plugin's `GetEnrichment` returns malformed JSON or an error
 - **THEN** the host surfaces a failed fetch for that source and leaves other sources unaffected
+
+### Requirement: Batch detail+chapters plugin function
+
+The plugin ABI SHALL include an optional `GetMangaDetailWithChapters(mangaID string) (string, error)` function. When exported, this function SHALL return a JSON object containing both manga detail and chapter list in a single response: `{"detail": <Manga>, "chapters": [<Chapter>]}`. The host SHALL invoke this function instead of separate `GetMangaDetail` + `GetChapterList` calls when both results are needed for the same manga. Plugins that do not export this function SHALL continue to work via separate calls.
+
+#### Scenario: Plugin implements batch function
+- **WHEN** a plugin exports `GetMangaDetailWithChapters`
+- **THEN** the host invokes it instead of separate `GetMangaDetail` + `GetChapterList` calls when both are needed
+
+#### Scenario: Plugin does not implement batch function
+- **WHEN** a plugin does not export `GetMangaDetailWithChapters`
+- **THEN** the host falls back to separate `GetMangaDetail` + `GetChapterList` calls
+
+#### Scenario: Batch function returns valid response
+- **WHEN** `GetMangaDetailWithChapters` is invoked and returns valid JSON with `detail` and `chapters`
+- **THEN** the host parses both and returns them as separate typed results
+
+#### Scenario: Batch function returns error
+- **WHEN** `GetMangaDetailWithChapters` returns an error
+- **THEN** the host returns the error without falling back to separate calls
+
+#### Scenario: Legacy plugin unaffected
+- **WHEN** a plugin does not export `GetMangaDetailWithChapters`
+- **THEN** the host uses separate `GetMangaDetail` + `GetChapterList` calls as before

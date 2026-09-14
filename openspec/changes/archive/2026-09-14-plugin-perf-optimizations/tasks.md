@@ -3,8 +3,8 @@
 ## Group 1 — Connection Pooling (foundation, no deps)
 
 - [x] 1.1 Configure `hostnet.Proxy` with custom `*http.Transport`: `MaxIdleConnsPerHost=6`, `IdleConnTimeout=90s`, `TLSHandshakeTimeout=10s`, `DisableKeepAlives=false`. Replace `http.DefaultTransport` usage.
-- [ ] 1.2 Add connection pool metrics logging (idle connections, active connections) at debug level.
-- [ ] 1.3 Test: verify connection reuse by making 3 sequential requests to same host and checking transport stats.
+- [x] 1.2 Add connection pool metrics logging (idle connections, active connections) at debug level.
+- [x] 1.3 Test: verify connection reuse by making 3 sequential requests to same host and checking transport stats.
 
 ## Group 2 — Plugin Caching (depends on nothing)
 
@@ -26,10 +26,10 @@
 ## Group 4 — Preconnect (depends on connection pooling)
 
 - [x] 4.1 Implement `hostnet.Proxy.Preconnect(host string)` method: HEAD request with 5s timeout.
-- [ ] 4.2 Track known hosts in `app_data/known_hosts.json`. Add/remove on plugin use.
-- [ ] 4.3 On plugin lazy-load, extract primary host and trigger preconnect (background, non-blocking).
-- [ ] 4.4 On startup, load known hosts and preconnect with concurrency limit 4.
-- [ ] 4.5 Test: preconnect warms connection, subsequent request is faster, failure is graceful.
+- [x] 4.2 Track known hosts in `app_data/known_hosts.json`. Add/remove on plugin use.
+- [x] 4.3 On plugin lazy-load, extract primary host and trigger preconnect (background, non-blocking).
+- [x] 4.4 On startup, load known hosts and preconnect with concurrency limit 4.
+- [x] 4.5 Test: preconnect warms connection, subsequent request is faster, failure is graceful.
 
 ## Group 5 — Integration & Polish
 
