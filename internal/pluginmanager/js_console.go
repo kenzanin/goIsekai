@@ -1,8 +1,8 @@
 package pluginmanager
 
 import (
-	"github.com/goccy/go-json"
 	"fmt"
+	"github.com/goccy/go-json"
 	"time"
 
 	"github.com/dop251/goja"

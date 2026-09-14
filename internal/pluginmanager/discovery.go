@@ -2,11 +2,11 @@ package pluginmanager
 
 import (
 	"encoding/json"
-	"os"
-	"strings"
-	"net/url"
 	"goisekai/internal/logger"
+	"net/url"
+	"os"
 	"path/filepath"
+	"strings"
 )
 
 // Discover scans pluginsDir and registers every folder containing main.lua,
@@ -86,9 +86,9 @@ func (m *Manager) TrackKnownHosts() {
 	if m.pluginsDir == "" {
 		return
 	}
-	
+
 	hosts := make(map[string]bool)
-	
+
 	// Scan plugin directories for site_url in metadata
 	// Lua/JS plugins: try to read plugin.json
 	luaMatches, _ := filepath.Glob(filepath.Join(m.pluginsDir, "*", "plugin.json"))
@@ -106,7 +106,7 @@ func (m *Manager) TrackKnownHosts() {
 			}
 		}
 	}
-	
+
 	// JS plugins: parse main.js for PLUGIN object
 	jsMatches, _ := filepath.Glob(filepath.Join(m.pluginsDir, "*", "main.js"))
 	for _, path := range jsMatches {
@@ -121,9 +121,15 @@ func (m *Manager) TrackKnownHosts() {
 			}
 		}
 	}
-	
+
 	// Save to known_hosts.json
-	data, _ := json.Marshal(func() []string { r := make([]string, 0, len(hosts)); for h := range hosts { r = append(r, h) }; return r }())
+	data, _ := json.Marshal(func() []string {
+		r := make([]string, 0, len(hosts))
+		for h := range hosts {
+			r = append(r, h)
+		}
+		return r
+	}())
 	_ = os.WriteFile(filepath.Join(os.Getenv("HOME"), "app_data", "known_hosts.json"), data, 0644)
 }
 

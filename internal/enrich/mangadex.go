@@ -3,8 +3,8 @@ package enrich
 import (
 	"bytes"
 	"context"
-	"github.com/goccy/go-json"
 	"fmt"
+	"github.com/goccy/go-json"
 	"net/http"
 )
 
@@ -122,55 +122,55 @@ func (p *MangaDexProvider) Fetch(ctx context.Context, httpc *http.Client, title 
 	}
 }
 
-// fetchTitles returns the first manga's alt titles.
+// fetchTitles returns the first (best-matching) manga's alt titles.
 func (p *MangaDexProvider) fetchTitles(resp mangaDexSearchResponse) []Item {
 	if len(resp.Data) == 0 {
 		return nil
 	}
+	d := resp.Data[0]
 	var titles []Item
-	for _, d := range resp.Data {
-		// Collect all alt titles, preferring English.
-		var primary string
-		for lang, name := range d.Attributes.Title {
-			if lang == "en" {
-				primary = name
-			} else if primary == "" {
-				primary = name
+	// Collect all alt titles, preferring English.
+	var primary string
+	for lang, name := range d.Attributes.Title {
+		if lang == "en" {
+			primary = name
+		} else if primary == "" {
+			primary = name
+		}
+	}
+	for _, at := range d.Attributes.AltTitles {
+		if en, ok := at["en"]; ok && en != "" {
+			titles = append(titles, Item{Value: en})
+		} else if len(at) > 0 {
+			for _, v := range at {
+				titles = append(titles, Item{Value: v})
+				break
 			}
 		}
-		for _, at := range d.Attributes.AltTitles {
-			if en, ok := at["en"]; ok && en != "" {
-				titles = append(titles, Item{Value: en})
-			} else if len(at) > 0 {
-				for _, v := range at {
-					titles = append(titles, Item{Value: v})
-					break
-				}
-			}
-		}
-		if len(titles) == 0 && primary != "" {
-			titles = append(titles, Item{Value: primary})
-		}
+	}
+	if len(titles) == 0 && primary != "" {
+		titles = append(titles, Item{Value: primary})
 	}
 	return titles
 }
 
-// fetchCategories returns unique genre tag names from all results.
+// fetchCategories returns unique genre tag names from the first (best-matching) result.
 func (p *MangaDexProvider) fetchCategories(resp mangaDexSearchResponse) []Item {
+	if len(resp.Data) == 0 {
+		return nil
+	}
 	seen := make(map[string]bool)
 	var items []Item
-	for _, d := range resp.Data {
-		for _, tag := range d.Attributes.Tags {
-			if tag.Attributes.Group != "genre" {
-				continue
-			}
-			name := tag.Attributes.Name["en"]
-			if name == "" || seen[name] {
-				continue
-			}
-			seen[name] = true
-			items = append(items, Item{Value: name})
+	for _, tag := range resp.Data[0].Attributes.Tags {
+		if tag.Attributes.Group != "genre" {
+			continue
 		}
+		name := tag.Attributes.Name["en"]
+		if name == "" || seen[name] {
+			continue
+		}
+		seen[name] = true
+		items = append(items, Item{Value: name})
 	}
 	return items
 }

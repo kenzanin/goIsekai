@@ -2,8 +2,8 @@ package database
 
 import (
 	"database/sql"
-	"github.com/goccy/go-json"
 	"fmt"
+	"github.com/goccy/go-json"
 	"time"
 
 	_ "modernc.org/sqlite"

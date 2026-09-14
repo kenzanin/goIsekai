@@ -2,8 +2,8 @@ package enrich
 
 import (
 	"context"
-	"github.com/goccy/go-json"
 	"fmt"
+	"github.com/goccy/go-json"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -268,7 +268,19 @@ func TestMangaUpdatesProvider_FetchTitles(t *testing.T) {
 		}
 		resp := muSearchResponse{
 			Results: []muResultItem{
-				{Record: muSeriesRecord{Title: "Solo Leveling"}},
+				{Record: muSeriesRecord{ID: 42, Title: "Solo Leveling"}},
+			},
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(resp)
+	})
+	// Alt titles live on the series detail endpoint's associated[] list.
+	mux.HandleFunc("/v1/series/42", func(w http.ResponseWriter, r *http.Request) {
+		resp := muSeriesDetail{
+			Associated: []muAssociatedTitle{
+				{Title: "Solo Leveling"},
+				{Title: "Only I Level Up"},
+				{Title: "Solo Leveling"}, // dup
 			},
 		}
 		w.Header().Set("Content-Type", "application/json")
@@ -289,11 +301,11 @@ func TestMangaUpdatesProvider_FetchTitles(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if len(items) != 1 {
-		t.Fatalf("expected 1 title, got %d", len(items))
+	if len(items) != 2 {
+		t.Fatalf("expected 2 deduped titles, got %d: %v", len(items), items)
 	}
-	if items[0].Value != "Solo Leveling" {
-		t.Errorf("title = %q, want Solo Leveling", items[0].Value)
+	if items[0].Value != "Solo Leveling" || items[1].Value != "Only I Level Up" {
+		t.Errorf("titles = %v, want [Solo Leveling, Only I Level Up]", items)
 	}
 }
 
@@ -424,4 +436,129 @@ func TestMangaUpdatesProvider_FetchError(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected error, got none")
 	}
+}
+
+// TestMangaUpdatesProvider_OnlyBestMatch guards against merging the metadata of
+// unrelated series: the search endpoint returns up to 25 fuzzy matches, and
+// only the first (most relevant) one describes the queried series.
+func TestMangaUpdatesProvider_OnlyBestMatch(t *testing.T) {
+	mux := http.NewServeMux()
+	mux.HandleFunc("/v1/series/search", func(w http.ResponseWriter, r *http.Request) {
+		resp := muSearchResponse{
+			Results: []muResultItem{
+				{Record: muSeriesRecord{
+					ID:          100,
+					Title:       "The Right Series",
+					Description: "The right synopsis.",
+					Genres:      []muGenreEntry{{Genre: "Action"}},
+				}},
+				{Record: muSeriesRecord{
+					ID:          200,
+					Title:       "An Unrelated Series",
+					Description: "An unrelated synopsis.",
+					Genres:      []muGenreEntry{{Genre: "Romance"}},
+				}},
+			},
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(resp)
+	})
+	// Only the best match (series 100) may be queried for its alt titles.
+	mux.HandleFunc("/v1/series/100", func(w http.ResponseWriter, r *http.Request) {
+		resp := muSeriesDetail{Associated: []muAssociatedTitle{{Title: "The Right Series"}}}
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(resp)
+	})
+	mux.HandleFunc("/v1/series/200", func(w http.ResponseWriter, r *http.Request) {
+		t.Error("fetched detail for an unrelated series")
+		w.WriteHeader(http.StatusNotFound)
+	})
+
+	srv := httptest.NewServer(mux)
+	defer srv.Close()
+
+	orig := muBase
+	muBase = srv.URL
+
+	p := NewMangaUpdatesProvider()
+	httpc := srv.Client()
+
+	for _, tc := range []struct {
+		kind Kind
+		want string
+	}{
+		{KindTitles, "The Right Series"},
+		{KindSummaries, "The right synopsis."},
+		{KindCategories, "Action"},
+	} {
+		items, err := p.Fetch(context.Background(), httpc, "The Right Series", tc.kind)
+		if err != nil {
+			t.Fatalf("%s: unexpected error: %v", tc.kind, err)
+		}
+		if len(items) != 1 {
+			t.Fatalf("%s: expected 1 item from best match, got %d: %v", tc.kind, len(items), items)
+		}
+		if items[0].Value != tc.want {
+			t.Errorf("%s: got %q, want %q", tc.kind, items[0].Value, tc.want)
+		}
+	}
+	muBase = orig
+}
+
+// TestMangaDexProvider_OnlyBestMatch guards against merging titles and genres
+// across the multiple fuzzy matches the MangaDex search endpoint returns.
+func TestMangaDexProvider_OnlyBestMatch(t *testing.T) {
+	mux := http.NewServeMux()
+	mux.HandleFunc("/manga", func(w http.ResponseWriter, r *http.Request) {
+		resp := mangaDexSearchResponse{
+			Data: []mangaDexManga{
+				{
+					Attributes: mangaDexMangaAttrs{
+						Title:     map[string]string{"en": "The Right Series"},
+						AltTitles: []map[string]string{{"en": "Right Alt"}},
+						Tags: []mangaDexTag{
+							{Attributes: mangaDexTagAttrs{Group: "genre", Name: map[string]string{"en": "Action"}}},
+						},
+					},
+				},
+				{
+					Attributes: mangaDexMangaAttrs{
+						Title:     map[string]string{"en": "An Unrelated Series"},
+						AltTitles: []map[string]string{{"en": "Unrelated Alt"}},
+						Tags: []mangaDexTag{
+							{Attributes: mangaDexTagAttrs{Group: "genre", Name: map[string]string{"en": "Romance"}}},
+						},
+					},
+				},
+			},
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(resp)
+	})
+
+	srv := httptest.NewServer(mux)
+	defer srv.Close()
+
+	orig := mangaDexBase
+	mangaDexBase = srv.URL
+
+	p := NewMangaDexProvider()
+	httpc := srv.Client()
+
+	titles, err := p.Fetch(context.Background(), httpc, "The Right Series", KindTitles)
+	if err != nil {
+		t.Fatalf("titles: unexpected error: %v", err)
+	}
+	if len(titles) != 1 || titles[0].Value != "Right Alt" {
+		t.Errorf("titles = %v, want [Right Alt]", titles)
+	}
+
+	cats, err := p.Fetch(context.Background(), httpc, "The Right Series", KindCategories)
+	if err != nil {
+		t.Fatalf("categories: unexpected error: %v", err)
+	}
+	if len(cats) != 1 || cats[0].Value != "Action" {
+		t.Errorf("categories = %v, want [Action]", cats)
+	}
+	mangaDexBase = orig
 }

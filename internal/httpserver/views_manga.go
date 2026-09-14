@@ -77,31 +77,31 @@ func (s *Server) buildMangaDetailData(r *http.Request, pluginID, mangaID string)
 	chEnd := min(chStart+chapterPageSize, chTotal)
 
 	return map[string]any{
-		"PluginID":             pluginID,
-		"PluginName":           pluginName,
-		"PluginIcon":           pluginIcon,
-		"MangaID":              mangaID,
-		"Manga":                manga,
-		"AltTitles":            altTitles,
-		"AltSummaries":         altSummaries,
-		"CurrentTitle":         manga.Title,
-		"AltTitleServers":      altTitleServers,
-		"AltSummaryServers":    altSummaryServers,
-		"Chapters":             chapters[chStart:chEnd],
-		"Progress":             progress,
-		"Continue":             continueTo,
-		"InLibrary":            inLibrary,
-		"Challenge":            challenge,
-		"ChCurrentPage":        chPage,
-		"ChTotalPages":         max((chTotal+chapterPageSize-1)/chapterPageSize, 1),
-		"ChHasNext":            chEnd < chTotal,
-		"ChHasPrev":            chPage > 1,
-		"Categories":           cats,
-		"Related":              rels,
-		"PluginGenres":         manga.RawGenres,
-		"OverrideGenres":       overrideGenres,
-		"Genres":               manga.Genres,
-		"CoverDim":             manga.CoverDim,
+		"PluginID":          pluginID,
+		"PluginName":        pluginName,
+		"PluginIcon":        pluginIcon,
+		"MangaID":           mangaID,
+		"Manga":             manga,
+		"AltTitles":         altTitles,
+		"AltSummaries":      altSummaries,
+		"CurrentTitle":      manga.Title,
+		"AltTitleServers":   altTitleServers,
+		"AltSummaryServers": altSummaryServers,
+		"Chapters":          chapters[chStart:chEnd],
+		"Progress":          progress,
+		"Continue":          continueTo,
+		"InLibrary":         inLibrary,
+		"Challenge":         challenge,
+		"ChCurrentPage":     chPage,
+		"ChTotalPages":      max((chTotal+chapterPageSize-1)/chapterPageSize, 1),
+		"ChHasNext":         chEnd < chTotal,
+		"ChHasPrev":         chPage > 1,
+		"Categories":        cats,
+		"Related":           rels,
+		"PluginGenres":      manga.RawGenres,
+		"OverrideGenres":    overrideGenres,
+		"Genres":            manga.Genres,
+		"CoverDim":          manga.CoverDim,
 	}
 }
 
@@ -123,6 +123,7 @@ func (s *Server) viewMangaDetail(w http.ResponseWriter, r *http.Request) {
 	}
 	s.renderPage(w, r, "views/detail", "", data)
 }
+
 // ContinuePoint names where the Continue button should resume.
 type ContinuePoint struct {
 	ChapterID string

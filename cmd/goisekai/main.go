@@ -145,7 +145,6 @@ func main() {
 		logger.Warn("load plugin profile pins", "error", perr)
 	}
 
-
 	proxy.SetPersistPin(func(pluginID, profile string) {
 		if err := db.SetPluginProfile(pluginID, profile); err != nil {
 			logger.Warn("persist plugin profile", "plugin", pluginID, "error", err)
@@ -212,7 +211,6 @@ func main() {
 
 	// Track known hosts and trigger preconnect for all discovered plugins
 	mgr.TrackKnownHosts()
-	
 
 	// Preconnect all known hosts on startup (warm connection pool)
 	go func() {
@@ -303,4 +301,3 @@ func main() {
 
 	logger.Info("shutdown complete")
 }
-

@@ -1,8 +1,8 @@
 package pluginmanager
 
 import (
-	"github.com/goccy/go-json"
 	"fmt"
+	"github.com/goccy/go-json"
 	"os"
 
 	"github.com/mmcdole/lunar"

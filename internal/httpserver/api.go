@@ -2,8 +2,8 @@ package httpserver
 
 import (
 	"crypto/subtle"
-	"github.com/goccy/go-json"
 	"errors"
+	"github.com/goccy/go-json"
 	"log/slog"
 	"net/http"
 	"strconv"

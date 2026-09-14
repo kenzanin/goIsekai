@@ -3,12 +3,13 @@ package enrich
 import (
 	"bytes"
 	"context"
-	"github.com/goccy/go-json"
 	"fmt"
+	"github.com/goccy/go-json"
 	"io"
 	"net/http"
 
 	"goisekai/internal/logger"
+	"goisekai/internal/pluginutil"
 )
 
 // MangaUpdatesProvider fetches enrichment data from MangaUpdates (api.mangaupdates.com).
@@ -62,7 +63,10 @@ func (p *MangaUpdatesProvider) Fetch(ctx context.Context, httpc *http.Client, ti
 
 	switch k {
 	case KindTitles:
-		return p.fetchTitles(searchResp.Results), nil
+		if len(searchResp.Results) == 0 {
+			return nil, nil
+		}
+		return p.fetchAltTitles(ctx, httpc, searchResp.Results[0].Record.ID)
 	case KindSummaries:
 		return p.fetchSummaries(searchResp.Results), nil
 	case KindCategories:
@@ -112,18 +116,26 @@ type muGenreEntry struct {
 
 // muRelatedSeries is a related-series entry from the MangaUpdates series detail API.
 type muRelatedSeries struct {
-	RelationType    string `json:"relation_type"`
-	RelatedSeriesID int    `json:"related_series_id"`
+	RelationType      string `json:"relation_type"`
+	RelatedSeriesID   int    `json:"related_series_id"`
 	RelatedSeriesName string `json:"related_series_name"`
-	RelatedSeriesURL string `json:"related_series_url"`
+	RelatedSeriesURL  string `json:"related_series_url"`
+}
+
+// muAssociatedTitle is one alternative-title entry from the series detail API.
+type muAssociatedTitle struct {
+	Title string `json:"title"`
 }
 
 // muSeriesDetail is the full series response from GET /v1/series/{id}.
 type muSeriesDetail struct {
-	RelatedSeries []muRelatedSeries `json:"related_series"`
+	Description   string              `json:"description"`
+	RelatedSeries []muRelatedSeries   `json:"related_series"`
+	Associated    []muAssociatedTitle `json:"associated"`
 }
 
-func (p *MangaUpdatesProvider) fetchRelated(ctx context.Context, httpc *http.Client, seriesID int) ([]Item, error) {
+// fetchDetail loads the full series record from GET /v1/series/{id}.
+func (p *MangaUpdatesProvider) fetchDetail(ctx context.Context, httpc *http.Client, seriesID int) (*muSeriesDetail, error) {
 	url := fmt.Sprintf("%s/v1/series/%d", muBase, seriesID)
 	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
 	if err != nil {
@@ -142,6 +154,14 @@ func (p *MangaUpdatesProvider) fetchRelated(ctx context.Context, httpc *http.Cli
 	if err := json.NewDecoder(resp.Body).Decode(&detail); err != nil {
 		return nil, fmt.Errorf("mangaupdates: detail decode: %w", err)
 	}
+	return &detail, nil
+}
+
+func (p *MangaUpdatesProvider) fetchRelated(ctx context.Context, httpc *http.Client, seriesID int) ([]Item, error) {
+	detail, err := p.fetchDetail(ctx, httpc, seriesID)
+	if err != nil {
+		return nil, err
+	}
 	seen := make(map[string]bool)
 	var items []Item
 	for _, rs := range detail.RelatedSeries {
@@ -154,35 +174,48 @@ func (p *MangaUpdatesProvider) fetchRelated(ctx context.Context, httpc *http.Cli
 	return items, nil
 }
 
-func (p *MangaUpdatesProvider) fetchTitles(results []muResultItem) []Item {
-	var items []Item
-	for _, r := range results {
-		if r.Record.Title != "" {
-			items = append(items, Item{Value: r.Record.Title})
-		}
+// fetchAltTitles returns the series' alternative titles (including translated
+// ones) from the detail API's associated[] list. The search endpoint only
+// exposes the main title, so the detail call is required. Only the first
+// (best-matching) search result is used; the rest are unrelated series.
+func (p *MangaUpdatesProvider) fetchAltTitles(ctx context.Context, httpc *http.Client, seriesID int) ([]Item, error) {
+	detail, err := p.fetchDetail(ctx, httpc, seriesID)
+	if err != nil {
+		return nil, err
 	}
-	return items
-}
-
-func (p *MangaUpdatesProvider) fetchSummaries(results []muResultItem) []Item {
-	var items []Item
-	for _, r := range results {
-		if r.Record.Description != "" {
-			items = append(items, Item{Value: r.Record.Description})
-		}
-	}
-	return items
-}
-
-func (p *MangaUpdatesProvider) fetchCategories(results []muResultItem) []Item {
 	seen := make(map[string]bool)
 	var items []Item
-	for _, r := range results {
-		for _, g := range r.Record.Genres {
-			if g.Genre != "" && !seen[g.Genre] {
-				seen[g.Genre] = true
-				items = append(items, Item{Value: g.Genre})
-			}
+	for _, a := range detail.Associated {
+		if a.Title != "" && !seen[a.Title] {
+			seen[a.Title] = true
+			items = append(items, Item{Value: a.Title})
+		}
+	}
+	return items, nil
+}
+
+// fetchSummaries returns the synopsis of the best-matching series. Using every
+// result merges the descriptions of unrelated series into one entry. The
+// description arrives as markdown (e.g. an "[Official Web Raw](url)" prefix),
+// so it is stripped to plain text like the plugin path does.
+func (p *MangaUpdatesProvider) fetchSummaries(results []muResultItem) []Item {
+	if len(results) == 0 || results[0].Record.Description == "" {
+		return nil
+	}
+	return []Item{{Value: pluginutil.StripMarkdown(results[0].Record.Description)}}
+}
+
+// fetchCategories returns the deduped genres of the best-matching series.
+func (p *MangaUpdatesProvider) fetchCategories(results []muResultItem) []Item {
+	if len(results) == 0 {
+		return nil
+	}
+	seen := make(map[string]bool)
+	var items []Item
+	for _, g := range results[0].Record.Genres {
+		if g.Genre != "" && !seen[g.Genre] {
+			seen[g.Genre] = true
+			items = append(items, Item{Value: g.Genre})
 		}
 	}
 	return items

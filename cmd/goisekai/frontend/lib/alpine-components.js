@@ -585,7 +585,7 @@
     var btn = document.getElementById(btnId);
     if (!btn) return;
     var show = btn.dataset.show === '1';
-    for (var i = maxVisible; i < tags.length; i++) {
+    for (let i = maxVisible; i < tags.length; i++) {
       tags[i].style.display = show ? '' : 'none';
     }
     btn.dataset.show = show ? '0' : '1';
@@ -593,17 +593,15 @@
   };
 })();
 
-  // =====================================================================
-  // Loading state helpers for buttons
-  // =====================================================================
-  window.setLoading = (btn, loading) => {
-    if (!btn) return;
-    btn.disabled = loading;
-    if (loading) {
-      btn.classList.add('opacity-70');
-    } else {
-      btn.classList.remove('opacity-70');
-    }
-  };
-})();
-
+// =====================================================================
+// Loading state helpers for buttons
+// =====================================================================
+window.setLoading = (btn, loading) => {
+  if (!btn) return;
+  btn.disabled = loading;
+  if (loading) {
+    btn.classList.add('opacity-70');
+  } else {
+    btn.classList.remove('opacity-70');
+  }
+};

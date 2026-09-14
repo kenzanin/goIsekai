@@ -1,8 +1,8 @@
 package database
 
 import (
-	"github.com/goccy/go-json"
 	"fmt"
+	"github.com/goccy/go-json"
 )
 
 // GetAltTitles returns the stored alt titles as the JSON payload

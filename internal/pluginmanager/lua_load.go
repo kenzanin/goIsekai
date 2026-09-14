@@ -2,8 +2,8 @@ package pluginmanager
 
 import (
 	"bytes"
-	"github.com/goccy/go-json"
 	"fmt"
+	"github.com/goccy/go-json"
 	"path/filepath"
 
 	lua "github.com/mmcdole/lunar"

@@ -1,8 +1,8 @@
 package database
 
 import (
-	"sync/atomic"
 	"fmt"
+	"sync/atomic"
 	"time"
 
 	"goisekai/internal/logger"

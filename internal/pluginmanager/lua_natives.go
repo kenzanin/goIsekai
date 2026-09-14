@@ -2,7 +2,6 @@ package pluginmanager
 
 import (
 	"github.com/goccy/go-json"
-	"fmt"
 	"strings"
 
 	lua "github.com/mmcdole/lunar"
@@ -57,121 +56,6 @@ func registerHostNatives(state *lua.State, m *Manager, id string) {
 
 	_ = host.RawSetString("http", http.Value())
 	_ = state.RawSetGlobal("host", host.Value())
-}
-
-// luaNormalizeStatus creates the callable table host.text.normalize_status.
-// Usage: host.text.normalize_status(map, raw) or
-//
-//	host.text.normalize_status(host.text.normalize_status.default, raw).
-//
-// The table itself has a .default field pointing to the host default map.
-func luaNormalizeStatus(state *lua.State) lua.Value {
-	// Build the callable: takes (map, raw) -> normalized string.
-	fnVal, _ := state.NewNativeFunction(func(frame lua.Frame) lua.Outcome {
-		var m map[string]string
-		if frame.ArgumentCount() > 0 && frame.Kind(0) != lua.NilKind {
-			arg, ok := frame.Argument(0)
-			if !ok {
-				return frame.ReturnValue(lua.String("normalize_status: missing map"))
-			}
-			gv, err := lunarToGo(arg)
-			if err != nil {
-				return frame.ReturnValue(lua.String("normalize_status map: " + err.Error()))
-			}
-			if mm, ok := gv.(map[string]any); ok {
-				m = make(map[string]string, len(mm))
-				for k, v := range mm {
-					if s, ok := v.(string); ok {
-						m[k] = s
-					}
-				}
-			}
-		}
-		raw := ""
-		if frame.ArgumentCount() > 1 {
-			raw, _ = frame.String(1)
-		}
-		return frame.ReturnValue(lua.String(pluginutil.NormalizeStatus(m, raw)))
-	})
-
-	// Build the callable table: the function + a .default property.
-	tbl, _ := state.NewTable()
-	dflt, _ := goLunarValue(state, func() map[string]any {
-		r := make(map[string]any)
-		for k, v := range pluginutil.DefaultStatusMap() {
-			r[k] = v
-		}
-		return r
-	}())
-	_ = tbl.RawSetString("default", dflt)
-	_ = tbl.RawSetString("", fnVal.Value()) // make it callable
-
-	return tbl.Value()
-}
-
-// luaVrfSign wraps host.crypto.vrf_sign(apiPath, params, stages) — VRF
-// signer algorithm in Go, tables supplied by the plugin as data ({iv,key,tbl}
-// base64), so rotations are plugin-side constant edits, no host rebuild.
-func luaVrfSign(state *lua.State) lua.Value {
-	fn, _ := state.NewNativeFunction(func(frame lua.Frame) lua.Outcome {
-		apiPath, _ := frame.String(0)
-
-		params := map[string]string{}
-		if frame.ArgumentCount() > 1 {
-			arg, ok := frame.Argument(1)
-			if ok && frame.Kind(1) != lua.NilKind {
-				gv, err := lunarToGo(arg)
-				if err != nil {
-					return frame.ReturnValues(lua.Nil(), lua.String("vrf_sign params: "+err.Error()))
-				}
-				if m, ok := gv.(map[string]any); ok {
-					for k, v := range m {
-						switch val := v.(type) {
-						case string:
-							params[k] = val
-						case int64:
-							params[k] = fmt.Sprint(val)
-						case float64:
-							params[k] = fmt.Sprint(val)
-						default:
-							return frame.ReturnValues(lua.Nil(), lua.String("vrf_sign param "+k+": unsupported type"))
-						}
-					}
-				}
-			}
-		}
-
-		var stages []pluginutil.VRFStageB64
-		if frame.ArgumentCount() > 2 {
-			arg, ok := frame.Argument(2)
-			if ok && frame.Kind(2) != lua.NilKind {
-				gv, err := lunarToGo(arg)
-				if err != nil {
-					return frame.ReturnValues(lua.Nil(), lua.String("vrf_sign stages: "+err.Error()))
-				}
-				if arr, ok := gv.([]any); ok {
-					for i, item := range arr {
-						m, ok := item.(map[string]any)
-						if !ok {
-							return frame.ReturnValues(lua.Nil(), lua.String(fmt.Sprintf("vrf_sign stage %d: not a table", i)))
-						}
-						s, err := pluginutil.VRFStageFromMap(m)
-						if err != nil {
-							return frame.ReturnValues(lua.Nil(), lua.String(fmt.Sprintf("vrf_sign stage %d: %v", i, err)))
-						}
-						stages = append(stages, s)
-					}
-				}
-			}
-		}
-
-		decoded, err := pluginutil.VRFStagesB64(stages)
-		if err != nil {
-			return frame.ReturnValues(lua.Nil(), lua.String(err.Error()))
-		}
-		return frame.ReturnValue(lua.String(pluginutil.VRFSign(apiPath, params, decoded)))
-	})
-	return fn.Value()
 }
 
 // luaHttpGet wraps host.http.get(url, headers?) → {status, headers, body}.
@@ -245,50 +129,4 @@ func luaHttpPost(state *lua.State, m *Manager, id string) lua.Value {
 		return frame.ReturnValue(luaval)
 	})
 	return fn.Value()
-}
-
-// luaStr1 wraps a string->string helper as a Lua native.
-func luaStr1(state *lua.State, fn func(string) string) lua.Value {
-	v, _ := state.NewNativeFunction(func(frame lua.Frame) lua.Outcome {
-		s, _ := frame.String(0)
-		return frame.ReturnValue(lua.String(fn(s)))
-	})
-	return v.Value()
-}
-
-// luaStr1Err wraps a string->(string,error) helper, returning nil+message on error.
-func luaStr1Err(state *lua.State, fn func(string) (string, error)) lua.Value {
-	v, _ := state.NewNativeFunction(func(frame lua.Frame) lua.Outcome {
-		s, _ := frame.String(0)
-		out, err := fn(s)
-		if err != nil {
-			return frame.ReturnValues(lua.Nil(), lua.String(err.Error()))
-		}
-		return frame.ReturnValue(lua.String(out))
-	})
-	return v.Value()
-}
-
-// luaStr2 wraps a (string,string)->string helper as a Lua native.
-func luaStr2(state *lua.State, fn func(string, string) string) lua.Value {
-	v, _ := state.NewNativeFunction(func(frame lua.Frame) lua.Outcome {
-		a, _ := frame.String(0)
-		b, _ := frame.String(1)
-		return frame.ReturnValue(lua.String(fn(a, b)))
-	})
-	return v.Value()
-}
-
-// luaStr2Err wraps a (string,string)->(string,error) helper.
-func luaStr2Err(state *lua.State, fn func(string, string) (string, error)) lua.Value {
-	v, _ := state.NewNativeFunction(func(frame lua.Frame) lua.Outcome {
-		a, _ := frame.String(0)
-		b, _ := frame.String(1)
-		out, err := fn(a, b)
-		if err != nil {
-			return frame.ReturnValues(lua.Nil(), lua.String(err.Error()))
-		}
-		return frame.ReturnValue(lua.String(out))
-	})
-	return v.Value()
 }

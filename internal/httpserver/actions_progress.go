@@ -55,7 +55,6 @@ func (s *Server) handleResetChapterProgress(w http.ResponseWriter, r *http.Reque
 	s.hxRedirect(w, "/view/manga/"+pluginID+"/"+mangaID)
 }
 
-
 // handleToggleChapterSkip toggles the skip flag on a single chapter.
 func (s *Server) handleToggleChapterSkip(w http.ResponseWriter, r *http.Request) {
 	pluginID := param(r, "pluginID")

@@ -15,6 +15,10 @@ import (
 func brHandler(fsys http.FileSystem) http.Handler {
 	fileServer := http.FileServer(fsys)
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Asset URLs carry no version, so a stale cached copy would survive a
+		// rebuild and keep running fixed code as broken. Force revalidation;
+		// ServeContent's Last-Modified turns the conditional request into a 304.
+		w.Header().Set("Cache-Control", "no-cache")
 		if !acceptsBrotli(r) {
 			fileServer.ServeHTTP(w, r)
 			return

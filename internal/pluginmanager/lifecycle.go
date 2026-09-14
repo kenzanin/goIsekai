@@ -1,10 +1,10 @@
 package pluginmanager
 
 import (
-	"net/url"
 	"fmt"
 	"goisekai/internal/enrich"
 	"goisekai/internal/logger"
+	"net/url"
 )
 
 // ensureLoaded lazily instantiates the plugin runtime on first use.

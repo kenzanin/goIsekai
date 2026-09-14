@@ -1,10 +1,10 @@
 package hostnet
 
 import (
-	"goisekai/internal/logger"
 	"context"
-	nethttp "net/http"
 	"fmt"
+	"goisekai/internal/logger"
+	nethttp "net/http"
 	"net/url"
 	"strings"
 	"sync"
@@ -182,7 +182,7 @@ func (p *Proxy) Preconnect(host string) {
 	_ = resp.Body.Close()
 	if resp.StatusCode >= 400 {
 		logger.Debug("preconnect non-2xx", "host", host, "status", resp.StatusCode)
-	logger.Debug("transport request completed", "host", host, "status", resp.StatusCode)
+		logger.Debug("transport request completed", "host", host, "status", resp.StatusCode)
 		return
 	}
 	logger.Info("preconnected", "host", host, "status", resp.StatusCode)

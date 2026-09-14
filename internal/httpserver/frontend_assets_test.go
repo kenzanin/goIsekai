@@ -1,0 +1,292 @@
+package httpserver
+
+import (
+	"encoding/json"
+	"os"
+	"os/exec"
+	"path/filepath"
+	"regexp"
+	"sort"
+	"strings"
+	"testing"
+)
+
+// The detail page wires every enrichment chip (alt title, alt synopsis,
+// category, related) with an inline handler that calls a helper exported by
+// the frontend bundle. Because the bundle is one IIFE, a single syntax error
+// stops the whole file from running: every helper becomes undefined and every
+// chip silently stops responding, with no server-side error to notice. That
+// exact failure shipped for three commits. These tests execute the real bundle
+// and cross-check it against the templates.
+
+const (
+	frontendLibDir = "../../cmd/goisekai/frontend/lib"
+	templatesDir   = "../templates"
+)
+
+// frontendGlobals are the helpers templates and reader code call by name. A
+// missing one means clicks silently do nothing.
+var frontendGlobals = []string{
+	"submitForm",
+	"showToast",
+	"toggleGenreTags",
+	"setLoading",
+	"syncEnrichmentPanel",
+	"syncViewMode",
+}
+
+// nodePath returns the node binary or skips the test.
+func nodePath(t *testing.T) string {
+	t.Helper()
+	node, err := exec.LookPath("node")
+	if err != nil {
+		t.Skip("node not on PATH; skipping frontend bundle checks")
+	}
+	return node
+}
+
+// jsStubHarness loads the bundle into a stubbed browser and prints the type of
+// each requested global as JSON. Running the file (not just parsing it) is the
+// point: it catches a throw at load time as well as a syntax error.
+const jsStubHarness = `
+global.window = global;
+const noop = () => {};
+const mkEl = () => ({
+  style: {}, dataset: {},
+  classList: { add: noop, remove: noop, toggle: noop, contains: () => false },
+  appendChild: noop, setAttribute: noop, remove: noop,
+  querySelector: () => null, querySelectorAll: () => [],
+});
+global.document = {
+  createElement: mkEl,
+  head: { appendChild: noop },
+  documentElement: { appendChild: noop },
+  body: { appendChild: noop },
+  addEventListener: noop,
+  getElementById: () => null,
+  querySelector: () => null,
+  querySelectorAll: () => [],
+};
+global.localStorage = { getItem: () => null, setItem: noop, removeItem: noop };
+global.Alpine = { store: () => null, initTree: noop, data: noop, plugin: noop };
+global.addEventListener = noop;
+global.fetch = () => Promise.resolve({ ok: true, text: () => Promise.resolve('') });
+global.history = { replaceState: noop, state: null };
+global.location = { origin: 'http://localhost', href: 'http://localhost', pathname: '/' };
+global.MutationObserver = class { observe() {} disconnect() {} };
+global.requestAnimationFrame = noop;
+
+require(process.env.GOISEKAI_BUNDLE);
+
+const names = (process.env.GOISEKAI_NAMES || '').split(',').filter(Boolean);
+const out = {};
+for (const n of names) out[n] = typeof global[n];
+console.log(JSON.stringify(out));
+`
+
+func frontendBundles(t *testing.T) []string {
+	t.Helper()
+	matches, err := filepath.Glob(filepath.Join(frontendLibDir, "*.js"))
+	if err != nil {
+		t.Fatalf("glob frontend js: %v", err)
+	}
+	if len(matches) == 0 {
+		t.Fatalf("no frontend bundles found under %s", frontendLibDir)
+	}
+	sort.Strings(matches)
+	return matches
+}
+
+// TestFrontendJSParses runs `node --check` on every served bundle.
+func TestFrontendJSParses(t *testing.T) {
+	node := nodePath(t)
+	for _, bundle := range frontendBundles(t) {
+		t.Run(filepath.Base(bundle), func(t *testing.T) {
+			out, err := exec.Command(node, "--check", bundle).CombinedOutput()
+			if err != nil {
+				t.Fatalf("%s does not parse — the whole file stops executing and every "+
+					"inline handler it exports becomes undefined:\n%s", bundle, out)
+			}
+		})
+	}
+}
+
+// TestFrontendBundleDefinesGlobals executes the bundle and asserts the helpers
+// templates rely on exist at runtime.
+func TestFrontendBundleDefinesGlobals(t *testing.T) {
+	node := nodePath(t)
+	bundle, err := filepath.Abs(filepath.Join(frontendLibDir, "alpine-components.js"))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	harness := filepath.Join(t.TempDir(), "harness.js")
+	if err := os.WriteFile(harness, []byte(jsStubHarness), 0o644); err != nil {
+		t.Fatalf("write harness: %v", err)
+	}
+
+	cmd := exec.Command(node, harness)
+	cmd.Env = append(os.Environ(),
+		"GOISEKAI_BUNDLE="+bundle,
+		"GOISEKAI_NAMES="+strings.Join(frontendGlobals, ","),
+	)
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("loading %s threw — a syntax error or a throw at load time kills "+
+			"every handler at once:\n%s", filepath.Base(bundle), out)
+	}
+
+	var got map[string]string
+	if err := json.Unmarshal(out, &got); err != nil {
+		t.Fatalf("harness output %q is not JSON: %v", out, err)
+	}
+	for _, name := range frontendGlobals {
+		if got[name] != "function" {
+			t.Errorf("window.%s is %s, want function — templates call it from inline handlers, "+
+				"so clicks would silently do nothing", name, got[name])
+		}
+	}
+}
+
+// leadingCall matches the first call in an inline handler attribute value:
+// onclick="submitForm(..." or @click="toggleGenreTags(...".
+var leadingCall = regexp.MustCompile(`(?:@[a-zA-Z.\-]+|on(?:click|change|submit|input|blur|focus))="\s*([A-Za-z_$][A-Za-z0-9_$]*)\s*\(`)
+
+// chainedCall matches a call that follows a ";" in the same handler, e.g.
+// onclick="event.preventDefault();submitForm(this.closest('form'))".
+var chainedCall = regexp.MustCompile(`;\s*([A-Za-z_$][A-Za-z0-9_$]*)\s*\(`)
+
+// windowExport matches a global assignment in the bundle.
+var windowExport = regexp.MustCompile(`window\.([A-Za-z_$][A-Za-z0-9_$]*)\s*=`)
+
+// scriptFunction matches a helper declared in a template's own <script> block.
+var scriptFunction = regexp.MustCompile(`function\s+([A-Za-z_$][A-Za-z0-9_$]*)\s*\(`)
+
+// browserBuiltins are handler calls the browser provides, plus the Alpine magic
+// objects, which are resolved by Alpine rather than by a global.
+//
+// ponytail: manual allowlist. Add a name here when a template newly leans on a
+// browser or Alpine global; only a real JS parser would remove the upkeep.
+var browserBuiltins = map[string]bool{
+	"event": true, "window": true, "document": true, "alert": true,
+	"confirm": true, "console": true, "history": true, "location": true,
+	"fetch": true, "setInterval": true, "clearInterval": true,
+	"setTimeout": true, "clearTimeout": true, "requestAnimationFrame": true,
+	"cancelAnimationFrame": true, "queueMicrotask": true, "$": true, "Alpine": true,
+}
+
+// jsKeywords are language constructs the extractor can catch mid-handler, e.g.
+// the "for" and "if" in @click="if (x) { for (...) submitForm(f) }". They are
+// never callable helpers, so they must not be reported as undefined.
+var jsKeywords = map[string]bool{
+	"if": true, "else": true, "for": true, "while": true, "do": true,
+	"switch": true, "case": true, "default": true, "return": true, "typeof": true,
+	"instanceof": true, "in": true, "of": true, "new": true, "delete": true,
+	"void": true, "await": true, "async": true, "try": true, "catch": true,
+	"finally": true, "throw": true, "break": true, "continue": true,
+	"function": true, "class": true, "var": true, "let": true, "const": true,
+	"this": true, "super": true, "yield": true, "with": true, "debugger": true,
+}
+
+func scanTemplates(t *testing.T) map[string][]string {
+	t.Helper()
+	files := map[string][]string{}
+	err := filepath.WalkDir(templatesDir, func(path string, d os.DirEntry, err error) error {
+		if err != nil || d.IsDir() || !strings.HasSuffix(path, ".lua") {
+			return err
+		}
+		data, readErr := os.ReadFile(path)
+		if readErr != nil {
+			return readErr
+		}
+		files[path] = []string{string(data)}
+		return nil
+	})
+	if err != nil {
+		t.Fatalf("walk templates: %v", err)
+	}
+	if len(files) == 0 {
+		t.Fatalf("no templates found under %s", templatesDir)
+	}
+	return files
+}
+
+// templateHandlerCalls returns, per file, the helper names the file invokes
+// from an inline event handler.
+func templateHandlerCalls(files map[string][]string) map[string][]string {
+	calls := map[string][]string{}
+	for path, contents := range files {
+		re := regexp.MustCompile(leadingCall.String() + "|" + chainedCall.String())
+		for _, loc := range re.FindAllStringSubmatchIndex(contents[0], -1) {
+			for i := 2; i+1 < len(loc); i += 2 {
+				if loc[i] < 0 {
+					continue
+				}
+				name := contents[0][loc[i]:loc[i+1]]
+				calls[name] = append(calls[name], filepath.Base(path))
+			}
+		}
+	}
+	return calls
+}
+
+// TestFrontendTemplateHandlersAreResolvable fails when a template invokes a
+// helper from an inline handler that neither the bundle exports nor a template
+// script defines. A rename on either side breaks the control with no error.
+func TestFrontendTemplateHandlersAreResolvable(t *testing.T) {
+	files := scanTemplates(t)
+
+	bundle, err := os.ReadFile(filepath.Join(frontendLibDir, "alpine-components.js"))
+	if err != nil {
+		t.Fatalf("read bundle: %v", err)
+	}
+	defined := map[string]bool{}
+	for _, m := range windowExport.FindAllStringSubmatch(string(bundle), -1) {
+		defined[m[1]] = true
+	}
+	for _, contents := range files {
+		for _, m := range scriptFunction.FindAllStringSubmatch(contents[0], -1) {
+			defined[m[1]] = true
+		}
+	}
+
+	calls := templateHandlerCalls(files)
+	if len(calls) == 0 {
+		t.Fatal("found no inline handler calls in templates — the extractor is broken")
+	}
+	for name, sites := range calls {
+		if defined[name] || browserBuiltins[name] || jsKeywords[name] {
+			continue
+		}
+		sort.Strings(sites)
+		t.Errorf("templates call %s() from inline handlers (%s) but neither the frontend "+
+			"bundle nor a template <script> defines it — the control would silently do nothing",
+			name, strings.Join(sites, ", "))
+	}
+}
+
+// TestEnrichmentChipsCallSubmitForm pins the mechanism the chips depend on: the
+// clickable spans delegate to submitForm, which posts the surrounding form.
+// Paired with TestFrontendBundleDefinesGlobals, this covers both a chip that
+// lost its handler and a helper that stopped being exported.
+func TestEnrichmentChipsCallSubmitForm(t *testing.T) {
+	calls := templateHandlerCalls(scanTemplates(t))
+	if len(calls["submitForm"]) == 0 {
+		t.Fatal("no template uses submitForm() — enrichment chips would not be clickable")
+	}
+	if !contains(calls["submitForm"], "detail_alt.lua") {
+		t.Errorf("detail_alt.lua does not use submitForm(); callers: %v", calls["submitForm"])
+	}
+	if !contains(frontendGlobals, "submitForm") {
+		t.Error("submitForm is not in frontendGlobals, so nothing asserts the bundle exports it")
+	}
+}
+
+func contains(haystack []string, needle string) bool {
+	for _, h := range haystack {
+		if h == needle {
+			return true
+		}
+	}
+	return false
+}

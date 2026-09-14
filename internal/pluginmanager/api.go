@@ -1,10 +1,9 @@
 package pluginmanager
 
 import (
-	"github.com/goccy/go-json"
 	"fmt"
+	"github.com/goccy/go-json"
 	"goisekai/internal/logger"
-
 
 	"goisekai/pkg/types"
 )
@@ -181,8 +180,8 @@ func (m *Manager) GetMangaDetailWithChapters(pluginID, mangaID string) (types.Ma
 	if err == nil {
 		// Parse the batch response: {"manga": Manga, "chapters": [Chapter]}
 		var batchResp struct {
-			Manga     types.Manga   `json:"manga"`
-			Chapters  []types.Chapter `json:"chapters"`
+			Manga    types.Manga     `json:"manga"`
+			Chapters []types.Chapter `json:"chapters"`
 		}
 		if err := json.Unmarshal([]byte(out), &batchResp); err == nil {
 			return batchResp.Manga, batchResp.Chapters, nil

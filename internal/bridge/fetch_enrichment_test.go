@@ -12,11 +12,14 @@ import (
 )
 
 // enrichMockProvider is a test provider returning predefined items per kind.
+// It also records the title each Fetch was asked for, so tests can assert
+// which title the caller fell back to.
 type enrichMockProvider struct {
-	id    string
-	name  string
-	kinds []enrich.Kind
-	items map[enrich.Kind][]enrich.Item
+	id     string
+	name   string
+	kinds  []enrich.Kind
+	items  map[enrich.Kind][]enrich.Item
+	titles []string
 }
 
 func (m *enrichMockProvider) ID() string   { return m.id }
@@ -26,7 +29,8 @@ func (m *enrichMockProvider) Kinds() []enrich.Kind {
 	copy(out, m.kinds)
 	return out
 }
-func (m *enrichMockProvider) Fetch(_ context.Context, _ *http.Client, _ string, k enrich.Kind) ([]enrich.Item, error) {
+func (m *enrichMockProvider) Fetch(_ context.Context, _ *http.Client, title string, k enrich.Kind) ([]enrich.Item, error) {
+	m.titles = append(m.titles, title)
 	return m.items[k], nil
 }
 

@@ -1,8 +1,8 @@
 package pluginmanager
 
 import (
-	"github.com/goccy/go-json"
 	"fmt"
+	"github.com/goccy/go-json"
 	"path/filepath"
 	"plugin"
 	"strings"

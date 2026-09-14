@@ -107,8 +107,8 @@ return function(data)
 				.. '<div class="relative flex-1 min-w-0">'
 				.. coverHTML
 				.. '<div class="lib-dim" style="display:'
-					.. ((m.CoverDim ~= nil and m.CoverDim == 1) and "block" or "none")
-					.. ';position:absolute;inset:0;background:rgba(0,0,0,0.82);border-radius:0.5rem;"></div>'
+				.. ((m.CoverDim ~= nil and m.CoverDim == 1) and "block" or "none")
+				.. ';position:absolute;inset:0;background:rgba(0,0,0,0.82);border-radius:0.5rem;"></div>'
 				.. statusBadge
 				.. pluginBadge
 				.. "</div>"

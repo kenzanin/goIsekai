@@ -81,15 +81,8 @@ func TestMangaUpdatesProvider_FetchFromLiveFixture(t *testing.T) {
 
 	p := NewMangaUpdatesProvider()
 
-	// Titles
-	items := p.fetchTitles(resp.Results)
-	if len(items) == 0 {
-		t.Fatal("expected titles from fixture, got none")
-	}
-	t.Logf("titles: %v", items)
-
 	// Categories
-	items = p.fetchCategories(resp.Results)
+	items := p.fetchCategories(resp.Results)
 	if len(items) == 0 {
 		t.Fatal("expected categories from fixture, got none")
 	}

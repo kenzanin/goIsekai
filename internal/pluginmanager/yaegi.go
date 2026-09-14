@@ -2,8 +2,8 @@ package pluginmanager
 
 import (
 	"context"
-	"github.com/goccy/go-json"
 	"fmt"
+	"github.com/goccy/go-json"
 	"go/parser"
 	"go/token"
 	"reflect"
