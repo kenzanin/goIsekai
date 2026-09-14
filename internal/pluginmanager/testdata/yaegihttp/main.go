@@ -3,7 +3,7 @@ package main
 import "hostnet"
 
 func Search(arg string) (string, error) {
-	url := "http://localhost:" + arg
+	url := "http://127.0.0.1:" + arg
 	body, err := hostnet.Get(url)
 	if err != nil {
 		return "", err
