@@ -69,7 +69,7 @@ func (s *AppService) GetMangaDetails(pluginID, mangaID string) (types.Manga, []t
 				manga.Genres = genres
 			}
 			// A user-set cover dim override wins over the default.
-			if dim, has, _ := s.db.GetMangaCoverDim(rowID); err == nil && has && dim == 1 {
+			if dim, has, _ := s.db.GetMangaCoverDim(rowID); has && dim == 1 {
 				manga.CoverDim = dim
 			}
 			return manga, chapters, nil
@@ -89,7 +89,7 @@ func (s *AppService) GetMangaDetails(pluginID, mangaID string) (types.Manga, []t
 			manga.Genres = genres
 		}
 		// A user-set cover dim override wins over the default.
-		if dim, has, _ := s.db.GetMangaCoverDim(rowID); err == nil && has && dim == 1 {
+		if dim, has, _ := s.db.GetMangaCoverDim(rowID); has && dim == 1 {
 			manga.CoverDim = dim
 		}
 		// Return live manga but fall back chapters.
@@ -157,7 +157,7 @@ func (s *AppService) cachedMangaFallback(pluginID, mangaID, rowID string) (types
 		manga.Genres = genres
 	}
 	// Apply user cover dim override.
-	if dim, has, _ := s.db.GetMangaCoverDim(rowID); err == nil && has && dim == 1 {
+	if dim, has, _ := s.db.GetMangaCoverDim(rowID); has && dim == 1 {
 		manga.CoverDim = dim
 	}
 

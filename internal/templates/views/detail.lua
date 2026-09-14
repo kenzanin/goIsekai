@@ -67,11 +67,15 @@ return function(data)
 				.. (data.CoverDim == 1 and "block" or "none")
 				.. ';position:absolute;top:0;left:0;right:0;bottom:0;border-radius:0.75rem;background:rgba(0,0,0,0.82);"></div>'
 			.. '</div>'
-			.. '<button type="button" id="cover-dim-btn" title="Dim the cover image" onclick="this.onclick=null;var d=document.getElementById(&quot;cover-dim&quot;);var b=this;d.style.display=d.style.display===&quot;none&quot;?&quot;block&quot;:&quot;none&quot;;b.textContent=d.style.display===&quot;block&quot;?&quot;Show cover&quot;:&quot;Hide cover&quot;;fetch(&quot;/action/toggle-cover-dim/'
+			.. '<form action="/action/toggle-cover-dim/'
 				.. h(pluginID)
-				.. '&quot;,{method:&quot;POST&quot;});" class="mt-2 inline-flex items-center text-xs text-neutral-400 hover:text-neutral-200 transition cursor-pointer">'
-				.. (data.CoverDim == 1 and "Show cover" or "Hide cover")
-				.. '</button>'
+				.. '/'
+				.. h(data.MangaID)
+				.. '" method="POST" style="display:inline">'
+				.. '<button type="submit" id="cover-dim-btn" title="Dim the cover image" class="mt-2 inline-flex items-center text-xs text-neutral-400 hover:text-neutral-200 transition cursor-pointer">'
+					.. (data.CoverDim == 1 and "Show cover" or "Hide cover")
+					.. '</button>'
+				.. '</form>'
 	else
 		coverHTML = '<div class="w-full aspect-[2/3] bg-neutral-800 rounded-xl flex items-center justify-center text-neutral-500 text-4xl font-semibold">'
 			.. h(getInitials(manga.Title or ""))
