@@ -464,8 +464,14 @@ func TestMangaUpdatesProvider_OnlyBestMatch(t *testing.T) {
 		_ = json.NewEncoder(w).Encode(resp)
 	})
 	// Only the best match (series 100) may be queried for its alt titles.
+	// related_series is served on purpose: KindRelated must ignore it and read
+	// category_recommendations instead.
 	mux.HandleFunc("/v1/series/100", func(w http.ResponseWriter, r *http.Request) {
-		resp := muSeriesDetail{Associated: []muAssociatedTitle{{Title: "The Right Series"}}}
+		resp := map[string]any{
+			"associated":               []map[string]any{{"title": "The Right Series"}},
+			"related_series":           []map[string]any{{"related_series_name": "Plot Relation"}},
+			"category_recommendations": []map[string]any{{"series_name": "Recommended Series", "series_url": "http://rec"}},
+		}
 		w.Header().Set("Content-Type", "application/json")
 		_ = json.NewEncoder(w).Encode(resp)
 	})
@@ -484,12 +490,14 @@ func TestMangaUpdatesProvider_OnlyBestMatch(t *testing.T) {
 	httpc := srv.Client()
 
 	for _, tc := range []struct {
-		kind Kind
-		want string
+		kind    Kind
+		want    string
+		wantURL string
 	}{
-		{KindTitles, "The Right Series"},
-		{KindSummaries, "The right synopsis."},
-		{KindCategories, "Action"},
+		{KindTitles, "The Right Series", ""},
+		{KindSummaries, "The right synopsis.", ""},
+		{KindCategories, "Action", ""},
+		{KindRelated, "Recommended Series", "http://rec"},
 	} {
 		items, err := p.Fetch(context.Background(), httpc, "The Right Series", tc.kind)
 		if err != nil {
@@ -500,6 +508,9 @@ func TestMangaUpdatesProvider_OnlyBestMatch(t *testing.T) {
 		}
 		if items[0].Value != tc.want {
 			t.Errorf("%s: got %q, want %q", tc.kind, items[0].Value, tc.want)
+		}
+		if tc.wantURL != "" && items[0].URL != tc.wantURL {
+			t.Errorf("%s: url = %q, want %q", tc.kind, items[0].URL, tc.wantURL)
 		}
 	}
 	muBase = orig

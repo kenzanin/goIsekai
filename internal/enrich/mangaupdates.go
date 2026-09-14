@@ -92,9 +92,8 @@ type muResultItem struct {
 }
 
 // muSeriesRecord mirrors the series shape in a MangaUpdates search result.
-// The MU API search endpoint returns title, genres, description but NOT
-// recommendations or related-series data. Those require a separate API call
-// not exposed by the public search endpoint.
+// The search endpoint returns title, genres and description but no
+// recommendation data, so recommendations need a follow-up detail call.
 type muSeriesRecord struct {
 	ID             int             `json:"series_id"`
 	Title          string          `json:"title"`
@@ -114,12 +113,13 @@ type muGenreEntry struct {
 	Genre string `json:"genre"`
 }
 
-// muRelatedSeries is a related-series entry from the MangaUpdates series detail API.
-type muRelatedSeries struct {
-	RelationType      string `json:"relation_type"`
-	RelatedSeriesID   int    `json:"related_series_id"`
-	RelatedSeriesName string `json:"related_series_name"`
-	RelatedSeriesURL  string `json:"related_series_url"`
+// muCategoryRecommendation is one entry from the detail API's
+// category_recommendations[] list — the block the MangaUpdates site renders as
+// "Recommendations". Entries are siblings sharing the series' categories, not
+// plot relations, so a series with no relations still yields several.
+type muCategoryRecommendation struct {
+	SeriesName string `json:"series_name"`
+	SeriesURL  string `json:"series_url"`
 }
 
 // muAssociatedTitle is one alternative-title entry from the series detail API.
@@ -129,9 +129,9 @@ type muAssociatedTitle struct {
 
 // muSeriesDetail is the full series response from GET /v1/series/{id}.
 type muSeriesDetail struct {
-	Description   string              `json:"description"`
-	RelatedSeries []muRelatedSeries   `json:"related_series"`
-	Associated    []muAssociatedTitle `json:"associated"`
+	Description             string                     `json:"description"`
+	CategoryRecommendations []muCategoryRecommendation `json:"category_recommendations"`
+	Associated              []muAssociatedTitle        `json:"associated"`
 }
 
 // fetchDetail loads the full series record from GET /v1/series/{id}.
@@ -157,6 +157,11 @@ func (p *MangaUpdatesProvider) fetchDetail(ctx context.Context, httpc *http.Clie
 	return &detail, nil
 }
 
+// fetchRelated returns the detail API's category_recommendations[] list, which
+// is what the MangaUpdates site renders under "Recommendations". The
+// related_series[] field is deliberately not used: it carries only direct plot
+// relations (sequels, novel adaptations) and is empty or single-entry for most
+// series, so the section looked broken next to the source site.
 func (p *MangaUpdatesProvider) fetchRelated(ctx context.Context, httpc *http.Client, seriesID int) ([]Item, error) {
 	detail, err := p.fetchDetail(ctx, httpc, seriesID)
 	if err != nil {
@@ -164,11 +169,11 @@ func (p *MangaUpdatesProvider) fetchRelated(ctx context.Context, httpc *http.Cli
 	}
 	seen := make(map[string]bool)
 	var items []Item
-	for _, rs := range detail.RelatedSeries {
-		name := rs.RelatedSeriesName
+	for _, rec := range detail.CategoryRecommendations {
+		name := rec.SeriesName
 		if name != "" && !seen[name] {
 			seen[name] = true
-			items = append(items, Item{Value: name, URL: rs.RelatedSeriesURL})
+			items = append(items, Item{Value: name, URL: rec.SeriesURL})
 		}
 	}
 	return items, nil
