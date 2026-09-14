@@ -4,21 +4,23 @@
 
 **Always use these tools in this order of priority:**
 
-| Task                                         | Tool                  | Notes                                                            |
-| -------------------------------------------- | --------------------- | ---------------------------------------------------------------- |
-| Shell commands, builds, tests                | `bash`                | Default for all terminal operations                              |
-| Code exploration, find references, relations | `codebase-memory-mcp` | Use `search_graph`, `trace_path`, `get_code_snippet` before grep |
-| Memory management, session state             | `agentic-memory-mcp`  | Store/recall context across sessions                             |
-| Browse web pages, check UI                   | `obscura`             | Primary browser tool                                             |
-| Debug web pages (console, network)           | `playwright-cdp`      | Only when deep debugging needed                                  |
-| Look up API docs, library info               | `deepwiki`            | For GitHub repos and documentation                               |
+| Task                                         | Tool                 | Notes                                                            |
+| -------------------------------------------- | -------------------- | ---------------------------------------------------------------- |
+| Shell commands, builds, tests                | `bash`               | Default for all terminal operations                              |
+| Code exploration, find references, relations | `codebase-memory`    | Use `search_graph`, `trace_path`, `get_code_snippet` before grep |
+| Memory management, session state             | `agentic-memory-mcp` | Store/recall context across sessions                             |
+| Browse web pages, check UI                   | `obscura`            | Primary browser tool                                             |
+| Debug web pages (console, network)           | `playwright-cdp`     | Only when deep debugging needed                                  |
+| Look up API docs, library info               | `deepwiki`           | For GitHub repos and documentation                               |
+| MCP server interaction                       | `read_mcp_resource`  | Read resources from MCP servers (codebase-memory, etc.)          |
 
 **Workflow:**
 
-1. Before editing code → `codebase-memory-mcp` to find all references and callers
+1. Before editing code → `codebase-memory` to find all references and callers
 2. Before testing changes → `obscura` to verify UI behavior
 3. After completing task → `vestige-mcp` to store session context
 4. When stuck on API → `deepwiki` to check documentation
+5. For MCP resources → `read_mcp_resource` with correct mcp_name
 
 ---
 
@@ -172,3 +174,119 @@ Changes use the **openspec** workflow in `openspec/`:
 - `openspec/changes/` — active change proposals (delta specs)
 - `openspec/changes/archive/` — completed changes
 - Commands via `.opencode/commands/opsx-*`: `opsx-explore`, `opsx-propose`, `opsx-apply`, `opsx-archive`, `opsx-sync`, `opsx-update`
+
+---
+
+## MCP Server Tools Reference
+
+### codebase-memory
+
+```bash
+# List projects
+mcp_codebase-memory_list_projects
+
+# Index repository
+mcp_codebase-memory_index_repository \
+  --repo_path /path/to/repo \
+  --mode full \
+  --name project-name
+
+# Search symbols
+mcp_codebase-memory_search_graph \
+  --project project-name \
+  --query "search term" \
+  --label Function
+
+# Get code snippet
+mcp_codebase-memory_get_code_snippet \
+  --project project-name \
+  --qualified_name fully.qualified.SymbolName
+
+# Trace calls
+mcp_codebase-memory_trace_path \
+  --project project-name \
+  --function_name functionName \
+  --mode calls \
+  --direction inbound
+```
+
+### agentic-memory-mcp
+
+```bash
+# Add memory event
+mcp_agentic-memory-mcp_memory_add \
+  --event_type fact \
+  --content "memory content"
+
+# Query memories
+mcp_agentic-memory-mcp_memory_query \
+  --event_types fact \
+  --min_confidence 0.7
+
+# Similar search
+mcp_agentic-memory-mcp_memory_similar \
+  --min_similarity 0.6 \
+  --query_text "what I need to know"
+```
+
+### obscura
+
+```bash
+# Navigate to URL
+mcp_obscura_browser_navigate --url https://example.com
+
+# Click element by ref
+mcp_obscura_browser_click --ref e3
+
+# Snapshot page
+mcp_obscura_browser_snapshot
+
+# Take screenshot
+mcp_obscura_browser_take_screenshot --type png
+```
+
+### playwright-cdp
+
+```bash
+# Navigate
+mcp_playwright-cdp_browser_navigate --url https://example.com
+
+# Snapshot
+mcp_playwright-cdp_browser_snapshot
+
+# Click
+mcp_playwright-cdp_browser_click --target element-selector
+```
+
+### deepwiki
+
+```bash
+# Ask question about repo
+mcp_deepwiki_ask_question \
+  --repoName owner/repo \
+  --question "How do I use X?"
+
+# Read docs
+mcp_deepwiki_read_wiki_contents \
+  --repoName owner/repo
+```
+
+### read_mcp_resource (general)
+
+```bash
+# Read from any MCP server
+read_mcp_resource \
+  --mcp_name codebase-memory \
+  --uri /path/to/resource
+```
+
+---
+
+## Common Issues & Fixes
+
+| Issue                               | Fix                                                                             |
+| ----------------------------------- | ------------------------------------------------------------------------------- |
+| `codebase-memory-mcp` tools failing | Use `codebase-memory` MCP server (without `-mcp` suffix)                        |
+| MCP tools not responding            | Run `mcp_codebase-memory_index_repository` to refresh index                     |
+| File not found errors               | Check if file is in `.gitignore` — excluded files need direct read              |
+| MCP resource not available          | List available resources first: `list_mcp_resources --mcp_name codebase-memory` |

@@ -120,4 +120,17 @@ var migrations = []string{
 	`ALTER TABLE chapters ADD COLUMN is_skipped INTEGER DEFAULT 0;`,
 	// Index 19: user toggle to dim the manga cover image (persisted per manga).
 	`ALTER TABLE mangas ADD COLUMN cover_dim INTEGER DEFAULT 0;`,
+	// Index 20: plugin response cache — stores JSON responses keyed by plugin,
+	// manga, and function. ponytail: when the cache grows to millions of entries,
+	// add a shard index on (plugin_id, cached_at) for the cleanup scan.
+	`CREATE TABLE IF NOT EXISTS plugin_cache (
+		id TEXT PRIMARY KEY,
+		plugin_id TEXT NOT NULL,
+		manga_id TEXT NOT NULL,
+		function_name TEXT NOT NULL,
+		response TEXT NOT NULL,
+		cached_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+		expires_at TIMESTAMP NOT NULL,
+		UNIQUE(plugin_id, manga_id, function_name)
+	);`,
 }

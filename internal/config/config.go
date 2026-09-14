@@ -58,6 +58,11 @@ type Config struct {
 	CDPPath string
 	// CDPSolveTimeout bounds a single challenge solve in seconds.
 	CDPSolveTimeout int
+	// [maintenance] — plugin caching and preconnect.
+	// CacheTTLHours is the TTL for plugin response cache in hours.
+	CacheTTLHours int
+	// PreconnectEnabled toggles HTTP preconnect to plugin hosts at startup.
+	PreconnectEnabled bool
 }
 
 // Default returns the built-in defaults.
@@ -81,6 +86,8 @@ func Default() *Config {
 		BackupIntervalHours: 24,
 		BackupKeep:          5,
 		PruneOrphans:        true,
+		CacheTTLHours:       24,
+		PreconnectEnabled:   false,
 	}
 	c.CacheDir = filepath.Join(c.DataDir, "cache")
 	// Source-tree locations (relative to the working dir) so template and
@@ -113,6 +120,8 @@ func (c *Config) Save(path string) error {
 	fmt.Fprintf(&b, "cdp_engine = %s\n", c.CDPEngine)
 	fmt.Fprintf(&b, "cdp_path = %s\n", c.CDPPath)
 	fmt.Fprintf(&b, "cdp_solve_timeout = %d\n", c.CDPSolveTimeout)
+	fmt.Fprintf(&b, "cache_ttl_hours = %d\n", c.CacheTTLHours)
+	fmt.Fprintf(&b, "preconnect_enabled = %t\n", c.PreconnectEnabled)
 	fmt.Fprintf(&b, "\n[maintenance]\n")
 	fmt.Fprintf(&b, "backup_interval_hours = %d\n", c.BackupIntervalHours)
 	fmt.Fprintf(&b, "backup_keep = %d\n", c.BackupKeep)

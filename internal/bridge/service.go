@@ -397,3 +397,8 @@ func (s *AppService) ResetEnrichment(pluginID, mangaID string) error {
 	}
 	return nil
 }
+
+// CacheStats returns cache metrics for the /api/stats endpoint.
+func (s *AppService) CacheStats() (total, hits int64, err error) {
+	return s.db.CacheStats()
+}

@@ -3,14 +3,12 @@ package main
 import (
 	"context"
 	"flag"
-	"fmt"
 	"log"
 	"log/slog"
 	"os"
 	"os/signal"
 	"path/filepath"
 	"strconv"
-	"strings"
 	"syscall"
 	"time"
 
@@ -146,6 +144,8 @@ func main() {
 	} else {
 		logger.Warn("load plugin profile pins", "error", perr)
 	}
+
+
 	proxy.SetPersistPin(func(pluginID, profile string) {
 		if err := db.SetPluginProfile(pluginID, profile); err != nil {
 			logger.Warn("persist plugin profile", "plugin", pluginID, "error", err)
@@ -209,6 +209,24 @@ func main() {
 	if err := mgr.Discover(); err != nil {
 		logger.Fatal("discover plugins", "error", err)
 	}
+
+	// Track known hosts and trigger preconnect for all discovered plugins
+	mgr.TrackKnownHosts()
+	
+
+	// Preconnect all known hosts on startup (warm connection pool)
+	go func() {
+		hosts := mgr.GetKnownHosts()
+		logger.Info("preconnecting to known hosts", "count", len(hosts))
+		sem := make(chan struct{}, 4) // concurrency limit 4
+		for _, host := range hosts {
+			sem <- struct{}{}
+			go func(h string) {
+				defer func() { <-sem }()
+				mgr.Proxy().Preconnect(h)
+			}(host)
+		}
+	}()
 
 	// Register plugins loaded from the plugins dir so they appear in
 	// ListPlugins (Discover only loads them into memory).
@@ -286,36 +304,3 @@ func main() {
 	logger.Info("shutdown complete")
 }
 
-// runStop reads the PID file from the data directory and sends SIGTERM.
-func runStop() {
-	cfgPath := os.Getenv("GOISEKAI_CONFIG")
-	if cfgPath == "" {
-		cfgPath = "goisekai.ini"
-	}
-	cfg, err := config.Load(cfgPath)
-	if err != nil {
-		log.Fatalf("load config: %v", err)
-	}
-
-	pidPath := filepath.Join(cfg.DataDir, "goisekai.pid")
-	data, err := os.ReadFile(pidPath)
-	if err != nil {
-		log.Fatalf("read PID file: %v", err)
-	}
-
-	pidStr := strings.TrimSpace(string(data))
-	pid, err := strconv.Atoi(pidStr)
-	if err != nil {
-		log.Fatalf("invalid PID %q: %v", pidStr, err)
-	}
-
-	proc, err := os.FindProcess(pid)
-	if err != nil {
-		log.Fatalf("find process %d: %v", pid, err)
-	}
-	if err := proc.Signal(syscall.SIGTERM); err != nil {
-		log.Fatalf("send SIGTERM to %d: %v", pid, err)
-	}
-
-	fmt.Printf("sent SIGTERM to process %d\n", pid)
-}

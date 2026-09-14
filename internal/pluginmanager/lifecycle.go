@@ -1,6 +1,7 @@
 package pluginmanager
 
 import (
+	"net/url"
 	"fmt"
 	"goisekai/internal/enrich"
 	"goisekai/internal/logger"
@@ -70,6 +71,27 @@ func (m *Manager) ensureLoaded(id string) error {
 
 	if m.onLoad != nil {
 		go m.onLoad(id)
+		go m.preconnectOnLoad(id)
 	}
 	return nil
+}
+
+// preconnectOnLoad triggers preconnect in the background after plugin lazy-load.
+// It extracts the host from the plugin site_url and initiates a preconnect.
+func (m *Manager) preconnectOnLoad(id string) {
+	p, err := m.get(id)
+	if err != nil {
+		logger.Debug("preconnectOnLoad failed", "plugin", id, "error", err)
+		return
+	}
+	if p.meta.SiteURL == "" {
+		return
+	}
+	// Extract host from URL
+	u, err := url.Parse(p.meta.SiteURL)
+	if err != nil {
+		logger.Debug("preconnectOnLoad parse URL", "plugin", id, "url", p.meta.SiteURL, "error", err)
+		return
+	}
+	m.proxy.Preconnect(u.Host)
 }

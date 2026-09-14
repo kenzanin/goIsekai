@@ -14,6 +14,9 @@ const (
 	GetMangaDetailFunc = "GetMangaDetail"
 	// GetChapterListFunc accepts a manga id and returns a JSON array of Chapter.
 	GetChapterListFunc = "GetChapterList"
+	// GetMangaDetailWithChaptersFunc accepts a manga id and returns both
+	// Manga detail and Chapter list in a single call for efficiency.
+	GetMangaDetailWithChaptersFunc = "GetMangaDetailWithChapters"
 	// GetPageListFunc accepts a chapter id and returns a JSON array of Page.
 	GetPageListFunc = "GetPageList"
 	// ContractVersionFunc is exported by each plugin and returns the ABI

@@ -1,6 +1,9 @@
 package hostnet
 
 import (
+	"goisekai/internal/logger"
+	"context"
+	nethttp "net/http"
 	"fmt"
 	"net/url"
 	"strings"
@@ -42,6 +45,8 @@ type Proxy struct {
 
 	// solveChallenge is swappable for tests; nil means the real chromedp solver.
 	solveChallenge func(cfg CDPConfig, url string) ([]*http.Cookie, string, error)
+	// stdlibTransport is shared by all stdlib requests for connection pooling.
+	stdlibTransport *nethttp.Transport
 }
 
 // defaultUA is a browser-like User-Agent so requests are less likely to be
@@ -69,6 +74,11 @@ func NewProxy() *Proxy {
 		pins:           make(map[string]string),
 		hints:          make(map[string][]string),
 		solveChallenge: solveChallenge,
+		stdlibTransport: &nethttp.Transport{
+			MaxIdleConnsPerHost: 6,
+			IdleConnTimeout:     90 * time.Second,
+			TLSHandshakeTimeout: 10 * time.Second,
+		},
 	}
 }
 
@@ -149,4 +159,39 @@ func (p *Proxy) TestCDP(cfg CDPConfig, targetURL string) ([]*http.Cookie, string
 		return nil, "", fmt.Errorf("CDP solver not configured")
 	}
 	return solver(cfg, targetURL)
+}
+
+// Preconnect opens a HEAD request to the given host to warm the connection pool.
+// It is fire-and-forget: failures are logged at debug level and silently ignored.
+func (p *Proxy) Preconnect(host string) {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	req, err := nethttp.NewRequestWithContext(ctx, nethttp.MethodHead, "https://"+host, nil)
+	if err != nil {
+		logger.Debug("preconnect build request", "host", host, "error", err)
+		return
+	}
+	req.Header.Set("User-Agent", defaultUA)
+
+	resp, err := p.stdlibTransport.RoundTrip(req)
+	if err != nil {
+		logger.Debug("preconnect failed", "host", host, "error", err)
+		return
+	}
+	_ = resp.Body.Close()
+	if resp.StatusCode >= 400 {
+		logger.Debug("preconnect non-2xx", "host", host, "status", resp.StatusCode)
+	logger.Debug("transport request completed", "host", host, "status", resp.StatusCode)
+		return
+	}
+	logger.Info("preconnected", "host", host, "status", resp.StatusCode)
+}
+
+// GetTransportStats returns current transport stats (idle connections count).
+// Returns 0 if stats not available (stdlib Transport has no public stats API).
+func (p *Proxy) GetTransportStats() (idleConns int) {
+	// stdlib Transport doesn't expose idle connection count publicly
+	// We log at debug level on each preconnect instead
+	return 0
 }

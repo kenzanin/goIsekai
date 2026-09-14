@@ -90,6 +90,7 @@ func (s *Server) registerAPIRoutes(r chi.Router) {
 	r.Delete("/manga/{pluginID}/{mangaID}/related", s.apiRemoveRelated)
 	r.Get("/history", s.apiHistory)
 	r.Get("/plugins", s.apiPlugins)
+	r.Get("/stats", s.apiStats)
 	r.Post("/library/toggle/{pluginID}/{mangaID}", s.apiToggleLibrary)
 	r.Post("/chapters/read/{pluginID}/{mangaID}/{chapterID}", s.apiMarkChapterRead)
 	r.Post("/progress/{pluginID}/{mangaID}/{chapterID}", s.apiSetProgress)
@@ -358,5 +359,24 @@ func (s *Server) apiFetchEnrich(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{
 		"categories": categories,
 		"related":    related,
+	})
+}
+
+// apiStats returns cache and system statistics for the /api/stats endpoint.
+func (s *Server) apiStats(w http.ResponseWriter, r *http.Request) {
+	total, hits, err := s.service.CacheStats()
+	if err != nil {
+		s.logger.Error("api stats", "error", err)
+		writeErr(w, http.StatusInternalServerError, "failed to get stats")
+		return
+	}
+	var hitRate float64
+	if total > 0 {
+		hitRate = float64(hits) / float64(total) * 100
+	}
+	writeJSON(w, http.StatusOK, map[string]any{
+		"total_entries": total,
+		"hit_count":     hits,
+		"hit_rate":      hitRate,
 	})
 }

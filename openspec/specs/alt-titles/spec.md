@@ -1,69 +1,27 @@
-# alt-titles
-
-## Purpose
-
-Resolve, store, and curate alternative titles for library manga, sourced from plugin-declared lookup servers, enabling reliable duplicate detection and library search at scale.
-
-## Requirements
+## MODIFIED Requirements
 
 ### Requirement: Provider discovery
-The system shall expose a JSON list of all available alt-title lookup servers, aggregated from plugins that declare the alt-title enricher capability. The list shall contain, per entry, the provider plugin identifier, the server identifier, and a display name. The host shall not hardcode any provider or server.
+The system SHALL expose a JSON list of all available alt-title lookup servers, aggregated from the host's built-in enrichment providers and from plugins that declare the alt-title enricher capability. The list SHALL contain, per entry, the provider identifier, the server identifier, and a display name. Built-in MangaDex and MangaUpdates providers SHALL always be present; plugin-declared servers SHALL be added without the host hardcoding them.
 
 #### Scenario: Plugin declares multiple servers
 - **WHEN** a plugin declares two lookup servers in its metadata
-- **THEN** `GET /api/alt-title-servers` returns both entries tagged with that plugin's id
+- **THEN** `GET /api/alt-title-servers` returns both entries tagged with that plugin's id alongside the built-in providers
 
 #### Scenario: No provider installed
 - **WHEN** no active plugin exposes the alt-title capability
-- **THEN** `GET /api/alt-title-servers` returns an empty list and no error
+- **THEN** `GET /api/alt-title-servers` returns the built-in MangaDex and MangaUpdates entries and no error
 
 ### Requirement: Fetch alternative titles
-The system shall fetch alternative titles for a library manga by delegating to the provider plugin's lookup function with the user-selected server identifier and the manga's current title, and shall merge the returned titles into persistent storage tagged with the provider-reported source label. Titles already stored for that manga shall be skipped (no duplicates). An empty result shall not delete existing rows.
+The system SHALL fetch alternative titles for a library manga by resolving the user-selected server to either a host-built-in provider (MangaDex, MangaUpdates) or a plugin-declared provider, invoking it with the manga's current title, and merging the returned titles into persistent storage tagged with the provider-reported source label. Titles already stored for that manga SHALL be skipped (no duplicates). An empty result SHALL NOT delete existing rows.
 
 #### Scenario: Fetch with a chosen server
-- **WHEN** `POST /api/manga/{pluginID}/{mangaID}/alt-titles` is called with a server id offered by an installed provider
+- **WHEN** `POST /api/manga/{pluginID}/{mangaID}/alt-titles` is called with a server id offered by an installed or built-in provider
 - **THEN** new titles returned by the provider are stored with their source label and pre-existing titles are unchanged
+
+#### Scenario: Fetch from a built-in provider
+- **WHEN** the request names the `mangadex` or `mangaupdates` server and no plugin declares it
+- **THEN** the host resolves the title through its built-in provider and stores the returned titles
 
 #### Scenario: Unknown server
 - **WHEN** the request names a server id not present in the aggregated server list
 - **THEN** the API responds with an error indicating the server is unavailable
-
-### Requirement: List alternative titles
-The system shall return the stored alternative titles for a manga, each with its source label, alongside the manga's main title.
-
-#### Scenario: Detail data includes alt titles
-- **WHEN** the manga detail view or its API is requested for a manga with stored alt titles
-- **THEN** the alternative titles and their source labels are included in the response
-
-### Requirement: Set main title from alternative list
-The system shall allow setting a manga's main library title to exactly one of its stored alternative titles. On success the chosen title becomes the main title, and the previous main title is inserted into the alternative list. Titles not present in the alternative list shall be rejected.
-
-#### Scenario: Promote an alternative title
-- **WHEN** `PUT /api/manga/{pluginID}/{mangaID}/title` is called with a title present in the manga's stored alternatives
-- **THEN** the manga's main title becomes the requested value and the previous main title appears in the alternative list
-
-#### Scenario: Reject unknown title
-- **WHEN** the requested title is not in the stored alternative list
-- **THEN** the API responds with a validation error and the main title is unchanged
-
-### Requirement: Remove alternative title
-The system shall allow removing a single stored alternative title for a manga.
-
-#### Scenario: Remove one title
-- **WHEN** `DELETE /api/manga/{pluginID}/{mangaID}/alt-titles` is called with a stored title
-- **THEN** that row is deleted and other alternative titles remain
-
-#### Scenario: Main title protected
-- **WHEN** removal is attempted for a title equal to the current main title
-- **THEN** the request is rejected with a validation error
-
-### Requirement: Library fuzzy search
-The system shall provide library search over main titles and stored alternative titles, using a SQLite full-text index for candidate retrieval and typo-tolerant ranking (exact match ranked above prefix, prefix above substring, substring above subsequence). Results shall include plugin id, manga id, title, and relevance score, and shall function performantly with 2000+ titles.
-
-#### Scenario: Search hits alt title
-- **WHEN** the user searches a string matching a stored alternative title but not the main title
-- **THEN** the manga is returned in results
-
-#### Scenario: Typo tolerance
-- **WHEN** the query contains a minor typo that is a subsequence of a title (e.g. "iseki" for "isekai")
-- **THEN** the matching manga is still returned, ranked below exact/prefix matches

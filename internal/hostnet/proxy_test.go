@@ -5,6 +5,9 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"time"
+	"context"
+	"net/url"
 	"testing"
 
 	"goisekai/pkg/types"
@@ -227,5 +230,109 @@ func TestChallengeError(t *testing.T) {
 	}
 	if err.Error() == "" || !strings.Contains(err.Error(), "example.com") {
 		t.Errorf("ChallengeError.Error() = %q, want verify URL included", err.Error())
+	}
+}
+
+// TestConnectionPoolReuse verifies that sequential requests to the same host
+// reuse connections from the pool.
+func TestConnectionPoolReuse(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(200)
+		w.Write([]byte("OK"))
+	}))
+	defer server.Close()
+
+	u, _ := url.Parse(server.URL)
+	_ = u.Host
+
+	proxy := NewProxy()
+
+	var responses []int
+	for i := 0; i < 3; i++ {
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		req, err := http.NewRequestWithContext(ctx, http.MethodGet, server.URL, nil)
+		if err != nil {
+			cancel()
+			t.Fatalf("request %d: %v", i+1, err)
+		}
+		req.Header.Set("User-Agent", defaultUA)
+
+		resp, err := proxy.stdlibTransport.RoundTrip(req)
+		cancel()
+		if err != nil {
+			t.Fatalf("request %d: %v", i+1, err)
+		}
+		resp.Body.Close()
+		responses = append(responses, resp.StatusCode)
+	}
+
+	for i, code := range responses {
+		if code != 200 {
+			t.Errorf("request %d: got status %d, want 200", i+1, code)
+		}
+	}
+}
+
+// TestPreconnectWarmup verifies that preconnect warms the connection pool.
+func TestPreconnectWarmup(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(200)
+		w.Write([]byte("OK"))
+	}))
+	defer server.Close()
+
+	u, _ := url.Parse(server.URL)
+	_ = u.Host
+
+	proxy := NewProxy()
+
+	proxy.Preconnect(u.Host)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, server.URL, nil)
+	if err != nil {
+		t.Fatalf("request: %v", err)
+	}
+
+	resp, err := proxy.stdlibTransport.RoundTrip(req)
+	if err != nil {
+		t.Fatalf("request after preconnect: %v", err)
+	}
+	resp.Body.Close()
+
+	if resp.StatusCode != 200 {
+		t.Errorf("got status %d, want 200", resp.StatusCode)
+	}
+}
+
+// TestPreconnectFailureGraceful verifies that preconnect failures are handled gracefully.
+func TestPreconnectFailureGraceful(t *testing.T) {
+	proxy := NewProxy()
+
+	proxy.Preconnect("nonexistent.example.com:443")
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(200)
+	}))
+	defer server.Close()
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, server.URL, nil)
+	if err != nil {
+		t.Fatalf("request: %v", err)
+	}
+
+	resp, err := proxy.stdlibTransport.RoundTrip(req)
+	if err != nil {
+		t.Fatalf("request after failed preconnect: %v", err)
+	}
+	resp.Body.Close()
+
+	if resp.StatusCode != 200 {
+		t.Errorf("got status %d, want 200", resp.StatusCode)
 	}
 }

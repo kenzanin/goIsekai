@@ -2,17 +2,7 @@
 //
 // Yaegi plugins are sandboxed Go source programs. The host interprets this
 // file as-is with github.com/traefik/yaegi. Use this file as the starting point for real
-// /
-// github.com/traefik/yaegi. Use this file as the starting point for real source plugins.
-
-//
-// Sandbox rules (what a Yaegi plugin CAN import — everything else fails at
-// load time):
-//   - hostnet: host.Get(url) / host.Post(url, body) — HTTP through the host's
-//     TLS-fingerprinted proxy. A bare URL arg makes the demo Search below call
-//     hostnet.Get so the round trip is observable from the playground/sandbox.
-//   - fmt: Println/Printf/Sprintf/Sprint/Errorf.
-//   - the whole Go stdlib (strings, encoding/json, os on) is available.
+// source plugins.
 //
 // Note:
 // plugins build and read JSON by hand (fmt.Sprintf + string slicing). ABI
@@ -25,7 +15,6 @@
 package main
 
 import (
-	"hostnet"
 	"fmt"
 )
 
@@ -42,34 +31,7 @@ func hasPrefix(s, prefix string) bool {
 
 // Search(arg) — arg is a JSON SearchFilter object like {"query":"...","page":1}.
 // Returns: JSON array of {id, title, author, cover_url, status}.
-//
-// When arg is a bare http(s) URL (playground/sandbox usage), this demonstrates
-// the hostnet.Get round trip and embeds the response head into the result so
-// the fetch is observable without breaking the []Manga ABI shape.
 func Search(arg string) (string, error) {
-	if hasPrefix(arg, "http://") || hasPrefix(arg, "https://") {
-		body, err := hostnet.Get(arg)
-		title := "hostnet.Get failed: " + err.Error()
-		if err == nil {
-			if len(body) > 80 {
-				body = body[:80]
-			}
-			title = "Fetched " + arg + " -> " + body
-		}
-		// Keep the title JSON-safe for the demo: strip double quotes and
-		// backslashes that may appear in a raw HTML response head.
-		var clean string
-		for i := 0; i < len(title); i++ {
-			switch title[i] {
-			case '"', '\\', '\n', '\r', '\t':
-				clean += " "
-			default:
-				clean += string(title[i])
-			}
-		}
-		return `[{"id":"fetch","title":"` + clean + `","cover_url":""}]`, nil
-	}
-
 	return `[
   {"id":"sd-1","title":"Yaegi: The Interpreted Chronicles","cover_url":"https://picsum.photos/seed/yaegi-demo-1/400/560","author":"Demo Author","description":"A dummy isekai action series used as the Yaegi plugin reference.","status":"ongoing"},
   {"id":"sd-2","title":"My Demo Girlfriend Is a Go Routine","cover_url":"https://picsum.photos/seed/yaegi-demo-2/400/560","author":"Demo Author","description":"A dummy slice-of-life romance series.","status":"completed"},

@@ -11,6 +11,7 @@ import (
 	"github.com/dop251/goja"
 	lunar "github.com/mmcdole/lunar"
 
+	"goisekai/internal/database"
 	"goisekai/internal/enrich"
 	"goisekai/internal/hostnet"
 	"goisekai/pkg/types"
@@ -56,6 +57,11 @@ type Manager struct {
 	plugins map[string]*loadedPlugin
 	onLoad  func(id string)  // called after first successful load
 	enrich  *enrich.Registry // optional enrichment registry; plugin providers registered on load
+
+	// db is the database handle for caching plugin responses.
+	db *database.DB
+	// cacheTTL is the TTL for cached plugin responses.
+	cacheTTL time.Duration
 }
 
 // SetOnLoad registers a callback that fires once per plugin after its first
@@ -76,14 +82,26 @@ func (m *Manager) SetEnrichRegistry(reg *enrich.Registry) {
 }
 
 // NewManager returns a Manager that will load plugins from pluginsDir and route
-// their network access through proxy.
+// their network access through proxy. SetDB must be called before use for caching.
 func NewManager(proxy *hostnet.Proxy, pluginsDir string) *Manager {
 	return &Manager{
 		proxy:      proxy,
 		pluginsDir: pluginsDir,
 		ctx:        context.Background(),
 		plugins:    make(map[string]*loadedPlugin),
+		cacheTTL:   24 * time.Hour, // default TTL
 	}
+}
+
+// SetDB wires the database handle and cache TTL for response caching.
+func (m *Manager) SetDB(db *database.DB, cacheTTL time.Duration) {
+	m.db = db
+	m.cacheTTL = cacheTTL
+}
+
+// SetCacheTTL updates the cache TTL (e.g. from config reload).
+func (m *Manager) SetCacheTTL(ttl time.Duration) {
+	m.cacheTTL = ttl
 }
 
 // LoadedPlugin is metadata about a currently-registered plugin.
@@ -126,4 +144,9 @@ func (m *Manager) LoadedPlugins() []LoadedPlugin {
 	}
 	sort.Slice(out, func(i, j int) bool { return out[i].ID < out[j].ID })
 	return out
+}
+
+// Proxy returns the internal proxy (for testing/debugging only)
+func (m *Manager) Proxy() *hostnet.Proxy {
+	return m.proxy
 }
