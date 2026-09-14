@@ -2,7 +2,7 @@ package database
 
 import (
 	"database/sql"
-	"encoding/json"
+	"github.com/goccy/go-json"
 	"fmt"
 	"time"
 

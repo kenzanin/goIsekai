@@ -2,7 +2,7 @@ package pluginmanager
 
 import (
 	"context"
-	"encoding/json"
+	"github.com/goccy/go-json"
 	"fmt"
 	"goisekai/internal/enrich"
 	"goisekai/internal/logger"

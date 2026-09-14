@@ -2,7 +2,7 @@ package httpserver
 
 import (
 	"crypto/subtle"
-	"encoding/json"
+	"github.com/goccy/go-json"
 	"errors"
 	"log/slog"
 	"net/http"

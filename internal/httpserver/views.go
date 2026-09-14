@@ -1,7 +1,7 @@
 package httpserver
 
 import (
-	"encoding/json"
+	"github.com/goccy/go-json"
 	"errors"
 	"net/http"
 	"strconv"

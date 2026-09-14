@@ -2,7 +2,7 @@ package httpserver
 
 import (
 	"bytes"
-	"encoding/json"
+	"github.com/goccy/go-json"
 	"image"
 	"image/png"
 	"log/slog"
