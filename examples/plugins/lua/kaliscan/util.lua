@@ -1,22 +1,7 @@
--- util.lua — KaliScan HTML parsing + HTTP helpers
+-- util.lua — KaliScan HTML parsing helpers
 -- Sibling module required by main.lua via require("util")
 
 local util = {}
-
--- ─── URL encoding ──────────────────────────────────────────────────────────
-
-function util.url_encode(s)
-    return host.text.url_encode(s)
-end
-
--- ─── HTTP helper ───────────────────────────────────────────────────────────
--- Thin alias for host.http.get. Returns {status, headers, body}; the host
--- logs any transport failure or non-2xx response.
--- On error returns {status=0, error=...} per ABI contract.
-
-function util.http_get(url, extra_headers)
-    return host.http.get(url, extra_headers)
-end
 
 -- ─── Search result parsing ─────────────────────────────────────────────────
 -- Parses the /search?q=...&page=N HTML page.
@@ -78,13 +63,6 @@ end
 --   Cover: <div class="cover"> ... <img data-src="URL">
 --   Description: <p class="content" ...>TEXT</p>      in summary tab panel
 
--- normalizeStatus maps a raw status string to the canonical host vocabulary.
--- Canonical set: Ongoing, Completed, Hiatus, Dropped, Upcoming.
--- Unknown values pass through as-is.
-local function normalizeStatus(s)
-    return host.text.normalize_status(s)
-end
-
 function util.parse_manga_detail(html, manga_id)
     local detail = { id = manga_id }
 
@@ -96,7 +74,7 @@ function util.parse_manga_detail(html, manga_id)
         'Authors[^<]*</strong>%s*\n?%s*<a[^>]*>%s*<span>([^<]+)</span>') or ""
 
     -- Status
-    detail.status = normalizeStatus(string.match(html,
+    detail.status = host.text.normalize_status(string.match(html,
         'Status[^<]*</strong>%s*\n?%s*<a[^>]*>%s*<span>([^<]+)</span>') or "")
 
     -- Cover: data-src inside the cover div
@@ -104,9 +82,7 @@ function util.parse_manga_detail(html, manga_id)
         'class="cover[^"]*"[^>]*>.-<img[^>]*data%-src="([^"]-)"') or ""
 
     -- Description: <p class="content" ...>TEXT</p>
-    local desc = string.match(html, '<p class="content"[^>]*>(.-)</p>') or ""
-    -- Strip inner HTML tags
-    desc = desc:gsub("<[^>]+>", ""):gsub("^%s+", ""):gsub("%s+$", "")
+    local desc = host.text.strip_html(string.match(html, '<p class="content"[^>]*>(.-)</p>') or "")
     detail.description = desc
 
     -- Genres

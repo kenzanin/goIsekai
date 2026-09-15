@@ -105,7 +105,7 @@ function get_manga_detail(arg)
 
     -- author
     local ablock = body:match('class="author%-content">(.-)</div>') or ""
-    detail.author = unescape(trim(ablock:gsub("<[^>]+>", " "):gsub(",", ", ")))
+    detail.author = host.text.strip_html(ablock):gsub(",", ", ")
 
     -- genres
     local gblock = body:match('class="genres%-content">(.-)</div>') or ""
@@ -119,22 +119,14 @@ function get_manga_detail(arg)
     if sblock ~= "" then
         local after = sblock:match("Status%s*</h5>.-class=\"summary%-content\">%s*([^<]+)")
         if after then
-            local raw = trim(after)
-            local smap = {
-                ["ongoing"] = "Ongoing", ["on going"] = "Ongoing", ["on-going"] = "Ongoing",
-                ["completed"] = "Completed", ["complete"] = "Completed",
-                ["onhold"] = "Hiatus", ["on hold"] = "Hiatus", ["hiatus"] = "Hiatus",
-                ["cancelled"] = "Dropped", ["dropped"] = "Dropped",
-                ["upcoming"] = "Upcoming"
-            }
-            detail.status = smap[raw:lower()] or raw
+            detail.status = host.text.normalize_status(trim(after))
         end
     end
 
     -- description
     local dblock = body:match('class="summary__content[^"]*">(.-)<span%s+class="[^"]*content%-readmore"') or ""
     if dblock == "" then dblock = body:match('class="summary__content[^"]*">(.-)</div>') or "" end
-    detail.description = unescape(trim(dblock:gsub("<[^>]+>", " "):gsub("%s+", " ")))
+    detail.description = host.text.strip_html(dblock):gsub("%s+", " ")
 
     return host.json.encode(detail)
 end

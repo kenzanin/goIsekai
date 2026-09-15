@@ -104,7 +104,7 @@ function get_manga_detail(arg)
 
     -- author + artist
     local ablock = body:match('class="author%-content">(.-)</div>') or ""
-    detail.author = unescape(trim(ablock:gsub("<[^>]+>", " "):gsub(",", ", ")))
+    detail.author = host.text.strip_html(ablock):gsub(",", ", ")
 
     -- genres
     local gblock = body:match('class="genres%-content">(.-)</div>') or ""
@@ -127,7 +127,7 @@ function get_manga_detail(arg)
     -- capture to the "show-more" span boundary)
     local dblock = body:match('class="summary__content[^"]*">(.-)<span%s+class="[^"]*content%-readmore"') or ""
     if dblock == "" then dblock = body:match('class="summary__content[^"]*">(.-)</div>') or "" end
-    detail.description = unescape(trim(dblock:gsub("<[^>]+>", " "):gsub("%s+", " ")))
+    detail.description = host.text.strip_html(dblock):gsub("%s+", " ")
 
     return host.json.encode(detail)
 end

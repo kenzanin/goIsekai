@@ -25,7 +25,7 @@ function search_manga(arg)
     log.debug("search q=" .. query)
 
     -- Fetch page 1 to discover total pages, then loop all pages.
-    local resp = util.http_get("https://kaliscan.io/search?q=" .. util.url_encode(query) .. "&page=1")
+    local resp = host.http.get("https://kaliscan.io/search?q=" .. host.text.url_encode(query) .. "&page=1")
     if not resp or resp.status ~= 200 then
         return host.json.encode({})
     end
@@ -34,7 +34,7 @@ function search_manga(arg)
     local max_page = first.total or 1
 
     for p = 2, max_page do
-        local presp = util.http_get("https://kaliscan.io/search?q=" .. util.url_encode(query) .. "&page=" .. tostring(p))
+        local presp = host.http.get("https://kaliscan.io/search?q=" .. host.text.url_encode(query) .. "&page=" .. tostring(p))
         if not presp or presp.status ~= 200 then
             break
         end
@@ -55,7 +55,7 @@ end
 -- Returns: {id, title, author, description, cover_url, genres, status}
 function get_manga_detail(arg)
     local manga_id = host.json.decode(arg) -- yields a plain string
-    local resp = util.http_get("https://kaliscan.io/manga/" .. manga_id)
+    local resp = host.http.get("https://kaliscan.io/manga/" .. manga_id)
     if not resp or resp.status ~= 200 then
         -- empty table encodes as []; detail must stay an OBJECT — emit {id} only
         return host.json.encode({id = manga_id})
@@ -67,7 +67,7 @@ end
 -- Returns: array of {id, number, title, uploaded_at}
 function get_chapter_list(arg)
     local manga_id = host.json.decode(arg) -- yields a plain string
-    local resp = util.http_get("https://kaliscan.io/manga/" .. manga_id)
+    local resp = host.http.get("https://kaliscan.io/manga/" .. manga_id)
     if not resp or resp.status ~= 200 then
         return host.json.encode({})
     end
@@ -80,7 +80,7 @@ function get_page_list(arg)
     local chapter_path = host.json.decode(arg) -- e.g. "SLUG:chapter-98"
     chapter_path = chapter_path:gsub(":", "/") -- restore real path
     -- Step 1: fetch the chapter page to extract the numeric chapterId
-    local resp = util.http_get("https://kaliscan.io/manga/" .. chapter_path)
+    local resp = host.http.get("https://kaliscan.io/manga/" .. chapter_path)
     if not resp or resp.status ~= 200 then
         return host.json.encode({})
     end
@@ -90,7 +90,7 @@ function get_page_list(arg)
     end
     -- Step 2: fetch page images from the chapter server (requires Referer)
     local api_url = "https://kaliscan.io/service/backend/chapterServer/?server_id=1&chapter_id=" .. chapter_id
-    local img_resp = util.http_get(api_url, {
+    local img_resp = host.http.get(api_url, {
         ["Referer"] = "https://kaliscan.io/manga/" .. chapter_path,
         ["X-Requested-With"] = "XMLHttpRequest"
     })

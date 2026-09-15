@@ -15,7 +15,7 @@
 --   pages:   GET /series/{slug}.{zid}/{chapter-slug} -> HTML; data-src CDN webp imgs
 --
 -- Layout (split to make copying to a new plugin trivial):
---   helpers.lua  generic helpers  (normalizeStatus, http_get, lua_escape) — copy unchanged
+--   helpers.lua  generic helpers  (normalizeStatus, http_get) — copy unchanged
 --   main.lua     THIS file — the only one you edit: PLUGIN table + BASE/CDN/UA
 --                + site-specific parsers + the four core ABI functions.
 -- Every sibling pre-executes before main.lua, so their globals are ready.
@@ -50,7 +50,7 @@ function label_value(html, label, href_prefix)
     local pos = string.match(html, label .. "%s*</h1>()")
     if not pos then return "" end
     local seg = string.sub(html, pos, pos + 400)
-    return string.match(seg, 'href="' .. lua_escape(href_prefix) .. '([^"]+)"') or ""
+    return string.match(seg, 'href="' .. host.text.lua_escape(href_prefix) .. '([^"]+)"') or ""
 end
 
 -- ─── ABI: search_manga(arg) ────────────────────────────────────────────────

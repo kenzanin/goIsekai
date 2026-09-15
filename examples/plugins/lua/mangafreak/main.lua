@@ -31,8 +31,8 @@ function search_manga(arg)
         return host.json.encode({})
     end
 
-    local url = BASE .. "/Find/" .. util.url_encode(query)
-    local resp = util.http_get(url)
+    local url = BASE .. "/Find/" .. host.text.url_encode(query)
+    local resp = host.http.get(url)
     if not resp or resp.status ~= 200 then
         return host.json.encode({})
     end
@@ -49,7 +49,7 @@ end
 
 function get_manga_detail(arg)
     local manga_id = host.json.decode(arg)
-    local resp = util.http_get(BASE .. "/Manga/" .. manga_id)
+    local resp = host.http.get(BASE .. "/Manga/" .. manga_id)
     if not resp or resp.status ~= 200 then
         return host.json.encode({ id = manga_id })
     end
@@ -64,7 +64,7 @@ end
 
 function get_chapter_list(arg)
     local manga_id = host.json.decode(arg)
-    local resp = util.http_get(BASE .. "/Manga/" .. manga_id)
+    local resp = host.http.get(BASE .. "/Manga/" .. manga_id)
     if not resp or resp.status ~= 200 then
         return host.json.encode({})
     end
@@ -83,7 +83,7 @@ function get_page_list(arg)
     -- Extract Read1_ path from "SLUG:Read1_SLUG_CHNUM"
     local _, _, ch_path = chapter_id:find(":(.+)$")
     local url = BASE .. "/Read1_" .. ch_path
-    local resp = util.http_get(url)
+    local resp = host.http.get(url)
     if not resp or resp.status ~= 200 then
         return host.json.encode({})
     end

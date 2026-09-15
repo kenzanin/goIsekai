@@ -4,7 +4,7 @@
 -- Image CDN (img-r1.2xstorage.com) requires Referer: https://mangafire.to/
 --
 -- Layout:
---   helpers.lua  generic helpers (normalizeStatus, http_get, lua_escape)
+--   helpers.lua  generic helpers (normalizeStatus, http_get)
 --   main.lua     THIS file — PLUGIN table + VRF tables + site parsers + ABI functions
 -- Every sibling pre-executes before main.lua, so their globals are ready.
 
@@ -62,11 +62,7 @@ end
 -- ---------------------------------------------------------------------------
 
 function sanitize_title(s)
-    if not s then return "" end
-    s = s:gsub("&#039;", "'")
-    s = s:gsub("&quot;", '"')
-    s = s:gsub("&amp;", "&")
-    return s:match("^%s*(.-)%s*$")
+    return host.text.trim(host.text.unescape(s or ""))
 end
 
 -- ---------------------------------------------------------------------------

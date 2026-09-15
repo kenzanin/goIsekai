@@ -6,7 +6,6 @@
 -- Globals provided:
 --   normalizeStatus(s)  raw status -> canonical (Ongoing/Completed/Hiatus/
 --                       Dropped/Upcoming); unknown passes through, empty -> "unknown"
---   lua_escape(s)       escape Lua pattern magic chars for string.match/gsub
 --   http_get(url, opts) GET wrapper over host.http.get with logging
 --
 -- The escaping and status vocabulary live in the host (host.text.*); only the
@@ -31,12 +30,6 @@
 function normalizeStatus(s)
     if not s or s == "" then return "unknown" end
     return host.text.normalize_status(s)
-end
-
--- lua_escape escapes Lua pattern magic chars in literals interpolated into
--- patterns: [ - . + [ ] ( ) $ ^ % ? *
-function lua_escape(s)
-    return host.text.lua_escape(s)
 end
 
 local defaultUA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 Safari/537.36"

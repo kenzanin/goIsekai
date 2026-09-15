@@ -1,6 +1,7 @@
 -- Dummy plugin for goIsekai
 -- Reference Lua plugin with a hardcoded catalog. Use as a starting point
--- for real source plugins: replace http_request calls with live site data.
+-- for real source plugins: replace the catalog with host.http.get + host.html.*
+-- lookups over a live page (see examples/plugins/lua/htmlscrape).
 
 PLUGIN = {
     contract_version = 1,
@@ -78,7 +79,7 @@ end
 -- search_manga(arg) — arg is a JSON object: {"query":"...","page":1}
 function search_manga(arg)
     local args = host.json.decode(arg)
-    local query = (args.query or ""):lower():gsub("^%s+", ""):gsub("%s+$", "")
+    local query = host.text.trim((args.query or ""):lower())
 
     local results = {}
     for _, m in ipairs(catalog) do

@@ -1,4 +1,4 @@
--- util.lua — Mangafreak HTML parsing + HTTP helpers
+-- util.lua — Mangafreak HTML parsing helpers
 -- Sibling module required by main.lua via require("util")
 local util = {}
 
@@ -9,21 +9,6 @@ local util = {}
 local function normalizeStatus(s)
     local raw = (s or ""):gsub("%s+series%s*$", "")
     return host.text.normalize_status(raw)
-end
--- URL encoding
-function util.url_encode(s)
-    return host.text.url_encode(s)
-end
-
--- HTTP helper. Thin alias for host.http.get, which logs any transport failure
--- or non-2xx response.
-function util.http_get(url, extra_headers)
-    return host.http.get(url, extra_headers)
-end
-
--- HTML tag strip
-local function strip_tags(s)
-    return host.text.strip_html(s)
 end
 
 -- ─── Search result parsing ─────────────────────────────────────────────────
@@ -76,10 +61,10 @@ function util.parse_manga_detail(html, manga_id)
     local detail = { id = manga_id }
 
     -- Title: <h1>TITLE</h1>
-    detail.title = strip_tags(html:match('<h1>(.-)</h1>') or "")
+    detail.title = host.text.strip_html(html:match('<h1>(.-)</h1>') or "")
     if detail.title == "" then
         local data_block = html:match('class="manga_series_data">(.-)%s*</div>%s*</div>') or ""
-        detail.title = strip_tags(data_block:match('<h5>(.-)</h5>')) or ""
+        detail.title = host.text.strip_html(data_block:match('<h5>(.-)</h5>')) or ""
     end
 
     -- Cover
@@ -92,7 +77,7 @@ function util.parse_manga_detail(html, manga_id)
 		or html:match('class="manga_series_data">(.-)</div>') or ""
 	local divs = {}
 	for d in data_block:gmatch('<div[^>]*>(.-)</div>') do
-		divs[#divs + 1] = strip_tags(d)
+		divs[#divs + 1] = host.text.strip_html(d)
 	end
 	local function rowValue(label)
 		for _, v in ipairs(divs) do
@@ -124,7 +109,7 @@ function util.parse_manga_detail(html, manga_id)
 
     -- Description
     local desc_block = html:match('class="manga_series_description">(.-)</div>') or ""
-    detail.description = strip_tags(desc_block:match('<p>(.-)</p>') or desc_block)
+    detail.description = host.text.strip_html(desc_block:match('<p>(.-)</p>') or desc_block)
 
     return detail
 end

@@ -34,10 +34,10 @@ local normalizeStatus = host.text.normalize_status
 
 -- Escape Lua pattern magic chars (slugs are [a-z0-9-], but '-' is the
 -- lazy quantifier — raw slugs in gmatch/find patterns silently fail).
-lua_escape = host.text.lua_escape
+local lua_escape = host.text.lua_escape
 
 -- Thin alias for host.http.get, which logs transport failures and non-2xx.
-http_get = host.http.get
+local http_get = host.http.get
 
 -- Extract the <script type="application/ld+json"> block whose decoded JSON
 -- carries "@type":"Book". Returns decoded table or nil.
