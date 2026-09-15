@@ -1,4 +1,4 @@
-## MODIFIED Requirements
+## Requirements
 
 ### Requirement: Provider discovery
 The system SHALL expose a JSON list of all available alt-title lookup servers, aggregated from the host's built-in enrichment providers and from plugins that declare the alt-title enricher capability. The list SHALL contain, per entry, the provider identifier, the server identifier, and a display name. Built-in MangaDex and MangaUpdates providers SHALL always be present; plugin-declared servers SHALL be added without the host hardcoding them.

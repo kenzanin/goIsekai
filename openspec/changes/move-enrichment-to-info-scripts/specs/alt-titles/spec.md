@@ -1,0 +1,9 @@
+## REMOVED Requirements
+
+### Requirement: Provider discovery
+**Reason**: The server list had no UI consumer left, and it existed only to feed the removed fetch endpoint. Its notion of "built-in providers" is also gone: enrichment sources come from scripts in the info directory, not from host code. This and the requirement below are the only requirements in `openspec/specs/alt-titles/spec.md`, so applying this delta retires the capability — the file should be deleted rather than kept as an empty spec.
+**Migration**: Read the enrichment catalog instead. The sources a user can fetch metadata from are the catalog entries, each with the kinds it supports; there is no separate alt-title server list and no `GET /api/alt-title-servers` route. Any plugin that declared `alt_title_servers` drops that field and, if it fetched metadata, declares `PLUGIN.enrichment_providers` and implements `getEnrichment` instead. The behavior this capability used to document lives on in `storage` (the alternative-titles table), `enrichment` (fetching metadata from a source), and `http-api` (title promotion and alt-title removal).
+
+### Requirement: Fetch alternative titles
+**Reason**: Fetching alternative titles is no longer a capability of its own. `POST /api/manga/{pluginID}/{mangaID}/alt-titles` was removed, along with the alt-title and alt-summary fetch actions and the plugin `getAltTitles`/`getAltSummary` exports, so no path resolves a named alt-title server any more.
+**Migration**: Fetch through the enrichment path — `POST /action/fetch-enrichment/{pluginID}/{mangaID}` with a title and a source, or the enrichment panel's kind and source selectors — using kind `titles` for alternative titles and `summaries` for alternative synopses. Stored rows and their source labels are unchanged, so existing titles, promotion via `PUT /api/manga/{pluginID}/{mangaID}/title`, and removal via `DELETE /api/manga/{pluginID}/{mangaID}/alt-titles` keep working.

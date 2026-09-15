@@ -1,8 +1,8 @@
 ## Purpose
 
-Provide host-managed enrichment of manga metadata from external providers — built-in MangaDex and MangaUpdates plus plugin-declared custom sources — across alternative titles, alternative summaries, categories, and related manga, fetched on demand and persisted for later display.
+Provide host-managed enrichment of manga metadata, across alternative titles, alternative summaries, categories, authors, and related manga, fetched on demand and persisted for later display. Sources come from enrichment scripts discovered in the info directory and from plugins that declare enrichment providers.
 
-## ADDED Requirements
+## Requirements
 
 ### Requirement: Built-in enrichment providers
 
