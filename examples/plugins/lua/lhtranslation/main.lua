@@ -24,23 +24,17 @@ local BASE = "https://lhtranslation.net"
 local trim = host.text.trim
 local unescape = host.text.unescape
 
--- The wrappers add this site's 200-check and error log; the request itself is
--- shaped by the host.
+-- The wrappers keep this site's 200-check and collapse the response to a body;
+-- the request itself is shaped by the host, which also logs failures.
 local function http_get(url)
     local resp = host.http.get(url)
-    if not resp or resp.status ~= 200 then
-        log.error("http status " .. (resp and resp.status or "nil") .. " for " .. url)
-        return nil
-    end
+    if not resp or resp.status ~= 200 then return nil end
     return resp.body
 end
 
 local function http_post(url)
     local resp = host.http.post(url, "", { ["X-Requested-With"] = "xmlhttprequest" })
-    if not resp or resp.status ~= 200 then
-        log.error("http status " .. (resp and resp.status or "nil") .. " for " .. url)
-        return nil
-    end
+    if not resp or resp.status ~= 200 then return nil end
     return resp.body
 end
 

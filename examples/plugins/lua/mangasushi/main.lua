@@ -24,27 +24,21 @@ local BASE = "https://mangasushi.org"
 local trim = host.text.trim
 local unescape = host.text.unescape
 
--- The wrappers add this site's 200-check and error log; the request itself is
--- shaped by the host.
+-- The wrappers keep this site's 200-check and collapse the response to a body;
+-- the request itself is shaped by the host, which also logs failures.
 local function http_post(url, body)
     local headers = {
         ["X-Requested-With"] = "xmlhttprequest",
         ["Content-Type"] = "application/x-www-form-urlencoded",
     }
     local resp = host.http.post(url, body or "", headers)
-    if not resp or resp.status ~= 200 then
-        log.error("http status " .. (resp and resp.status or "nil") .. " for " .. url)
-        return nil
-    end
+    if not resp or resp.status ~= 200 then return nil end
     return resp.body
 end
 
 local function http_get(url)
     local resp = host.http.get(url)
-    if not resp or resp.status ~= 200 then
-        log.error("http status " .. (resp and resp.status or "nil") .. " for " .. url)
-        return nil
-    end
+    if not resp or resp.status ~= 200 then return nil end
     return resp.body
 end
 

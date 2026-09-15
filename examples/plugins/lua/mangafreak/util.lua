@@ -15,15 +15,10 @@ function util.url_encode(s)
     return host.text.url_encode(s)
 end
 
--- HTTP helper
+-- HTTP helper. Thin alias for host.http.get, which logs any transport failure
+-- or non-2xx response.
 function util.http_get(url, extra_headers)
-    local resp = host.http.get(url, extra_headers)
-    if not resp then
-        log.error("http_request returned nil for " .. url)
-    elseif resp.status ~= 200 then
-        log.error("http status " .. tostring(resp.status) .. " for " .. url)
-    end
-    return resp
+    return host.http.get(url, extra_headers)
 end
 
 -- HTML tag strip

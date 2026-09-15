@@ -41,9 +41,10 @@ end
 
 local defaultUA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 Safari/537.36"
 
--- http_get issues GET via host.http.get, logging failures. Uses the global UA
--- when the plugin set one, else defaultUA; JSON calls get a Referer of
--- BASE .. "/" unless overridden via opts.referer.
+-- http_get issues GET via host.http.get, which logs transport failures and
+-- non-2xx responses. Uses the global UA when the plugin set one, else
+-- defaultUA; JSON calls get a Referer of BASE .. "/" unless overridden via
+-- opts.referer.
 function http_get(url, opts)
     local o = opts
     if type(o) ~= "table" then
@@ -65,11 +66,5 @@ function http_get(url, opts)
     if o.headers then
         for k, v in pairs(o.headers) do headers[k] = v end
     end
-    local resp = host.http.get(url, headers)
-    if not resp then
-        log.error("http_request returned nil for " .. url)
-    elseif resp.status ~= 200 then
-        log.error("http status " .. tostring(resp.status) .. " for " .. url)
-    end
-    return resp
+    return host.http.get(url, headers)
 end

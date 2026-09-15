@@ -10,17 +10,12 @@ function util.url_encode(s)
 end
 
 -- ─── HTTP helper ───────────────────────────────────────────────────────────
--- Wraps host.http.get. Returns {status, headers, body}.
+-- Thin alias for host.http.get. Returns {status, headers, body}; the host
+-- logs any transport failure or non-2xx response.
 -- On error returns {status=0, error=...} per ABI contract.
 
 function util.http_get(url, extra_headers)
-    local resp = host.http.get(url, extra_headers)
-    if not resp then
-        log.error("http_request returned nil for " .. url)
-    elseif resp.status ~= 200 then
-        log.error("http status " .. tostring(resp.status) .. " for " .. url)
-    end
-    return resp
+    return host.http.get(url, extra_headers)
 end
 
 -- ─── Search result parsing ─────────────────────────────────────────────────

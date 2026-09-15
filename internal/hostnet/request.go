@@ -8,6 +8,7 @@ import (
 
 	http "github.com/bogdanfinn/fhttp"
 
+	"goisekai/internal/logger"
 	"goisekai/pkg/types"
 )
 
@@ -134,7 +135,13 @@ func (p *Proxy) HandleRequest(pluginID string, requestJSON string) (string, erro
 
 	resp, err := p.Request(pluginID, req)
 	if err != nil {
+		logger.Warn("plugin request failed",
+			"plugin", pluginID, "method", req.Method, "url", req.URL, "error", err)
 		return "", fmt.Errorf("hostnet: request failed: %w", err)
+	}
+	if resp.Status < 200 || resp.Status >= 300 {
+		logger.Warn("plugin request non-2xx",
+			"plugin", pluginID, "method", req.Method, "url", req.URL, "status", resp.Status)
 	}
 
 	out, err := json.Marshal(resp)

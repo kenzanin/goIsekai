@@ -37,7 +37,7 @@ Counted by function definition across `examples/plugins/{lua,js,wasm}`:
 | `url_decode_text` / `urlDecodeText` | 6 | 4 | – | ASCII-only guard, keeps non-ASCII encoded |
 | `strip_markdown` / `stripMarkdown` | 6 | 4 | – | identical ~20 lines |
 | `normalizeStatus` | 4 | 4 | 1 | **DECIDED: keep plugin-side** (see §4) |
-| `http_get` | 4 | – | – | `http_request` boilerplate + error log |
+| `http_get` | 4 | – | – | `http_request` boilerplate + error log — **both resolved host-side** (see P5b) |
 | `stripHTML` | – | 2 | 1 | tags removed, `<br>`→`\n`, entities decoded |
 | `titlecase` | 2 | – | – | |
 | `decode_entities` | 1 | – | – | only mangabuddy; JS embeds it in stripHTML |
@@ -104,6 +104,7 @@ tables/glue stay plugin-side (site-specific, rotate with extension updates).
 | **P2b** | Migrate 4 JS plugins → `host.text.*` | ✅ done | 91dee9b |
 | **P4** | `codecs`/`crypto` hex primitives (utf8_hex, b64decode_hex, b64url_encode/decode_hex) | ✅ done | 6bf31bf |
 | **P5** | **`host.http.*`** — centralized HTTP wrappers (get, post) over http_request proxy | ✅ done | (next) |
+| **P5b** | Failure logging hoisted into `hostnet.HandleRequest`; plugin HTTP wrappers collapse to `host.http.*` aliases | ✅ done | (this change) |
 | **P6** | `host.json.*` — shared JSON codec for Lua + JS; the Lua `json` global removed | ✅ done | see `add-host-json-helpers` |
 
 P0–P5 delivers the full surface: 10 plugins migrated, ~530 LOC deleted, 16 native functions wired to both Lua and JS runtimes.
@@ -123,6 +124,11 @@ P0–P5 delivers the full surface: 10 plugins migrated, ~530 LOC deleted, 16 nat
   chapters, pages, alt-titles/summaries) live — not just search (memory #2521).
 - If a `host.text.url_decode` is adopted, re-check the enrichment DB for
   previously-kept-encoded non-ASCII rows (the old ASCII guard left them encoded).
+- Plugin HTTP failures are logged once in `hostnet.HandleRequest`, so plugin
+  wrappers must not re-log them. Only `HandleRequest` is covered: callers that
+  use `Proxy.Request` directly (image fetching, Yaegi) log nothing.
+- The new warning is `level=WARN`, not `ERROR` — an upstream 404 is not a host
+  bug, and `grep -c level=ERROR` is expected to stay at 0.
 
 ## 7. Open questions
 

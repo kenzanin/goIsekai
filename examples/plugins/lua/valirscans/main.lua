@@ -40,15 +40,8 @@ local normalizeStatus = host.text.normalize_status
 -- lazy quantifier — raw slugs in gmatch/find patterns silently fail).
 lua_escape = host.text.lua_escape
 
-function http_get(url, extra_headers)
-    local resp = host.http.get(url, extra_headers)
-    if not resp then
-        log.error("http_request returned nil for " .. url)
-    elseif resp.status ~= 200 then
-        log.error("http status " .. tostring(resp.status) .. " for " .. url)
-    end
-    return resp
-end
+-- Thin alias for host.http.get, which logs transport failures and non-2xx.
+http_get = host.http.get
 
 -- Extract the <script type="application/ld+json"> block whose decoded JSON
 -- carries "@type":"Book". Returns decoded table or nil.
