@@ -8,52 +8,6 @@ import (
 	"goisekai/internal/database"
 )
 
-// apiAltTitleServers lists every alt-title server declared by discovered plugins.
-func (s *Server) apiAltTitleServers(w http.ResponseWriter, _ *http.Request) {
-	servers := s.service.AltTitleServers()
-	out := make([]map[string]string, 0, len(servers))
-	for _, e := range servers {
-		out = append(out, map[string]string{
-			"provider": e.ProviderPluginID,
-			"server":   e.ServerID,
-			"name":     e.Name,
-		})
-	}
-	writeJSON(w, http.StatusOK, out)
-}
-
-// apiFetchAltTitles fetches titles from the chosen provider server and merges
-// them into the stored list for a manga.
-func (s *Server) apiFetchAltTitles(w http.ResponseWriter, r *http.Request) {
-	pluginID := param(r, "pluginID")
-	mangaID := param(r, "mangaID")
-	var body struct {
-		Server string `json:"server"`
-	}
-	if err := json.NewDecoder(r.Body).Decode(&body); err != nil || body.Server == "" {
-		writeErr(w, http.StatusBadRequest, "server is required")
-		return
-	}
-	known := false
-	for _, e := range s.service.AltTitleServers() {
-		if e.ServerID == body.Server {
-			known = true
-			break
-		}
-	}
-	if !known {
-		writeErr(w, http.StatusBadRequest, "unknown server")
-		return
-	}
-	rows, err := s.service.FetchAltTitles(pluginID, mangaID, body.Server)
-	if err != nil {
-		s.logger.Error("api fetch alt titles", "error", err, "plugin", pluginID, "manga", mangaID, "server", body.Server)
-		writeErr(w, http.StatusBadGateway, "fetch failed")
-		return
-	}
-	writeJSON(w, http.StatusOK, altTitleRowsPayload(rows))
-}
-
 // apiRemoveAltTitle deletes one stored alternative title.
 func (s *Server) apiRemoveAltTitle(w http.ResponseWriter, r *http.Request) {
 	pluginID := param(r, "pluginID")

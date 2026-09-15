@@ -87,7 +87,7 @@ func (m *Manager) loadLua(id, dir string) (*loadedPlugin, error) {
 	// getEnrichment, which is optional everywhere.
 	if !isInfoPlugin(id) {
 		for abi, name := range luaFnNames {
-			if abi == types.GetAltTitlesFunc || abi == types.GetAltSummaryFunc || abi == types.GetEnrichmentFunc {
+			if abi == types.GetEnrichmentFunc {
 				continue
 			}
 			fn, err := state.RawGlobal(name)

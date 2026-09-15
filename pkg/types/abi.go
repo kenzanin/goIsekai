@@ -25,27 +25,11 @@ const (
 	// InitFunc is an optional export. When present, the host calls it once at
 	// load time with no arguments; it returns a PluginMeta JSON object.
 	InitFunc = "Init"
-	// GetAltTitlesFunc is an OPTIONAL enrichment export. When present, the
-	// plugin can resolve alternative titles for a manga title via one of its
-	// declared alt-title servers. Input: JSON {"title":string,"server":string}.
-	// Output: JSON {"source":string,"titles":[]}.
-	// Plugins declaring it act as alt-title providers (e.g. MangaDex, MAL,
-	// or even an AI backend) — the host never hardcodes a provider.
-	GetAltTitlesFunc = "GetAltTitles"
-	// GetAltSummaryFunc is an OPTIONAL enrichment export. When present, the
-	// plugin can resolve alternative summaries/descriptions for a manga title
-	// via one of its declared alt-title servers that are summary-capable.
-	// Input: JSON {"title":string,"server":string}.
-	// Output: JSON {"source":string,"summaries":[]string}.
-	// Plugins may omit this export entirely; only servers with kind
-	// "summaries" or "both" require it.
-	GetAltSummaryFunc = "GetAltSummary"
 	// GetEnrichmentFunc is an OPTIONAL enrichment export. When present, the
-	// plugin can fetch enrichment items (categories, related, etc.) for a
-	// manga title. Input: JSON {"title":string,"kind":string,"source":string}.
+	// plugin can fetch enrichment items (titles, summaries, categories,
+	// authors, related) for a manga title. Input: JSON
+	// {"title":string,"kind":string,"source":string}.
 	// Output: JSON array of items [{value,url,cover_url,source}, ...].
-	// This is the modern replacement for GetAltTitles/GetAltSummary:
-	// it supports any kind, not just titles and summaries.
 	GetEnrichmentFunc = "GetEnrichment"
 )
 

@@ -2,26 +2,6 @@ package httpserver
 
 import "net/http"
 
-// handleFetchAltTitles resolves alternative titles via the provider plugin
-// and redirects back to the manga detail page. The server is taken from the
-// form (browser flow).
-func (s *Server) handleFetchAltTitles(w http.ResponseWriter, r *http.Request) {
-	pluginID := param(r, "pluginID")
-	mangaID := param(r, "mangaID")
-	if err := r.ParseForm(); err != nil {
-		s.logger.Error("fetch alt titles: parse form", "error", err)
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
-	}
-	server := r.FormValue("server")
-	if _, err := s.service.FetchAltTitles(pluginID, mangaID, server); err != nil {
-		s.logger.Error("fetch alt titles", "pluginID", pluginID, "mangaID", mangaID, "server", server, "error", err)
-		http.Error(w, err.Error(), http.StatusBadGateway)
-		return
-	}
-	s.viewMangaDetail(w, r)
-}
-
 // handleSetTitle promotes the submitted title to be the manga's main title.
 func (s *Server) handleSetTitle(w http.ResponseWriter, r *http.Request) {
 	pluginID := param(r, "pluginID")
@@ -53,25 +33,6 @@ func (s *Server) handleRemoveAltTitle(w http.ResponseWriter, r *http.Request) {
 	if err := s.service.RemoveAltTitle(pluginID, mangaID, title); err != nil {
 		s.logger.Error("remove alt title", "pluginID", pluginID, "mangaID", mangaID, "title", title, "error", err)
 		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
-	}
-	s.viewMangaDetail(w, r)
-}
-
-// handleFetchAltSummaries resolves alternative summaries via the provider
-// plugin and redirects back to the manga detail page.
-func (s *Server) handleFetchAltSummaries(w http.ResponseWriter, r *http.Request) {
-	pluginID := param(r, "pluginID")
-	mangaID := param(r, "mangaID")
-	if err := r.ParseForm(); err != nil {
-		s.logger.Error("fetch alt summaries: parse form", "error", err)
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
-	}
-	server := r.FormValue("server")
-	if _, err := s.service.FetchAltSummaries(pluginID, mangaID, server); err != nil {
-		s.logger.Error("fetch alt summaries", "pluginID", pluginID, "mangaID", mangaID, "server", server, "error", err)
-		http.Error(w, err.Error(), http.StatusBadGateway)
 		return
 	}
 	s.viewMangaDetail(w, r)

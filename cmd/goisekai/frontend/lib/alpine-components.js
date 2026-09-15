@@ -51,8 +51,6 @@
           if (u && u.indexOf(window.location.origin) === 0) {
             history.replaceState(history.state, '', u);
           }
-          if (action.indexOf('fetch-alt-titles') !== -1) expandSection('alt-titles-body');
-          if (action.indexOf('fetch-alt-summaries') !== -1) expandSection('alt-summaries-body');
         });
       })
       .catch(() => {
@@ -60,17 +58,6 @@
           Alpine.store('toast').show('Network error — check your connection', 'error');
         }
       });
-  };
-
-  // Expand a collapsible section (used after fetch-alt-* actions so freshly
-  // fetched items are visible instead of re-collapsed by the re-render).
-  const expandSection = (id) => {
-    const body = document.getElementById(id);
-    if (!body) return;
-    body.classList.remove('hidden');
-    const btn = body.previousElementSibling;
-    const ch = btn?.querySelector('.chev');
-    if (ch) ch.classList.add('rotate-90');
   };
 
   // =====================================================================
@@ -463,9 +450,6 @@
               if (u && u.indexOf(window.location.origin) === 0) {
                 history.replaceState(history.state, '', u);
               }
-              // After a fetch action, reveal the section that just grew.
-              if (action.indexOf('fetch-alt-titles') !== -1) expandSection('alt-titles-body');
-              if (action.indexOf('fetch-alt-summaries') !== -1) expandSection('alt-summaries-body');
             });
           })
           .catch(() => {

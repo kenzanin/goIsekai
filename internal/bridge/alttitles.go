@@ -5,7 +5,6 @@ import (
 	"strings"
 
 	"goisekai/internal/database"
-	"goisekai/internal/pluginmanager"
 )
 
 type SearchHit struct {
@@ -13,37 +12,6 @@ type SearchHit struct {
 	SourceMangaID string
 	Title         string
 	Score         int
-}
-
-// AltTitleServers returns every alt-title provider server discovered from
-// installed plugins.
-func (s *AppService) AltTitleServers() []pluginmanager.AltTitleServerEntry {
-	return s.mgr.AltTitleServers()
-}
-
-// FetchAltTitles resolves alternative titles for a manga from the given
-// provider server, merges them into the database (deduplicating by title),
-// rebuilds the FTS index, and returns the full stored list.
-func (s *AppService) FetchAltTitles(pluginID, mangaID, server string) ([]database.AltTitleRow, error) {
-	rowID, err := s.db.MangaRowID(pluginID, mangaID)
-	if err != nil {
-		return nil, fmt.Errorf("bridge: resolve manga: %w", err)
-	}
-	title, err := s.db.MangaTitle(pluginID, mangaID)
-	if err != nil {
-		return nil, fmt.Errorf("bridge: resolve title: %w", err)
-	}
-	res, err := s.mgr.GetAltTitles(title, server)
-	if err != nil {
-		return nil, fmt.Errorf("bridge: fetch alt titles: %w", err)
-	}
-	if _, err := s.db.AddAltTitles(rowID, res.Titles, res.Source); err != nil {
-		return nil, fmt.Errorf("bridge: persist alt titles: %w", err)
-	}
-	if err := s.db.SyncFTS(rowID); err != nil {
-		return nil, fmt.Errorf("bridge: sync fts: %w", err)
-	}
-	return s.db.ListAltTitles(rowID)
 }
 
 // SetMainTitle promotes newTitle to be the manga's main title. The title must
@@ -87,29 +55,6 @@ func (s *AppService) RemoveAltTitle(pluginID, mangaID, title string) error {
 		return fmt.Errorf("bridge: sync fts: %w", err)
 	}
 	return nil
-}
-
-// FetchAltSummaries resolves alternative summaries for a manga from the given
-// provider server and merges them into the database (deduplicating by
-// description), then returns the full stored list. Unlike FetchAltTitles there
-// is no FTS sync — descriptions are not in library_fts.
-func (s *AppService) FetchAltSummaries(pluginID, mangaID, server string) ([]database.AltDescriptionRow, error) {
-	rowID, err := s.db.MangaRowID(pluginID, mangaID)
-	if err != nil {
-		return nil, fmt.Errorf("bridge: resolve manga: %w", err)
-	}
-	title, err := s.db.MangaTitle(pluginID, mangaID)
-	if err != nil {
-		return nil, fmt.Errorf("bridge: resolve title: %w", err)
-	}
-	res, err := s.mgr.GetAltSummaries(title, server)
-	if err != nil {
-		return nil, fmt.Errorf("bridge: fetch alt summaries: %w", err)
-	}
-	if _, err := s.db.AddAltDescriptions(rowID, res.Summaries, res.Source); err != nil {
-		return nil, fmt.Errorf("bridge: persist alt summaries: %w", err)
-	}
-	return s.db.ListAltDescriptions(rowID)
 }
 
 // ListAltSummaries returns the stored alternative summaries for a manga by its

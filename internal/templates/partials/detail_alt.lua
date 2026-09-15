@@ -1,7 +1,7 @@
 --- partials/detail_alt.lua
 --  Detail page: Alpine.js-powered enrichment panel — interactive genres & related toggles.
 --  data.PluginID, data.MangaID, data.CurrentTitle, data.AltTitles,
---  data.AltTitleServers, data.AltSummaries, data.AltSummaryServers, data.Manga
+--  data.AltSummaries, data.Manga
 --  data.Categories, data.Related, data.Genres (current active genres for highlighting)
 
 return function(data)
@@ -9,9 +9,7 @@ return function(data)
 	local mangaID = data.MangaID or ""
 	local currentTitle = data.CurrentTitle or ""
 	local altTitles = data.AltTitles or {}
-	local altTitleServers = data.AltTitleServers or {}
 	local altSummaries = data.AltSummaries or {}
-	local altSummaryServers = data.AltSummaryServers or {}
 	local manga = data.Manga or {}
 	local cats = data.Categories or {}
 	local rels = data.Related or {}

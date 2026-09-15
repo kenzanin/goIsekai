@@ -77,8 +77,6 @@ func (s *Server) registerAPIRoutes(r chi.Router) {
 	r.Get("/library", s.apiLibrary)
 	r.Get("/library/search", s.apiLibrarySearch)
 	r.Get("/search", s.apiSearch)
-	r.Get("/alt-title-servers", s.apiAltTitleServers)
-	r.Post("/manga/{pluginID}/{mangaID}/alt-titles", s.apiFetchAltTitles)
 	r.Delete("/manga/{pluginID}/{mangaID}/alt-titles", s.apiRemoveAltTitle)
 	r.Put("/manga/{pluginID}/{mangaID}/title", s.apiSetTitle)
 	r.Get("/manga/{pluginID}/{mangaID}", s.apiMangaDetail)

@@ -72,4 +72,3 @@ series — users can only access the 5 newest chapters.
 - **Search:** GET `/?s={query}&post_type=wp-manga` (server-rendered HTML)
 - **Chapters:** POST `{manga_path}/ajax/chapters/` (empty body + `X-Requested-With`)
 - **Pages:** GET chapter URL, parse `img.wp-manga-chapter-img` `data-src`
-- **Alt-titles:** MangaDex API (`alt_title_servers: [{id:"mangadex"}]`)

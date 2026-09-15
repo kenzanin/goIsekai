@@ -64,7 +64,7 @@ internal/httpserver/*         ← HTTP routes, views (Lua templates), API handle
 internal/database/*           ← SQLite (modernc.org/sqlite), go-jet DSL queries (.gen/)
 internal/pluginmanager/*      ← Plugin loading (Lua/lunar, JS/goja, Go plugin, Yaegi)
 internal/hostnet/*            ← HTTP proxy, CDP browser engine for anti-bot solving
-internal/enrich/*             ← Alt-title enrichment providers (MangaDex, MangaUpdates)
+internal/enrich/*             ← Enrichment registry (providers come from info scripts)
 internal/templates/*          ← Lua templates for HTML rendering
 internal/config/*             ← Hand-rolled INI parser (goisekai.ini)
 internal/bridge/cache, image  ← Image caching and download pipeline
@@ -79,7 +79,9 @@ pkg/types/*                   ← Plugin ABI contract, shared types
 
 1. Reader loads chapters from DB → plugin's `GetPageList()` → pages downloaded → cached on disk → served through image proxy
 
-**Plugin ABI** (`pkg/types/abi.go`): Plugins export `Search`, `GetMangaDetail`, `GetChapterList`, `GetPageList` as JSON-over-string functions. Optional: `Init`, `GetAltTitles`, `GetAltSummary`. The host imports `host_http_request` for all network access.
+**Plugin ABI** (`pkg/types/abi.go`): Plugins export `Search`, `GetMangaDetail`, `GetChapterList`, `GetPageList` as JSON-over-string functions. Optional: `Init`, `GetEnrichment`. The host imports `host_http_request` for all network access.
+
+**Info scripts** are metadata-only Lua scripts in the info directory (`app_data/info/<source>/main.lua`), discovered separately from source plugins and hidden from the plugin list. They declare enrichment providers in `PLUGIN.enrichment_providers` and implement only `getEnrichment`.
 
 ---
 

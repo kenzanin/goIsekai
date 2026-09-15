@@ -52,35 +52,11 @@ type SearchFilter struct {
 	SortBy string   `json:"sort_by,omitempty"`
 }
 
-// AltTitleServer describes a single lookup server offered by a plugin.
-// Kind controls what the server can resolve: empty or "titles" (default)
-// means titles only; "summaries" means summaries only; "both" means both.
-type AltTitleServer struct {
-	ID   string `json:"id"`
-	Name string `json:"name"`
-	Kind string `json:"kind,omitempty"`
-}
-
 // EnrichmentProvider declares a custom enrichment source offered by a plugin.
 type EnrichmentProvider struct {
 	ID    string   `json:"id"`
 	Name  string   `json:"name"`
 	Kinds []string `json:"kinds"`
-}
-
-// AltTitlesResult is what a GetAltTitles provider returns: the provider's own
-// display name (reported by the plugin, never hardcoded by the host) plus the
-// alternative title list.
-type AltTitlesResult struct {
-	Source string   `json:"source"`
-	Titles []string `json:"titles"`
-}
-
-// AltSummaryResult is what a GetAltSummary provider returns: the provider's
-// own display name plus alternative summary/description texts.
-type AltSummaryResult struct {
-	Source    string   `json:"source"`
-	Summaries []string `json:"summaries"`
 }
 
 // PluginMeta is the metadata a plugin optionally declares in its Init response.
@@ -104,10 +80,6 @@ type PluginMeta struct {
 	// The host uses it to decide whether a "Next" pagination link should be
 	// shown (a full page implies more results). 0 falls back to 24.
 	SearchPageSize int `json:"search_page_size,omitempty"`
-	// AltTitleServers lists the lookup servers this plugin provides for
-	// alternative-title resolution. A non-empty list signals enricher
-	// capability — the host also expects a GetAltTitles export.
-	AltTitleServers []AltTitleServer `json:"alt_title_servers,omitempty"`
 	// EnrichmentProviders declares custom enrichment sources this plugin offers.
 	// Each provider has a stable ID, display name, and list of supported kinds.
 	EnrichmentProviders []EnrichmentProvider `json:"enrichment_providers,omitempty"`

@@ -2,7 +2,6 @@ package httpserver
 
 import (
 	"bytes"
-	"github.com/goccy/go-json"
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
@@ -78,55 +77,6 @@ func seedManga(t *testing.T, db *database.DB, id, pluginID, sourceID, title stri
 	}
 	if err := db.SyncFTS(id); err != nil {
 		t.Fatalf("sync fts %s: %v", id, err)
-	}
-}
-
-// ── GET /api/alt-title-servers ──────────────────────────────────────────────
-
-func TestAltTitleServersReturnsEmptyJSONArray(t *testing.T) {
-	s, _ := testServerFullDB(t, "", false)
-
-	req := httptest.NewRequest("GET", "/api/alt-title-servers", nil)
-	rec := httptest.NewRecorder()
-	s.Router.ServeHTTP(rec, req)
-
-	if rec.Code != http.StatusOK {
-		t.Fatalf("status = %d, want 200", rec.Code)
-	}
-	var arr []map[string]string
-	if err := json.Unmarshal(rec.Body.Bytes(), &arr); err != nil {
-		t.Fatalf("body is not valid JSON array: %v\nbody: %s", err, rec.Body.String())
-	}
-	if len(arr) != 0 {
-		t.Fatalf("expected empty array, got %d elements", len(arr))
-	}
-}
-
-// ── POST /api/manga/../alt-titles ───────────────────────────────────────────
-
-func TestFetchAltTitlesMissingServer(t *testing.T) {
-	s, _ := testServerFullDB(t, "", false)
-
-	body := bytes.NewBufferString(`{}`)
-	req := httptest.NewRequest("POST", "/api/manga/p1/m1/alt-titles", body)
-	rec := httptest.NewRecorder()
-	s.Router.ServeHTTP(rec, req)
-
-	if rec.Code != http.StatusBadRequest {
-		t.Fatalf("status = %d, want 400", rec.Code)
-	}
-}
-
-func TestFetchAltTitlesUnknownServer(t *testing.T) {
-	s, _ := testServerFullDB(t, "", false)
-
-	body := bytes.NewBufferString(`{"server":"no-such-server"}`)
-	req := httptest.NewRequest("POST", "/api/manga/p1/m1/alt-titles", body)
-	rec := httptest.NewRecorder()
-	s.Router.ServeHTTP(rec, req)
-
-	if rec.Code != http.StatusBadRequest {
-		t.Fatalf("status = %d, want 400", rec.Code)
 	}
 }
 

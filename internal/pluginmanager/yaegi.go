@@ -25,7 +25,6 @@ var yaegiABIFns = []string{
 	types.GetMangaDetailFunc,
 	types.GetChapterListFunc,
 	types.GetPageListFunc,
-	types.GetAltTitlesFunc,
 	types.InitFunc,
 }
 

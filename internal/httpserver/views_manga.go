@@ -4,7 +4,6 @@ import (
 	"errors"
 	"goisekai/internal/database"
 	"goisekai/internal/hostnet"
-	"goisekai/internal/pluginmanager"
 	"goisekai/pkg/types"
 	"net/http"
 	"strconv"
@@ -57,19 +56,6 @@ func (s *Server) buildMangaDetailData(r *http.Request, pluginID, mangaID string)
 	}
 	altTitles, _ := s.service.ListAltTitles(pluginID, mangaID)
 	altSummaries, _ := s.service.ListAltSummaries(pluginID, mangaID)
-	allServers := s.service.AltTitleServers()
-	var altTitleServers []pluginmanager.AltTitleServerEntry
-	var altSummaryServers []pluginmanager.AltTitleServerEntry
-	for _, srv := range allServers {
-		if srv.ProviderPluginID == pluginID {
-			if srv.Kind == "" || srv.Kind == "titles" || srv.Kind == "both" {
-				altTitleServers = append(altTitleServers, srv)
-			}
-			if srv.Kind == "summaries" || srv.Kind == "both" {
-				altSummaryServers = append(altSummaryServers, srv)
-			}
-		}
-	}
 	cats, _ := s.service.ListCategories(pluginID, mangaID)
 	rels, _ := s.service.ListRelated(pluginID, mangaID)
 	s.logger.Debug("enrichment cache", "plugin", pluginID, "manga", mangaID, "categories", len(cats), "related", len(rels))
@@ -85,31 +71,29 @@ func (s *Server) buildMangaDetailData(r *http.Request, pluginID, mangaID string)
 	chEnd := min(chStart+chapterPageSize, chTotal)
 
 	return map[string]any{
-		"PluginID":          pluginID,
-		"PluginName":        pluginName,
-		"PluginIcon":        pluginIcon,
-		"MangaID":           mangaID,
-		"Manga":             manga,
-		"AltTitles":         altTitles,
-		"AltSummaries":      altSummaries,
-		"CurrentTitle":      manga.Title,
-		"AltTitleServers":   altTitleServers,
-		"AltSummaryServers": altSummaryServers,
-		"Chapters":          chapters[chStart:chEnd],
-		"Progress":          progress,
-		"Continue":          continueTo,
-		"InLibrary":         inLibrary,
-		"Challenge":         challenge,
-		"ChCurrentPage":     chPage,
-		"ChTotalPages":      max((chTotal+chapterPageSize-1)/chapterPageSize, 1),
-		"ChHasNext":         chEnd < chTotal,
-		"ChHasPrev":         chPage > 1,
-		"Categories":        cats,
-		"Related":           rels,
-		"PluginGenres":      manga.RawGenres,
-		"OverrideGenres":    overrideGenres,
-		"Genres":            manga.Genres,
-		"CoverDim":          manga.CoverDim,
+		"PluginID":       pluginID,
+		"PluginName":     pluginName,
+		"PluginIcon":     pluginIcon,
+		"MangaID":        mangaID,
+		"Manga":          manga,
+		"AltTitles":      altTitles,
+		"AltSummaries":   altSummaries,
+		"CurrentTitle":   manga.Title,
+		"Chapters":       chapters[chStart:chEnd],
+		"Progress":       progress,
+		"Continue":       continueTo,
+		"InLibrary":      inLibrary,
+		"Challenge":      challenge,
+		"ChCurrentPage":  chPage,
+		"ChTotalPages":   max((chTotal+chapterPageSize-1)/chapterPageSize, 1),
+		"ChHasNext":      chEnd < chTotal,
+		"ChHasPrev":      chPage > 1,
+		"Categories":     cats,
+		"Related":        rels,
+		"PluginGenres":   manga.RawGenres,
+		"OverrideGenres": overrideGenres,
+		"Genres":         manga.Genres,
+		"CoverDim":       manga.CoverDim,
 	}
 }
 

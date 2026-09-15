@@ -3,7 +3,6 @@
 --  Called as: detail(data) -> string (body HTML only, layout wraps it)
 --  data.PluginID, data.PluginName, data.PluginIcon, data.MangaID
 --  data.Manga: types.Manga, data.AltTitles: []AltTitle, data.CurrentTitle: string
---  data.AltTitleServers: []AltTitleServerEntry
 --  data.Chapters: []types.Chapter, data.Progress: map[string]database.ChapterProgress
 --  data.Continue: *ContinuePoint, data.InLibrary: bool, data.Challenge: bool
 --  data.ChCurrentPage/ChTotalPages: int
@@ -20,9 +19,7 @@ return function(data)
 	local manga = data.Manga or {}
 	local altTitles = data.AltTitles or {}
 	local currentTitle = data.CurrentTitle or manga.Title or ""
-	local altTitleServers = data.AltTitleServers or {}
 	local altSummaries = data.AltSummaries or {}
-	local altSummaryServers = data.AltSummaryServers or {}
 	local chapters = data.Chapters or {}
 	local progress = data.Progress or {}
 	local continuePoint = data.Continue
@@ -249,9 +246,7 @@ return function(data)
 			MangaID = mangaID,
 			CurrentTitle = currentTitle,
 			AltTitles = altTitles,
-			AltTitleServers = altTitleServers,
 			AltSummaries = altSummaries,
-			AltSummaryServers = altSummaryServers,
 			Manga = manga,
 			Author = manga.Author,
 			Categories = cats,

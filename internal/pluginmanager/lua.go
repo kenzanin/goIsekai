@@ -17,8 +17,6 @@ var luaFnNames = map[string]string{
 	types.GetMangaDetailFunc: "get_manga_detail",
 	types.GetChapterListFunc: "get_chapter_list",
 	types.GetPageListFunc:    "get_page_list",
-	types.GetAltTitlesFunc:   "getAltTitles",
-	types.GetAltSummaryFunc:  "getAltSummary",
 	types.GetEnrichmentFunc:  "getEnrichment",
 }
 

@@ -68,32 +68,6 @@ func TestAPISetTitleUnknownTitle(t *testing.T) {
 	}
 }
 
-// --- Fetch alt titles ---
-
-func TestAPIFetchAltTitlesMissingServer(t *testing.T) {
-	s := testServer(t, "")
-	body := bytes.NewBufferString(`{}`)
-	req := httptest.NewRequest("POST", "/api/manga/p1/m1/alt-titles", body)
-	req.Header.Set("Content-Type", "application/json")
-	rec := httptest.NewRecorder()
-	s.Router.ServeHTTP(rec, req)
-	if rec.Code != 400 {
-		t.Errorf("status = %d, want 400", rec.Code)
-	}
-}
-
-func TestAPIFetchAltTitlesUnknownServer(t *testing.T) {
-	s := testServer(t, "")
-	body := bytes.NewBufferString(`{"server":"nonexistent"}`)
-	req := httptest.NewRequest("POST", "/api/manga/p1/m1/alt-titles", body)
-	req.Header.Set("Content-Type", "application/json")
-	rec := httptest.NewRecorder()
-	s.Router.ServeHTTP(rec, req)
-	if rec.Code != 400 {
-		t.Errorf("status = %d, want 400", rec.Code)
-	}
-}
-
 // --- Remove alt title ---
 
 func TestAPIRemoveAltTitleMissingBody(t *testing.T) {
