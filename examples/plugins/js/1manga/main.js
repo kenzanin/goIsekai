@@ -1,6 +1,7 @@
 // 1Manga (MangaHub) JS plugin for goIsekai
 // Uses MangaHub GraphQL API at api.mghcdn.com.
-// Source ID: mn03 — requires mhub_access cookie for authentication.
+// Source ID: mn03. The API answers 404 without Origin/Referer on the POST;
+// mhub_access is only needed by the chapter (pages) resolver.
 
 var PLUGIN = {
     contract_version: 1,
@@ -15,8 +16,8 @@ var PLUGIN = {
 
 var GRAPHQL_URL = "https://api.mghcdn.com/graphql";
 var SITE_URL = "https://1manga.co";
-var IMG_CDN = "https://imgx.mghcdn.com";
-var THUMB_CDN = "https://thumb.mghcdn.com";
+var IMG_CDN = "https://imgx.mghcdn.com/";
+var THUMB_CDN = "https://thumb.mghcdn.com/";
 
 // Module-level cached access key (refreshed on first call or after error).
 var _cachedKey = null;
@@ -63,6 +64,8 @@ function _graphqlQuery(query) {
 
     var r = host.http.post(GRAPHQL_URL, JSON.stringify({ query: query }), {
         "Content-Type": "application/json",
+        "Origin": SITE_URL,
+        "Referer": SITE_URL + "/",
         "x-mhub-access": key,
     });
 
@@ -76,6 +79,8 @@ function _graphqlQuery(query) {
 
         r = host.http.post(GRAPHQL_URL, JSON.stringify({ query: query }), {
             "Content-Type": "application/json",
+            "Origin": SITE_URL,
+            "Referer": SITE_URL + "/",
             "x-mhub-access": key,
         });
         if (!r || r.status < 200 || r.status >= 300) return null;
@@ -176,6 +181,11 @@ function getMangaDetail(arg) {
         status = String(status);
     }
 
+    // genres arrives as one comma-separated string; the ABI wants a list.
+    var genres = (typeof m.genres === "string" ? m.genres.split(",") : (m.genres || []))
+        .map(function (s) { return s.trim(); })
+        .filter(function (s) { return s !== ""; });
+
     return JSON.stringify({
         id: m.slug || slug,
         title: m.title || "",
@@ -183,7 +193,7 @@ function getMangaDetail(arg) {
         author: m.author || "",
         description: m.description || "",
         status: host.text.normalize_status(status || ""),
-        genres: m.genres || [],
+        genres: genres,
     });
 }
 
