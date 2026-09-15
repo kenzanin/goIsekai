@@ -474,6 +474,177 @@ func TestLuaHTMLScrapeExample(t *testing.T) {
 	}
 }
 
+// TestLuaMangaKatanaExample drives the shipping MangaKatana plugin against a
+// stub of the real site's markup. The reader page is the half worth stubbing:
+// it carries no image URLs in its markup at all, so the stub reproduces the
+// JavaScript array the plugin has to read instead.
+func TestLuaMangaKatanaExample(t *testing.T) {
+	// The second card has no <picture> wrapper, like the site's cover-less
+	// results, so the cover list has to stay aligned with the title list.
+	const searchPage = `<!doctype html><html><body>
+		<div id="book_list">
+			<div class="item" data-genre=",3,4," data-id="2">
+				<div class="media"><div class="wrap_img">
+					<a href="{{base}}/manga/chihayafuru.2"><picture><source srcset="/imgs/cover/fccf5.webp" type="image/webp"><img src="/imgs/cover/fccf5.jpg" alt="[Cover]"></picture></a>
+				</div><div class="status completed"><i class="uk-icon-tasks"></i> Completed</div></div>
+				<div class="text"><h3 class="title">
+					<a href="{{base}}/manga/chihayafuru.2" target="_blank">Chihayafuru</a><span> - Update chapter 247</span>
+				</h3></div>
+			</div>
+			<div class="item" data-genre=",9," data-id="9">
+				<div class="media"><div class="wrap_img">
+					<a href="{{base}}/manga/untitled.9"><img src="/imgs/no-cover.png" alt="[Cover]"></a>
+				</div><div class="status ongoing">Ongoing</div></div>
+				<div class="text"><h3 class="title"><a href="{{base}}/manga/untitled.9">Untitled</a></h3></div>
+			</div>
+		</div>
+		</body></html>`
+
+	// #related repeats the card shape inside #single_book and carries its own
+	// .chapter links, so it is the tripwire for every scoped lookup below.
+	const detailPage = `<!doctype html><html><body>
+		<div id="wrap_content"><div id="single_book">
+			<div class="media"><div class="cover">
+				<picture><source srcset="/imgs/cover/fccf5.webp" type="image/webp"><img src="/imgs/cover/fccf5.jpg" alt="[Cover]"></picture>
+			</div></div>
+			<div class="text"><div class="info">
+				<h1 class="heading">   Chihayafuru   </h1>
+				<ul class="meta">
+					<li><div class="label">Alt name(s):</div><div class="value"><div class="alt_name">ちはやふる ; Chihayafuru</div></div></li>
+					<li><div class="label">Author(s) / Artist(s):</div><div class="value authors"><a class="author" href="/author/suetsugu-yuki.2">Suetsugu Yuki</a></div></li>
+					<li><div class="label">Genres:</div><div class="value"><div class="genres"><a href="/genre/drama" class="text_0">Drama</a><a href="/genre/sports" class="text_0">Sports</a></div></div></li>
+					<li><div class="label">Status:</div><div class="d-cell-small value status completed">Completed</div></li>
+					<li><div class="label">Latest chapter(s):</div><div class="d-cell-small value new_chap">Chapter 247</div></li>
+				</ul>
+			</div></div>
+			<div class="summary"><div class="label">Description</div>
+				<p>All her life, Chihaya&#39;s dream was to be the Queen.<br>Then she met Arata.<br><br>Note: a karuta story.</p>			</div>
+			<div id="related" class="uk-hidden-large"><div class="body">
+				<div class="item" data-id="24677"><div class="d-cell text">
+					<h4 class="title"><a href="/manga/spin-off.24677">Spin-off</a></h4>
+					<div class="chapter"><a href="/manga/spin-off.24677/c18">Chapter 18</a></div>
+				</div></div>
+			</div></div>
+			<div class="chapters"><table class="uk-table"><tbody>
+				<tr><td><div class="chapter"><a href="{{base}}/manga/chihayafuru.2/c247">Chapter 247 [END]</a></div></td><td><div class="update_time">Aug-15-2022</div></td></tr>
+				<tr><td><div class="chapter"><a href="{{base}}/manga/chihayafuru.2/c230.5">Chapter 230.5: Karuta</a></div></td><td><div class="update_time">Jan-01-2022</div></td></tr>
+			</tbody></table></div>
+		</div></div>
+		</body></html>`
+
+	// ytaw repeats the first URL and cds holds dimensions, so the plugin has to
+	// pick the longest array rather than the first one it finds.
+	const readerPage = `<!doctype html><html><body>
+		<div id="imgs" data-alt="Chihayafuru - Chapter 247 [END]"><div id="page1" class="wrap_img uk-width-1-1" data-pages="2"><img data-src="#" alt=""/></div><div id="page2" class="wrap_img uk-width-1-1" data-pages="2"><img data-src="#" alt=""/></div></div>
+		<script>
+			var ytaw=['{{base}}/p/1.jpg',];
+			var thzq=['{{base}}/p/1.jpg','{{base}}/p/2.jpg',];
+			var cds = ["1337x1920","1114x1600"];
+			function kxatz(){for(i=thzq.length-1;i>=0;i--){var obj=$('#imgs .wrap_img:eq('+i+') img');obj.attr('data-src', thzq[i]);}}
+		</script>
+		</body></html>`
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/html")
+		page := searchPage
+		switch {
+		case strings.HasPrefix(r.URL.Path, "/manga/") && strings.Count(r.URL.Path, "/") > 2:
+			page = readerPage
+		case strings.HasPrefix(r.URL.Path, "/manga/"):
+			page = detailPage
+		}
+		_, _ = io.WriteString(w, strings.ReplaceAll(page, "{{base}}", "http://"+r.Host))
+	}))
+	defer srv.Close()
+
+	mgr := NewManager(hostnet.NewProxy(), t.TempDir())
+	defer func() { _ = mgr.Close() }()
+	if _, err := mgr.Install("../../examples/plugins/lua/mangakatana"); err != nil {
+		t.Fatalf("install mangakatana plugin: %v", err)
+	}
+
+	// The plugin reads BASE at call time, so retargeting it sends both search
+	// and detail to the stub instead of the live site.
+	if err := mgr.ensureLoaded("mangakatana"); err != nil {
+		t.Fatalf("load mangakatana plugin: %v", err)
+	}
+	mgr.mu.RLock()
+	state := mgr.plugins["mangakatana"].lunar
+	mgr.mu.RUnlock()
+	if _, err := state.DoString("test-base", fmt.Sprintf("BASE = %q", srv.URL)); err != nil {
+		t.Fatalf("retarget BASE: %v", err)
+	}
+
+	results, err := mgr.Search("mangakatana", types.SearchFilter{Query: "chihayafuru"})
+	if err != nil {
+		t.Fatalf("Search: %v", err)
+	}
+	if len(results) != 2 {
+		t.Fatalf("search = %+v, want the two stub cards", results)
+	}
+	if results[0].Title != "Chihayafuru" || results[0].ID != srv.URL+"/manga/chihayafuru.2" {
+		t.Errorf("first result = %+v", results[0])
+	}
+	if results[0].CoverURL != "/imgs/cover/fccf5.jpg" {
+		t.Errorf("first result cover = %q, want the img src and not the webp source", results[0].CoverURL)
+	}
+	if results[1].CoverURL != "/imgs/no-cover.png" {
+		t.Errorf("second result cover = %q, want the cover-less card to stay aligned", results[1].CoverURL)
+	}
+
+	detail, err := mgr.GetMangaDetail("mangakatana", srv.URL+"/manga/chihayafuru.2")
+	if err != nil {
+		t.Fatalf("GetMangaDetail: %v", err)
+	}
+	if detail.Title != "Chihayafuru" {
+		t.Errorf("title = %q, want the trimmed heading", detail.Title)
+	}
+	if detail.Author != "Suetsugu Yuki" {
+		t.Errorf("author = %q", detail.Author)
+	}
+	if detail.CoverURL != "/imgs/cover/fccf5.jpg" {
+		t.Errorf("cover_url = %q", detail.CoverURL)
+	}
+	if detail.Status != "Completed" {
+		t.Errorf("status = %q, want the host's canonical vocabulary", detail.Status)
+	}
+	if !reflect.DeepEqual(detail.Genres, []string{"Drama", "Sports"}) {
+		t.Errorf("genres = %v, want the detail page's own chips", detail.Genres)
+	}
+	const wantDesc = "All her life, Chihaya's dream was to be the Queen.\nThen she met Arata.\nNote: a karuta story."
+	if detail.Description != wantDesc {
+		t.Errorf("description = %q\nwant %q", detail.Description, wantDesc)
+	}
+
+	chapters, err := mgr.GetChapterList("mangakatana", srv.URL+"/manga/chihayafuru.2")
+	if err != nil {
+		t.Fatalf("GetChapterList: %v", err)
+	}
+	if len(chapters) != 2 {
+		t.Fatalf("chapters = %+v, want the two table rows and not the related card", chapters)
+	}
+	if chapters[0].Title != "Chapter 247 [END]" || chapters[0].ChapterNum != 247 {
+		t.Errorf("first chapter = %+v", chapters[0])
+	}
+	if chapters[1].ChapterNum != 230.5 {
+		t.Errorf("second chapter_num = %v, want the decimal read from the href", chapters[1].ChapterNum)
+	}
+
+	pages, err := mgr.GetPageList("mangakatana", chapters[0].URL)
+	if err != nil {
+		t.Fatalf("GetPageList: %v", err)
+	}
+	if len(pages) != 2 {
+		t.Fatalf("pages = %+v, want the two URLs from the script array", pages)
+	}
+	if !strings.HasSuffix(pages[0].URL, "/p/1.jpg") || !strings.HasSuffix(pages[1].URL, "/p/2.jpg") {
+		t.Errorf("page urls = %q, %q", pages[0].URL, pages[1].URL)
+	}
+	if pages[0].Index != 1 || pages[1].Index != 2 {
+		t.Errorf("page indexes = %d, %d, want 1-based", pages[0].Index, pages[1].Index)
+	}
+}
+
 // liveScrapeURL is a real manga page the live check scrapes. It is a home feed
 // rather than a chapter reader so the check does not depend on a chapter still
 // existing, and it serves server-rendered <img src> markup (sites that render
@@ -522,4 +693,67 @@ func TestLuaHTMLScrapeLivePage(t *testing.T) {
 		t.Errorf("a wrong expression should report a parse error, got %q", got.BadSelector)
 	}
 	t.Logf("live: title=%q images=%d links=%d", got.Title, got.Images, got.Links)
+}
+
+// TestLuaMangaKatanaLive walks the shipped MangaKatana plugin down a real
+// search: results, detail, chapters, then the reader page whose image URLs are
+// only in a script array. Skipped unless GOISEKAI_LIVE=1, because it needs the
+// network and a site that can change under us.
+func TestLuaMangaKatanaLive(t *testing.T) {
+	if os.Getenv("GOISEKAI_LIVE") == "" {
+		t.Skip("set GOISEKAI_LIVE=1 to scrape the real site")
+	}
+
+	mgr := NewManager(hostnet.NewProxy(), t.TempDir())
+	defer func() { _ = mgr.Close() }()
+	if _, err := mgr.Install("../../examples/plugins/lua/mangakatana"); err != nil {
+		t.Fatalf("install mangakatana plugin: %v", err)
+	}
+
+	results, err := mgr.Search("mangakatana", types.SearchFilter{Query: "chihayafuru"})
+	if err != nil {
+		t.Fatalf("Search: %v", err)
+	}
+	if len(results) == 0 {
+		t.Fatal("search returned nothing")
+	}
+
+	detail, err := mgr.GetMangaDetail("mangakatana", results[0].ID)
+	if err != nil {
+		t.Fatalf("GetMangaDetail: %v", err)
+	}
+	if detail.Title == "" || detail.CoverURL == "" {
+		t.Errorf("detail = %+v", detail)
+	}
+	if detail.Description == "" {
+		t.Error("read no description")
+	}
+
+	chapters, err := mgr.GetChapterList("mangakatana", results[0].ID)
+	if err != nil {
+		t.Fatalf("GetChapterList: %v", err)
+	}
+	if len(chapters) < 2 {
+		t.Fatalf("chapters = %d, want a whole series", len(chapters))
+	}
+	if chapters[0].ChapterNum < chapters[1].ChapterNum {
+		t.Errorf("chapters are not newest-first: %v then %v", chapters[0].ChapterNum, chapters[1].ChapterNum)
+	}
+
+	pages, err := mgr.GetPageList("mangakatana", chapters[0].URL)
+	if err != nil {
+		t.Fatalf("GetPageList: %v", err)
+	}
+	if len(pages) == 0 {
+		t.Fatal("read no pages from the reader page")
+	}
+	for _, p := range pages {
+		if !strings.HasPrefix(p.URL, "https://") {
+			t.Errorf("page url = %q, want a real image URL", p.URL)
+		}
+	}
+	if pages[0].Index != 1 || pages[len(pages)-1].Index != len(pages) {
+		t.Errorf("page indexes are not 1-based over %d pages", len(pages))
+	}
+	t.Logf("live: %q -> %d chapters, %d pages; first page %s", detail.Title, len(chapters), len(pages), pages[0].URL)
 }
