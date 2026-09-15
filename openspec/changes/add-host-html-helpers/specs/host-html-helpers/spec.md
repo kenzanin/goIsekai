@@ -6,35 +6,47 @@ Give Lua, JS and Yaegi plugins one host-backed way to read a scraped HTML page, 
 
 ### Requirement: HTML document handle
 
-The host SHALL expose a document handle built from a markup string: `host.html.parse(html)` in the Lua and JS runtimes, and `hostnet.Parse(html)` in the Yaegi runtime. The handle SHALL expose the eight lookup functions defined below and SHALL be the only way a plugin reaches them.
+The host SHALL expose a document handle built from a markup string: `host.html.parse(html)` in the Lua and JS runtimes, and `hostnet.Parse(html)` in the Yaegi runtime. The handle SHALL be an opaque value. A plugin SHALL reach the lookups by passing the handle back to the host's `host.html` group, not by calling methods on the handle, so the whole HTML surface stays a flat set of functions in one namespace, the way the other host groups are.
 
-Parsing SHALL take the markup as a string argument supplied by the plugin. The handle SHALL NOT read a file, accept a path or URL, or open a network connection, so HTML parsing SHALL NOT widen the plugin file, IO or process surface.
+Parsing SHALL take the markup as a string argument supplied by the plugin. The host SHALL read no file, accept no path or URL, and open no network connection, so HTML parsing SHALL NOT widen the plugin file, IO or process surface.
 
-Malformed or truncated markup SHALL NOT be a parse failure: the handle SHALL be built from whatever tree the parser recovers. A non-string argument SHALL fail and report the failure to the caller instead of returning a handle.
+A value that is not a handle from this host SHALL NOT be accepted where a handle is expected, so a handle cannot be substituted with a string, a table or a handle belonging to something else.
+
+Malformed or truncated markup SHALL NOT be a parse failure: the handle SHALL be built from whatever tree the parser recovers. A non-string argument to the parse function SHALL fail and report the failure to the caller instead of returning a handle.
 
 #### Scenario: Handle built from markup
 
 - **WHEN** a Lua plugin calls `host.html.parse` with the markup string `<h1 class="t">Solo Leveling</h1>`
-- **THEN** it receives a handle, and lookups on that handle see the document
+- **THEN** it receives a handle, and lookups that are given that handle see the document
+
+#### Scenario: Lookups take the handle as an argument
+
+- **WHEN** a plugin holds a handle and reads a value from it
+- **THEN** it calls a function of the form `host.html.find_text(doc, selector)`, passing the handle as the first argument
 
 #### Scenario: Non-string argument rejected
 
 - **WHEN** a plugin calls `host.html.parse` with a number instead of a string
 - **THEN** the call fails with an error about the argument and no handle is returned
 
+#### Scenario: A value that is not a handle rejected
+
+- **WHEN** a plugin passes a string, a table or some other value where a document handle is expected
+- **THEN** the call fails with an error naming the argument, rather than being read as a document or failing obscurely
+
 #### Scenario: Malformed markup still yields a handle
 
 - **WHEN** a plugin calls `host.html.parse` with markup that is unclosed or otherwise invalid HTML
 - **THEN** it receives a handle and a lookup against it returns the recovered content rather than failing
 
-#### Scenario: Handle cannot reach the filesystem
+#### Scenario: Parsing cannot reach the filesystem
 
 - **WHEN** a plugin calls `host.html.parse` with a filesystem path instead of markup
 - **THEN** it receives a handle parsed from that literal text, and no host file is read
 
 ### Requirement: CSS selector lookups
 
-The document handle SHALL expose four CSS-selector lookups, available as `doc.find_text(selector)`, `doc.find_attr(selector, attr)`, `doc.find_list_text(selector)` and `doc.find_list_attr(selector, attr)` in the Lua and JS runtimes, and as `FindText`, `FindAttr`, `FindListText` and `FindListAttr` methods on the Yaegi handle.
+The host SHALL expose four CSS-selector lookups in its `html` group, each taking the document handle as its first argument: `host.html.find_text(doc, selector)`, `host.html.find_attr(doc, selector, attr)`, `host.html.find_list_text(doc, selector)` and `host.html.find_list_attr(doc, selector, attr)`. The Yaegi runtime SHALL expose the equivalent `hostnet` functions `FindText`, `FindAttr`, `FindListText` and `FindListAttr`, in the same argument order.
 
 - `find_text` SHALL return the text content of the first element matching the selector, with surrounding whitespace trimmed.
 - `find_attr` SHALL return the value of the named attribute on the first element matching the selector.
@@ -43,12 +55,12 @@ The document handle SHALL expose four CSS-selector lookups, available as `doc.fi
 
 #### Scenario: First match text read
 
-- **WHEN** a plugin calls `find_text` with a selector matching `<span class="status">Ongoing</span>`
+- **WHEN** a plugin calls `find_text(doc, "span.status")` against markup containing `<span class="status">Ongoing</span>`
 - **THEN** it receives `Ongoing` with surrounding whitespace removed
 
 #### Scenario: First match attribute read
 
-- **WHEN** a plugin calls `find_attr` with a selector matching an anchor whose `href` is `/read/1`
+- **WHEN** a plugin calls `find_attr(doc, "a.next", "href")` against markup whose anchor carries `href="/read/1"`
 - **THEN** it receives `/read/1`
 
 #### Scenario: First match wins when several elements match
@@ -63,12 +75,12 @@ The document handle SHALL expose four CSS-selector lookups, available as `doc.fi
 
 #### Scenario: List of attributes read
 
-- **WHEN** a plugin calls `find_list_attr` with a selector matching four page images and the attribute `src`
+- **WHEN** a plugin calls `find_list_attr(doc, "div.page img", "src")` against markup with four page images
 - **THEN** it receives the four `src` values in document order
 
 ### Requirement: XPath lookups
 
-The document handle SHALL expose four XPath lookups, available as `doc.xpath_text(expr)`, `doc.xpath_attr(expr, attr)`, `doc.xpath_list_text(expr)` and `doc.xpath_list_attr(expr, attr)` in the Lua and JS runtimes, and as `XPathText`, `XPathAttr`, `XPathListText` and `XPathListAttr` methods on the Yaegi handle.
+The host SHALL expose four XPath lookups in its `html` group, each taking the document handle as its first argument: `host.html.xpath_text(doc, expr)`, `host.html.xpath_attr(doc, expr, attr)`, `host.html.xpath_list_text(doc, expr)` and `host.html.xpath_list_attr(doc, expr, attr)`. The Yaegi runtime SHALL expose the equivalent `hostnet` functions `XPathText`, `XPathAttr`, `XPathListText` and `XPathListAttr`, in the same argument order.
 
 They SHALL return the same shapes as the CSS lookups from the nodes the XPath expression selects: trimmed text content for the text variants, the named attribute value for the attribute variants, the first match for the singular variants, and every match in document order for the list variants.
 
@@ -139,12 +151,19 @@ A selector or XPath expression the host cannot parse SHALL fail and report the f
 
 ### Requirement: Equivalent HTML helper surface across runtimes
 
-The Lua, JS and Yaegi runtimes SHALL expose the same eight lookups with the same results: the same value for the same markup, selector or expression and attribute name, and the same error text for the same invalid selector or expression. Each runtime SHALL report failures in its own established idiom — a second return value in Lua, a thrown error in JS, an `error` return in Yaegi — while the reported text stays identical. The Lua and JS runtimes SHALL expose the lookups on the existing `host` surface as a `html` group, alongside `text`, `codecs`, `crypto`, `json` and `http`.
+The Lua, JS and Yaegi runtimes SHALL expose the same nine functions — the parse function and the eight lookups — with the same argument order and the same results: the same value for the same markup, selector or expression and attribute name, and the same error text for the same invalid argument, selector or expression. A call SHALL be movable between a Lua and a JS plugin without change. Each runtime SHALL report failures in its own established idiom — a second return value in Lua, a thrown error in JS, an `error` return in Yaegi — while the reported text stays identical.
+
+The Lua and JS runtimes SHALL expose the nine functions as a flat `html` group on the existing `host` surface, alongside `text`, `codecs`, `crypto`, `json` and `http`. No function of the group SHALL require method-call syntax or a receiver, and the group SHALL NOT be reachable through a bare Lua global.
 
 #### Scenario: Same markup, same text in every runtime
 
 - **WHEN** a Lua plugin, a JS plugin and a Yaegi plugin each parse the same markup and read the same selector's text
 - **THEN** all three receive the same string
+
+#### Scenario: Same call text in Lua and JS
+
+- **WHEN** the same lookup is written in a Lua plugin and in a JS plugin
+- **THEN** the two calls read identically, with the handle as the first argument and no receiver syntax
 
 #### Scenario: Same markup, same list in every runtime
 

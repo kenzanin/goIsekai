@@ -14,31 +14,35 @@
 
 ## 3. Lua runtime
 
-- [ ] 3.1 Add `internal/pluginmanager/lua_html.go` wrapping `htmldoc.Parse` and the eight document methods as Lua natives, with each lookup bound to its document and returning `nil` plus a message on failure, matching the convention the other Lua natives use; verify the package builds
-- [ ] 3.2 Register an `html` group exposing `parse` in `registerHostNatives` (`internal/pluginmanager/lua_natives.go`), beside `text`, `codecs`, `crypto`, `json` and `http`; verify a Lua fixture reaches `host.html.parse` and reads a value out of fixed markup
-- [ ] 3.3 Verify the already-shipped helpers still behave as before by calling `host.text.strip_html` and `host.json.decode` in the same fixture, and verify a bare `html` global is still absent so the group is the only entry point
+- [ ] 3.1 Add `internal/pluginmanager/lua_html.go` registering the document handle as a typed Lunar userdata (`state.NewUserDataType`) and wrapping the nine functions as natives that read the handle from argument 0, with a failed lookup returning `nil` plus a message the way the other Lua natives do; verify the package builds
+- [ ] 3.2 Register the `html` group in `registerHostNatives` (`internal/pluginmanager/lua_natives.go`), beside `text`, `codecs`, `crypto`, `json` and `http`; verify a Lua fixture reaches `host.html.parse` and reads a value with `host.html.find_text(doc, selector)`
+- [ ] 3.3 Verify the handle is opaque and type-checked: a plugin mutating the handle changes nothing, and passing a string, a table or a handle from elsewhere where a handle is expected fails with an error naming the argument rather than being read as a document
+- [ ] 3.4 Verify the already-shipped helpers still behave as before by calling `host.text.strip_html` and `host.json.decode` in the same fixture, and verify a bare `html` global is still absent so the group is the only entry point
 
 ## 4. JS runtime
 
-- [ ] 4.1 Add `internal/pluginmanager/js_html.go` wrapping `htmldoc.Parse` and the eight document methods as goja natives, throwing on failure in the runtime's established idiom; verify the package builds
+- [ ] 4.1 Add `internal/pluginmanager/js_html.go` wrapping the nine functions as goja natives that read the handle from the first call argument and throw on failure in the runtime's established idiom, carrying the Go document in a JS-side object the plugin cannot traverse rather than passing the Go pointer itself; verify the package builds
 - [ ] 4.2 Register the `html` group in `registerJSHostNatives` (`internal/pluginmanager/js_natives.go`); verify a JS fixture reaches `host.html.parse` and reads a value out of the same fixed markup the Lua fixture uses
+- [ ] 4.3 Verify the Go method set is not reachable from JS: a JS fixture inspecting the handle finds no `FindText`-style property, so `host.html.find_text(doc, selector)` is the only way to read it
+- [ ] 4.4 Verify a value that is not a handle is rejected in JS too, by passing a plain object where a handle is expected and observing an error rather than a silent empty result
 
 ## 5. Yaegi runtime
 
-- [ ] 5.1 Export `htmldoc.Parse` and the `Document` type on the synthetic `hostnet` package in `internal/pluginmanager/yaegi.go`, keeping the exported symbol names equal to the names a plugin writes; verify a Yaegi plugin source can declare and use the handle without a load-time error
+- [ ] 5.1 Export `htmldoc.Parse` and the `Document` type on the synthetic `hostnet` package in `internal/pluginmanager/yaegi.go` as ordinary functions taking the handle as a Go-typed first argument, keeping the exported symbol names equal to the names a plugin writes; verify a Yaegi plugin source can declare and use the handle without a load-time error
 - [ ] 5.2 Extend `examples/plugins/yaegi/yaegidemo/main.go` to parse markup and run a lookup; verify the plugin still loads under the sandbox's import check and the lookup returns the expected value
-- [ ] 5.3 If Yaegi rejects the exported type, fall back to the stateless `hostnet` function form recorded in design.md and verify the same lookup value and error text are still produced
+- [ ] 5.3 If Yaegi rejects the exported type, fall back to the Yaegi-only form recorded in design.md, where the bridge functions take the markup string per call, and verify the same lookup value and error text are still produced
 
 ## 6. Cross-runtime equivalence
 
 - [ ] 6.1 Add assertions to `internal/pluginmanager/host_helpers_test.go` that run the same markup and selector through the Lua and JS runtimes and require identical values for a text lookup, an attribute lookup, and both list lookups; verify the test fails when one runtime's result is altered
 - [ ] 6.2 Add an assertion that the two script runtimes report identical error text for the same invalid selector and the same invalid XPath expression; verify the test fails when one runtime's message is altered
-- [ ] 6.3 Add an assertion that the Yaegi bridge returns the same lookup value as the script runtimes for the same markup and selector; verify the test fails when the Yaegi result is altered
+- [ ] 6.3 Add an assertion that a lookup written for Lua and the same lookup written for JS are the same function name and the same argument order, with the handle first and no receiver; verify the test fails if a runtime registers the lookup under a different name or order
+- [ ] 6.4 Add an assertion that the Yaegi bridge returns the same lookup value as the script runtimes for the same markup and selector; verify the test fails when the Yaegi result is altered
 
 ## 7. Documentation
 
-- [ ] 7.1 Add `host.html.*` and the Yaegi `hostnet` HTML functions to the per-runtime inventory in `docs/host-native-helpers-plan.md`; verify the list names all eight lookups for each runtime that has them
-- [ ] 7.2 Add a plugin-facing example that fetches a page and reads a list of image URLs through the new handle; verify the example runs in a plugin or is exercised by a test, so it is not a snippet nobody has executed
+- [ ] 7.1 Add `host.html.*` and the Yaegi `hostnet` HTML functions to the per-runtime inventory in `docs/host-native-helpers-plan.md`; verify the list names all nine functions for each runtime that has them, with their argument order
+- [ ] 7.2 Add a plugin-facing example that fetches a page and reads a list of image URLs through the handle; verify the example runs in a plugin or is exercised by a test, so it is not a snippet nobody has executed
 
 ## 8. Verification
 

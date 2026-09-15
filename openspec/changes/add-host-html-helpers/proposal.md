@@ -9,9 +9,10 @@ CSS selectors cover the ordinary case in one line; XPath is the escape hatch for
 ## What Changes
 
 - Add two HTML parsing libraries as direct dependencies: `github.com/PuerkitoBio/goquery` (CSS selectors, plus `cascadia` transitively) and `github.com/antchfx/htmlquery` (XPath, on the already-present `golang.org/x/net/html`).
-- Add a `host.html` helper group with 8 natives in the Lua and JS runtimes, and the matching functions on the synthetic `hostnet` package in the Yaegi runtime:
-  - CSS selectors (`goquery`): `find_text(selector)`, `find_attr(selector, attr)`, `find_list_text(selector)`, `find_list_attr(selector, attr)`.
-  - XPath (`htmlquery`): `xpath_text(expr)`, `xpath_attr(expr, attr)`, `xpath_list_text(expr)`, `xpath_list_attr(expr, attr)`.
+- Add a `host.html` helper group with 9 functions in the Lua and JS runtimes, and the matching functions on the synthetic `hostnet` package in the Yaegi runtime. `parse` builds an opaque document handle from a markup string; the eight lookups take that handle as their first argument, so the whole group is flat functions in one namespace with no receiver syntax and identical call text in Lua and JS:
+  - `parse(html)`.
+  - CSS selectors (`goquery`): `find_text(doc, selector)`, `find_attr(doc, selector, attr)`, `find_list_text(doc, selector)`, `find_list_attr(doc, selector, attr)`.
+  - XPath (`htmlquery`): `xpath_text(doc, expr)`, `xpath_attr(doc, expr, attr)`, `xpath_list_text(doc, expr)`, `xpath_list_attr(doc, expr, attr)`.
 - Document the new group alongside the existing host helper inventory.
 
 No existing helper changes behaviour, no plugin ABI function changes, and nothing is removed.
