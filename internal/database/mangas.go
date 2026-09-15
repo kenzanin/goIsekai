@@ -222,6 +222,27 @@ func (d *DB) SetMangaCoverDim(mangaRowID string, dim int64) error {
 	return err
 }
 
+// SetMangaAuthor stores the author captured by an enrichment provider.
+// An empty author clears the value.
+func (d *DB) SetMangaAuthor(mangaRowID, author string) error {
+	_, err := d.db.Exec(`UPDATE mangas SET author = ? WHERE id = ?`, author, mangaRowID)
+	return err
+}
+
+// GetMangaAuthor returns the stored enrichment author for a manga.
+// Returns ("", false) when nothing was fetched yet.
+func (d *DB) GetMangaAuthor(mangaRowID string) (string, bool, error) {
+	var author string
+	err := d.db.QueryRow(`SELECT author FROM mangas WHERE id = ?`, mangaRowID).Scan(&author)
+	if err != nil {
+		return "", false, err
+	}
+	if author == "" {
+		return "", false, nil
+	}
+	return author, true, nil
+}
+
 // GetMangaCoverDim returns the current cover_dim flag for a manga.
 // Returns (0, false) when no override exists.
 func (d *DB) GetMangaCoverDim(mangaRowID string) (int64, bool, error) {

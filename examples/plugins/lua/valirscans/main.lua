@@ -20,10 +20,6 @@ PLUGIN = {
     needs_human_verify = false,
     thumb_ratio = 0.703,
     search_page_size = 24,
-    alt_title_servers = {
-        {id = "mangadex",     name = "MangaDex",     kind = "titles"},
-        {id = "mangaupdates", name = "MangaUpdates", kind = "both"}
-    },
 }
 
 BASE = "https://valirscans.org"

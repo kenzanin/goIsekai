@@ -1,7 +1,6 @@
 // 1Manga (MangaHub) JS plugin for goIsekai
 // Uses MangaHub GraphQL API at api.mghcdn.com.
 // Source ID: mn03 — requires mhub_access cookie for authentication.
-require("./enrich.js");
 
 var PLUGIN = {
     contract_version: 1,
@@ -12,10 +11,6 @@ var PLUGIN = {
     needs_human_verify: false,
     thumb_ratio: 0.703,
     search_page_size: 30,
-    alt_title_servers: [
-        { id: "mangadex", name: "MangaDex", kind: "titles" },
-        { id: "mangaupdates", name: "MangaUpdates", kind: "both" },
-    ],
 };
 
 var GRAPHQL_URL = "https://api.mghcdn.com/graphql";

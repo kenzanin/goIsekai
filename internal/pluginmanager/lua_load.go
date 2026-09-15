@@ -81,16 +81,20 @@ func (m *Manager) loadLua(id, dir string) (*loadedPlugin, error) {
 		return nil, fmt.Errorf("lua plugin %s: %w", id, err)
 	}
 
-	// Verify all ABI globals are functions (snake_case Lua names).
-	// GetAltTitles is OPTIONAL (enricher capability) — mirror js.go.
-	for abi, name := range luaFnNames {
-		if abi == types.GetAltTitlesFunc || abi == types.GetAltSummaryFunc {
-			continue
-		}
-		fn, err := state.RawGlobal(name)
-		if err != nil || fn.Kind() != lua.FunctionKind {
-			_ = state.Close()
-			return nil, fmt.Errorf("lua plugin %s: global %q is not a function", id, name)
+	// Verify the source ABI globals are functions (snake_case Lua names).
+	// An enrichment script serves metadata only, so it has none of
+	// Search/GetMangaDetail/GetChapterList/GetPageList to verify — just
+	// getEnrichment, which is optional everywhere.
+	if !isInfoPlugin(id) {
+		for abi, name := range luaFnNames {
+			if abi == types.GetAltTitlesFunc || abi == types.GetAltSummaryFunc || abi == types.GetEnrichmentFunc {
+				continue
+			}
+			fn, err := state.RawGlobal(name)
+			if err != nil || fn.Kind() != lua.FunctionKind {
+				_ = state.Close()
+				return nil, fmt.Errorf("lua plugin %s: global %q is not a function", id, name)
+			}
 		}
 	}
 

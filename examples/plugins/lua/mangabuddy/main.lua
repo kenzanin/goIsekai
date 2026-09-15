@@ -16,13 +16,9 @@
 --
 -- Layout (split to make copying to a new plugin trivial):
 --   helpers.lua  generic helpers  (normalizeStatus, http_get, lua_escape) — copy unchanged
---   enrich.lua   generic alt-title/alt-summary providers (MangaDex +
---                MangaUpdates via getAltTitles/getAltSummary) — copy unchanged,
---                then declare the servers you want in PLUGIN.alt_title_servers
 --   main.lua     THIS file — the only one you edit: PLUGIN table + BASE/CDN/UA
 --                + site-specific parsers + the four core ABI functions.
 -- Every sibling pre-executes before main.lua, so their globals are ready.
--- Trim the site comment above when reusing for another site.
 
 PLUGIN = {
     contract_version = 1,
@@ -33,10 +29,6 @@ PLUGIN = {
     needs_human_verify = false,
     thumb_ratio = 0.667,
     search_page_size = 24,
-    alt_title_servers = {
-        {id = "mangadex", name = "MangaDex", kind = "titles"},
-        {id = "mangaupdates", name = "MangaUpdates", kind = "both"}
-    },
 }
 
 BASE = "https://mangabuddy1.co.uk"

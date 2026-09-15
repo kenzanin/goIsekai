@@ -8,6 +8,7 @@ import (
 	"goisekai/pkg/types"
 	"net/http"
 	"strconv"
+	"strings"
 )
 
 // buildMangaDetailData assembles the data map for a manga detail view.
@@ -24,6 +25,13 @@ func (s *Server) buildMangaDetailData(r *http.Request, pluginID, mangaID string)
 		} else {
 			s.logger.Error("manga detail", "error", err, "plugin", pluginID, "manga", mangaID)
 			return nil
+		}
+	}
+	// Source plugins rarely supply an author; fall back to the one captured by
+	// an enrichment provider, if any.
+	if strings.TrimSpace(manga.Author) == "" {
+		if author, ok := s.service.StoredAuthor(pluginID, mangaID); ok {
+			manga.Author = author
 		}
 	}
 	progress, err := s.service.GetChapterProgresses(pluginID, mangaID)

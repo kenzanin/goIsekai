@@ -65,7 +65,7 @@ flowchart LR
 - **Automatic anti-bot fallback** — when a site returns a Cloudflare challenge, the host spawns a CDP browser (lightpanda or Chrome), solves it, harvests the cookies back into the jar, and retries the fast path — no manual paste
 - **SPA reader** — canvas reader with fetch-swap chapter navigation (no page reload), cursor-anchored zoom, drag pan, fit-width/fit-height/1:1 modes, RTL/LTR, keyboard nav (arrows/space/Esc/Home/End/r/PageUp/Down), per-chapter read progress, read-ahead prefetch into the next chapter
 - **Read tracking** — per-chapter progress (`N/M` pages), strikethrough when a chapter is fully read or manually marked, reset buttons, cached-page counts, continue-from-history
-- **Alt-title & alt-summary enrichment** — plugins declare enrichment servers (MangaDex, MangaUpdates, etc.) with per-server capability (titles, summaries, or both); host fetches, stores, and lets you swap the main title or summary with any result
+- **Alt-title & alt-summary enrichment** — info scripts under `info/<id>/` fetch titles, synopsis, genres, author, and related manga from a metadata site; the host stores each in the detail page's alt sections so you pick what to promote to main
 - **Library stats** — sidebar with title counts by status (done/ongoing/unknown), read progress, estimated time spent, most/fewest chapters, per-plugin title counts, duplicate detection
 - **FTS5 library search** — full-text search across titles and alt-titles with Go-side fuzzy ranking (exact > prefix > substring > subsequence)
 - **CBZ export** — per-manga or per-chapter export from the disk cache as an ordered ZIP (1.webp, 2.webp, …); works offline for fully-read chapters
@@ -91,7 +91,7 @@ Host/port come from CLI flags or `goisekai.ini` (flags win):
 
 ## Plugins
 
-Plugins implement a small ABI (`Init`, `SearchManga`, `GetMangaDetails`, `GetChapterList`, `GetPageList`, optional `GetAltTitles`, optional `GetAltSummary`) and call the host function `http_request` for all networking. All runtimes are interchangeable — pick Lua for quick ones, JS for JSON-heavy ones, Yaegi when Go stdlib matters.
+Plugins implement a small ABI (`Init`, `SearchManga`, `GetMangaDetails`, `GetChapterList`, `GetPageList`) and call the host function `http_request` for all networking. All runtimes are interchangeable — pick Lua for quick ones, JS for JSON-heavy ones, Yaegi when Go stdlib matters.
 
 ### Lua plugins (no toolchain needed)
 
@@ -102,10 +102,6 @@ local PLUGIN = {
   name = "KaliScan",
   version = "1.0.0",
   thumb_ratio = 0.71,
-  alt_title_servers = {
-    { id = "mangadex", name = "MangaDex", kind = "titles" },
-    { id = "mangaupdates", name = "MangaUpdates", kind = "both" },
-  },
 }
 
 function search_manga(filter_json)
@@ -115,9 +111,30 @@ function search_manga(filter_json)
 end
 ```
 
-`main.lua` declares a `PLUGIN` table and ABI globals (`search_manga`, `get_manga_detail`, `get_chapter_list`, `get_page_list`, optional `get_alt_titles`, `get_alt_summary`). Each takes one JSON-string argument and returns a Lua table. Networking goes through `http_request({url=..., method=..., headers=...})`, which rides the same TLS-fingerprinted, cookie-jarred, rate-paced session as all other runtimes. `json.encode`/`json.decode` are provided. Available stdlib: `string`, `table`, `math`, `os.time/date/clock` — no `io`, no `os.execute`.
+`main.lua` declares a `PLUGIN` table and ABI globals (`search_manga`, `get_manga_detail`, `get_chapter_list`, `get_page_list`). Each takes one JSON-string argument and returns a Lua table. Networking goes through `http_request({url=..., method=..., headers=...})`, which rides the same TLS-fingerprinted, cookie-jarred, rate-paced session as all other runtimes. `json.encode`/`json.decode` are provided. Available stdlib: `string`, `table`, `math`, `os.time/date/clock` — no `io`, no `os.execute`.
 
-Reusable modules (`helpers.lua`, `enrich.lua`) can be copied across plugins for shared utilities and enrichment logic. See `examples/plugins/lua/mangabuddy/` for a complete example.
+Reusable modules (`helpers.lua`) can be copied across plugins for shared utilities. See `examples/plugins/lua/mangabuddy/` for a complete example.
+
+### Info scripts (metadata enrichment)
+
+One folder per metadata source under `info/<id>/`, with `main.lua` as the entry point. Info scripts serve metadata, not chapters: they are never offered as a manga source and never read a page. Dropping a new folder is all it takes to add a provider.
+
+```lua
+PLUGIN = {
+  contract_version = 1,
+  name = "MangaDex Info",
+  enrichment_providers = {
+    { id = "mangadex", name = "MangaDex",
+      kinds = { "titles", "summaries", "categories", "authors", "related" } },
+  },
+}
+
+function getEnrichment(arg)   -- {"title":..., "kind":..., "source":...}
+  return host.json.encode({ { value = "Berserk Gaiden", url = "https://mangadex.org/title/..." } })
+end
+```
+
+"Fetch Details" on a manga page calls every provider that serves the requested kind and stores the result in the matching alt section, where you promote the entry you want to the main title, synopsis, or genres. Author is surfaced directly on the detail page. See `examples/info/mangadex/main.lua`.
 
 ### JS plugins (no toolchain needed)
 
@@ -128,10 +145,6 @@ var PLUGIN = {
   name: "MangaDex",
   version: "1.0.0",
   thumb_ratio: 0.71,
-  alt_title_servers: [
-    { id: "mangadex", name: "MangaDex", kind: "titles" },
-    { id: "mangaupdates", name: "MangaUpdates", kind: "both" },
-  ],
 };
 
 function search_manga(filterJson) {
@@ -143,7 +156,7 @@ function search_manga(filterJson) {
 }
 ```
 
-Same ABI as Lua — `PLUGIN` metadata + PascalCase globals. `http_request` takes a JSON string, returns a JSON string. `json` is native JS. A shared `enrich.js` module handles MangaUpdates enrichment. See `examples/plugins/js/mangadex/` for a complete example.
+Same ABI as Lua — `PLUGIN` metadata + PascalCase globals. `http_request` takes a JSON string, returns a JSON string. `json` is native JS. See `examples/plugins/js/mangadex/` for a complete example.
 
 ### Yaegi plugins (interpreted Go)
 

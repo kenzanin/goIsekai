@@ -42,6 +42,9 @@ type loadedPlugin struct {
 	contractVersion int32
 	// meta is the metadata the plugin declared in its optional Init export.
 	meta types.PluginMeta
+	// infoOnly marks an enrichment script discovered under infoDir. It has no
+	// source ABI and is excluded from the manga-source plugin list.
+	infoOnly bool
 	// mu serializes invocations: concurrent calls to the same plugin must not interleave.
 	mu sync.Mutex
 }
@@ -51,7 +54,11 @@ type loadedPlugin struct {
 type Manager struct {
 	proxy      *hostnet.Proxy
 	pluginsDir string
-	ctx        context.Context
+	// infoDir holds enrichment scripts (one folder per source, each with a
+	// main.lua). They run in the same sandbox as a plugin but serve metadata
+	// instead of scraping a site, so they never appear as a manga source.
+	infoDir string
+	ctx     context.Context
 
 	mu      sync.RWMutex
 	plugins map[string]*loadedPlugin
@@ -93,6 +100,12 @@ func NewManager(proxy *hostnet.Proxy, pluginsDir string) *Manager {
 	}
 }
 
+// SetInfoDir points the manager at the enrichment script directory. Discovery
+// of that directory is part of Discover, so call this before it.
+func (m *Manager) SetInfoDir(dir string) {
+	m.infoDir = dir
+}
+
 // SetDB wires the database handle and cache TTL for response caching.
 func (m *Manager) SetDB(db *database.DB, cacheTTL time.Duration) {
 	m.db = db
@@ -127,6 +140,11 @@ func (m *Manager) LoadedPlugins() []LoadedPlugin {
 	defer m.mu.RUnlock()
 	out := make([]LoadedPlugin, 0, len(m.plugins))
 	for _, p := range m.plugins {
+		if p.infoOnly {
+			// An enrichment script is not a manga source: keep it out of the
+			// plugin list the UI and search read.
+			continue
+		}
 		out = append(out, LoadedPlugin{
 			ID:               p.id,
 			Version:          strconv.Itoa(int(p.contractVersion)),

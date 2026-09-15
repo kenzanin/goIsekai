@@ -26,11 +26,20 @@ type EnrichmentCatalogEntry struct {
 	Kinds []string `json:"kinds"`
 }
 
+// loadInfoProviders instantiates the enrichment scripts so the providers they
+// declare are registered before the catalog or a fetch reads it.
+func (s *AppService) loadInfoProviders() {
+	if s.mgr != nil {
+		s.mgr.LoadEnrichmentProviders()
+	}
+}
+
 // FetchEnrichment fetches enrichment data from external sources and stores it.
 func (s *AppService) FetchEnrichment(pluginID, mangaID, title string, sources []string) error {
 	if s.enrich == nil {
 		return fmt.Errorf("enrichment provider not configured")
 	}
+	s.loadInfoProviders()
 	rowID, err := s.db.ResolveMangaRowID(pluginID, mangaID)
 	if err != nil {
 		return err
@@ -97,6 +106,24 @@ func (s *AppService) FetchEnrichment(pluginID, mangaID, title string, sources []
 	} else {
 		logger.Debug("enrich categories: none found")
 	}
+	// Store author (a single value, so the provider's items are joined).
+	if authors, ok := items[enrich.KindAuthors]; ok && len(authors) > 0 {
+		names := make([]string, 0, len(authors))
+		for _, a := range authors {
+			if strings.TrimSpace(a.Value) != "" {
+				names = append(names, strings.TrimSpace(a.Value))
+			}
+		}
+		if len(names) > 0 {
+			if err := s.db.SetMangaAuthor(rowID, strings.Join(names, ", ")); err != nil {
+				logger.Warn("store author", "error", err)
+			} else {
+				logger.Info("enrich author stored", "author", strings.Join(names, ", "), "source", authors[0].Source)
+			}
+		}
+	} else {
+		logger.Debug("enrich authors: none found")
+	}
 
 	// Store related manga.
 	if rels, ok := items[enrich.KindRelated]; ok && len(rels) > 0 {
@@ -121,6 +148,7 @@ func (s *AppService) EnrichmentSources() []string {
 	if s.enrich == nil {
 		return nil
 	}
+	s.loadInfoProviders()
 	entries := s.enrich.Catalog("")
 	out := make([]string, len(entries))
 	for i, e := range entries {
@@ -136,6 +164,7 @@ func (s *AppService) EnrichmentCatalog(kind string) []EnrichmentCatalogEntry {
 	if s.enrich == nil {
 		return nil
 	}
+	s.loadInfoProviders()
 	entries := s.enrich.Catalog(enrich.Kind(kind))
 	out := make([]EnrichmentCatalogEntry, 0, len(entries))
 	for _, e := range entries {
@@ -219,7 +248,24 @@ func (s *AppService) ResetEnrichment(pluginID, mangaID string) error {
 	if err := s.db.SetMangaGenres(rowID, nil); err != nil {
 		return fmt.Errorf("reset genres: %w", err)
 	}
+	if err := s.db.SetMangaAuthor(rowID, ""); err != nil {
+		return fmt.Errorf("reset author: %w", err)
+	}
 	return nil
+}
+
+// StoredAuthor returns the author captured by an enrichment provider.
+// ok is false when nothing was fetched yet.
+func (s *AppService) StoredAuthor(pluginID, mangaID string) (author string, ok bool) {
+	rowID, err := s.db.ResolveMangaRowID(pluginID, mangaID)
+	if err != nil {
+		return "", false
+	}
+	author, ok, err = s.db.GetMangaAuthor(rowID)
+	if err != nil {
+		return "", false
+	}
+	return author, ok
 }
 
 // ListCategories returns enrichment categories for a manga from the database.

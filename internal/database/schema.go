@@ -133,4 +133,7 @@ var migrations = []string{
 		expires_at TIMESTAMP NOT NULL,
 		UNIQUE(plugin_id, manga_id, function_name)
 	);`,
+	// Index 21: author captured by an enrichment provider (plugins do not
+	// always supply one). Empty string means "not fetched yet".
+	`ALTER TABLE mangas ADD COLUMN author TEXT NOT NULL DEFAULT '';`,
 }

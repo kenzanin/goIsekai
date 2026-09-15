@@ -1,7 +1,6 @@
 // Mangzio JS plugin for goIsekai
 // Parses Next.js RSC flight data from SSR HTML pages.
 // Contract version: 1 (matches pkg/types ContractVersion)
-require("./enrich.js");
 
 var PLUGIN = {
     contract_version: 1,
@@ -12,10 +11,6 @@ var PLUGIN = {
     needs_human_verify: false,
     thumb_ratio: 0.703,
     search_page_size: 24,
-    alt_title_servers: [
-        { id: "mangadex", name: "MangaDex", kind: "titles" },
-        { id: "mangaupdates", name: "MangaUpdates", kind: "both" },
-    ],
 };
 
 var BASE = "https://www.mangzio.com";

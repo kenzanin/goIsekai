@@ -120,22 +120,3 @@ func TestSupportsKind(t *testing.T) {
 		t.Fatal("expected SupportsKind(nope, titles) to be false")
 	}
 }
-
-func Test_normalizeTitle(t *testing.T) {
-	tests := []struct {
-		in   string
-		want string
-	}{
-		{"Solo Leveling", "Solo Leveling"},
-		{"  Solo Leveling  ", "Solo Leveling"},
-		{"Solo Leveling (manga)", "Solo Leveling"},
-		{"Solo Leveling ( MANGA )", "Solo Leveling"},
-		{"Solo Leveling (manga) (manga)", "Solo Leveling"},
-	}
-	for _, tt := range tests {
-		got := normalizeTitle(tt.in)
-		if got != tt.want {
-			t.Errorf("normalizeTitle(%q) = %q, want %q", tt.in, got, tt.want)
-		}
-	}
-}

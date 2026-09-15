@@ -9,7 +9,6 @@ require("./search.js");
 require("./detail.js");
 require("./chapters.js");
 require("./pages.js");
-require("./enrich.js");
 
 var PLUGIN = {
     contract_version: 1,
@@ -17,8 +16,4 @@ var PLUGIN = {
     site_url: "https://mangadex.org",
     logo: "https://mangadex.org/favicon.ico",
     thumb_ratio: 0.703,
-    alt_title_servers: [
-        { id: "mangadex", name: "MangaDex", kind: "titles" },
-        { id: "mangaupdates", name: "MangaUpdates", kind: "both" },
-    ],
 };

@@ -30,6 +30,11 @@ type Config struct {
 	FrontendDir  string
 	TemplatesDir string
 
+	// InfoDir holds the enrichment scripts (one folder per source, each with a
+	// main.lua). Separate from the plugin directory because these fetch manga
+	// metadata rather than scrape a manga site. Defaults to <DataDir>/info.
+	InfoDir string
+
 	// HTTP server
 	Host string
 	Port int
@@ -90,6 +95,7 @@ func Default() *Config {
 		PreconnectEnabled:   false,
 	}
 	c.CacheDir = filepath.Join(c.DataDir, "cache")
+	c.InfoDir = filepath.Join(c.DataDir, "info")
 	// Source-tree locations (relative to the working dir) so template and
 	// frontend edits take effect without a rebuild.
 	c.FrontendDir = "cmd/goisekai/frontend"
@@ -110,6 +116,7 @@ func (c *Config) Save(path string) error {
 	fmt.Fprintf(&b, "cache_dir = %s\n", c.CacheDir)
 	fmt.Fprintf(&b, "frontend_dir = %s\n", c.FrontendDir)
 	fmt.Fprintf(&b, "templates_dir = %s\n", c.TemplatesDir)
+	fmt.Fprintf(&b, "info_dir = %s\n", c.InfoDir)
 	fmt.Fprintf(&b, "host = %s\n", c.Host)
 	fmt.Fprintf(&b, "port = %d\n", c.Port)
 	fmt.Fprintf(&b, "api_key = %s\n", c.APIKey)

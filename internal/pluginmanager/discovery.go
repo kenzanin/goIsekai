@@ -9,13 +9,50 @@ import (
 	"strings"
 )
 
+// infoPrefix namespaces enrichment-script ids inside the manager's plugin map.
+// It keeps an enrichment script from colliding with a scraper plugin of the
+// same folder name (both /plugins/mangadex and /info/mangadex can coexist);
+// the declared enrichment provider id stays the bare folder name.
+const infoPrefix = "info:"
+
+// isInfoPlugin reports whether an id belongs to an enrichment script.
+func isInfoPlugin(id string) bool {
+	return strings.HasPrefix(id, infoPrefix)
+}
+
 // Discover scans pluginsDir and registers every folder containing main.lua,
 // main.js, or main.go, WITHOUT instantiating any runtime. Plugins are lazily
 // instantiated on first use via ensureLoaded. A folder that collides with an
 // already-registered id is logged and skipped rather than aborting discovery.
+// It then scans infoDir for enrichment scripts, which are registered the same
+// way but serve metadata rather than a manga source.
 func (m *Manager) Discover() error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
+
+	// Enrichment scripts: one folder per source, main.lua entry, folder name is
+	// both the declared provider id and the enrich source id used by the UI.
+	if m.infoDir != "" {
+		infoMatches, err := filepath.Glob(filepath.Join(m.infoDir, "*", "main.lua"))
+		if err != nil {
+			return err
+		}
+		for _, path := range infoMatches {
+			id := filepath.Base(filepath.Dir(path))
+			key := infoPrefix + id
+			if _, dup := m.plugins[key]; dup {
+				logger.Error("info script id collision, skipping", "id", id)
+				continue
+			}
+			m.plugins[key] = &loadedPlugin{
+				id:       key,
+				wasmPath: filepath.Dir(path),
+				kind:     "lua",
+				infoOnly: true,
+			}
+			logger.Info("info script registered", "id", id, "path", path)
+		}
+	}
 
 	// Lua plugins: one folder per plugin, main.lua entry, folder name = id.
 	luaMatches, err := filepath.Glob(filepath.Join(m.pluginsDir, "*", "main.lua"))

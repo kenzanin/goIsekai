@@ -6,7 +6,7 @@ PKGS   := ./internal/... ./pkg/... ./cmd/...
 # by the linter; Lua and web assets have their own targets (lint-lua, lint-web).
 PROD   := ./internal/... ./pkg/... ./cmd/...
 
-.PHONY: build dev devrun run open check fmt fmt-prod fmt-web fmt-lua test race modernize lint lint-prod lint-web lint-lua css br clean build-plugins install-plugins all
+.PHONY: build dev devrun run open check fmt fmt-prod fmt-web fmt-lua test race modernize lint lint-prod lint-web lint-lua css br clean build-plugins install-plugins install-info all
 
 ## build: compile the server binary (pure Go, CGO-free, cross-compilable).
 build: css br
@@ -121,3 +121,13 @@ install-lua:
 	rm -rf $(PLUGINS_DIR)/$(PLUGIN)
 	cp -r plugins/lua/$(PLUGIN) $(PLUGINS_DIR)/$(PLUGIN)
 	@echo "installed: $(PLUGINS_DIR)/$(PLUGIN)/main.lua (restart the server to load it)"
+
+## install-info: copy an info (metadata enrichment) script folder into the info dir.
+## Usage: make install-info INFO=mangadex
+INFO_DIR ?= app_data/info
+install-info:
+	@test -f examples/info/$(INFO)/main.lua || { echo "examples/info/$(INFO)/main.lua not found"; exit 1; }
+	mkdir -p $(INFO_DIR)
+	rm -rf $(INFO_DIR)/$(INFO)
+	cp -r examples/info/$(INFO) $(INFO_DIR)/$(INFO)
+	@echo "installed: $(INFO_DIR)/$(INFO)/main.lua (restart the server to load it)"

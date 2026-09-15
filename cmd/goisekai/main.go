@@ -100,6 +100,13 @@ func main() {
 	if err := os.MkdirAll(pluginsDir, 0o755); err != nil {
 		logger.Fatal("mkdir plugins dir", "error", err)
 	}
+	infoDir := cfg.InfoDir
+	if infoDir == "" {
+		infoDir = filepath.Join(dataDir, "info")
+	}
+	if err := os.MkdirAll(infoDir, 0o755); err != nil {
+		logger.Fatal("mkdir info dir", "error", err)
+	}
 
 	cacheDir := cfg.CacheDir
 	if cacheDir == "" {
@@ -205,6 +212,7 @@ func main() {
 	defer close(maintenanceStop)
 
 	mgr := pluginmanager.NewManager(proxy, pluginsDir)
+	mgr.SetInfoDir(infoDir)
 	if err := mgr.Discover(); err != nil {
 		logger.Fatal("discover plugins", "error", err)
 	}
@@ -241,11 +249,10 @@ func main() {
 		}
 	}
 
-	// Build enrichment registry: register built-in providers first,
-	// then let the plugin manager register plugin-declared providers on load.
+	// Build the enrichment registry. It starts empty: every provider is
+	// plugin-declared and registers itself when its plugin first loads, so
+	// changing what a source returns is a plugin edit, not a host rebuild.
 	enrichReg := enrich.NewRegistry()
-	enrichReg.Register(&enrich.MangaUpdatesProvider{})
-	enrichReg.Register(&enrich.MangaDexProvider{})
 
 	svc := bridge.NewAppService(db, mgr, proxy, cfgPath, cacheDir, enrichReg)
 	mgr.SetOnLoad(svc.SyncPluginMeta)

@@ -68,6 +68,31 @@ func (m *Manager) ensureMetaLoaded() {
 	}
 }
 
+// ensureInfoLoaded instantiates every enrichment script that has not been
+// loaded yet, so the providers they declare appear in the catalog. Scraper
+// plugins are left alone: reading the catalog must not pay for every source VM.
+func (m *Manager) ensureInfoLoaded() {
+	m.mu.RLock()
+	var ids []string
+	for id, p := range m.plugins {
+		if p.infoOnly && !p.loaded {
+			ids = append(ids, id)
+		}
+	}
+	m.mu.RUnlock()
+	for _, id := range ids {
+		if err := m.ensureLoaded(id); err != nil {
+			logger.Warn("info script load", "id", id, "error", err)
+		}
+	}
+}
+
+// LoadEnrichmentProviders makes every discovered enrichment script declare its
+// providers. Call it before reading the enrichment catalog.
+func (m *Manager) LoadEnrichmentProviders() {
+	m.ensureInfoLoaded()
+}
+
 // AltTitleServers iterates all discovered plugins and returns every declared
 // alt-title server. Deferred plugins are loaded on demand so their metadata
 // is visible even after a cold start.

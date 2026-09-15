@@ -5,7 +5,6 @@
 --
 -- Layout:
 --   helpers.lua  generic helpers (normalizeStatus, http_get, lua_escape)
---   enrich.lua   placeholder — alt-title servers declared in PLUGIN.alt_title_servers
 --   main.lua     THIS file — PLUGIN table + VRF tables + site parsers + ABI functions
 -- Every sibling pre-executes before main.lua, so their globals are ready.
 
@@ -16,10 +15,6 @@ PLUGIN = {
     logo = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ctext y='28' font-size='28'%3E🔥%3C/text%3E%3C/svg%3E",
     thumb_ratio = 0.677,
     search_page_size = 50,
-    alt_title_servers = {
-        {id = "mangadex", name = "MangaDex", kind = "titles"},
-        {id = "mangaupdates", name = "MangaUpdates", kind = "both"},
-    },
 }
 
 API_URL = "https://mangafire.to/api"

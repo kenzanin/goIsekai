@@ -1,22 +1,23 @@
 // Package enrich provides a registry of enrichment providers that fetch
-// metadata for library manga — titles, summaries, categories, and related
-// manga — from external sources. Built-in providers (MangaDex, MangaUpdates)
-// are shipped with the host; plugins may also declare custom providers.
+// metadata for library manga — titles, summaries, categories, authors, and
+// related manga — from external sources.
 //
 // Providers are resolved by a string source identifier (e.g. "mangadex").
-// The registry dispatches to the built-in provider or a plugin-declared one.
-// The host never makes network calls directly — every provider must use
-// internal/hostnet so the host's TLS fingerprinting, cookie jar, and pacing
-// apply uniformly.
+// Every provider is plugin-declared: a plugin advertises its sources in
+// PLUGIN.enrichment_providers and exports GetEnrichment. The host ships no
+// built-in provider, so adding or changing a source is a plugin edit rather
+// than a host rebuild.
+//
+// The host never makes network calls directly — a provider runs inside a
+// plugin VM, whose host.http.* helpers route through internal/hostnet so the
+// host's TLS fingerprinting, cookie jar, and pacing apply uniformly.
 package enrich
 
 import (
 	"context"
 	"fmt"
 	"net/http"
-	"regexp"
 	"slices"
-	"strings"
 	"sync"
 
 	"goisekai/internal/logger"
@@ -30,15 +31,17 @@ const (
 	KindSummaries  Kind = "summaries"
 	KindCategories Kind = "categories"
 	KindRelated    Kind = "related"
+	KindAuthors    Kind = "authors"
 )
 
-// Item is one enrichment record. All four kinds share this shape because
-// they are all small text/graph records.
+// Item is one enrichment record. Every kind shares this shape because they
+// are all small text/graph records. The JSON tags are the plugin-facing wire
+// contract for a GetEnrichment response.
 type Item struct {
-	Value    string // primary text (title/summary/category name)
-	URL      string // link to the source page
-	CoverURL string // cover image URL (for related manga)
-	Source   string // provider source label (set at fetch time)
+	Value    string `json:"value"`     // primary text (title/summary/category/author name)
+	URL      string `json:"url"`       // link to the source page
+	CoverURL string `json:"cover_url"` // cover image URL (for related manga)
+	Source   string `json:"source"`    // provider source label (also set by the host)
 }
 
 // Provider is the interface every enrichment provider implements.
@@ -50,8 +53,7 @@ type Provider interface {
 	// Kinds returns the subset of enrichment kinds this provider supports.
 	Kinds() []Kind
 	// Fetch fetches items for the given kind by searching with the title.
-	// The ctx may carry a timeout. The HTTP client passed in is already
-	// configured with the host's TLS fingerprinting, cookies, and pacing.
+	// The ctx may carry a timeout.
 	Fetch(ctx context.Context, httpc *http.Client, title string, k Kind) ([]Item, error)
 }
 
@@ -78,8 +80,8 @@ func NewRegistry() *Registry {
 }
 
 // Register adds a provider to the registry. If a provider with the same ID
-// already exists, the new one is ignored (built-ins registered first take
-// precedence).
+// already exists, the new one is ignored (the first plugin to claim an ID
+// wins, so the catalog stays stable across reloads).
 func (r *Registry) Register(p Provider) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -142,19 +144,17 @@ func (r *Registry) Fetch(ctx context.Context, httpc *http.Client, source string,
 	if p == nil {
 		return nil, fmt.Errorf("enrich: unknown source %q", source)
 	}
-	for _, kind := range p.Kinds() {
-		if kind == k {
-			items, err := p.Fetch(ctx, httpc, title, k)
-			if err != nil {
-				return nil, fmt.Errorf("enrich: fetch %s from %s: %w", k, source, err)
-			}
-			for i := range items {
-				items[i].Source = source
-			}
-			return items, nil
-		}
+	if !slices.Contains(p.Kinds(), k) {
+		return nil, fmt.Errorf("enrich: source %q does not support kind %q", source, k)
 	}
-	return nil, fmt.Errorf("enrich: source %q does not support kind %q", source, k)
+	items, err := p.Fetch(ctx, httpc, title, k)
+	if err != nil {
+		return nil, fmt.Errorf("enrich: fetch %s from %s: %w", k, source, err)
+	}
+	for i := range items {
+		items[i].Source = source
+	}
+	return items, nil
 }
 
 // FetchAll fetches every kind supported by the given sources for the title.
@@ -183,22 +183,4 @@ func (r *Registry) FetchAll(ctx context.Context, httpc *http.Client, title strin
 		}
 	}
 	return out
-}
-
-// normalizeTitle strips common noise from a manga title before sending to
-// upstream search APIs. Both MangaDex and MangaUpdates search tolerate
-// extra whitespace and parentheses, but stripping the "( manga )" suffix
-// (common on mirror sites) improves matching.
-var mangaSuffixRe = regexp.MustCompile(`\s*\([^)]*[Mm][Aa][Nn][Gg][Aa][^)]*\)$`)
-
-func normalizeTitle(t string) string {
-	t = strings.TrimSpace(t)
-	for {
-		before := mangaSuffixRe.ReplaceAllString(t, "")
-		if before == t {
-			break
-		}
-		t = before
-	}
-	return strings.TrimSpace(t)
 }
