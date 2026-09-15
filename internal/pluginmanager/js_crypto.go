@@ -59,25 +59,30 @@ func jsVRFStages(v goja.Value) ([]pluginutil.VRFStageB64, error) {
 }
 
 // jsNormalizeStatus creates a callable function with a .default property.
-// Usage: host.text.normalize_status(map, raw) or
-//
-//	host.text.normalize_status(host.text.normalize_status.default, raw).
+// Usage: host.text.normalize_status(raw) for the default vocabulary, or
+// host.text.normalize_status(map, raw) to extend it. An empty map means
+// "use the defaults".
 func jsNormalizeStatus(vm *goja.Runtime) *goja.Object {
 	fn := func(call goja.FunctionCall) goja.Value {
 		var m map[string]string
-		if len(call.Arguments) > 0 && !call.Arguments[0].SameAs(goja.Undefined()) && !call.Arguments[0].SameAs(goja.Null()) {
-			if obj, ok := call.Arguments[0].(*goja.Object); ok {
-				m = make(map[string]string, 0)
-				for _, k := range obj.Keys() {
-					if v := obj.Get(k); v != nil {
-						m[k] = v.String()
+		var raw string
+		if len(call.Arguments) > 1 {
+			if arg := call.Arguments[0]; !arg.SameAs(goja.Undefined()) && !arg.SameAs(goja.Null()) {
+				if obj, ok := arg.(*goja.Object); ok {
+					keys := obj.Keys()
+					if len(keys) > 0 {
+						m = make(map[string]string, len(keys))
+						for _, k := range keys {
+							if v := obj.Get(k); v != nil {
+								m[k] = v.String()
+							}
+						}
 					}
 				}
 			}
-		}
-		raw := ""
-		if len(call.Arguments) > 1 {
 			raw = call.Arguments[1].String()
+		} else if len(call.Arguments) > 0 {
+			raw = call.Arguments[0].String()
 		}
 		return vm.ToValue(pluginutil.NormalizeStatus(m, raw))
 	}

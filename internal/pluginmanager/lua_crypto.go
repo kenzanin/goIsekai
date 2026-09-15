@@ -8,34 +8,39 @@ import (
 	"goisekai/internal/pluginutil"
 )
 
-// luaNormalizeStatus wraps host.text.normalize_status(status, raw) → normalized status.
+// luaNormalizeStatus wraps host.text.normalize_status(raw) → canonical status,
+// and the host.text.normalize_status(map, raw) form for plugins that extend the
+// default vocabulary. An empty map means "use the defaults".
 func luaNormalizeStatus(state *lua.State) lua.Value {
 	v, _ := state.NewNativeFunction(func(frame lua.Frame) lua.Outcome {
-		m := map[string]string{}
-		arg, ok := frame.Argument(0)
-		if ok && frame.Kind(0) != lua.NilKind {
-			gv, err := lunarToGo(arg)
-			if err != nil {
-				return frame.ReturnValues(lua.Nil(), lua.String("normalize_status: "+err.Error()))
-			}
-			if mv, ok := gv.(map[string]any); ok {
-				for k, v := range mv {
-					switch val := v.(type) {
-					case string:
-						m[k] = val
-					case int64:
-						m[k] = fmt.Sprint(val)
-					case float64:
-						m[k] = fmt.Sprint(val)
-					default:
-						return frame.ReturnValues(lua.Nil(), lua.String("normalize_status param "+k+": unsupported type"))
+		var m map[string]string
+		var raw string
+		if frame.ArgumentCount() > 1 {
+			arg, ok := frame.Argument(0)
+			if ok && frame.Kind(0) != lua.NilKind {
+				gv, err := lunarToGo(arg)
+				if err != nil {
+					return frame.ReturnValues(lua.Nil(), lua.String("normalize_status: "+err.Error()))
+				}
+				if mv, ok := gv.(map[string]any); ok && len(mv) > 0 {
+					m = make(map[string]string, len(mv))
+					for k, v := range mv {
+						switch val := v.(type) {
+						case string:
+							m[k] = val
+						case int64:
+							m[k] = fmt.Sprint(val)
+						case float64:
+							m[k] = fmt.Sprint(val)
+						default:
+							return frame.ReturnValues(lua.Nil(), lua.String("normalize_status param "+k+": unsupported type"))
+						}
 					}
 				}
 			}
-		}
-		var raw string
-		if frame.ArgumentCount() > 1 {
 			raw, _ = frame.String(1)
+		} else {
+			raw, _ = frame.String(0)
 		}
 		return frame.ReturnValue(lua.String(pluginutil.NormalizeStatus(m, raw)))
 	})

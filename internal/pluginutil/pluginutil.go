@@ -256,16 +256,18 @@ func HTMLEntityUnescape(s string) string {
 	return html.UnescapeString(s)
 }
 
-// LuaEscape escapes Lua pattern magic characters (%, ., [, ], -, ?, +, *, $, ^)
-// so the result can be used as a literal argument to Lua string.find/gsub/match.
+// LuaEscape escapes every Lua pattern magic character (- . + [ ] ( ) $ ^ % ? *)
+// with a leading %, so the result is a literal for string.find/gsub/match.
 func LuaEscape(s string) string {
 	var b strings.Builder
 	b.Grow(len(s) + 10)
 	for i := 0; i < len(s); i++ {
-		if s[i] == '%' {
-			b.WriteString("%%")
-		} else {
-			b.WriteByte(s[i])
+		switch c := s[i]; c {
+		case '-', '.', '+', '[', ']', '(', ')', '$', '^', '%', '?', '*':
+			b.WriteByte('%')
+			b.WriteByte(c)
+		default:
+			b.WriteByte(c)
 		}
 	}
 	return b.String()
