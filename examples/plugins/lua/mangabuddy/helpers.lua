@@ -4,10 +4,13 @@
 -- call these at call time; no require() needed from other modules.
 --
 -- Globals provided:
---   normalizeStatus(s)  raw status -> canonical via host.text.normalize_status;
---                       empty -> "unknown", unknown passes through
+--   normalizeStatus(s)  raw status -> canonical (Ongoing/Completed/Hiatus/
+--                       Dropped/Upcoming); unknown passes through, empty -> "unknown"
 --   lua_escape(s)       escape Lua pattern magic chars for string.match/gsub
---   http_get(url, opts) GET wrapper over http_request with logging
+--   http_get(url, opts) GET wrapper over host.http.get with logging
+--
+-- The escaping and status vocabulary live in the host (host.text.*); only the
+-- site-shaped bits stay here.
 --
 -- Site globals read at call time (optional; set them in main.lua):
 --   UA    browser user-agent  (defaults to a generic Chrome UA below)
@@ -20,24 +23,27 @@
 --
 -- If your plugin ships its own util.lua defining these names, drop yours or
 -- merge — this file pre-executes and later-loaded definitions win in the VM.
--- Only sandbox globals are used (http_request, log); helpers has no deps.
+-- Only sandbox globals are used (host, log); helpers has no deps.
 
+-- normalizeStatus maps a raw status string to a canonical host value.
+-- Canonical set: Ongoing, Completed, Hiatus, Dropped, Upcoming.
+-- Unknown values pass through as-is.
 function normalizeStatus(s)
     if not s or s == "" then return "unknown" end
-    return host.text.normalize_status(nil, s)
+    return host.text.normalize_status(s)
 end
 
 -- lua_escape escapes Lua pattern magic chars in literals interpolated into
 -- patterns: [ - . + [ ] ( ) $ ^ % ? *
 function lua_escape(s)
-    return (s:gsub("[%-%.%+%[%]%(%)%$%^%%%?%*]", "%%%0"))
+    return host.text.lua_escape(s)
 end
 
 local defaultUA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 Safari/537.36"
 
--- http_get issues GET via the sandbox http_request global, logging failures.
--- Uses the global UA when the plugin set one, else defaultUA; JSON calls get
--- a Referer of BASE .. "/" unless overridden via opts.referer.
+-- http_get issues GET via host.http.get, logging failures. Uses the global UA
+-- when the plugin set one, else defaultUA; JSON calls get a Referer of
+-- BASE .. "/" unless overridden via opts.referer.
 function http_get(url, opts)
     local o = opts
     if type(o) ~= "table" then
@@ -59,7 +65,7 @@ function http_get(url, opts)
     if o.headers then
         for k, v in pairs(o.headers) do headers[k] = v end
     end
-    local resp = http_request({url = url, method = "GET", headers = headers})
+    local resp = host.http.get(url, headers)
     if not resp then
         log.error("http_request returned nil for " .. url)
     elseif resp.status ~= 200 then

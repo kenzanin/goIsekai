@@ -2,25 +2,22 @@
 -- Sibling module required by main.lua via require("util")
 local util = {}
 
+-- normalizeStatus maps a raw status string to the canonical host vocabulary.
+-- Canonical set: Ongoing, Completed, Hiatus, Dropped, Upcoming.
+-- The site appends " series" ("COMPLETED series"), so drop that suffix before
+-- delegating to the host map.
 local function normalizeStatus(s)
-    return host.text.normalize_status(nil, s or "")
+    local raw = (s or ""):gsub("%s+series%s*$", "")
+    return host.text.normalize_status(raw)
 end
 -- URL encoding
 function util.url_encode(s)
-    return s:gsub("([^%w%-%.%_%~])", function(c)
-        return string.format("%%%02X", string.byte(c))
-    end)
+    return host.text.url_encode(s)
 end
 
 -- HTTP helper
 function util.http_get(url, extra_headers)
-    local req = { url = url, method = "GET", headers = {} }
-    if extra_headers then
-        for k, v in pairs(extra_headers) do
-            req.headers[k] = v
-        end
-    end
-    local resp = http_request(req)
+    local resp = host.http.get(url, extra_headers)
     if not resp then
         log.error("http_request returned nil for " .. url)
     elseif resp.status ~= 200 then
@@ -31,8 +28,7 @@ end
 
 -- HTML tag strip
 local function strip_tags(s)
-    if not s then return "" end
-    return (s:gsub("<[^>]+>", ""):gsub("^%s+", ""):gsub("%s+$", ""))
+    return host.text.strip_html(s)
 end
 
 -- ─── Search result parsing ─────────────────────────────────────────────────

@@ -34,19 +34,14 @@ var _cachedKey = null;
 // The Kotlin source (MangaHub.kt line 112) refreshes via chapter URL with Referer.
 function _fetchAccessKey() {
     var refreshUrl = SITE_URL + "/chapter/martial-peak/chapter-" + (1000 + Math.floor(Math.random() * 2000));
-    var resp = http_request(JSON.stringify({
-        method: "GET",
-        url: refreshUrl,
-        headers: {
-            "Referer": SITE_URL + "/manga/martial-peak",
-            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-            "Sec-Fetch-Dest": "document",
-            "Sec-Fetch-Mode": "navigate",
-            "Sec-Fetch-Site": "same-origin",
-            "Upgrade-Insecure-Requests": "1",
-        },
-    }));
-    var r = typeof resp === "string" ? JSON.parse(resp) : resp;
+    var r = host.http.get(refreshUrl, {
+        "Referer": SITE_URL + "/manga/martial-peak",
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+        "Sec-Fetch-Dest": "document",
+        "Sec-Fetch-Mode": "navigate",
+        "Sec-Fetch-Site": "same-origin",
+        "Upgrade-Insecure-Requests": "1",
+    });
     if (!r || !r.headers) return null;
 
     // Go flattens multi-valued headers with ", " — find mhub_access=VALUE
@@ -71,16 +66,10 @@ function _graphqlQuery(query) {
         return null;
     }
 
-    var resp = http_request(JSON.stringify({
-        method: "POST",
-        url: GRAPHQL_URL,
-        headers: {
-            "Content-Type": "application/json",
-            "x-mhub-access": key,
-        },
-        body: JSON.stringify({ query: query }),
-    }));
-    var r = typeof resp === "string" ? JSON.parse(resp) : resp;
+    var r = host.http.post(GRAPHQL_URL, JSON.stringify({ query: query }), {
+        "Content-Type": "application/json",
+        "x-mhub-access": key,
+    });
 
     if (!r || r.status < 200 || r.status >= 300) {
         // Token expired — refresh and retry once.
@@ -90,16 +79,10 @@ function _graphqlQuery(query) {
         if (key) _cachedKey = key;
         if (!key) return null;
 
-        resp = http_request(JSON.stringify({
-            method: "POST",
-            url: GRAPHQL_URL,
-            headers: {
-                "Content-Type": "application/json",
-                "x-mhub-access": key,
-            },
-            body: JSON.stringify({ query: query }),
-        }));
-        r = typeof resp === "string" ? JSON.parse(resp) : resp;
+        r = host.http.post(GRAPHQL_URL, JSON.stringify({ query: query }), {
+            "Content-Type": "application/json",
+            "x-mhub-access": key,
+        });
         if (!r || r.status < 200 || r.status >= 300) return null;
     }
 
@@ -131,8 +114,10 @@ function _toISO(dateVal) {
     return new Date(ms).toISOString();
 }
 
+// Normalize a source status string to the host's canonical vocabulary
+// (Ongoing/Completed/Hiatus/Dropped/Upcoming). Unrecognized values pass through.
 function normalizeStatus(s) {
-    return host.text.normalize_status(null, s || "");
+    return host.text.normalize_status(s || "");
 }
 
 // ---------------------------------------------------------------------------

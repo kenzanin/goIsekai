@@ -62,16 +62,6 @@ local function vrf_url(path, params)
     return u .. "?vrf=" .. sig
 end
 
--- Parse JSON safely.
-local function parse_json(body)
-    local ok, data = pcall(host.json.decode, body)
-    if not ok then
-        log.error("json decode failed: " .. tostring(data))
-        return nil
-    end
-    return data
-end
-
 -- ---------------------------------------------------------------------------
 -- Text helpers (mirror JS plugin)
 -- ---------------------------------------------------------------------------
@@ -102,7 +92,7 @@ function search_manga(arg)
             log.error("mangafire search: HTTP error page=" .. page)
             break
         end
-        local body = parse_json(resp.body)
+        local body = host.json.decode(resp.body)
         if not body then break end
         local items = body.items or {}
         if #items == 0 then break end
@@ -132,7 +122,7 @@ function get_manga_detail(arg)
 
     local resp = http_get(vrf_url("/titles/" .. hid, nil))
     if not resp or resp.status ~= 200 then return host.json.encode(nil) end
-    local body = parse_json(resp.body)
+    local body = host.json.decode(resp.body)
     if not body then return host.json.encode(nil) end
     local d = body.data
     if not d then return host.json.encode(nil) end
@@ -172,7 +162,7 @@ function get_chapter_list(arg)
             page = "" .. page, sort = "number",
         }))
         if not resp or resp.status ~= 200 then break end
-        local body = parse_json(resp.body)
+        local body = host.json.decode(resp.body)
         if not body then break end
         local items = body.items or {}
         if #items == 0 then break end
@@ -205,7 +195,7 @@ function get_page_list(arg)
 
     local resp = http_get(vrf_url("/chapters/" .. chapter_id, nil))
     if not resp or resp.status ~= 200 then return host.json.encode({}) end
-    local body = parse_json(resp.body)
+    local body = host.json.decode(resp.body)
     if not body then return host.json.encode({}) end
     local raw_pages = (body.data and body.data.pages) or {}
     if #raw_pages == 0 then return host.json.encode({}) end

@@ -29,38 +29,25 @@ PLUGIN = {
 BASE = "https://valirscans.org"
 MEDIA = "https://media.valirscans.org"
 
-local function normalizeStatus(s)
-    return host.text.normalize_status(nil, s or "")
-end
+-- normalizeStatus maps a raw status string to a canonical host value.
+-- Canonical set: Ongoing, Completed, Hiatus, Dropped, Upcoming.
+-- Unknown values pass through as-is.
+local normalizeStatus = host.text.normalize_status
 
 -- ─── helpers ───────────────────────────────────────────────────────────────
 
-
 -- Escape Lua pattern magic chars (slugs are [a-z0-9-], but '-' is the
 -- lazy quantifier — raw slugs in gmatch/find patterns silently fail).
-function lua_escape(s)
-    return (s:gsub("[%-%.%+%[%]%(%)%$%^%%%?%*]", "%%%0"))
-end
+lua_escape = host.text.lua_escape
 
 function http_get(url, extra_headers)
-    local req = { url = url, method = "GET", headers = {} }
-    if extra_headers then
-        for k, v in pairs(extra_headers) do
-            req.headers[k] = v
-        end
-    end
-    local resp = http_request(req)
+    local resp = host.http.get(url, extra_headers)
     if not resp then
         log.error("http_request returned nil for " .. url)
     elseif resp.status ~= 200 then
         log.error("http status " .. tostring(resp.status) .. " for " .. url)
     end
     return resp
-end
-
-function titlecase(s)
-    if s == nil then return "" end
-    return s:sub(1, 1) .. s:sub(2):lower()
 end
 
 -- Extract the <script type="application/ld+json"> block whose decoded JSON
@@ -162,7 +149,7 @@ function get_manga_detail(arg)
         end
         -- status: anchor on the cover path (relative) in the flight payload
         local status = flight_status(html, img)
-        if status ~= "" then detail.status = normalizeStatus(titlecase(status)) end
+        if status ~= "" then detail.status = normalizeStatus(status) end
     end
 
     -- Fallbacks for anything JSON-LD missed (or if the block was absent)
@@ -177,7 +164,7 @@ function get_manga_detail(arg)
     if detail.status == "" then
         local st = flight_status(html, string.match(detail.cover_url,
             '(https?://[^/]+)?(/uploads/series/[^"]+)') or detail.cover_url)
-        if st ~= "" then detail.status = normalizeStatus(titlecase(st)) end
+        if st ~= "" then detail.status = normalizeStatus(st) end
     end
 
     log.debug("detail: " .. detail.title .. " | " .. detail.status)

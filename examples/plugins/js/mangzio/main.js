@@ -20,8 +20,11 @@ var PLUGIN = {
 
 var BASE = "https://www.mangzio.com";
 
+// normalizeStatus maps a raw status string to the canonical host vocabulary.
+// Canonical set: Ongoing, Completed, Hiatus, Dropped, Upcoming.
+// Unknown values pass through as-is.
 function normalizeStatus(s) {
-    return host.text.normalize_status(null, s || "");
+    return host.text.normalize_status(s || "");
 }
 
 // ---------------------------------------------------------------------------
@@ -29,8 +32,7 @@ function normalizeStatus(s) {
 // ---------------------------------------------------------------------------
 
 function httpGet(url) {
-    var resp = http_request(JSON.stringify({ method: "GET", url: url, headers: {} }));
-    return typeof resp === "string" ? JSON.parse(resp) : resp;
+    return host.http.get(url);
 }
 
 // Extract all RSC flight data chunks from a Next.js SSR HTML page.

@@ -21,28 +21,17 @@ local BASE = "https://mangasushi.org"
 
 -- ─── helpers ────────────────────────────────────────────────────────────────
 
-local function trim(s)
-    return (s:gsub("^%s+", ""):gsub("%s+$", ""))
-end
+local trim = host.text.trim
+local unescape = host.text.unescape
 
-local function unescape(s)
-    if not s then return s end
-    local map = { quot = '"', amp = "&", lt = "<", gt = ">", apos = "'", nbsp = " ",
-        ["#039"] = "'", ["#8217"] = "'", ["#8211"] = "–", ["#8230"] = "…" }
-    return (s:gsub("&(%w+);", map):gsub("&#(%d+);", function(n)
-        n = tonumber(n)
-        if n >= 32 and n <= 126 then return string.char(n) end
-        return ""
-    end))
-end
-
+-- The wrappers add this site's 200-check and error log; the request itself is
+-- shaped by the host.
 local function http_post(url, body)
     local headers = {
         ["X-Requested-With"] = "xmlhttprequest",
         ["Content-Type"] = "application/x-www-form-urlencoded",
     }
-    local req = { url = url, method = "POST", headers = headers, body = body or "" }
-    local resp = http_request(req)
+    local resp = host.http.post(url, body or "", headers)
     if not resp or resp.status ~= 200 then
         log.error("http status " .. (resp and resp.status or "nil") .. " for " .. url)
         return nil
@@ -51,8 +40,7 @@ local function http_post(url, body)
 end
 
 local function http_get(url)
-    local req = { url = url, method = "GET", headers = {} }
-    local resp = http_request(req)
+    local resp = host.http.get(url)
     if not resp or resp.status ~= 200 then
         log.error("http status " .. (resp and resp.status or "nil") .. " for " .. url)
         return nil

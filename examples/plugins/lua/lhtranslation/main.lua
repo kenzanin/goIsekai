@@ -21,13 +21,13 @@ local BASE = "https://lhtranslation.net"
 
 -- ─── helpers ────────────────────────────────────────────────────────────────
 
-local function trim(s)
-    return (s:gsub("^%s+", ""):gsub("%s+$", ""))
-end
+local trim = host.text.trim
+local unescape = host.text.unescape
 
+-- The wrappers add this site's 200-check and error log; the request itself is
+-- shaped by the host.
 local function http_get(url)
-    local req = { url = url, method = "GET", headers = {} }
-    local resp = http_request(req)
+    local resp = host.http.get(url)
     if not resp or resp.status ~= 200 then
         log.error("http status " .. (resp and resp.status or "nil") .. " for " .. url)
         return nil
@@ -36,26 +36,12 @@ local function http_get(url)
 end
 
 local function http_post(url)
-    local req = { url = url, method = "POST", headers = { ["X-Requested-With"] = "xmlhttprequest" } }
-    local resp = http_request(req)
+    local resp = host.http.post(url, "", { ["X-Requested-With"] = "xmlhttprequest" })
     if not resp or resp.status ~= 200 then
         log.error("http status " .. (resp and resp.status or "nil") .. " for " .. url)
         return nil
     end
     return resp.body
-end
-
--- decode HTML entities found in titles
-local function unescape(s)
-    if not s then return s end
-    local map = { quot = '"', amp = "&", lt = "<", gt = ">", apos = "'", nbsp = " ",
-        ["#039"] = "'", ["#8217"] = "’", ["#8211"] = "–", ["#8230"] = "…" }
-    return (s:gsub("&(%w+);", map):gsub("&#(%d+);", function(n)
-        n = tonumber(n)
-        -- ASCII range only; ponytail: higher codepoints rare in titles
-        if n >= 32 and n <= 126 then return string.char(n) end
-        return ""
-    end))
 end
 
 -- ─── ABI: search_manga ──────────────────────────────────────────────────────
@@ -143,15 +129,7 @@ function get_manga_detail(arg)
         -- find the "Status" heading then the next summary-content
         local after = sblock:match("Status%s*</h5>.-class=\"summary%-content\">%s*([^<]+)")
         if after then
-            local raw = trim(after)
-            local smap = {
-                ["ongoing"] = "Ongoing", ["on going"] = "Ongoing", ["on-going"] = "Ongoing",
-                ["completed"] = "Completed", ["complete"] = "Completed",
-                ["onhold"] = "Hiatus", ["on hold"] = "Hiatus", ["hiatus"] = "Hiatus",
-                ["cancelled"] = "Dropped", ["dropped"] = "Dropped",
-                ["upcoming"] = "Upcoming"
-            }
-            detail.status = smap[raw:lower()] or raw
+            detail.status = host.text.normalize_status(trim(after))
         end
     end
 

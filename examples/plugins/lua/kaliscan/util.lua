@@ -6,23 +6,15 @@ local util = {}
 -- ─── URL encoding ──────────────────────────────────────────────────────────
 
 function util.url_encode(s)
-    return s:gsub("([^%w%-%.%_%~])", function(c)
-        return string.format("%%%02X", string.byte(c))
-    end)
+    return host.text.url_encode(s)
 end
 
 -- ─── HTTP helper ───────────────────────────────────────────────────────────
--- Wraps http_request (host-provided global). Returns {status, headers, body}.
+-- Wraps host.http.get. Returns {status, headers, body}.
 -- On error returns {status=0, error=...} per ABI contract.
 
 function util.http_get(url, extra_headers)
-    local req = { url = url, method = "GET", headers = {} }
-    if extra_headers then
-        for k, v in pairs(extra_headers) do
-            req.headers[k] = v
-        end
-    end
-    local resp = http_request(req)
+    local resp = host.http.get(url, extra_headers)
     if not resp then
         log.error("http_request returned nil for " .. url)
     elseif resp.status ~= 200 then
@@ -91,8 +83,11 @@ end
 --   Cover: <div class="cover"> ... <img data-src="URL">
 --   Description: <p class="content" ...>TEXT</p>      in summary tab panel
 
+-- normalizeStatus maps a raw status string to the canonical host vocabulary.
+-- Canonical set: Ongoing, Completed, Hiatus, Dropped, Upcoming.
+-- Unknown values pass through as-is.
 local function normalizeStatus(s)
-    return host.text.normalize_status(nil, s or "")
+    return host.text.normalize_status(s)
 end
 
 function util.parse_manga_detail(html, manga_id)
