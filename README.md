@@ -134,7 +134,7 @@ function getEnrichment(arg)   -- {"title":..., "kind":..., "source":...}
 end
 ```
 
-"Fetch Details" on a manga page calls every provider that serves the requested kind and stores the result in the matching alt section, where you promote the entry you want to the main title, synopsis, or genres. Author is surfaced directly on the detail page. See `examples/info/mangadex/main.lua`.
+"Fetch Details" on a manga page calls every provider that serves the requested kind and stores the result in the matching alt section, where you promote the entry you want to the main title, synopsis, or genres. Author is surfaced directly on the detail page. See `examples/info/mangadex/main.lua` and `examples/info/mangaupdates/main.lua` — the latter is what fills the Related / Recommended section for manga a source site does not list.
 
 ### JS plugins (no toolchain needed)
 

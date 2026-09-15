@@ -216,19 +216,31 @@ func (s *AppService) GetEnrichment(pluginID, mangaID string) (*EnrichmentResult,
 	}
 
 	res := &EnrichmentResult{}
-	res.AltTitles, err = s.db.ListEnrichment(rowID, "alt_titles")
+
+	// alt_titles and alt_summaries are tables, not enrichment kinds, so they
+	// come through their own listers and are reshaped into the shared row.
+	titles, err := s.db.ListAltTitles(rowID)
 	if err != nil {
 		return nil, err
 	}
-	res.AltSummaries, err = s.db.ListEnrichment(rowID, "alt_summaries")
+	res.AltTitles = make([]database.EnrichmentRow, len(titles))
+	for i, t := range titles {
+		res.AltTitles[i] = database.EnrichmentRow{Value: t.Title, Source: t.Source}
+	}
+	summaries, err := s.db.ListAltDescriptions(rowID)
 	if err != nil {
 		return nil, err
 	}
-	res.Categories, err = s.db.ListEnrichment(rowID, "categories")
+	res.AltSummaries = make([]database.EnrichmentRow, len(summaries))
+	for i, a := range summaries {
+		res.AltSummaries[i] = database.EnrichmentRow{Value: a.Description, Source: a.Source}
+	}
+
+	res.Categories, err = s.db.ListEnrichment(rowID, string(enrich.KindCategories))
 	if err != nil {
 		return nil, err
 	}
-	res.Related, err = s.db.ListEnrichment(rowID, "related")
+	res.Related, err = s.db.ListEnrichment(rowID, string(enrich.KindRelated))
 	if err != nil {
 		return nil, err
 	}
