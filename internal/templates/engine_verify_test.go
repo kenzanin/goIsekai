@@ -5,6 +5,7 @@ import (
 	"os"
 	"strings"
 	"testing"
+	"testing/fstest"
 
 	"goisekai/internal/database"
 )
@@ -113,21 +114,32 @@ func formNestingDepth(html string) int {
 	}
 }
 
-func TestHelpers(t *testing.T) {
-	if got := formatDate(""); got != "—" {
-		t.Errorf(`formatDate("") = %q, want —`, got)
+// TestFormatHelpers covers the template-visible formatters through the Lua
+// bindings the templates actually call, not a Go-side duplicate.
+func TestFormatHelpers(t *testing.T) {
+	tmplFS := fstest.MapFS{
+		"views/fmt.lua": &fstest.MapFile{
+			Data: []byte(`return function(data)
+				return table.concat({
+					formatDate(""),
+					formatDate("2024-01-02T15:04:05Z"),
+					formatChapterNum(nil),
+					formatChapterNum(5.0),
+					formatChapterNum(5.5),
+				}, "|")
+			end`),
+		},
 	}
-	if got := formatDate("2024-01-02T15:04:05Z"); got != "Jan 2, 2024" {
-		t.Errorf("formatDate = %q, want Jan 2, 2024", got)
+	engine, err := NewLuaEngine(tmplFS, false)
+	if err != nil {
+		t.Fatalf("NewLuaEngine: %v", err)
 	}
-	if got := formatChapterNum(nil); got != "—" {
-		t.Errorf("formatChapterNum(nil) = %q, want —", got)
+	var buf bytes.Buffer
+	if err := engine.Render(&buf, "views/fmt", nil); err != nil {
+		t.Fatalf("Render: %v", err)
 	}
-	if got := formatChapterNum(5.0); got != "5" {
-		t.Errorf("formatChapterNum(5.0) = %q, want 5", got)
+	const want = "\u2014|Jan 2, 2024|\u2014|5|5.5"
+	if got := strings.TrimSpace(buf.String()); got != want {
+		t.Errorf("formatters = %q, want %q", got, want)
 	}
-	if got := formatChapterNum(5.5); got != "5.5" {
-		t.Errorf("formatChapterNum(5.5) = %q, want 5.5", got)
-	}
-
 }

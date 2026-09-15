@@ -2,8 +2,11 @@
 
 BINARY := goisekai
 PKGS   := ./internal/... ./pkg/... ./cmd/...
+# PROD is the `check` gate scope: production Go code only. Test files are skipped
+# by the linter; Lua and web assets have their own targets (lint-lua, lint-web).
+PROD   := ./internal/... ./pkg/... ./cmd/...
 
-.PHONY: build dev devrun run open check fmt fmt-web fmt-lua test race modernize lint lint-web lint-lua css br clean build-plugins install-plugins all
+.PHONY: build dev devrun run open check fmt fmt-prod fmt-web fmt-lua test race modernize lint lint-prod lint-web lint-lua css br clean build-plugins install-plugins all
 
 ## build: compile the server binary (pure Go, CGO-free, cross-compilable).
 build: css br
@@ -39,11 +42,18 @@ run: build
 open:
 	xdg-open http://127.0.0.1:8080
 
-## check: full quality gate — format, race tests, modernize, lint (Go + web).
-check: fmt fmt-web fmt-lua race modernize lint lint-web lint-lua
+## check: quality gate over production Go code only (no test files, no Lua/web).
+## Tests: `make test` / `make race`. Web: `make lint-web`. Lua: `make lint-lua`.
+check: fmt-prod modernize lint-prod
 
 fmt:
 	go fmt $(PKGS)
+## fmt-prod: format production Go packages (go fmt's package scope also touches test files).
+fmt-prod:
+	go fmt $(PROD)
+## lint-prod: lint production Go code, skipping *_test.go.
+lint-prod:
+	CGO_ENABLED=0 golangci-lint run --tests=false $(PROD)
 
 ## fmt-web: format + auto-fix the frontend (Biome).
 fmt-web:

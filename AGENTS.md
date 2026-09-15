@@ -41,9 +41,11 @@ Module: `goisekai` · Go 1.27 · CGO-free · pure Go SQLite
 | `make race`      | Run tests with `-race` (`CGO_ENABLED=1`)                                   |
 | `make lint`      | `golangci-lint run ./internal/... ./pkg/... ./cmd/...`                     |
 | `make modernize` | `modernize -fix` on all packages                                           |
-| `make check`     | Full quality gate: fmt + race + modernize + lint + lint-web + lint-lua     |
+| `make check`     | Production-Go gate: fmt + modernize + lint, skipping tests and Lua/web      |
 | `make run`       | Build + launch (`./goisekai -logLevel debug`)                              |
 | `make fmt`       | `go fmt` on all packages                                                   |
+| `make fmt-prod`  | `go fmt` on production packages (the `check` scope)                        |
+| `make lint-prod` | `golangci-lint run --tests=false` on production packages                   |
 | `make fmt-web`   | `biome check --write cmd/goisekai/frontend`                                |
 | `make fmt-lua`   | `stylua internal/templates/`                                               |
 | `make lint-web`  | `biome check cmd/goisekai/frontend` (read-only)                            |

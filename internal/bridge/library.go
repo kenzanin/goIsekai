@@ -3,6 +3,7 @@ package bridge
 import (
 	"fmt"
 	"github.com/goccy/go-json"
+	"slices"
 
 	"goisekai/internal/database"
 	"goisekai/internal/logger"
@@ -316,10 +317,8 @@ func (s *AppService) AddGenre(pluginID, mangaID, genre string) error {
 	if !has {
 		genres = nil
 	}
-	for _, g := range genres {
-		if g == genre {
-			return nil
-		}
+	if slices.Contains(genres, genre) {
+		return nil
 	}
 	genres = append(genres, genre)
 	if err := s.db.SetMangaGenres(rowID, genres); err != nil {

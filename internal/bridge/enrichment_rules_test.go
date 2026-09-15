@@ -2,6 +2,7 @@ package bridge
 
 import (
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
@@ -237,10 +238,5 @@ func TestRemoveAltSummaryDropsRow(t *testing.T) {
 }
 
 func containsStr(haystack []string, needle string) bool {
-	for _, h := range haystack {
-		if h == needle {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(haystack, needle)
 }

@@ -248,7 +248,7 @@ func TestConnectionPoolReuse(t *testing.T) {
 	proxy := NewProxy()
 
 	var responses []int
-	for i := 0; i < 3; i++ {
+	for i := range 3 {
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		req, err := http.NewRequestWithContext(ctx, http.MethodGet, server.URL, nil)
 		if err != nil {

@@ -7,7 +7,6 @@ import (
 	"io/fs"
 	"sort"
 	"strconv"
-	"strings"
 	"time"
 )
 
@@ -52,47 +51,6 @@ func toDataMap(data any) map[string]any {
 		return m
 	}
 	return map[string]any{}
-}
-
-// formatDate formats an ISO-8601 timestamp as "Jan 2, 2006". Empty input or a
-// value that does not parse returns "—".
-func formatDate(ts string) string {
-	ts = strings.TrimSpace(ts)
-	if ts == "" {
-		return "—"
-	}
-	for _, layout := range dateLayouts {
-		if t, err := time.Parse(layout, ts); err == nil {
-			return t.Format("Jan 2, 2006")
-		}
-	}
-	return "—"
-}
-
-// formatChapterNum trims a float chapter number to its meaningful digits
-// (5.0 -> "5", 5.5 -> "5.5"). nil/empty/unparseable -> "—".
-func formatChapterNum(n any) string {
-	switch v := n.(type) {
-	case nil:
-		return "—"
-	case int:
-		return strconv.Itoa(v)
-	case float64:
-		return chapterFloat(v)
-	case float32:
-		return chapterFloat(float64(v))
-	case string:
-		if strings.TrimSpace(v) == "" {
-			return "—"
-		}
-		f, err := strconv.ParseFloat(v, 64)
-		if err != nil {
-			return v
-		}
-		return chapterFloat(f)
-	default:
-		return "—"
-	}
 }
 
 // chapterFloat formats a float without trailing zeros. FormatFloat with -1
