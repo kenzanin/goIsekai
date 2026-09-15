@@ -34,6 +34,11 @@ css:
         echo "npx not found — keeping the committed tailwind.css"
         exit 0
     fi
+    # tailwindcss 3.4 is pinned, so its bundled caniuse-lite snapshot ages past
+    # the 6 months browserslist tolerates and it nags on every build. The data
+    # only decides which CSS prefixes autoprefixer emits; pinning it keeps the
+    # output reproducible instead of tracking whatever npm cached today.
+    export BROWSERSLIST_IGNORE_OLD_DATA=1
     printf '@tailwind base;\n@tailwind components;\n@tailwind utilities;\n' > {{lib_dir}}/input.css
     npx --yes tailwindcss@3.4.17 -c tailwind.config.js \
         -i {{lib_dir}}/input.css -o {{lib_dir}}/tailwind.css
