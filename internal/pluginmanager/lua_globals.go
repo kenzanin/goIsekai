@@ -8,44 +8,9 @@ import (
 	"goisekai/internal/logger"
 )
 
-// setupGlobals registers json, log, and http_request globals on the state.
+// setupGlobals registers log and http_request globals on the state. JSON is
+// reached through host.json.decode / host.json.encode.
 func (m *Manager) setupGlobals(state *lua.State, id string) error {
-	// Register json.encode / json.decode as a global table.
-	jsonTbl, _ := state.NewTable()
-
-	jsonEncode, _ := state.NewNativeFunction(func(frame lua.Frame) lua.Outcome {
-		val, _ := frame.Argument(0)
-		goVal, err := lunarToGo(val)
-		if err != nil {
-			return frame.ReturnValues(lua.Nil(), lua.String(err.Error()))
-		}
-		b, err := json.Marshal(goVal)
-		if err != nil {
-			return frame.ReturnValues(lua.Nil(), lua.String(err.Error()))
-		}
-		return frame.ReturnValue(lua.String(string(b)))
-	})
-	_ = jsonTbl.RawSetString("encode", jsonEncode.Value())
-
-	jsonDecode, _ := state.NewNativeFunction(func(frame lua.Frame) lua.Outcome {
-		s, ok := frame.String(0)
-		if !ok {
-			return frame.ReturnValues(lua.Nil(), lua.String("json.decode: argument must be a string"))
-		}
-		var goVal any
-		if err := json.Unmarshal([]byte(s), &goVal); err != nil {
-			return frame.ReturnValues(lua.Nil(), lua.String(err.Error()))
-		}
-		luaval, err := goLunarValue(state, goVal)
-		if err != nil {
-			return frame.ReturnValues(lua.Nil(), lua.String(err.Error()))
-		}
-		return frame.ReturnValue(luaval)
-	})
-	_ = jsonTbl.RawSetString("decode", jsonDecode.Value())
-
-	_ = state.RawSetGlobal("json", jsonTbl.Value())
-
 	// Register log.debug/info/warn/error(msg, ...) globals.
 	logTbl, _ := state.NewTable()
 	for lvlName, logFn := range map[string]func(string, ...any){

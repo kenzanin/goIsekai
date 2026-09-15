@@ -9,7 +9,8 @@ import (
 	"goisekai/internal/pluginutil"
 )
 
-// registerHostNatives installs the shared `host` table (text/codecs/crypto/http)
+// registerHostNatives installs the shared `host` table
+// (text/codecs/crypto/json/http)
 // on the Lua state. Every plugin runtime exposes the same surface so helpers are
 // written once in Go instead of per plugin per language.
 func registerHostNatives(state *lua.State, m *Manager, id string) {
@@ -44,10 +45,15 @@ func registerHostNatives(state *lua.State, m *Manager, id string) {
 	_ = crypto.RawSetString("utf8_hex", luaStr1(state, pluginutil.UTF8Hex))
 	_ = crypto.RawSetString("vrf_sign", luaVrfSign(state))
 
+	jsonTbl, _ := state.NewTable()
+	_ = jsonTbl.RawSetString("decode", luaJSONDecode(state))
+	_ = jsonTbl.RawSetString("encode", luaJSONEncode(state))
+
 	host, _ := state.NewTable()
 	_ = host.RawSetString("text", text.Value())
 	_ = host.RawSetString("codecs", codecs.Value())
 	_ = host.RawSetString("crypto", crypto.Value())
+	_ = host.RawSetString("json", jsonTbl.Value())
 
 	// host.http — thin wrappers over http_request proxy.
 	http, _ := state.NewTable()

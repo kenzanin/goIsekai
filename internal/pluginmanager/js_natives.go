@@ -8,8 +8,8 @@ import (
 	"goisekai/internal/pluginutil"
 )
 
-// registerJSHostNatives installs the shared `host` object (text/codecs/crypto/http)
-// on the goja VM. Mirrors the Lua runtime's surface.
+// registerJSHostNatives installs the shared `host` object
+// (text/codecs/crypto/json/http) on the goja VM. Mirrors the Lua runtime's surface.
 func registerJSHostNatives(vm *goja.Runtime, m *Manager, id string) error {
 	groups := []struct {
 		name string
@@ -41,6 +41,10 @@ func registerJSHostNatives(vm *goja.Runtime, m *Manager, id string) error {
 			"xor":             jsStr2Err(vm, pluginutil.XORHex),
 			"utf8_hex":        jsStr1(vm, pluginutil.UTF8Hex),
 			"vrf_sign":        jsVrfSign(vm),
+		}},
+		{"json", map[string]any{
+			"decode": jsJSONDecode(vm),
+			"encode": jsJSONEncode(vm),
 		}},
 	}
 

@@ -10,21 +10,21 @@ PLUGIN = {
 local sibling = require("sibling")
 
 function search_manga(arg)
-    local f = json.decode(arg)
-    return json.encode({{id = "L1", title = "Lua " .. f.query, cover_url = sibling.cover()}})
+    local f = host.json.decode(arg)
+    return host.json.encode({{id = "L1", title = "Lua " .. f.query, cover_url = sibling.cover()}})
 end
 
 function get_manga_detail(arg)
-    local id = json.decode(arg)
-    return json.encode({id = id, title = "Detail " .. id, cover_url = sibling.cover()})
+    local id = host.json.decode(arg)
+    return host.json.encode({id = id, title = "Detail " .. id, cover_url = sibling.cover()})
 end
 
 function get_chapter_list(arg)
-    local id = json.decode(arg)
-    return json.encode({{id = id .. "/c1", manga_id = id, title = "Ch 1", chapter_num = 1.0}})
+    local id = host.json.decode(arg)
+    return host.json.encode({{id = id .. "/c1", manga_id = id, title = "Ch 1", chapter_num = 1.0}})
 end
 
 function get_page_list(arg)
-    local cid = json.decode(arg)
-    return json.encode({{index = 0, url = "https://example.com/img/1.png"}})
+    local cid = host.json.decode(arg)
+    return host.json.encode({{index = 0, url = "https://example.com/img/1.png"}})
 end
