@@ -133,8 +133,12 @@ func (s *AppService) liveChaptersFallback(rowID string, liveChapters []types.Cha
 func (s *AppService) cachedMangaFallback(pluginID, mangaID, rowID string) (types.Manga, []types.Chapter, error) {
 	// Fetch cached manga.
 	cachedManga, err := s.db.GetMangaCached(pluginID, mangaID)
-	if err != nil || cachedManga.ID == "" {
+	if err != nil {
 		return types.Manga{}, nil, fmt.Errorf("bridge: get manga detail: %w", err)
+	}
+	if cachedManga.ID == "" {
+		return types.Manga{}, nil, fmt.Errorf(
+			"bridge: plugin %s is unreachable and manga %s has no cached copy", pluginID, mangaID)
 	}
 
 	// Convert DB manga to types.Manga.

@@ -244,3 +244,38 @@ func TestLuaPluginInstallFolder(t *testing.T) {
 		t.Fatalf("unexpected result: %+v", mangas)
 	}
 }
+
+// TestUnloadPluginDoesNotDeadlock guards the unload path against
+// self-deadlocking. UnloadPlugin holds the plugin mutex, and it used to call a
+// Yaegi teardown helper that locked that same mutex again. The mutex is not
+// reentrant, so unload never returned while holding the manager lock, which
+// wedged every later plugin call until the process restarted.
+func TestUnloadPluginDoesNotDeadlock(t *testing.T) {
+	dir := luaPluginsDir(t)
+	mgr := NewManager(hostnet.NewProxy(), dir)
+	if err := mgr.Discover(); err != nil {
+		t.Fatalf("Discover: %v", err)
+	}
+	defer func() { _ = mgr.Close() }()
+
+	// Load the plugin so unload has a live runtime to release.
+	if _, err := mgr.Search("luatest", types.SearchFilter{Query: "test"}); err != nil {
+		t.Fatalf("Search: %v", err)
+	}
+
+	done := make(chan error, 1)
+	go func() { done <- mgr.UnloadPlugin("luatest") }()
+	select {
+	case err := <-done:
+		if err != nil {
+			t.Fatalf("UnloadPlugin: %v", err)
+		}
+	case <-time.After(10 * time.Second):
+		t.Fatal("UnloadPlugin did not return: the plugin manager is wedged")
+	}
+
+	// The manager must still serve calls afterwards.
+	if _, err := mgr.GetMangaDetail("luatest", "m1"); err != nil {
+		t.Fatalf("GetMangaDetail after unload: %v", err)
+	}
+}

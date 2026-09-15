@@ -202,13 +202,6 @@ func callYaegi(m *Manager, p *loadedPlugin, fnName, inputJSON string) (string, e
 	return out, nil
 }
 
-// closeYaegi shuts down a Yaegi plugin interpreter.
-func closeYaegi(p *loadedPlugin) {
-	p.mu.Lock()
-	defer p.mu.Unlock()
-	p.yaegi = nil
-}
-
 // callWithTimeout invokes the load-time wrapper for fnName in the Yaegi
 // interpreter. The wrapper returns a single string; plugin errors (and
 // timeouts, via EvalWithContext) surface as Eval errors.

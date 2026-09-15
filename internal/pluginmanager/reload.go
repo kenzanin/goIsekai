@@ -34,7 +34,7 @@ func (m *Manager) UnloadPlugin(id string) error {
 	p.js = nil
 	p.goPlugin = nil
 	p.goFns = nil
-	closeYaegi(p)
+	p.yaegi = nil
 	p.contractVersion = 0
 	p.meta = types.PluginMeta{}
 	p.loaded = false
