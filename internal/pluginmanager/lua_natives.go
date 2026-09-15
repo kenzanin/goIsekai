@@ -49,11 +49,17 @@ func registerHostNatives(state *lua.State, m *Manager, id string) {
 	_ = jsonTbl.RawSetString("decode", luaJSONDecode(state))
 	_ = jsonTbl.RawSetString("encode", luaJSONEncode(state))
 
+	htmlTbl, err := htmlGroup(state)
+	if err != nil {
+		panic(err)
+	}
+
 	host, _ := state.NewTable()
 	_ = host.RawSetString("text", text.Value())
 	_ = host.RawSetString("codecs", codecs.Value())
 	_ = host.RawSetString("crypto", crypto.Value())
 	_ = host.RawSetString("json", jsonTbl.Value())
+	_ = host.RawSetString("html", htmlTbl.Value())
 
 	// host.http — thin wrappers over http_request proxy.
 	http, _ := state.NewTable()

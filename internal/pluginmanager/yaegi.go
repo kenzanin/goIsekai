@@ -14,6 +14,7 @@ import (
 	"github.com/traefik/yaegi/stdlib"
 
 	"goisekai/internal/hostnet"
+	"goisekai/internal/htmldoc"
 	"goisekai/internal/logger"
 	"goisekai/pkg/types"
 )
@@ -80,17 +81,27 @@ func (m *Manager) loadYaegi(id, dir string) (*loadedPlugin, error) {
 		return nil, fmt.Errorf("yaegi plugin %s: stdlib: %w", id, err)
 	}
 
-	// Expose hostnet.Get/Post as a synthetic "hostnet" package. The export
-	// key must be import-path/package-name, so bare `import "hostnet"`
-	// resolves against "hostnet/hostnet".
+	// Expose hostnet package with all helper functions. The HTML helpers live in
+	// the same synthetic package as Get/Post: the bridge's shape is plain
+	// functions in one package, and a plugin's only permitted non-stdlib import
+	// is `hostnet`.
 	hp := yaegiHostPkg{proxy: m.proxy, id: id}
 	if err := i.Use(interp.Exports{
 		"hostnet/hostnet": map[string]reflect.Value{
-			"Get":  reflect.ValueOf(hp.Get),
-			"Post": reflect.ValueOf(hp.Post),
+			"Get":           reflect.ValueOf(hp.Get),
+			"Post":          reflect.ValueOf(hp.Post),
+			"Parse":         reflect.ValueOf(hp.Parse),
+			"FindText":      reflect.ValueOf(hp.FindText),
+			"FindAttr":      reflect.ValueOf(hp.FindAttr),
+			"FindListText":  reflect.ValueOf(hp.FindListText),
+			"FindListAttr":  reflect.ValueOf(hp.FindListAttr),
+			"XPathText":     reflect.ValueOf(hp.XPathText),
+			"XPathAttr":     reflect.ValueOf(hp.XPathAttr),
+			"XPathListText": reflect.ValueOf(hp.XPathListText),
+			"XPathListAttr": reflect.ValueOf(hp.XPathListAttr),
 		},
 	}); err != nil {
-		return nil, fmt.Errorf("yaegi plugin %s: hostnet export: %w", id, err)
+		return nil, fmt.Errorf("yaegi plugin %s: host exports: %w", id, err)
 	}
 
 	// Evaluate plugin source.
@@ -291,7 +302,7 @@ func isGoStdlib(path string) bool {
 }
 
 // yaegiHostPkg is a Yaegi-compatible host bridge.
-// It only exposes functions that use stdlib-compatible types, because yaegi
+// It exposes functions that use stdlib-compatible types, because yaegi
 // cannot parse bogdanfinn/fhttp source that hostnet uses internally.
 type yaegiHostPkg struct {
 	proxy *hostnet.Proxy
@@ -321,4 +332,49 @@ func (y yaegiHostPkg) Post(url, body string) (string, error) {
 		return "", err
 	}
 	return resp.Body, nil
+}
+
+// Parse is available as hostnet.Parse in interpreted plugins.
+func (y yaegiHostPkg) Parse(markup string) (*htmldoc.Document, error) {
+	return htmldoc.Parse(markup)
+}
+
+// FindText is available as hostnet.FindText in interpreted plugins.
+func (y yaegiHostPkg) FindText(doc *htmldoc.Document, selector string) (string, error) {
+	return doc.FindText(selector)
+}
+
+// FindAttr is available as hostnet.FindAttr in interpreted plugins.
+func (y yaegiHostPkg) FindAttr(doc *htmldoc.Document, selector, attr string) (string, error) {
+	return doc.FindAttr(selector, attr)
+}
+
+// FindListText is available as hostnet.FindListText in interpreted plugins.
+func (y yaegiHostPkg) FindListText(doc *htmldoc.Document, selector string) ([]string, error) {
+	return doc.FindListText(selector)
+}
+
+// FindListAttr is available as hostnet.FindListAttr in interpreted plugins.
+func (y yaegiHostPkg) FindListAttr(doc *htmldoc.Document, selector, attr string) ([]string, error) {
+	return doc.FindListAttr(selector, attr)
+}
+
+// XPathText is available as hostnet.XPathText in interpreted plugins.
+func (y yaegiHostPkg) XPathText(doc *htmldoc.Document, expr string) (string, error) {
+	return doc.XPathText(expr)
+}
+
+// XPathAttr is available as hostnet.XPathAttr in interpreted plugins.
+func (y yaegiHostPkg) XPathAttr(doc *htmldoc.Document, expr, attr string) (string, error) {
+	return doc.XPathAttr(expr, attr)
+}
+
+// XPathListText is available as hostnet.XPathListText in interpreted plugins.
+func (y yaegiHostPkg) XPathListText(doc *htmldoc.Document, expr string) ([]string, error) {
+	return doc.XPathListText(expr)
+}
+
+// XPathListAttr is available as hostnet.XPathListAttr in interpreted plugins.
+func (y yaegiHostPkg) XPathListAttr(doc *htmldoc.Document, expr, attr string) ([]string, error) {
+	return doc.XPathListAttr(expr, attr)
 }

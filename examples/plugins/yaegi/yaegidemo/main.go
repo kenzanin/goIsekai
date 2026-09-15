@@ -16,6 +16,7 @@ package main
 
 import (
 	"fmt"
+	"hostnet"
 )
 
 // Init returns the PluginMeta JSON (optional export). contract_version is
@@ -89,5 +90,32 @@ func GetPageList(arg string) (string, error) {
 		out += fmt.Sprintf(`{"index":%d,"url":"https://picsum.photos/seed/yaegi-page-%d/600/900"}`, i, i)
 	}
 	out += "]"
+	return out, nil
+}
+
+// ExampleHTMLDemo demonstrates using the hostnet HTML helpers.
+// This is not part of the plugin ABI but shows how a plugin would use the
+// HTML parsing functionality.
+func ExampleHTMLDemo(markup string) (string, error) {
+	doc, err := hostnet.Parse(markup)
+	if err != nil {
+		return "", err
+	}
+	title, err := hostnet.FindText(doc, "h1")
+	if err != nil {
+		return "", err
+	}
+	srcs, err := hostnet.FindListAttr(doc, "img", "src")
+	if err != nil {
+		return "", err
+	}
+	out := fmt.Sprintf(`{"title":"%s","srcs":[`, title)
+	for i, src := range srcs {
+		if i > 0 {
+			out += ","
+		}
+		out += fmt.Sprintf(`%q`, src)
+	}
+	out += "]}"
 	return out, nil
 }

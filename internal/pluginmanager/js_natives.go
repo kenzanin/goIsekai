@@ -65,6 +65,15 @@ func registerJSHostNatives(vm *goja.Runtime, m *Manager, id string) error {
 		}
 	}
 
+	// host.html — HTML parsing helpers with opaque handle.
+	htmlObj, err := htmlGroupJS(vm)
+	if err != nil {
+		return err
+	}
+	if err := host.Set("html", htmlObj); err != nil {
+		return err
+	}
+
 	// host.http — thin wrappers over http_request proxy.
 	httpObj := vm.NewObject()
 	if err := httpObj.Set("get", jsHttpGet(vm, m, id)); err != nil {

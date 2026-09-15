@@ -20,10 +20,10 @@ re-implements the same ~30 text/codec functions:
   maintained manually and is bug-prone.
 
 Host already exposes, per runtime:
-- **Lua**: `log`, `http_request`, plus `host.text.*`, `host.codecs.*`, `host.crypto.*`, `host.json.*` (2), `host.http.*` via `lua_natives.go`.
-- **JS/goja**: `host.text.*`, `host.codecs.*`, `host.crypto.*`, `host.json.*` (2), `host.http.*` via `js_natives.go`.
+- **Lua**: `log`, `http_request`, plus `host.text.*`, `host.codecs.*`, `host.crypto.*`, `host.json.*` (2), `host.html.*` (9), `host.http.*` via `lua_natives.go`.
+- **JS/goja**: `host.text.*`, `host.codecs.*`, `host.crypto.*`, `host.json.*` (2), `host.html.*` (9), `host.http.*` via `js_natives.go`.
 - **JS/WASM Extism**: `host_http_request` in `pkg/types/abi.go`.
-- **Scriggo**: `hostnet`, `hostapi`.
+- **Yaegi**: `hostnet` — `Get`/`Post` plus the nine HTML functions `Parse`, `FindText`, `FindAttr`, `FindListText`, `FindListAttr`, `XPathText`, `XPathAttr`, `XPathListText`, `XPathListAttr`.
 
 New `host.http.*` additions are pure additions — no overlap to reconcile.
 
@@ -70,8 +70,52 @@ host.json.encode(v)                  -- value -> JSON string
 empty-table headers normalization trap (project memory #2409: empty Lua table
 encodes as `[]`, headers must be `{}`), currently hand-fixed in 4 plugins.
 
-### JS/WASM (phase 3, optional) — Extism host functions
+### Lua + JS (phase 7) — `host.html.*`
 
+Both script runtimes expose the same flat group of nine functions, handle first.
+The call text is identical in Lua and JS.
+
+```lua
+host.html.parse(markup)                        -- -> document handle
+host.html.find_text(doc, selector)             -- string
+host.html.find_attr(doc, selector, attr)       -- string
+host.html.find_list_text(doc, selector)        -- array of string
+host.html.find_list_attr(doc, selector, attr)  -- array of string
+host.html.xpath_text(doc, expr)                -- string
+host.html.xpath_attr(doc, expr, attr)          -- string
+host.html.xpath_list_text(doc, expr)           -- array of string
+host.html.xpath_list_attr(doc, expr, attr)     -- array of string
+```
+
+The handle is an ordinary first argument, not a receiver: every other `host`
+group is a flat table, and a receiver would put Lua's `:`/`.` ambiguity on every
+call. The list lookups skip elements that do not carry the attribute, a lookup
+that matches nothing returns `""` or an empty list, and an unparseable selector
+or expression is an error naming the offending value. Malformed markup is never
+an error. All three runtimes share one implementation in `internal/htmldoc`.
+
+### Yaegi (phase 7) — `hostnet`
+
+Yaegi has no `host` table, so the same nine functions sit in the synthetic
+`hostnet` package beside `Get`/`Post`, same argument order with a Go-typed
+handle first:
+
+```go
+doc, err := hostnet.Parse(markup)
+hostnet.FindText(doc, "h1.title")        // (string, error)
+hostnet.FindAttr(doc, "a", "href")       // (string, error)
+hostnet.FindListText(doc, "a")           // ([]string, error)
+hostnet.FindListAttr(doc, "img", "src")  // ([]string, error)
+hostnet.XPathText(doc, "//h1")           // (string, error)
+hostnet.XPathAttr(doc, "//a", "href")    // (string, error)
+hostnet.XPathListText(doc, "//a")        // ([]string, error)
+hostnet.XPathListAttr(doc, "//img", "src") // ([]string, error)
+```
+
+Installed in `yaegi.go` through `interp.Exports{"hostnet/hostnet": ...}`.
+`hostnet` is the only non-stdlib import a Yaegi plugin may write.
+
+### JS/WASM (phase 3, optional) — Extism host functions
 Mirror only the genuinely duplicated ones (`stripMarkdown`, `urlDecodeText`,
 `stripHTML`). JS already has regex, so this is a semantics-consistency play,
 not a capability play. Cost: `pkg/types/abi.go` constant + `runtime.go`
@@ -106,6 +150,7 @@ tables/glue stay plugin-side (site-specific, rotate with extension updates).
 | **P5** | **`host.http.*`** — centralized HTTP wrappers (get, post) over http_request proxy | ✅ done | (next) |
 | **P5b** | Failure logging hoisted into `hostnet.HandleRequest`; plugin HTTP wrappers collapse to `host.http.*` aliases | ✅ done | (this change) |
 | **P6** | `host.json.*` — shared JSON codec for Lua + JS; the Lua `json` global removed | ✅ done | see `add-host-json-helpers` |
+| **P7** | **`host.html.*`** (9 functions) for Lua + JS, and the same nine on the Yaegi `hostnet` bridge, over one `internal/htmldoc` implementation | ✅ done | see `add-host-html-helpers` |
 
 P0–P5 delivers the full surface: 10 plugins migrated, ~530 LOC deleted, 16 native functions wired to both Lua and JS runtimes.
 
