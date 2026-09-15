@@ -13,7 +13,7 @@ pkgs := "./internal/... ./pkg/... ./cmd/..."
 # the linter; the Lua and web assets have their own recipes.
 prod := "./internal/... ./pkg/... ./cmd/..."
 
-# Where `install-lua` and `install-info` copy into. Override per run:
+# Where `install-lua`, `install-js` and `install-info` copy into. Override per run:
 #   just plugins_dir=/tmp/plugins install-lua kaliscan
 plugins_dir := "app_data/plugins"
 info_dir := "app_data/info"
@@ -126,6 +126,20 @@ install-lua plugin:
     rm -rf {{plugins_dir}}/{{plugin}}
     cp -r "$src" {{plugins_dir}}/{{plugin}}
     echo "installed: {{plugins_dir}}/{{plugin}}/main.lua (restart the server to load it)"
+
+# copy a JS plugin folder into the plugins dir: `just install-js mangzio`
+install-js plugin:
+    #!/usr/bin/env sh
+    set -eu
+    src="examples/plugins/js/{{plugin}}"
+    if [ ! -f "$src/main.js" ]; then
+        echo "$src/main.js not found"
+        exit 1
+    fi
+    mkdir -p {{plugins_dir}}
+    rm -rf {{plugins_dir}}/{{plugin}}
+    cp -r "$src" {{plugins_dir}}/{{plugin}}
+    echo "installed: {{plugins_dir}}/{{plugin}}/main.js (restart the server to load it)"
 
 # copy an info (metadata enrichment) script folder into the info dir: `just install-info mangadex`
 install-info info:
