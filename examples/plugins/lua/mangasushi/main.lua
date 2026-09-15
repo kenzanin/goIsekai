@@ -13,7 +13,7 @@ PLUGIN = {
     search_page_size = 24,
 }
 
-local BASE = "https://mangasushi.org"
+BASE = "https://mangasushi.org"
 
 -- ─── helpers ────────────────────────────────────────────────────────────────
 
@@ -153,7 +153,7 @@ function get_chapter_list(arg)
             if cid and not seen[cid] then
                 seen[cid] = true
                 chapters[#chapters + 1] = {
-                    id = cid,
+                    id = slug .. ":" .. cid,
                     chapter_num = tonumber(num) or 0,
                     title = label,
                     uploaded_at = date,
@@ -171,7 +171,7 @@ function get_chapter_list(arg)
                 seen[cid] = true
                 local num = label:match('[Cc]hapter%s+([%d%.%-]+)')
                 chapters[#chapters + 1] = {
-                    id = cid,
+                    id = slug .. ":" .. cid,
                     chapter_num = tonumber(num) or 0,
                     title = trim(label),
                     url = href

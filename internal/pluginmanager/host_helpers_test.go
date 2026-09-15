@@ -757,3 +757,79 @@ func TestLuaMangaKatanaLive(t *testing.T) {
 	}
 	t.Logf("live: %q -> %d chapters, %d pages; first page %s", detail.Title, len(chapters), len(pages), pages[0].URL)
 }
+
+// TestLuaMadaraChapterIDs covers the chapter id both Madara plugins hand to
+// the host. Their page reader expands the id into "<slug>/<chapter>" before
+// fetching, so an id that carries only the chapter segment reads a URL with no
+// slug and gets a 404 — the chapter list still looks fine, and only the reader
+// sees the failure.
+func TestLuaMadaraChapterIDs(t *testing.T) {
+	const chapterList = `<!doctype html><html><body><ul class="main version-chap">
+		<li class="wp-manga-chapter"><a href="{{base}}/manga/test-manga/chapter-96/">Chapter 96</a><span class="chapter-release-date"><i>July 7, 2026</i></span></li>
+		<li class="wp-manga-chapter"><a href="{{base}}/manga/test-manga/chapter-95/">Chapter 95</a><span class="chapter-release-date"><i>June 7, 2026</i></span></li>
+		</ul></body></html>`
+	const readerPage = `<!doctype html><html><body><div class="reading-content">
+		<div class="page-break"><img class="wp-manga-chapter-img" data-src="{{base}}/p/1.jpg"></div>
+		<div class="page-break"><img class="wp-manga-chapter-img" data-src="{{base}}/p/2.jpg"></div>
+		</div></body></html>`
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/html")
+		body := ""
+		switch {
+		case strings.HasSuffix(r.URL.Path, "/ajax/chapters/"):
+			body = chapterList
+		case strings.Contains(r.URL.Path, "/chapter-"):
+			body = readerPage
+		default:
+			http.NotFound(w, r)
+			return
+		}
+		_, _ = io.WriteString(w, strings.ReplaceAll(body, "{{base}}", "http://"+r.Host))
+	}))
+	defer srv.Close()
+
+	for _, id := range []string{"lhtranslation", "mangasushi"} {
+		t.Run(id, func(t *testing.T) {
+			mgr := NewManager(hostnet.NewProxy(), t.TempDir())
+			defer func() { _ = mgr.Close() }()
+			if _, err := mgr.Install("../../examples/plugins/lua/" + id); err != nil {
+				t.Fatalf("install plugin: %v", err)
+			}
+			if err := mgr.ensureLoaded(id); err != nil {
+				t.Fatalf("load plugin: %v", err)
+			}
+			mgr.mu.RLock()
+			state := mgr.plugins[id].lunar
+			mgr.mu.RUnlock()
+			if _, err := state.DoString("test-base", fmt.Sprintf("BASE = %q", srv.URL)); err != nil {
+				t.Fatalf("retarget BASE: %v", err)
+			}
+
+			chapters, err := mgr.GetChapterList(id, "test-manga")
+			if err != nil {
+				t.Fatalf("GetChapterList: %v", err)
+			}
+			if len(chapters) != 2 {
+				t.Fatalf("chapters = %+v, want the two stub rows", chapters)
+			}
+			if chapters[0].ID != "test-manga:chapter-96" {
+				t.Errorf("chapter id = %q, want the slug in front so the reader can build a URL", chapters[0].ID)
+			}
+			if chapters[0].Title != "Chapter 96" {
+				t.Errorf("chapter title = %q", chapters[0].Title)
+			}
+
+			pages, err := mgr.GetPageList(id, chapters[0].ID)
+			if err != nil {
+				t.Fatalf("GetPageList: %v", err)
+			}
+			if len(pages) != 2 {
+				t.Fatalf("pages = %+v, want the two stub images", pages)
+			}
+			if want := srv.URL + "/p/1.jpg"; pages[0].URL != want {
+				t.Errorf("first page = %q, want %q", pages[0].URL, want)
+			}
+		})
+	}
+}

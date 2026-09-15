@@ -13,7 +13,7 @@ PLUGIN = {
     search_page_size = 24,
 }
 
-local BASE = "https://lhtranslation.net"
+BASE = "https://lhtranslation.net"
 
 -- ─── helpers ────────────────────────────────────────────────────────────────
 
@@ -159,7 +159,7 @@ function get_chapter_list(arg)
                 iso = string.format("%s-%02d-%02dT12:00:00Z", yr, tonumber(months[mon]), tonumber(day))
             end
             local ch = {
-                id = cid or label,
+                id = slug .. ":" .. (cid or label),
                 chapter_num = tonumber(num) or 0,
                 title = label,
                 url = href
@@ -174,7 +174,7 @@ function get_chapter_list(arg)
 end
 
 -- ─── ABI: get_page_list ─────────────────────────────────────────────────────
--- arg: '"slug/chapter-N"'. Chapter page: <div class="reading-content"> with
+-- arg: '"slug:chapter-N"'. Chapter page: <div class="reading-content"> with
 -- <img data-src="..."> inside .page-break divs.
 
 function get_page_list(arg)
@@ -184,10 +184,7 @@ function get_page_list(arg)
     if not body then return host.json.encode({}) end
 
     local pages = {}
-    for src in body:gmatch('class="wp%-manga%-chapter%-img[^>]*"%s*>') do
-        -- attribute comes BEFORE class in this theme: capture from preceding tag text instead
-    end
-    -- Simpler: find all <img ...> tags carrying wp-manga-chapter-img, pull data-src
+    -- Find all <img ...> tags carrying wp-manga-chapter-img, pull data-src
     local pos = 1
     while true do
         local s = body:find("<img", pos, true)
