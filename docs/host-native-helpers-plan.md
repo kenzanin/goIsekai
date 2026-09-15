@@ -36,7 +36,7 @@ Counted by function definition across `examples/plugins/{lua,js,wasm}`:
 | `url_encode` / `qsEscape` | 10 (8 files) | 1 | – | pure percent-encode, identical |
 | `url_decode_text` / `urlDecodeText` | 6 | 4 | – | ASCII-only guard, keeps non-ASCII encoded |
 | `strip_markdown` / `stripMarkdown` | 6 | 4 | – | identical ~20 lines |
-| `normalizeStatus` | 4 | 4 | 1 | **DECIDED: keep plugin-side** (see §4) |
+| `normalizeStatus` | 4 | 4 | 1 | **SHIPPED: host default table; site-specific keys stay plugin-side** (see §4) |
 | `http_get` | 4 | – | – | `http_request` boilerplate + error log — **both resolved host-side** (see P5b) |
 | `stripHTML` | – | 2 | 1 | tags removed, `<br>`→`\n`, entities decoded |
 | `titlecase` | 2 | – | – | |
@@ -130,11 +130,16 @@ tables/glue stay plugin-side (site-specific, rotate with extension updates).
 
 ## 4. Explicitly NOT moving
 
-- **`normalizeStatus` — keep plugin-side.** User decision (message 9121):
-  *"jangan bro. plugins harus map status sumber ke status yang ada di host bro"*.
-  Source→canonical mapping is per-source and belongs in the plugin.
-  Canonical vocabulary stays `Ongoing/Completed/Hiatus/Dropped/Upcoming`
-  (unknown passes through).
+- **`normalizeStatus` — the canonical table is host-side; site-specific keys
+  stay plugin-side.** User decision (message 9121): *"jangan bro. plugins harus
+  map status sumber ke status yang ada di host bro"* — so the plugin keeps
+  owning which source field it reads and any keys only that site uses, and the
+  host owns the canonical vocabulary. `host.text.normalize_status(raw)` matches
+  case-insensitively against the host default table and returns `raw` unchanged
+  on a miss, which is what the plugins that had copied that table were doing
+  anyway; `host.text.normalize_status(map, raw)` takes a site-specific map for
+  the cases that need one. Canonical vocabulary stays
+  `Ongoing/Completed/Hiatus/Dropped/Upcoming` (unknown passes through).
 - Per-source HTML/JSON parsing, ABI exports, and any site-specific glue.
 
 ## 5. Phases
