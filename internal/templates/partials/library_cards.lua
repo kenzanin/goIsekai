@@ -39,7 +39,7 @@ return function(data)
 						.. h(title)
 						.. '" style="aspect-ratio: '
 						.. h(tostring(ratio))
-						.. '" class="w-full object-cover" loading="lazy">'
+						.. '" class="w-full object-cover" loading="lazy" onerror="this.onerror=null;this.style.opacity=0.5;">'
 				else
 					coverHTML = '<img src="/image?pluginID='
 						.. h(pluginID)
@@ -47,7 +47,7 @@ return function(data)
 						.. h(coverURL)
 						.. '" alt="'
 						.. h(title)
-						.. '" class="w-full aspect-[2/3] object-cover" loading="lazy">'
+						.. '" class="w-full aspect-[2/3] object-cover" loading="lazy" onerror="this.onerror=null;this.style.opacity=0.5;">'
 				end
 			else
 				coverHTML = '<div class="w-full aspect-[2/3] bg-neutral-800 flex items-center justify-center text-neutral-500 text-2xl font-semibold">'

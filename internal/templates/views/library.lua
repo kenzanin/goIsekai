@@ -49,6 +49,9 @@ return function(data)
 	local topPagination = pagination({
 		Pagination = { Base = pagBase, Param = "page", Current = page, Total = totalPages, Compact = true },
 	})
+	local bottomPagination = pagination({
+		Pagination = { Base = pagBase, Param = "page", Current = page, Total = totalPages, Compact = false },
+	})
 
 	return '<div class="flex items-center gap-3 flex-wrap mb-6">'
 		.. '<div class="shrink-0"><h1 class="text-xl font-semibold">Library</h1>'
@@ -75,6 +78,7 @@ return function(data)
 		.. sidebarHTML
 		.. mangaCards
 		.. (sidebarHTML ~= "" and "</div></div>" or "")
+		.. bottomPagination
 		.. [[
 <style>
   .view-container[data-view-mode="list"] {

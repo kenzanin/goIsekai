@@ -49,7 +49,7 @@ return function(data)
 		.. '<input type="hidden" name="manga_title" value="'
 		.. h(data.CurrentTitle or manga.Title or "")
 		.. '">'
-		.. '<button type="submit" class="border border-indigo-600/50 text-indigo-300 hover:bg-indigo-600/20 rounded-md px-3 py-1.5 text-xs font-medium inline-flex items-center gap-1.5" :disabled="loading">'
+		.. '<button type="submit" class="border border-indigo-600/50 text-indigo-300 hover:bg-indigo-600/20 rounded-md px-3 py-1.5 text-xs font-medium inline-flex items-center gap-1.5" @click="loading = true">'
 		.. '<svg x-show="loading" class="size-3.5 animate-spin" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-6.219-8.56"/><path d="M3.5 12h3.5"/><path d="M12 3.5v3.5"/></svg>'
 		.. '<span x-text="loading ? &quot;Fetching...&quot; : &quot;Fetch Details&quot;">Fetch Details</span>'
 		.. "</button>"
