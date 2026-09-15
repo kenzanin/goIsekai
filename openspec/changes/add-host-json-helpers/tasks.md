@@ -18,11 +18,11 @@
 
 ## 4. Documentation
 
-- [ ] 4.1 Update the per-runtime host surface inventory in `docs/host-native-helpers-plan.md` so Lua no longer lists a bare `json` global and both runtimes list `host.json.*`; verify a plugin author reading the removal note can find the replacement call
+- [x] 4.1 Update the per-runtime host surface inventory in `docs/host-native-helpers-plan.md` so Lua no longer lists a bare `json` global and both runtimes list `host.json.*`; verify a plugin author reading the removal note can find the replacement call
 
 ## 5. Migration and full verification
 
-- [ ] 5.1 Produce the Lua plugin migration mapping (`json.decode` -> `host.json.decode`, `json.encode` -> `host.json.encode`) and apply it to the installed Lua plugins under `app_data/plugins/`; verify each migrated plugin loads and its search returns results
-- [ ] 5.2 Run `CGO_ENABLED=0 go test ./internal/... ./pkg/... ./cmd/...` and verify all tests pass
-- [ ] 5.3 Run `golangci-lint run ./internal/... ./pkg/... ./cmd/...` and verify no new findings
-- [ ] 5.4 Exercise a JSON round trip in the running app (search through a migrated Lua plugin and through a JS plugin) and verify the results are unchanged from before the migration
+- [x] 5.1 Produce the Lua plugin migration mapping (`json.decode` -> `host.json.decode`, `json.encode` -> `host.json.encode`) and apply it to the installed Lua plugins under `app_data/plugins/`; verify each migrated plugin loads and its search returns results
+- [x] 5.2 Run `CGO_ENABLED=0 go test ./internal/... ./pkg/... ./cmd/...` and verify all tests pass
+- [x] 5.3 Run `golangci-lint run ./internal/... ./pkg/... ./cmd/...` and verify no new findings
+- [x] 5.4 Exercise a JSON round trip in the running app (search through a migrated Lua plugin and through a JS plugin) and verify the results are unchanged from before the migration

@@ -63,7 +63,7 @@ end
 -- ─── ABI: search_manga ──────────────────────────────────────────────────────
 
 function search_manga(arg)
-    local args = json.decode(arg)
+    local args = host.json.decode(arg)
     local query = args.query or ""
     local page = args.page or 1
 
@@ -72,7 +72,7 @@ function search_manga(arg)
     local body = http_get(url)
     if not body or body == "" then
         log.error("mangasushi search empty response")
-        return json.encode({})
+        return host.json.encode({})
     end
 
     local results = {}
@@ -104,15 +104,15 @@ function search_manga(arg)
     end
 
     log.debug("mangasushi search q=" .. query .. " page=" .. tostring(page) .. " found=" .. tostring(#results))
-    return json.encode(results)
+    return host.json.encode(results)
 end
 
 -- ─── ABI: get_manga_detail ──────────────────────────────────────────────────
 
 function get_manga_detail(arg)
-    local slug = json.decode(arg)
+    local slug = host.json.decode(arg)
     local body = http_get(BASE .. "/manga/" .. slug .. "/")
-    if not body then return json.encode({id = slug}) end
+    if not body then return host.json.encode({id = slug}) end
 
     local detail = { id = slug, title = "", author = "", description = "",
         cover_url = "", genres = {}, status = "" }
@@ -158,16 +158,16 @@ function get_manga_detail(arg)
     if dblock == "" then dblock = body:match('class="summary__content[^"]*">(.-)</div>') or "" end
     detail.description = unescape(trim(dblock:gsub("<[^>]+>", " "):gsub("%s+", " ")))
 
-    return json.encode(detail)
+    return host.json.encode(detail)
 end
 
 -- ─── ABI: get_chapter_list ──────────────────────────────────────────────────
 -- Madara chapters via POST {base}/manga/SLUG/ajax/chapters/
 
 function get_chapter_list(arg)
-    local slug = json.decode(arg)
+    local slug = host.json.decode(arg)
     local body = http_post(BASE .. "/manga/" .. slug .. "/ajax/chapters/", "")
-    if not body then return json.encode({}) end
+    if not body then return host.json.encode({}) end
 
     local chapters = {}
     local seen = {}
@@ -211,16 +211,16 @@ function get_chapter_list(arg)
     end
 
     log.debug("mangasushi chapters slug=" .. slug .. " count=" .. tostring(#chapters))
-    return json.encode(chapters)
+    return host.json.encode(chapters)
 end
 
 -- ─── ABI: get_page_list ─────────────────────────────────────────────────────
 
 function get_page_list(arg)
-    local path = json.decode(arg)
+    local path = host.json.decode(arg)
     path = path:gsub(":", "/")
     local body = http_get(BASE .. "/manga/" .. path .. "/")
-    if not body then return json.encode({}) end
+    if not body then return host.json.encode({}) end
 
     local pages = {}
     local pos = 1
@@ -242,6 +242,6 @@ function get_page_list(arg)
     end
 
     log.debug("mangasushi pages " .. path .. " count=" .. tostring(#pages))
-    return json.encode(pages)
+    return host.json.encode(pages)
 end
 

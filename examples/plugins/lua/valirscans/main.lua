@@ -74,7 +74,7 @@ function jsonld_book(html)
         if not e2 then return nil end
         local chunk = html:sub(e + 1, e2 - 1)
         if string.find(chunk, '"@type"%s*:%s*"Book"', 1) then
-            local ok, obj = pcall(json.decode, chunk)
+            local ok, obj = pcall(host.json.decode, chunk)
             if ok and type(obj) == "table" then
                 return obj
             end
@@ -98,16 +98,16 @@ end
 -- ─── ABI: search_manga(arg) ────────────────────────────────────────────────
 -- arg: {"query":"...","page":1}  ->  array of {id, title, cover_url}
 function search_manga(arg)
-    local args = json.decode(arg)
+    local args = host.json.decode(arg)
     local query = args.query or ""
     log.debug("search q=" .. query)
     local resp = http_get(BASE .. "/api/search?q=" .. host.text.url_encode(query))
     if not resp or resp.status ~= 200 then
-        return json.encode({})
+        return host.json.encode({})
     end
-    local ok, data = pcall(json.decode, resp.body)
+    local ok, data = pcall(host.json.decode, resp.body)
     if not ok or not data or not data.series then
-        return json.encode({})
+        return host.json.encode({})
     end
     local out = {}
     for _, r in ipairs(data.series) do
@@ -122,16 +122,16 @@ function search_manga(arg)
         }
     end
     log.debug("search: found " .. #out .. " results for q=" .. query)
-    return json.encode(out)
+    return host.json.encode(out)
 end
 
 -- ─── ABI: get_manga_detail(arg) ────────────────────────────────────────────
 -- arg: '"urlSlug"'  ->  {id, title, author, description, cover_url, genres, status}
 function get_manga_detail(arg)
-    local manga_id = json.decode(arg) -- plain string (urlSlug)
+    local manga_id = host.json.decode(arg) -- plain string (urlSlug)
     local resp = http_get(BASE .. "/series/comic/" .. manga_id)
     if not resp or resp.status ~= 200 then
-        return json.encode({id = manga_id}) -- detail must stay an OBJECT
+        return host.json.encode({id = manga_id}) -- detail must stay an OBJECT
     end
     local html = resp.body
     local detail = { id = manga_id, title = "", author = "", description = "",
@@ -181,17 +181,17 @@ function get_manga_detail(arg)
     end
 
     log.debug("detail: " .. detail.title .. " | " .. detail.status)
-    return json.encode(detail)
+    return host.json.encode(detail)
 end
 
 -- ─── ABI: get_chapter_list(arg) ────────────────────────────────────────────
 -- arg: '"urlSlug"'  ->  array of {id, manga_id, chapter_num, title, url, uploaded_at}
 -- Chapters are newest-first (descending number) per ABI convention.
 function get_chapter_list(arg)
-    local manga_id = json.decode(arg)
+    local manga_id = host.json.decode(arg)
     local resp = http_get(BASE .. "/series/comic/" .. manga_id)
     if not resp or resp.status ~= 200 then
-        return json.encode({})
+        return host.json.encode({})
     end
     local html = resp.body
 
@@ -220,20 +220,20 @@ function get_chapter_list(arg)
         }
     end
     log.debug("chapters: " .. #chapters .. " for " .. manga_id)
-    return json.encode(chapters)
+    return host.json.encode(chapters)
 end
 
 -- ─── ABI: get_page_list(arg) ───────────────────────────────────────────────
 -- arg: '"urlSlug:N"' (chapter id from get_chapter_list)  ->  array of {url}
 function get_page_list(arg)
-    local chapter_id = json.decode(arg) -- e.g. "urlSlug:37"
+    local chapter_id = host.json.decode(arg) -- e.g. "urlSlug:37"
     local manga_id, num = string.match(chapter_id, "^(.-):(%d+)$")
     if not manga_id or not num then
-        return json.encode({})
+        return host.json.encode({})
     end
     local resp = http_get(BASE .. "/series/comic/" .. manga_id .. "/chapter/" .. num)
     if not resp or resp.status ~= 200 then
-        return json.encode({})
+        return host.json.encode({})
     end
     local html = resp.body
 
@@ -249,6 +249,6 @@ function get_page_list(arg)
         end
     end
     log.debug("pages: " .. #pages .. " for chapter " .. manga_id .. ":" .. num)
-    return json.encode(pages)
+    return host.json.encode(pages)
 end
 

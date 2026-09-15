@@ -139,17 +139,27 @@ Returns `{"status": 200, "headers": {...}, "body": "..."}`
 **`log.debug/info/warn/error(msg)`** — Logs visible at `/view/logs` and in
 sandbox responses.
 
+### Shared helpers (`host.*`) — Lua and JS
+
+- `host.json.decode(str)` — JSON string to a value; `host.json.encode(value)` —
+  value back to a JSON string. Both runtimes use the same codec, so results and
+  error text match.
+- `host.text.*` — url/html decode, strip html/markdown, titlecase, trim, and more
+- `host.codecs.*` — base64, base64url and hex encode/decode
+- `host.crypto.*` — sha256, md5, hmac-sha256, xor, utf8 hex
+- `host.http.get(url, headers?)` / `host.http.post(url, headers?, body)` — same
+  transport as `http_request`
+
 ### Lua-specific
 
-- `json.encode(obj)` / `json.decode(str)` — JSON conversion
 - `require("util")` — loads sibling `.lua` files from the same folder
 - Sandbox: only `base`, `string`, `table`, `math` stdlib (no `os`, `io`, `debug`)
+- There is **no** global `json` table; use `host.json.*`
 
 ### JS-specific
 
-- `JSON.parse()` / `JSON.stringify()` — native
-- `http_request(jsonString)` — same as Lua
-- `log.debug/info/warn/error(msg)` — same as Lua
+- `JSON.parse()` / `JSON.stringify()` — the VM's own codec, kept for local work;
+  prefer `host.json.*` when a plugin must behave identically to a Lua plugin
 - ES5.1 only (no `let`, `const`, arrow functions, template literals, `Promise`)
 
 ### WASM-specific

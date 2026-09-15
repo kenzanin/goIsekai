@@ -64,18 +64,18 @@ end
 -- ─── ABI: search_manga(arg) ────────────────────────────────────────────────
 -- arg: {"query":"...","page":1}  ->  array of {id, title, cover_url}
 function search_manga(arg)
-    local args = json.decode(arg)
+    local args = host.json.decode(arg)
     local query = args.query or ""
     log.debug("search q=" .. query)
     -- /home?keyword= renders the plain home feed (no server-side filtering);
     -- the search modal calls /api/search?search=Q instead.
     local resp = http_get(BASE .. "/api/search?search=" .. host.text.url_encode(query), true)
     if not resp or resp.status ~= 200 then
-        return json.encode({})
+        return host.json.encode({})
     end
-    local ok, data = pcall(json.decode, resp.body)
+    local ok, data = pcall(host.json.decode, resp.body)
     if not ok or not data or type(data.comics) ~= "table" then
-        return json.encode({})
+        return host.json.encode({})
     end
     local out = {}
     for _, c in ipairs(data.comics) do
@@ -88,16 +88,16 @@ function search_manga(arg)
         end
     end
     log.debug("search: found " .. #out .. " results for q=" .. query)
-    return json.encode(out)
+    return host.json.encode(out)
 end
 
 -- ─── ABI: get_manga_detail(arg) ────────────────────────────────────────────
 -- arg: '"slug.ZID"'  ->  {id, title, author, description, cover_url, genres, status}
 function get_manga_detail(arg)
-    local manga_id = json.decode(arg)
+    local manga_id = host.json.decode(arg)
     local resp = http_get(BASE .. "/series/" .. manga_id)
     if not resp or resp.status ~= 200 then
-        return json.encode({id = manga_id}) -- detail must stay an OBJECT
+        return host.json.encode({id = manga_id}) -- detail must stay an OBJECT
     end
     local html = resp.body
 
@@ -139,27 +139,27 @@ function get_manga_detail(arg)
         status = normalizeStatus(status)
     }
     log.debug("detail: " .. detail.title .. " | " .. detail.status)
-    return json.encode(detail)
+    return host.json.encode(detail)
 end
 
 -- ─── ABI: get_chapter_list(arg) ────────────────────────────────────────────
 -- arg: '"slug.ZID"'  ->  array of {id, manga_id, chapter_num, title, url, released_at}
 -- Chapters are newest-first (descending number) per ABI convention.
 function get_chapter_list(arg)
-    local manga_id = json.decode(arg)
+    local manga_id = host.json.decode(arg)
     local slug = bare_slug(manga_id)
     if not slug then
-        return json.encode({})
+        return host.json.encode({})
     end
     -- JSON endpoint wants the bare slug (no .zid suffix)
     local resp = http_get(BASE .. "/get-chapter-list?slug=" .. slug)
     if not resp or resp.status ~= 200 then
-        return json.encode({})
+        return host.json.encode({})
     end
-    local ok, body = pcall(json.decode, resp.body)
+    local ok, body = pcall(host.json.decode, resp.body)
     if not ok or not body or not body.success or type(body.data) ~= "table" then
         log.error("get-chapter-list bad payload for " .. slug)
-        return json.encode({})
+        return host.json.encode({})
     end
 
     local chapters = {}
@@ -178,20 +178,20 @@ function get_chapter_list(arg)
     end
     table.sort(chapters, function(a, b) return a.chapter_num > b.chapter_num end)
     log.debug("chapters: " .. #chapters .. " for " .. manga_id)
-    return json.encode(chapters)
+    return host.json.encode(chapters)
 end
 
 -- ─── ABI: get_page_list(arg) ───────────────────────────────────────────────
 -- arg: '"slug.ZID:N"' (chapter id from get_chapter_list)  ->  array of {url}
 function get_page_list(arg)
-    local chapter_id = json.decode(arg) -- "slug.ZID:chapter_slug"
+    local chapter_id = host.json.decode(arg) -- "slug.ZID:chapter_slug"
     local manga_id, chslug = string.match(chapter_id, "^(.-):(.+)$")
     if not manga_id or not chslug then
-        return json.encode({})
+        return host.json.encode({})
     end
     local resp = http_get(BASE .. "/series/" .. manga_id .. "/" .. chslug)
     if not resp or resp.status ~= 200 then
-        return json.encode({})
+        return host.json.encode({})
     end
     local html = resp.body
 
@@ -206,5 +206,5 @@ function get_page_list(arg)
         end
     end
     log.debug("pages: " .. #pages .. " for chapter " .. manga_id .. ":" .. chslug)
-    return json.encode(pages)
+    return host.json.encode(pages)
 end

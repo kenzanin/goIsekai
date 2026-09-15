@@ -64,7 +64,7 @@ end
 
 -- Parse JSON safely.
 local function parse_json(body)
-    local ok, data = pcall(json.decode, body)
+    local ok, data = pcall(host.json.decode, body)
     if not ok then
         log.error("json decode failed: " .. tostring(data))
         return nil
@@ -90,7 +90,7 @@ end
 
 -- Search — returns ALL results across upstream pages (host paginates).
 function search_manga(arg)
-    local f = json.decode(arg)
+    local f = host.json.decode(arg)
     local query = f and f.query or ""
     log.debug("mangafire search: q=" .. query)
 
@@ -120,22 +120,22 @@ function search_manga(arg)
     end
 
     log.debug("mangafire search: found " .. #all .. " results for q=" .. query)
-    return json.encode(all)
+    return host.json.encode(all)
 end
 
 -- get_manga_detail — single title by hid.
 function get_manga_detail(arg)
-    local hid = json.decode(arg)
-    if not hid then return json.encode(nil) end
+    local hid = host.json.decode(arg)
+    if not hid then return host.json.encode(nil) end
 
     log.debug("mangafire detail: id=" .. hid)
 
     local resp = http_get(vrf_url("/titles/" .. hid, nil))
-    if not resp or resp.status ~= 200 then return json.encode(nil) end
+    if not resp or resp.status ~= 200 then return host.json.encode(nil) end
     local body = parse_json(resp.body)
-    if not body then return json.encode(nil) end
+    if not body then return host.json.encode(nil) end
     local d = body.data
-    if not d then return json.encode(nil) end
+    if not d then return host.json.encode(nil) end
 
     local genres = {}
     if d.genres then
@@ -146,7 +146,7 @@ function get_manga_detail(arg)
         for _, a in ipairs(d.authors) do authors[#authors + 1] = a.title end
     end
 
-    return json.encode({
+    return host.json.encode({
         id = d.hid or hid,
         title = sanitize_title(d.title),
         description = host.text.strip_html(d.synopsisHtml or ""),
@@ -159,8 +159,8 @@ end
 
 -- get_chapter_list — up to 3 pages (200/page), newest-first.
 function get_chapter_list(arg)
-    local hid = json.decode(arg)
-    if not hid then return json.encode({}) end
+    local hid = host.json.decode(arg)
+    if not hid then return host.json.encode({}) end
 
     log.debug("mangafire chapters: id=" .. hid)
 
@@ -193,22 +193,22 @@ function get_chapter_list(arg)
 
     table.sort(chapters, function(a, b) return a.chapter_num > b.chapter_num end)
     log.debug("mangafire chapters: found " .. #chapters .. " chapters for " .. hid)
-    return json.encode(chapters)
+    return host.json.encode(chapters)
 end
 
 -- get_page_list — pages for a chapter, each with Referer header.
 function get_page_list(arg)
-    local chapter_id = json.decode(arg)
-    if not chapter_id then return json.encode({}) end
+    local chapter_id = host.json.decode(arg)
+    if not chapter_id then return host.json.encode({}) end
 
     log.debug("mangafire pages: chapter=" .. chapter_id)
 
     local resp = http_get(vrf_url("/chapters/" .. chapter_id, nil))
-    if not resp or resp.status ~= 200 then return json.encode({}) end
+    if not resp or resp.status ~= 200 then return host.json.encode({}) end
     local body = parse_json(resp.body)
-    if not body then return json.encode({}) end
+    if not body then return host.json.encode({}) end
     local raw_pages = (body.data and body.data.pages) or {}
-    if #raw_pages == 0 then return json.encode({}) end
+    if #raw_pages == 0 then return host.json.encode({}) end
 
     local pages = {}
     for i = 1, #raw_pages do
@@ -220,5 +220,5 @@ function get_page_list(arg)
     end
 
     log.debug("mangafire pages: found " .. #pages .. " pages for " .. chapter_id)
-    return json.encode(pages)
+    return host.json.encode(pages)
 end

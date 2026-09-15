@@ -77,7 +77,7 @@ end
 
 -- search_manga(arg) — arg is a JSON object: {"query":"...","page":1}
 function search_manga(arg)
-    local args = json.decode(arg)
+    local args = host.json.decode(arg)
     local query = (args.query or ""):lower():gsub("^%s+", ""):gsub("%s+$", "")
 
     local results = {}
@@ -90,26 +90,26 @@ function search_manga(arg)
             })
         end
     end
-    return json.encode(results)
+    return host.json.encode(results)
 end
 
 -- get_manga_detail(arg) — arg is a JSON-encoded plain string (e.g. '"dummy-solo"')
 function get_manga_detail(arg)
-    local manga_id = json.decode(arg)
+    local manga_id = host.json.decode(arg)
     local m = find_manga(manga_id)
-    if not m then return json.encode({}) end
-    return json.encode(m)
+    if not m then return host.json.encode({}) end
+    return host.json.encode(m)
 end
 
 -- get_chapter_list(arg) — arg is a JSON-encoded plain string (e.g. '"dummy-solo"')
 function get_chapter_list(arg)
-    local manga_id = json.decode(arg)
-    if not find_manga(manga_id) then return json.encode({}) end
-    return json.encode(chapters_for(manga_id))
+    local manga_id = host.json.decode(arg)
+    if not find_manga(manga_id) then return host.json.encode({}) end
+    return host.json.encode(chapters_for(manga_id))
 end
 
 -- get_page_list(arg) — arg is a JSON-encoded plain string (e.g. '"dummy-solo-ch1"')
 function get_page_list(arg)
-    local chapter_id = json.decode(arg)
-    return json.encode(pages_for(chapter_id, 8))
+    local chapter_id = host.json.decode(arg)
+    return host.json.encode(pages_for(chapter_id, 8))
 end

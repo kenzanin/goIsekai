@@ -35,7 +35,7 @@ PLUGIN = {
 
 ## Available globals
 
-- `json.encode(value)` / `json.decode(string)` — JSON helpers
+- `host.json.encode(value)` / `host.json.decode(string)` — JSON helpers
 - `http_request(req_table)` — HTTP via host proxy
 - `log.debug(msg)` / `log.info(msg)` / `log.warn(msg)` / `log.error(msg)`
 - `require("sibling")` — load a sibling `.lua` module from the plugin folder

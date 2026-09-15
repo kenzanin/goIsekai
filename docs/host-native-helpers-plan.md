@@ -20,8 +20,8 @@ re-implements the same ~30 text/codec functions:
   maintained manually and is bug-prone.
 
 Host already exposes, per runtime:
-- **Lua**: `json`, `log`, `http_request`, plus `host.text.*` (6), `host.codecs.*` (9), `host.crypto.*` (5), `host.http.*` (2) via `lua_natives.go`.
-- **JS/goja**: `host.text.*` (6), `host.codecs.*` (9), `host.crypto.*` (5), `host.http.*` (2) via `js_natives.go`.
+- **Lua**: `log`, `http_request`, plus `host.text.*`, `host.codecs.*`, `host.crypto.*`, `host.json.*` (2), `host.http.*` via `lua_natives.go`.
+- **JS/goja**: `host.text.*`, `host.codecs.*`, `host.crypto.*`, `host.json.*` (2), `host.http.*` via `js_natives.go`.
 - **JS/WASM Extism**: `host_http_request` in `pkg/types/abi.go`.
 - **Scriggo**: `hostnet`, `hostapi`.
 
@@ -47,7 +47,7 @@ Total: **~30 duplicate function definitions** across 11 plugin folders.
 
 ## 3. Proposed host-native surface
 
-### Lua (phase 1) — new `host` table, legacy globals untouched
+### Lua (phase 1) — new `host` table
 
 ```lua
 host.text.url_encode(s)              -- string
@@ -62,6 +62,8 @@ host.codecs.base64_encode(b) / base64_decode(s)
 host.codecs.base64url_encode(b) / base64url_decode(s)
 host.codecs.hex_encode(b) / hex_decode(s)
 host.crypto.sha256_hex(s) / hmac_sha256_hex(key, msg) / md5_hex(s)   -- phase 4
+host.json.decode(s)                  -- JSON string -> value
+host.json.encode(v)                  -- value -> JSON string
 ```
 
 `host.http.get` centralizes the `http_request` boilerplate **and** the
@@ -102,6 +104,7 @@ tables/glue stay plugin-side (site-specific, rotate with extension updates).
 | **P2b** | Migrate 4 JS plugins → `host.text.*` | ✅ done | 91dee9b |
 | **P4** | `codecs`/`crypto` hex primitives (utf8_hex, b64decode_hex, b64url_encode/decode_hex) | ✅ done | 6bf31bf |
 | **P5** | **`host.http.*`** — centralized HTTP wrappers (get, post) over http_request proxy | ✅ done | (next) |
+| **P6** | `host.json.*` — shared JSON codec for Lua + JS; the Lua `json` global removed | ✅ done | see `add-host-json-helpers` |
 
 P0–P5 delivers the full surface: 10 plugins migrated, ~530 LOC deleted, 16 native functions wired to both Lua and JS runtimes.
 
@@ -113,7 +116,9 @@ P0–P5 delivers the full surface: 10 plugins migrated, ~530 LOC deleted, 16 nat
   **every** runtime kind.
 - Register `host` **before** plugin `main.lua` runs (check `lua_state.go` /
   `lua_load.go` setup order).
-- Do not remove `json`/`log`/`http_request` globals — back-compat.
+- Do not remove the `log`/`http_request` globals — back-compat.
+- The Lua `json` global **was** removed: JSON now goes through `host.json.*`
+  in both script runtimes, so plugins must not call a bare `json`.
 - After each plugin migration, verify **all** ABI functions (search, detail,
   chapters, pages, alt-titles/summaries) live — not just search (memory #2521).
 - If a `host.text.url_decode` is adopted, re-check the enrichment DB for

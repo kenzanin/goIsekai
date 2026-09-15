@@ -63,7 +63,7 @@ end
 -- Single page per call (Madara caps results page); return-all from this page.
 
 function search_manga(arg)
-    local args = json.decode(arg)
+    local args = host.json.decode(arg)
     local query = args.query or ""
     local page = args.page or 1
 
@@ -72,7 +72,7 @@ function search_manga(arg)
         url = url .. "&paged=" .. tostring(page)
     end
     local body = http_get(url)
-    if not body then return json.encode({}) end
+    if not body then return host.json.encode({}) end
 
     local results = {}
     -- Parse per item: anchor <a href=".../manga/SLUG/" title="..."> followed
@@ -102,7 +102,7 @@ function search_manga(arg)
     end
 
     log.debug("lhtranslation search q=" .. query .. " page=" .. tostring(page) .. " found=" .. tostring(#results))
-    return json.encode(results)
+    return host.json.encode(results)
 end
 
 -- ─── ABI: get_manga_detail ──────────────────────────────────────────────────
@@ -110,10 +110,10 @@ end
 -- author-content, artist-content, genres-content, post-status, summary__content.
 
 function get_manga_detail(arg)
-    local slug = json.decode(arg)
+    local slug = host.json.decode(arg)
     local body = http_get(BASE .. "/manga/" .. slug .. "/")
     -- empty table encodes as []; detail must stay an OBJECT — emit {id} only
-    if not body then return json.encode({id = slug}) end
+    if not body then return host.json.encode({id = slug}) end
 
     local detail = { id = slug, title = "", author = "", description = "",
         cover_url = "", genres = {}, status = "" }
@@ -161,7 +161,7 @@ function get_manga_detail(arg)
     if dblock == "" then dblock = body:match('class="summary__content[^"]*">(.-)</div>') or "" end
     detail.description = unescape(trim(dblock:gsub("<[^>]+>", " "):gsub("%s+", " ")))
 
-    return json.encode(detail)
+    return host.json.encode(detail)
 end
 
 -- ─── ABI: get_chapter_list ──────────────────────────────────────────────────
@@ -169,9 +169,9 @@ end
 -- Returns newest-first: /ajax/chapters/ returns newest first already.
 
 function get_chapter_list(arg)
-    local slug = json.decode(arg)
+    local slug = host.json.decode(arg)
     local body = http_post(BASE .. "/manga/" .. slug .. "/ajax/chapters/")
-    if not body then return json.encode({}) end
+    if not body then return host.json.encode({}) end
 
     local chapters = {}
     for li in body:gmatch('<li%s+class="wp%-manga%-chapter[^>]*>(.-)</li>') do
@@ -202,7 +202,7 @@ function get_chapter_list(arg)
     end
 
     log.debug("lhtranslation chapters slug=" .. slug .. " count=" .. tostring(#chapters))
-    return json.encode(chapters)
+    return host.json.encode(chapters)
 end
 
 -- ─── ABI: get_page_list ─────────────────────────────────────────────────────
@@ -210,10 +210,10 @@ end
 -- <img data-src="..."> inside .page-break divs.
 
 function get_page_list(arg)
-    local path = json.decode(arg) -- "slug:chapter-N"
+    local path = host.json.decode(arg) -- "slug:chapter-N"
     path = path:gsub(":", "/")
     local body = http_get(BASE .. "/manga/" .. path .. "/")
-    if not body then return json.encode({}) end
+    if not body then return host.json.encode({}) end
 
     local pages = {}
     for src in body:gmatch('class="wp%-manga%-chapter%-img[^>]*"%s*>') do
@@ -235,6 +235,6 @@ function get_page_list(arg)
     end
 
     log.debug("lhtranslation pages " .. path .. " count=" .. tostring(#pages))
-    return json.encode(pages)
+    return host.json.encode(pages)
 end
 
