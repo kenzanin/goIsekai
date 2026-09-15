@@ -1,0 +1,47 @@
+## 1. Dependencies
+
+- [ ] 1.1 Add `github.com/PuerkitoBio/goquery` and `github.com/antchfx/htmlquery` as direct dependencies with `go get`, then `go mod tidy`; verify `go build ./internal/... ./cmd/... ./pkg/...` succeeds and `git diff go.mod` shows no change to the existing `golang.org/x/net` version
+- [ ] 1.2 Run `make check`; verify it reports no lint or format issues, so the two new dependencies and their transitives introduce no production-Go problems
+
+## 2. Shared document implementation
+
+- [ ] 2.1 Add `internal/htmldoc` with an exported `Document` type and `Parse(markup string) (*Document, error)`, backed by goquery for the tree and htmlquery for XPath; verify the package builds and a direct unit test parses a fixed markup string into a document
+- [ ] 2.2 Implement `FindText`, `FindAttr`, `FindListText` and `FindListAttr` on `Document`; verify unit tests assert trimmed first-match text, first-match attribute value, all-matches text in document order, and all-matches attribute values in document order
+- [ ] 2.3 Implement `XPathText`, `XPathAttr`, `XPathListText` and `XPathListAttr` on `Document`; verify unit tests assert the same four shapes for expressions selecting by position and by text content rather than by class
+- [ ] 2.4 Add the empty-result behaviour: an unmatched lookup returns the empty string or empty slice, an absent attribute returns the empty string, and a list lookup skips elements that do not carry the attribute; verify with unit tests covering each case, including three matched elements of which only two carry the attribute
+- [ ] 2.5 Add the failure behaviour: a non-string parse argument, an unparseable CSS selector, and an unparseable XPath expression each return an error naming the offending value, while malformed markup still yields a document; verify with unit tests asserting an error for each and a non-nil document for the malformed-markup case
+- [ ] 2.6 Confirm the package reads no file and opens no connection, so it cannot widen the plugin surface; verify by inspection of the package's imports and by a test that passes a filesystem path as markup and receives a document parsed from that literal text
+
+## 3. Lua runtime
+
+- [ ] 3.1 Add `internal/pluginmanager/lua_html.go` wrapping `htmldoc.Parse` and the eight document methods as Lua natives, with each lookup bound to its document and returning `nil` plus a message on failure, matching the convention the other Lua natives use; verify the package builds
+- [ ] 3.2 Register an `html` group exposing `parse` in `registerHostNatives` (`internal/pluginmanager/lua_natives.go`), beside `text`, `codecs`, `crypto`, `json` and `http`; verify a Lua fixture reaches `host.html.parse` and reads a value out of fixed markup
+- [ ] 3.3 Verify the already-shipped helpers still behave as before by calling `host.text.strip_html` and `host.json.decode` in the same fixture, and verify a bare `html` global is still absent so the group is the only entry point
+
+## 4. JS runtime
+
+- [ ] 4.1 Add `internal/pluginmanager/js_html.go` wrapping `htmldoc.Parse` and the eight document methods as goja natives, throwing on failure in the runtime's established idiom; verify the package builds
+- [ ] 4.2 Register the `html` group in `registerJSHostNatives` (`internal/pluginmanager/js_natives.go`); verify a JS fixture reaches `host.html.parse` and reads a value out of the same fixed markup the Lua fixture uses
+
+## 5. Yaegi runtime
+
+- [ ] 5.1 Export `htmldoc.Parse` and the `Document` type on the synthetic `hostnet` package in `internal/pluginmanager/yaegi.go`, keeping the exported symbol names equal to the names a plugin writes; verify a Yaegi plugin source can declare and use the handle without a load-time error
+- [ ] 5.2 Extend `examples/plugins/yaegi/yaegidemo/main.go` to parse markup and run a lookup; verify the plugin still loads under the sandbox's import check and the lookup returns the expected value
+- [ ] 5.3 If Yaegi rejects the exported type, fall back to the stateless `hostnet` function form recorded in design.md and verify the same lookup value and error text are still produced
+
+## 6. Cross-runtime equivalence
+
+- [ ] 6.1 Add assertions to `internal/pluginmanager/host_helpers_test.go` that run the same markup and selector through the Lua and JS runtimes and require identical values for a text lookup, an attribute lookup, and both list lookups; verify the test fails when one runtime's result is altered
+- [ ] 6.2 Add an assertion that the two script runtimes report identical error text for the same invalid selector and the same invalid XPath expression; verify the test fails when one runtime's message is altered
+- [ ] 6.3 Add an assertion that the Yaegi bridge returns the same lookup value as the script runtimes for the same markup and selector; verify the test fails when the Yaegi result is altered
+
+## 7. Documentation
+
+- [ ] 7.1 Add `host.html.*` and the Yaegi `hostnet` HTML functions to the per-runtime inventory in `docs/host-native-helpers-plan.md`; verify the list names all eight lookups for each runtime that has them
+- [ ] 7.2 Add a plugin-facing example that fetches a page and reads a list of image URLs through the new handle; verify the example runs in a plugin or is exercised by a test, so it is not a snippet nobody has executed
+
+## 8. Verification
+
+- [ ] 8.1 Run `CGO_ENABLED=0 go test ./internal/... ./pkg/... ./cmd/...` and `make build`; verify both pass
+- [ ] 8.2 Run a Lua plugin against a real manga page in a running instance and read a title plus a list of image URLs; verify the scraper gets real values rather than empty results, and that an intentionally wrong selector reports the parse error instead
+- [ ] 8.3 Confirm the sandbox is not widened: verify `io.open` and `os.execute` remain unavailable in Lua, and that no new import is allowed in a Yaegi plugin
