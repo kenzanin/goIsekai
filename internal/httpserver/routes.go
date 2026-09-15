@@ -63,6 +63,9 @@ func (s *Server) renderPage(w http.ResponseWriter, r *http.Request, name, active
 	}
 	m["active"] = active
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	if r != nil && r.Header.Get("X-Partial") == "true" && active != "" {
+		w.Header().Set("X-Active-Nav", active)
+	}
 	var err error
 	if r != nil && r.Header.Get("X-Partial") == "true" {
 		err = s.engine.RenderPartial(w, name, m)

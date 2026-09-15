@@ -18,7 +18,7 @@ return function(data, content)
 		'    <main id="content">',
 		content,
 		"    </main>",
-		'    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.9/dist/cdn.min.js"></script>',
+		'    <script defer src="/static/lib/alpine.min.js"></script>',
 		'    <script defer src="/static/lib/alpine-components.js"></script>',
 		"</body>",
 		"</html>",

@@ -11,7 +11,7 @@ local function navLink(href, token, label, active)
 	if active == token then
 		cls = cls .. " " .. ACTIVE_CLASS
 	end
-	return '<a href="' .. h(href) .. '" class="' .. h(cls) .. '">' .. h(label) .. "</a>"
+	return '<a href="' .. h(href) .. '" class="' .. h(cls) .. '" data-nav="' .. h(token) .. '">' .. h(label) .. "</a>"
 end
 
 return function(data)

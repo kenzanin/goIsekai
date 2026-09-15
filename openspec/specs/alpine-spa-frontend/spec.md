@@ -2,7 +2,7 @@
 
 Provides Alpine.js-based client-side interactivity and SPA navigation, replacing hand-written vanilla JS (toast system, confirm modal, data-confirm delegation) and dead HTMX imports with a unified reactive framework that makes page transitions instant and UI interactions declarative.
 
-## ADDED Requirements
+## Requirements
 
 ### Requirement: Global toast notification store
 The system SHALL provide a global Alpine.js `$store.toast` that displays stacking toast notifications with auto-dismiss, color-coded by type (success, error, info). Toasts SHALL slide in from the top-right, stack vertically (max 4 visible), and auto-dismiss after a configurable duration. The store SHALL expose a `show(message, type)` method callable from any component or `htmx:responseError` equivalent.
