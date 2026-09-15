@@ -8,40 +8,39 @@ goIsekai is a single static Go binary that serves a chi + Lua template engine + 
 
 ## Architecture
 
+### Layer diagram
+
 ```mermaid
-flowchart LR
+flowchart TD
     subgraph Browser
         UI[Alpine.js SPA<br/>Tailwind CSS]
         Reader[Canvas Reader]
     end
 
-    subgraph goIsekai[goIsekai single binary]
-        HTTP[chi HTTP server]
-        API["/api JSON endpoints"]
+    subgraph goIsekai[Single static binary]
+        HTTP[chi HTTP router]
         Bridge[AppService bridge]
         PM[pluginmanager<br/>lazy-load]
         subgraph Sandboxes
-            Lua[lunar<br/>safe stdlib]
+            Lua[lunar<br/>Lua 5.4]
             JS[goja<br/>ES5.1]
             YG[yaegi<br/>interpreted Go]
-            GO[go plugin<br/>.so]
+            GO[plugin.Load<br/>`.so`]
         end
-        HostNet["hostnet proxy<br/>profile ladder"]
+        HostNet[TLS fingerprint<br/>profile ladder]
         DB[(SQLite<br/>modernc.org)]
-        Cache[(WebP disk cache)]
-        Backup["auto-backup<br/>+ orphan prune"]
+        Cache[(WebP disk)]
+        Backup[auto-backup]
     end
 
     subgraph Internet
         Sites[Manga sites]
-        CDP[CDP browser fallback<br/>lightpanda / chrome]
+        CDP[Chrome/CDP<br/>challenge solver]
     end
 
     UI --> HTTP
     Reader --> HTTP
     HTTP --> Bridge
-    HTTP --> API
-    API --> Bridge
     Bridge --> PM
     PM --> Lua
     PM --> JS
@@ -49,12 +48,133 @@ flowchart LR
     PM --> GO
     Lua --> HostNet
     JS --> HostNet
-    HostNet -->|profile ladder| Sites
-    HostNet -.->|WAF block / challenge| CDP
-    CDP -.->|solved cookies| HostNet
+    YG --> HostNet
+    GO --> HostNet
+    HostNet --> Sites
+    HostNet -.->|WAF block| CDP
+    CDP -.->|cookies| HostNet
     Bridge --> DB
     Bridge --> Cache
     Bridge --> Backup
+```
+
+### Enrichment precedence
+
+```mermaid
+sequenceDiagram
+    participant Browser
+    participant API
+    participant Bridge
+    participant Registry
+    participant Source1[MangaDex]
+    participant Source2[MangaUpdates]
+    participant DB
+
+    Browser->>API: POST /action/fetch-enrichment
+    API->>Bridge: FetchEnrichment(title, [src1, src2])
+    Bridge->>Registry: FetchFirst(title, sources)
+    Registry->>Source1: Fetch(kind=titles)
+    Source1-->>Registry: [{value, url}]
+    Registry->>DB: AddAltTitles
+    Registry->>Source1: Fetch(kind=related)
+    Source1-->>Registry: [{value, url, cover}]
+    Registry->>DB: AddRelated
+    Registry->>Source1: Fetch(kind=authors)
+    Source1-->>Registry: [{value, url}]
+    Registry->>DB: SetMangaAuthor
+    Registry->>Source1: Fetch(kind=categories)
+    Source1-->>Registry: [{value}]
+    Registry->>DB: AddCategories
+    Registry->>Source1: Fetch(kind=summaries)
+    Source1-->>Registry: [{value}]
+    Registry->>DB: AddAltDescriptions
+    Note over Registry,Source2: If Source1 returns empty,<br/>Registry tries Source2
+```
+
+### Plugin runtime selection
+
+```mermaid
+graph TD
+    A[Plugin folder] --> B{main.lua?}
+    B -->|yes| C[lunar VM]
+    A --> D{main.js?}
+    D -->|yes| E[goja VM]
+    A --> F{main.go?}
+    F -->|yes| G[yaegi interpreter]
+    A --> H{plugin.so?}
+    H -->|yes| I[plugin.Load]
+
+    C --> J[host_http_request]
+    E --> J
+    G --> J
+    I --> J
+
+    J --> K[hostnet proxy]
+    K --> L[TLS fingerprint ladder]
+    K --> M[CDP browser<br/>if WAF blocks]
+```
+
+### HTTP route groups
+
+```mermaid
+graph TD
+    A[/] --> B[Static assets]
+    A --> C[HTML views]
+    A --> D[/api JSON endpoints]
+    A --> E[/action HTMX]
+    A --> F[/image proxy]
+    A --> G[/plugin-static]
+
+    B --> B1["/static/*"]
+    C --> C1["/view/library"]
+    C --> C2["/view/manga/{id}"]
+    C --> C3["/view/plugins"]
+    C --> C4["/view/settings"]
+    C --> C5["/view/logs"]
+    C --> C6["/view/history"]
+    C --> C7["/view/search"]
+    C --> C8["/view/updates"]
+    C --> C9["/view/read/{id}"]
+
+    D --> D1["GET /health"]
+    D --> D2["GET /library"]
+    D --> D3["GET /search"]
+    D --> D4["GET /manga/{id}"]
+    D --> D5["GET /manga/{id}/enrichment"]
+    D --> D6["GET /manga/{id}/categories"]
+    D --> D7["GET /manga/{id}/related"]
+    D --> D8["DELETE /manga/{id}/alt-titles"]
+    D --> D9["PUT /manga/{id}/title"]
+    D --> D10["GET /logs"]
+    D --> D11["GET /history"]
+    D --> D12["GET /plugins"]
+    D --> D13["GET /stats"]
+    D --> D14["POST /library/toggle/{id}"]
+    D --> D15["POST /chapters/read/{id}"]
+    D --> D16["POST /progress/{id}"]
+    D --> D17["GET /image/{id}"]
+    D --> D18["GET /image/{plugin}/{manga}/{chapter}"]
+
+    E --> E1["POST /action/install-plugin"]
+    E --> E2["POST /action/toggle-plugin/{id}"]
+    E --> E3["POST /action/toggle-library/{id}"]
+    E --> E4["POST /action/sync"]
+    E --> E5["POST /action/set-title/{id}"]
+    E --> E6["POST /action/remove-alt-title/{id}"]
+    E --> E7["POST /action/set-summary/{id}"]
+    E --> E8["POST /action/remove-alt-summary/{id}"]
+    E --> E9["POST /action/fetch-enrichment/{id}"]
+    E --> E10["POST /action/remove-genre/{id}"]
+    E --> E11["POST /action/remove-related/{id}"]
+    E --> E12["POST /action/remove-category/{id}"]
+    E --> E13["POST /action/add-category/{id}"]
+    E --> E14["POST /action/add-genre/{id}"]
+    E --> E15["POST /action/reset-enrichment/{id}"]
+    E --> E16["POST /action/set-chapter-progress"]
+    E --> E17["POST /action/mark-read/{id}"]
+
+    G --> G1["/plugin-static/{id}/{file}"]
+    F --> F1["/image?pluginID=&url=&mangaID=&chapterID="]
 ```
 
 ## Features
@@ -134,7 +254,9 @@ function getEnrichment(arg)   -- {"title":..., "kind":..., "source":...}
 end
 ```
 
-"Fetch Details" on a manga page calls every provider that serves the requested kind and stores the result in the matching alt section, where you promote the entry you want to the main title, synopsis, or genres. Author is surfaced directly on the detail page. See `examples/info/mangadex/main.lua` and `examples/info/mangaupdates/main.lua` — the latter is what fills the Related / Recommended section for manga a source site does not list.
+**Enrichment precedence.** When "Fetch Details" is triggered, the host iterates sources in discovery order and assigns each enrichment kind to the first provider that returns non-empty results. For example, if `mangadex` is registered first and returns titles/summaries/categories/authors/related, only `mangadex` data is stored for those kinds. `mangaupdates` (registered second) only fills kinds that `mangadex` returns empty — it acts as a fallback. This ensures predictable, deterministic enrichment without duplicates.
+
+See `examples/info/mangadex/main.lua` and `examples/info/mangaupdates/main.lua`.
 
 ### JS plugins (no toolchain needed)
 

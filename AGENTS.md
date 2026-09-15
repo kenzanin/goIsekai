@@ -11,8 +11,7 @@
 | Memory management, session state             | `agentic-memory-mcp` | Store/recall context across sessions                             |
 | Browse web pages, check UI                   | `obscura`            | Primary browser tool                                             |
 | Debug web pages (console, network)           | `playwright-cdp`     | Only when deep debugging needed                                  |
-| Look up API docs, library info               | `deepwiki`           | For GitHub repos and documentation                               |
-| MCP server interaction                       | `read_mcp_resource`  | Read resources from MCP servers (codebase-memory, etc.)          |
+| Look up API docs, library info                 | `deepwiki`           | For GitHub repos and documentation                               |
 
 **Workflow:**
 
@@ -20,7 +19,6 @@
 2. Before testing changes → `obscura` to verify UI behavior
 3. After completing task → `vestige-mcp` to store session context
 4. When stuck on API → `deepwiki` to check documentation
-5. For MCP resources → `read_mcp_resource` with correct mcp_name
 
 ---
 
@@ -280,15 +278,6 @@ mcp_deepwiki_read_wiki_contents \
   --repoName owner/repo
 ```
 
-### read_mcp_resource (general)
-
-```bash
-# Read from any MCP server
-read_mcp_resource \
-  --mcp_name codebase-memory \
-  --uri /path/to/resource
-```
-
 ---
 
 ## Common Issues & Fixes
@@ -298,4 +287,6 @@ read_mcp_resource \
 | `codebase-memory-mcp` tools failing | Use `codebase-memory` MCP server (without `-mcp` suffix)                        |
 | MCP tools not responding            | Run `mcp_codebase-memory_index_repository` to refresh index                     |
 | File not found errors               | Check if file is in `.gitignore` — excluded files need direct read              |
-| MCP resource not available          | List available resources first: `list_mcp_resources --mcp_name codebase-memory` |
+| `read_mcp_resource` returns         | `codebase-memory` exposes tools only (0 resources), so it has nothing to read.  |
+| "Method not found"                  | Use the `mcp_codebase-memory_*` tools instead. `list_mcp_resources` reports     |
+|                                     | which servers do publish resources (currently only `memory`, via `amem://`).    |
