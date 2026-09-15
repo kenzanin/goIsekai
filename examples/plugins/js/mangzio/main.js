@@ -15,20 +15,9 @@ var PLUGIN = {
 
 var BASE = "https://www.mangzio.com";
 
-// normalizeStatus maps a raw status string to the canonical host vocabulary.
-// Canonical set: Ongoing, Completed, Hiatus, Dropped, Upcoming.
-// Unknown values pass through as-is.
-function normalizeStatus(s) {
-    return host.text.normalize_status(s || "");
-}
-
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
-
-function httpGet(url) {
-    return host.http.get(url);
-}
 
 // Extract all RSC flight data chunks from a Next.js SSR HTML page.
 // Returns an array of decoded strings.
@@ -86,7 +75,7 @@ function searchManga(arg) {
 
     // Mangzio search is server-rendered at /en?q={query}
     // All results are on the first page; pagination not supported by the site.
-    var resp = httpGet(BASE + "/en?q=" + encodeURIComponent(query));
+    var resp = host.http.get(BASE + "/en?q=" + encodeURIComponent(query));
     if (!resp || resp.status !== 200) {
         log.error("mangzio search: HTTP " + (resp ? resp.status : "null"));
         return JSON.stringify([]);
@@ -143,7 +132,7 @@ function getMangaDetail(arg) {
     var slug = JSON.parse(arg);
     log.info("mangzio detail: slug=" + slug);
 
-    var resp = httpGet(BASE + "/en/" + encodeURIComponent(slug));
+    var resp = host.http.get(BASE + "/en/" + encodeURIComponent(slug));
     if (!resp || resp.status !== 200) {
         log.error("mangzio detail: HTTP " + (resp ? resp.status : "null"));
         return JSON.stringify(null);
@@ -173,7 +162,7 @@ function getMangaDetail(arg) {
         description: host.text.strip_html(synopsis),
         cover_url: manga.coverImageUrl ? (manga.coverImageUrl.indexOf("http") === 0 ? manga.coverImageUrl : BASE + manga.coverImageUrl) : "",
         genres: manga.genres || [],
-        status: normalizeStatus(manga.status || ""),
+        status: host.text.normalize_status(manga.status || ""),
     };
 
     return JSON.stringify(result);
@@ -183,7 +172,7 @@ function getChapterList(arg) {
     var slug = JSON.parse(arg);
     log.info("mangzio chapters: slug=" + slug);
 
-    var resp = httpGet(BASE + "/en/" + encodeURIComponent(slug));
+    var resp = host.http.get(BASE + "/en/" + encodeURIComponent(slug));
     if (!resp || resp.status !== 200) {
         log.error("mangzio chapters: HTTP " + (resp ? resp.status : "null"));
         return JSON.stringify([]);
@@ -240,7 +229,7 @@ function getPageList(arg) {
     log.info("mangzio pages: slug=" + slug + " ch=" + chapterNum);
 
     var chapterURL = BASE + "/en/" + slug + "-en-chapter-" + chapterNum;
-    var resp = httpGet(chapterURL);
+    var resp = host.http.get(chapterURL);
     if (!resp || resp.status !== 200) {
         log.error("mangzio pages: HTTP " + (resp ? resp.status : "null"));
         return JSON.stringify([]);

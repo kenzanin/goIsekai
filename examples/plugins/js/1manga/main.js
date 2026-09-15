@@ -109,12 +109,6 @@ function _toISO(dateVal) {
     return new Date(ms).toISOString();
 }
 
-// Normalize a source status string to the host's canonical vocabulary
-// (Ongoing/Completed/Hiatus/Dropped/Upcoming). Unrecognized values pass through.
-function normalizeStatus(s) {
-    return host.text.normalize_status(s || "");
-}
-
 // ---------------------------------------------------------------------------
 // ABI functions
 // ---------------------------------------------------------------------------
@@ -188,7 +182,7 @@ function getMangaDetail(arg) {
         cover_url: cover,
         author: m.author || "",
         description: m.description || "",
-        status: normalizeStatus(status) || "",
+        status: host.text.normalize_status(status || ""),
         genres: m.genres || [],
     });
 }
