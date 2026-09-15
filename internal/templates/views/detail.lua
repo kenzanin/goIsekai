@@ -121,7 +121,11 @@ return function(data)
 
 	-- Related manga tags — click to remove (no confirm, capture-phase dispatch)
 	local relatedTagsHTML = ""
+	local seenRelated = {}
 	for _, r in ipairs(rels) do
+		local name = r.Value or ""
+		if name == "" or seenRelated[name] then goto next end
+		seenRelated[name] = true
 		relatedTagsHTML = relatedTagsHTML
 			.. '<form method="post" action="/action/remove-related/'
 			.. h(pluginID)
@@ -129,12 +133,13 @@ return function(data)
 			.. h(mangaID)
 			.. '" class="inline">'
 			.. '<input type="hidden" name="title" value="'
-			.. h(r.Value or "")
+			.. h(name)
 			.. '">'
 			.. '<span class="inline-flex items-center gap-1 rounded-full bg-emerald-500/10 text-emerald-400 text-xs pl-2 pr-1 cursor-pointer hover:bg-emerald-500/20">'
-			.. (r.URL and r.URL ~= "" and ('<a href="' .. h(r.URL) .. '" target="_blank" class="hover:underline">' .. h(r.Value) .. "</a>") or h(r.Value))
+			.. (r.URL and r.URL ~= "" and ('<a href="' .. h(r.URL) .. '" target="_blank" class="hover:underline">' .. h(name) .. "</a>") or h(name))
 			.. '<span class="size-4 inline-flex items-center justify-center rounded-full text-emerald-500 hover:text-red-400 hover:bg-neutral-700" onclick="submitForm(this.closest(\'form\'))">&times;</span>'
 			.. '</span></form>'
+		::next::
 	end
 
 	-- Synopsis with read-more toggle
@@ -250,8 +255,6 @@ return function(data)
 			Manga = manga,
 			Author = manga.Author,
 			Categories = cats,
-			Related = rels,
-			Genres = manga.Genres,
 			PluginGenres = manga.RawGenres,
 			OverrideGenres = data.OverrideGenres or {},
 		})

@@ -31,10 +31,6 @@ func enrichmentData() map[string]any {
 			{Value: "Action", Source: "plugin"},
 			{Value: "Shounen", Source: "plugin"},
 		},
-		"Related": []database.EnrichmentRow{
-			{Value: "Other Manga", Source: "plugin"},
-		},
-		"Genres":       []string{"Action"},
 		"PluginGenres": []string{"Action"},
 	}
 }
@@ -61,7 +57,6 @@ func TestDetailAltChipFormsTargetActions(t *testing.T) {
 		{"remove alt synopsis", "/action/remove-alt-summary/demo/m1", "description", "An alternative synopsis."},
 		{"add category", "/action/add-category/demo/m1", "category", "Shounen"},
 		{"remove category", "/action/remove-category/demo/m1", "category", "Action"},
-		{"remove related", "/action/remove-related/demo/m1", "title", "Other Manga"},
 		{"fetch", "/action/fetch-enrichment/demo/m1", "manga_title", "Main Title"},
 	}
 	for _, tc := range cases {
@@ -125,8 +120,8 @@ func TestDetailAltChipsAreClickable(t *testing.T) {
 	if !strings.Contains(form, "submitForm(") {
 		t.Errorf("alt title chip has no submitForm() handler:\n%s", form)
 	}
-	if n := strings.Count(out, "submitForm("); n < 5 {
-		t.Errorf("only %d chips are clickable, want >= 5 (titles, synopses, categories, related)", n)
+	if n := strings.Count(out, "submitForm("); n < 4 {
+		t.Errorf("only %d chips are clickable, want >= 4 (titles, synopses, categories)", n)
 	}
 }
 
@@ -139,7 +134,6 @@ func TestDetailAltEscapesUntrustedValues(t *testing.T) {
 	data["AltTitles"] = []database.AltTitleRow{{Title: nasty, Source: "MangaDex"}}
 	data["AltSummaries"] = []database.AltDescriptionRow{{Description: nasty}}
 	data["Categories"] = []database.EnrichmentRow{{Value: nasty}}
-	data["Related"] = []database.EnrichmentRow{{Value: nasty}}
 
 	out := renderEnrichment(t, data)
 	if strings.Contains(out, "<script>") {
@@ -167,7 +161,7 @@ func TestDetailAltOmitsEmptySections(t *testing.T) {
 	if !strings.Contains(out, `action="/action/reset-enrichment/demo/m1"`) {
 		t.Error("Reset form missing")
 	}
-	for _, gone := range []string{"set-title", "set-summary", "add-category", "remove-related"} {
+	for _, gone := range []string{"set-title", "set-summary", "add-category", "remove-category"} {
 		if strings.Contains(out, "/action/"+gone+"/") {
 			t.Errorf("empty panel rendered an %s form", gone)
 		}

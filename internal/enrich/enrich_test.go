@@ -120,3 +120,77 @@ func TestSupportsKind(t *testing.T) {
 		t.Fatal("expected SupportsKind(nope, titles) to be false")
 	}
 }
+
+// kindMock answers per kind and records which kinds it was asked for.
+type kindMock struct {
+	id     string
+	kinds  []Kind
+	byKind map[Kind][]Item
+	calls  []Kind
+}
+
+func (m *kindMock) ID() string { return m.id }
+func (m *kindMock) Name() string {
+	return m.id
+}
+func (m *kindMock) Kinds() []Kind {
+	out := make([]Kind, len(m.kinds))
+	copy(out, m.kinds)
+	return out
+}
+func (m *kindMock) Fetch(_ context.Context, _ *http.Client, _ string, k Kind) ([]Item, error) {
+	m.calls = append(m.calls, k)
+	return m.byKind[k], nil
+}
+
+// TestCatalog_KeepsRegistrationOrder: the catalog is the caller's source
+// precedence, so walking it must not shuffle the sources (a map walk did).
+func TestCatalog_KeepsRegistrationOrder(t *testing.T) {
+	r := NewRegistry()
+	for _, id := range []string{"mangadex", "mangaupdates", "anilist"} {
+		r.Register(&kindMock{id: id, kinds: []Kind{KindTitles}})
+	}
+
+	var got []string
+	for _, e := range r.Catalog("") {
+		got = append(got, e.ID)
+	}
+	want := []string{"mangadex", "mangaupdates", "anilist"}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("catalog order = %v, want %v", got, want)
+	}
+}
+
+// TestFetchFirst_FirstSourceOwnsAKind: whatever the first source answers is
+// final for that kind, and a later source is only asked for the kinds the
+// earlier ones left empty.
+func TestFetchFirst_FirstSourceOwnsAKind(t *testing.T) {
+	r := NewRegistry()
+	first := &kindMock{id: "mangadex", kinds: []Kind{KindCategories, KindRelated}, byKind: map[Kind][]Item{
+		KindCategories: {{Value: "Action"}},
+	}}
+	second := &kindMock{id: "mangaupdates", kinds: []Kind{KindCategories, KindRelated}, byKind: map[Kind][]Item{
+		KindCategories: {{Value: "Shounen"}},
+		KindRelated:    {{Value: "Related Manga"}},
+	}}
+	r.Register(first)
+	r.Register(second)
+
+	got := r.FetchFirst(context.Background(), nil, "Title", []string{"mangadex", "mangaupdates"})
+
+	if len(got[KindCategories]) != 1 || got[KindCategories][0].Value != "Action" {
+		t.Fatalf("categories = %+v, want the first source's single 'Action'", got[KindCategories])
+	}
+	if got[KindCategories][0].Source != "mangadex" {
+		t.Errorf("categories source = %q, want mangadex", got[KindCategories][0].Source)
+	}
+	if len(got[KindRelated]) != 1 || got[KindRelated][0].Value != "Related Manga" {
+		t.Fatalf("related = %+v, want the first source's empty kind filled by the second", got[KindRelated])
+	}
+	if got[KindRelated][0].Source != "mangaupdates" {
+		t.Errorf("related source = %q, want mangaupdates", got[KindRelated][0].Source)
+	}
+	if len(second.calls) != 1 || second.calls[0] != KindRelated {
+		t.Errorf("second source was asked for %v, want only related", second.calls)
+	}
+}

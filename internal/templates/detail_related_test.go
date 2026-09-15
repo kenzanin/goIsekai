@@ -7,11 +7,11 @@ import (
 	"goisekai/internal/database"
 )
 
-// The "Related / Recommended" section is rendered twice from the same
-// data.Related: as plain tags in the detail column (views/detail) and as chips
-// inside the enrichment panel (partials/detail_alt). Either one silently
-// renders nothing when the list is empty, so a regression in one of the two
-// places is invisible — no error, no log line. These tests pin both.
+// The "Related / Recommended" section renders in the detail column and only
+// there. The enrichment panel used to repeat the same list from the same
+// data.Related, so every entry appeared twice on an opened page. Rendering
+// nothing when the list is empty is silent, so these tests pin both the
+// placement and the de-duplication.
 
 func relatedRows() []database.EnrichmentRow {
 	return []database.EnrichmentRow{
@@ -34,37 +34,53 @@ func detailData() map[string]any {
 	}
 }
 
-func TestRelatedSectionRendersInBothPlaces(t *testing.T) {
+func TestRelatedSectionRendersInDetailColumnOnly(t *testing.T) {
 	e := mustEngine(t)
-	for _, name := range []string{"views/detail", "partials/detail_alt"} {
-		t.Run(name, func(t *testing.T) {
-			out := renderPartial(t, e, name, detailData())
-			if !strings.Contains(out, "Related / Recommended") {
-				t.Fatalf("%s dropped the Related / Recommended heading", name)
-			}
-			if !strings.Contains(out, `action="/action/remove-related/demo/m1"`) {
-				t.Errorf("%s has no remove-related form", name)
-			}
-			for _, r := range relatedRows() {
-				if !strings.Contains(out, r.Value) {
-					t.Errorf("%s is missing related entry %q", name, r.Value)
-				}
-			}
-		})
+	out := renderPartial(t, e, "views/detail", detailData())
+	if !strings.Contains(out, "Related / Recommended") {
+		t.Fatal("views/detail dropped the Related / Recommended heading")
+	}
+	if n := strings.Count(out, `action="/action/remove-related/demo/m1"`); n != len(relatedRows()) {
+		t.Errorf("views/detail rendered %d related chips, want %d", n, len(relatedRows()))
+	}
+	if !strings.Contains(out, `href="https://example.com/other"`) {
+		t.Error("views/detail did not link a related entry to its source page")
+	}
+
+	panel := renderPartial(t, e, "partials/detail_alt", detailData())
+	if strings.Contains(panel, "Related / Recommended") {
+		t.Error("the enrichment panel repeats the related list the detail column already shows")
 	}
 }
 
+// TestRelatedSectionHiddenWhenEmpty: with no rows the heading must not appear,
+// so an empty enrichment fetch does not leave a bare title behind.
 func TestRelatedSectionHiddenWhenEmpty(t *testing.T) {
 	e := mustEngine(t)
-	for _, name := range []string{"views/detail", "partials/detail_alt"} {
-		t.Run(name, func(t *testing.T) {
-			data := detailData()
-			data["Related"] = []database.EnrichmentRow{}
-			out := renderPartial(t, e, name, data)
-			if strings.Contains(out, "Related / Recommended") {
-				t.Errorf("%s rendered the Related / Recommended heading with no related manga", name)
-			}
-		})
+	data := detailData()
+	data["Related"] = []database.EnrichmentRow{}
+	out := renderPartial(t, e, "views/detail", data)
+	if strings.Contains(out, "Related / Recommended") {
+		t.Error("rendered the Related / Recommended heading with no related manga")
+	}
+}
+
+// TestRelatedDuplicatesCollapse: two rows carrying the same title are one
+// chip, whatever mix of sources produced them.
+func TestRelatedDuplicatesCollapse(t *testing.T) {
+	e := mustEngine(t)
+	data := detailData()
+	data["Related"] = []database.EnrichmentRow{
+		{Value: "Same Title", URL: "https://example.com/a", Source: "mangadex"},
+		{Value: "Same Title", URL: "https://example.com/b", Source: "mangaupdates"},
+		{Value: "", Source: "mangadex"},
+	}
+	out := renderPartial(t, e, "views/detail", data)
+	if n := strings.Count(out, `action="/action/remove-related/demo/m1"`); n != 1 {
+		t.Errorf("three related rows rendered %d chips, want 1", n)
+	}
+	if strings.Count(out, `href="https://example.com/a"`) != 1 {
+		t.Error("the first row's link should be the one kept")
 	}
 }
 

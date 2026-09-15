@@ -69,6 +69,7 @@ type Registry struct {
 	mu     sync.RWMutex
 	byID   map[string]Provider // keyed by Provider.ID()
 	byKind map[Kind][]Provider // for filtering
+	order  []string            // registration order, so the catalog is stable
 }
 
 // NewRegistry creates an empty registry.
@@ -90,6 +91,7 @@ func (r *Registry) Register(p Provider) {
 		return
 	}
 	r.byID[p.ID()] = p
+	r.order = append(r.order, p.ID())
 	for _, k := range p.Kinds() {
 		r.byKind[k] = append(r.byKind[k], p)
 	}
@@ -110,7 +112,8 @@ func (r *Registry) Catalog(kind Kind) []CatalogEntry {
 			})
 		}
 	} else {
-		for _, p := range r.byID {
+		for _, id := range r.order {
+			p := r.byID[id]
 			entries = append(entries, CatalogEntry{
 				ID:    p.ID(),
 				Name:  p.Name(),
@@ -157,29 +160,35 @@ func (r *Registry) Fetch(ctx context.Context, httpc *http.Client, source string,
 	return items, nil
 }
 
-// FetchAll fetches every kind supported by the given sources for the title.
-// Returns a map[Kind][]Item. Items that fail to fetch are skipped (best-effort).
-func (r *Registry) FetchAll(ctx context.Context, httpc *http.Client, title string, sources []string) map[Kind][]Item {
-	r.mu.RLock()
-	defer r.mu.RUnlock()
-
+// FetchFirst fetches each kind from the first source that returns anything for
+// it, so one source owns a kind instead of every source merging into it. The
+// source order is the precedence order; a source that errors or comes back
+// empty passes the kind on to the next one.
+func (r *Registry) FetchFirst(ctx context.Context, httpc *http.Client, title string, sources []string) map[Kind][]Item {
 	out := make(map[Kind][]Item)
 	for _, source := range sources {
-		p := r.byID[source]
+		p := r.Resolve(source)
 		if p == nil {
 			continue
 		}
 		for _, kind := range p.Kinds() {
+			if len(out[kind]) > 0 {
+				continue
+			}
 			items, err := p.Fetch(ctx, httpc, title, kind)
 			if err != nil {
 				logger.Debug("enrich fetch failed", "source", source, "kind", string(kind), "error", err)
+				continue
+			}
+			if len(items) == 0 {
+				logger.Debug("enrich fetch empty", "source", source, "kind", string(kind))
 				continue
 			}
 			for i := range items {
 				items[i].Source = source
 			}
 			logger.Debug("enrich fetch ok", "source", source, "kind", string(kind), "count", len(items))
-			out[kind] = append(out[kind], items...)
+			out[kind] = items
 		}
 	}
 	return out

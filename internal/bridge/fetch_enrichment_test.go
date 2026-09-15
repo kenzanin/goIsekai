@@ -88,6 +88,67 @@ func TestFetchEnrichmentStoresAllKinds(t *testing.T) {
 	}
 }
 
+// TestFetchEnrichmentPrefersTheFirstSource: the source list is a precedence
+// order, not a merge list. A kind the first source answers is final, and a
+// kind it leaves empty falls through to the next source, so one source owns
+// each section instead of every source piling into all of them.
+func TestFetchEnrichmentPrefersTheFirstSource(t *testing.T) {
+	db, err := database.Open(filepath.Join(t.TempDir(), "enrich.db"))
+	if err != nil {
+		t.Fatalf("open db: %v", err)
+	}
+	defer func() { _ = db.Close() }()
+
+	if err := db.UpsertManga(database.Manga{
+		ID: "p1|m1", PluginID: "p1", SourceMangaID: "m1", Title: "Title",
+	}); err != nil {
+		t.Fatalf("upsert manga: %v", err)
+	}
+
+	primary := &enrichMockProvider{
+		id:   "mangadex",
+		name: "MangaDex",
+		kinds: []enrich.Kind{
+			enrich.KindCategories, enrich.KindRelated,
+		},
+		items: map[enrich.Kind][]enrich.Item{
+			enrich.KindCategories: {{Value: "Action", Source: "mangadex"}},
+		},
+	}
+	fallback := &enrichMockProvider{
+		id:   "mangaupdates",
+		name: "MangaUpdates",
+		kinds: []enrich.Kind{
+			enrich.KindCategories, enrich.KindRelated,
+		},
+		items: map[enrich.Kind][]enrich.Item{
+			enrich.KindCategories: {{Value: "Shounen", Source: "mangaupdates"}},
+			enrich.KindRelated:    {{Value: "Related Manga", URL: "http://x", Source: "mangaupdates"}},
+		},
+	}
+	reg := enrich.NewRegistry()
+	reg.Register(primary)
+	reg.Register(fallback)
+	s := NewAppService(db, nil, hostnet.NewProxy(), "", "", reg)
+
+	if err := s.FetchEnrichment("p1", "m1", "Title", []string{"mangadex", "mangaupdates"}); err != nil {
+		t.Fatalf("FetchEnrichment: %v", err)
+	}
+
+	cats, _ := s.ListCategories("p1", "m1")
+	if len(cats) != 1 || cats[0].Value != "Action" || cats[0].Source != "mangadex" {
+		t.Errorf("categories = %+v, want only the first source's 'Action'", cats)
+	}
+	rels, _ := s.ListRelated("p1", "m1")
+	if len(rels) != 1 || rels[0].Value != "Related Manga" || rels[0].Source != "mangaupdates" {
+		t.Errorf("related = %+v, want the fallback source's entry", rels)
+	}
+	// The first source answered categories, so the second was never asked.
+	if n := len(fallback.titles); n != 1 {
+		t.Errorf("the fallback source was consulted %d times, want 1 (related only)", n)
+	}
+}
+
 // TestGetEnrichmentReturnsEveryStoredSection: the API response mirrors the
 // detail page, and alt titles/summaries live in their own tables rather than
 // in the enrichment kinds, so they need their own lookup path.

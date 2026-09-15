@@ -1,8 +1,8 @@
 --- partials/detail_alt.lua
---  Detail page: Alpine.js-powered enrichment panel — interactive genres & related toggles.
+--  Detail page: Alpine.js-powered enrichment panel — interactive genres & title toggles.
 --  data.PluginID, data.MangaID, data.CurrentTitle, data.AltTitles,
 --  data.AltSummaries, data.Manga
---  data.Categories, data.Related, data.Genres (current active genres for highlighting)
+--  data.Categories, data.PluginGenres (current active genres for highlighting)
 
 return function(data)
 	local pluginID = data.PluginID or ""
@@ -12,32 +12,10 @@ return function(data)
 	local altSummaries = data.AltSummaries or {}
 	local manga = data.Manga or {}
 	local cats = data.Categories or {}
-	local rels = data.Related or {}
-	local genres = data.Genres or {}
 	local pluginGenres = data.PluginGenres or {}
 	local author = data.Author or ""
 
-	-- Use &quot; for JSON double-quotes so they don't break the HTML attribute.
-	-- The browser decodes &quot; → " before Alpine sees the x-data expression.
-	local jq = '&quot;'
-
-	-- Build x-data: genres list and related list for Alpine reactive highlighting.
-	-- Individual values are HTML-escaped with h(); the JSON structure uses &quot;.
-	local genresJSON = '['
-	for i, g in ipairs(genres) do
-		if i > 1 then genresJSON = genresJSON .. ',' end
-		genresJSON = genresJSON .. jq .. h(g) .. jq
-	end
-	genresJSON = genresJSON .. ']'
-
-	local relsJSON = '['
-	for i, r in ipairs(rels) do
-		if i > 1 then relsJSON = relsJSON .. ',' end
-		relsJSON = relsJSON .. jq .. h(r.Value or '') .. jq
-	end
-	relsJSON = relsJSON .. ']'
-
-	local xData = "x-data=\"{ loading: false, currentGenres: " .. genresJSON .. ", currentRelated: " .. relsJSON .. " }\""
+	local xData = 'x-data="{ loading: false }"'
 
 	local chevOnClick =
 		"var b=document.getElementById(&quot;enrichment-btn&quot;);var bd=document.getElementById(&quot;enrichment-body&quot;);bd.classList.toggle(&quot;hidden&quot;);b.querySelector(&quot;.chev&quot;).classList.toggle(&quot;rotate-90&quot;);try{localStorage.setItem(&quot;gsk:enrichment-open:&quot;+b.dataset.key,b.querySelector(&quot;.chev&quot;).classList.contains(&quot;rotate-90&quot;) ? &quot;1&quot; : &quot;0&quot;)}catch(e){}"
@@ -211,37 +189,6 @@ return function(data)
 		end
 		body = body .. "</div></div>"
 
-	end
-
-	-- Related manga — clickable, highlighted if in current related
-	if #rels > 0 then
-		body = body .. '<div class="mb-3" data-related-section>'
-		body = body .. '<span class="text-[11px] font-semibold text-neutral-400 uppercase">Related / Recommended</span>'
-		body = body .. '<div class="flex flex-wrap gap-1.5 mt-1">'
-		for _, r in ipairs(rels) do
-			local rName = r.Value or ""
-			local isCur = false
-			for _, g in ipairs(genres) do
-				if g == rName then isCur = true; break end
-			end
-			body = body
-				.. '<form method="post" action="/action/remove-related/'
-				.. h(pluginID)
-				.. "/"
-				.. h(mangaID)
-				.. '" class="inline">'
-				.. '<input type="hidden" name="title" value="'
-				.. h(rName)
-				.. '">'
-				.. '<span class="inline-flex items-center gap-1 rounded-full '
-				.. (isCur
-					and 'bg-emerald-500/20 border-emerald-600/60 text-emerald-300 cursor-pointer hover:bg-emerald-500/30'
-					or 'bg-neutral-800 border-neutral-700 text-neutral-300 cursor-pointer hover:bg-neutral-700')
-				.. '" @click="submitForm($el.closest(&apos;form&apos;))">'
-				.. h(rName)
-				.. '</span></form>'
-		end
-		body = body .. "</div></div>"
 	end
 
 	body = body .. "</div></div>"

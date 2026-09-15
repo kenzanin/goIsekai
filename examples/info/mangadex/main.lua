@@ -12,7 +12,7 @@
 --   summaries   synopsis
 --   categories  genres
 --   authors     author
---   related     related manga, each linked to its MangaDex page
+--   related     recommended manga (what the site's Recommendations tab lists)
 --
 -- One title maps to two upstream requests (search, then detail). The detail
 -- response carries every field, so it is memoized in the VM and reused by the
@@ -174,12 +174,39 @@ local function relatedTitles(ids)
     return byID
 end
 
-local function related(data)
+-- recommendedIDs fetches the list behind the site's Recommendations tab.
+-- /manga/{id}/recommendation scores every other manga against this one and
+-- returns bare ids, so the titles still need the batch lookup below. It takes
+-- no limit or offset, so its first 50 are all it will ever hand back.
+local function recommendedIDs(id)
+    local body = get(API .. "/manga/" .. id .. "/recommendation")
+    if not body or type(body.data) ~= "table" then
+        return {}
+    end
     local ids, seen = {}, {}
-    for _, rel in ipairs(data.relationships or {}) do
-        if rel.type == "manga" and not seen[rel.id] then
-            seen[rel.id] = true
-            ids[#ids + 1] = rel.id
+    for _, rec in ipairs(body.data) do
+        for _, rel in ipairs(rec.relationships or {}) do
+            if rel.type == "manga" and rel.id ~= id and not seen[rel.id] then
+                seen[rel.id] = true
+                ids[#ids + 1] = rel.id
+            end
+        end
+    end
+    return ids
+end
+
+-- related: the recommendations are the main list, matching what the MangaDex
+-- page shows. The plot relations from the detail response are the fallback,
+-- since only a minority of series have any.
+local function related(data)
+    local ids = recommendedIDs(data.id)
+    if #ids == 0 then
+        local seen = {}
+        for _, rel in ipairs(data.relationships or {}) do
+            if rel.type == "manga" and rel.id ~= data.id and not seen[rel.id] then
+                seen[rel.id] = true
+                ids[#ids + 1] = rel.id
+            end
         end
     end
     local byID = relatedTitles(ids)

@@ -57,7 +57,7 @@ func (s *AppService) FetchEnrichment(pluginID, mangaID, title string, sources []
 		}
 	}
 	logger.Debug("enrich fetch start", "title", title, "sources", sources)
-	items := s.enrich.FetchAll(context.Background(), &http.Client{}, title, sources)
+	items := s.enrich.FetchFirst(context.Background(), &http.Client{}, title, sources)
 
 	// Store alt titles.
 	if titles, ok := items[enrich.KindTitles]; ok && len(titles) > 0 {
@@ -143,7 +143,9 @@ func (s *AppService) FetchEnrichment(pluginID, mangaID, title string, sources []
 	return nil
 }
 
-// EnrichmentSources returns all registered enrichment source IDs.
+// EnrichmentSources returns all registered enrichment source IDs in provider
+// registration order, which is the precedence order a fetch walks: the first
+// source that answers a kind owns it and later sources only fill the gaps.
 func (s *AppService) EnrichmentSources() []string {
 	if s.enrich == nil {
 		return nil
