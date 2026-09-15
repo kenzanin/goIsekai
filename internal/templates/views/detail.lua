@@ -229,17 +229,18 @@ return function(data)
 		body = body .. synopsisHTML
 	end
 
-	-- Related manga
+	-- Related manga with read-more toggle
 	if relatedTagsHTML ~= "" then
 		body = body
 			.. '<div class="mb-3">'
 			.. '<span class="text-xs font-semibold text-neutral-300 uppercase tracking-wide">Related / Recommended</span>'
-			.. '<div class="flex flex-wrap gap-1.5 mt-1.5">'
+			.. '<div id="related-text" class="text-sm text-neutral-400 mt-1.5 max-h-[6rem] overflow-hidden transition-all duration-300 relative">'
+			.. '<div class="flex flex-wrap gap-1.5">'
 			.. relatedTagsHTML
-			.. "</div></div>"
+			.. '</div>'
+			.. '<span id="related-fade" class="absolute inset-x-0 bottom-0 h-8 bg-gradient-to-t from-neutral-950 to-transparent pointer-events-none"></span></div>'
+			.. '<button type="button" id="related-toggle" onclick="var t=document.getElementById(&quot;related-text&quot;);var f=document.getElementById(&quot;related-fade&quot;);var b=document.getElementById(&quot;related-toggle&quot;);t.classList.toggle(&quot;max-h-[6rem]&quot;);t.classList.toggle(&quot;max-h-none&quot;);f.style.display=t.classList.contains(&quot;max-h-none&quot;)?&quot;none&quot;:&quot;block&quot;;b.textContent=t.classList.contains(&quot;max-h-none&quot;)?&quot;Show less&quot;:&quot;Read more&quot;;" class="text-xs text-indigo-400 hover:text-indigo-300 transition mt-1 cursor-pointer">Read more</button></div>'
 	end
-
-	-- Author
 	if manga.Author and manga.Author ~= "" then
 		body = body .. '<p class="text-sm text-neutral-400 mb-2">' .. h(manga.Author) .. "</p>"
 	end
