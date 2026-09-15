@@ -18,7 +18,7 @@ func newLuaState(t *testing.T) *lua.State {
 	}
 	mgr := NewManager(hostnet.NewProxy(), t.TempDir())
 	if err := mgr.setupGlobals(state, "test"); err != nil {
-		state.Close()
+		_ = state.Close()
 		t.Fatalf("setup globals: %v", err)
 	}
 	return state
@@ -29,7 +29,7 @@ func newLuaState(t *testing.T) *lua.State {
 func runLua(t *testing.T, chunk string, check func(t *testing.T, first lua.Value)) {
 	t.Helper()
 	state := newLuaState(t)
-	defer state.Close()
+	defer func() { _ = state.Close() }()
 
 	fn, err := state.Load("test.lua", strings.NewReader(chunk))
 	if err != nil {
@@ -218,9 +218,9 @@ func TestLuaHTMLGroupLeavesExistingHelpersAlone(t *testing.T) {
 // host.html.parse panicked.
 func TestLuaHTMLTwoStatesInOneProcess(t *testing.T) {
 	first := newLuaState(t)
-	defer first.Close()
+	defer func() { _ = first.Close() }()
 	second := newLuaState(t)
-	defer second.Close()
+	defer func() { _ = second.Close() }()
 
 	chunk := `return host.html.find_text(host.html.parse("<h1>one</h1>"), "h1")`
 	for name, state := range map[string]*lua.State{"first": first, "second": second} {

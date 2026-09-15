@@ -10,7 +10,7 @@ import (
 // brHandler wraps an http.FileSystem and serves a pre-compressed `.br` sibling
 // (e.g. reader.js.br) when the client accepts brotli and the file exists. This
 // avoids compressing at request time: assets are compressed once at build time
-// by `make br`, then embedded and committed. The explicit Content-Encoding makes
+// by `just br`, then embedded and committed. The explicit Content-Encoding makes
 // chi's Compress middleware skip re-compression.
 func brHandler(fsys http.FileSystem) http.Handler {
 	fileServer := http.FileServer(fsys)

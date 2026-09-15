@@ -79,7 +79,7 @@ flowchart LR
 ## Quick start
 
 ```sh
-make build          # CGO-free build -> ./goisekai
+just build          # CGO-free build -> ./goisekai
 ./goisekai          # serves http://localhost:8080 (add -open to launch a browser)
 ```
 
@@ -176,7 +176,7 @@ func Search(arg string) (string, error) {
 ABI functions take one string arg and return `(string, error)`; `Init` takes no arg. Networking goes through the synthetic `hostnet` package (`hostnet.Get`/`hostnet.Post`), which routes through the same TLS-fingerprinted per-plugin proxy. Sandbox: the Go stdlib is available, but any third-party (`github.com/...`) or `goisekai/...` import is rejected at load time. See `examples/plugins/yaegi/yaegidemo/` for a complete example.
 
 ```sh
-make install-plugins   # copies all plugin sources → app_data/plugins/
+just install-lua kaliscan   # copies a Lua plugin → app_data/plugins/
 ```
 
 ## TLS profile ladder
@@ -209,14 +209,16 @@ See `docs/API.md` for the full endpoint reference.
 ## Development
 
 ```sh
-make build           # build the server
-make test            # go test ./...
-make lint            # golangci-lint
-make lint-web        # Biome (web sources)
-make check           # fmt + test + modernize + lint
-make install-plugins # install example plugins
-make br              # brotli-compress static assets
-make clean           # remove binary + generated assets
+just                 # build the server (the default recipe)
+just test            # go test ./internal/... ./pkg/... ./cmd/...
+just race            # the same, under the race detector
+just lint            # golangci-lint
+just lint-web        # Biome (web sources)
+just check           # fmt + modernize + lint, production Go only
+just install-lua kaliscan   # install a Lua plugin into app_data/plugins/
+just br              # brotli-compress static assets
+just clean           # remove the binary
+just --list          # everything else
 ```
 
 Stack: Go 1.27 · chi · Lua templates (lunar) · Alpine.js · Tailwind CSS (static build) · Extism · goja · tls-client · chromedp · modernc.org/sqlite (via go-jet) · gen2brain/webp.

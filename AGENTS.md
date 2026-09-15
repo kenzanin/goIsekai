@@ -34,24 +34,29 @@ Module: `goisekai` · Go 1.27 · CGO-free · pure Go SQLite
 
 ## Commands
 
+Recipes live in the `justfile` (`just --list`).
+
 | Command          | What it does                                                               |
 | ---------------- | -------------------------------------------------------------------------- |
-| `make build`     | Full build (runs `css`, `br`, then `CGO_ENABLED=0 go build`)               |
-| `make test`      | Run all tests (`CGO_ENABLED=0 go test ./internal/... ./pkg/... ./cmd/...`) |
-| `make race`      | Run tests with `-race` (`CGO_ENABLED=1`)                                   |
-| `make lint`      | `golangci-lint run ./internal/... ./pkg/... ./cmd/...`                     |
-| `make modernize` | `modernize -fix` on all packages                                           |
-| `make check`     | Production-Go gate: fmt + modernize + lint, skipping tests and Lua/web      |
-| `make run`       | Build + launch (`./goisekai -logLevel debug`)                              |
-| `make fmt`       | `go fmt` on all packages                                                   |
-| `make fmt-prod`  | `go fmt` on production packages (the `check` scope)                        |
-| `make lint-prod` | `golangci-lint run --tests=false` on production packages                   |
-| `make fmt-web`   | `biome check --write cmd/goisekai/frontend`                                |
-| `make fmt-lua`   | `stylua internal/templates/`                                               |
-| `make lint-web`  | `biome check cmd/goisekai/frontend` (read-only)                            |
-| `make lint-lua`  | `luacheck internal/templates/ --codes --no-unused --no-unused-args`        |
+| `just build`     | Full build (runs `css`, `br`, then `CGO_ENABLED=0 go build`)               |
+| `just test`      | Run all tests (`CGO_ENABLED=0 go test ./internal/... ./pkg/... ./cmd/...`) |
+| `just race`      | Run tests with `-race` (`CGO_ENABLED=1`)                                   |
+| `just lint`      | `golangci-lint run ./internal/... ./pkg/... ./cmd/...`                     |
+| `just modernize` | `modernize -fix` on all packages                                           |
+| `just check`     | Production-Go gate: fmt + modernize + lint, skipping tests and Lua/web     |
+| `just run`       | Build + launch (`./goisekai -logLevel debug`); args pass through           |
+| `just devrun`    | Alias of `just run`                                                        |
+| `just fmt`       | `go fmt` on all packages                                                   |
+| `just fmt-prod`  | `go fmt` on production packages (the `check` scope)                        |
+| `just lint-prod` | `golangci-lint run --tests=false` on production packages                   |
+| `just fmt-web`   | `biome check --write cmd/goisekai/frontend`                                |
+| `just fmt-lua`   | `stylua internal/templates/`                                               |
+| `just lint-web`  | `biome check cmd/goisekai/frontend` (read-only)                            |
+| `just lint-lua`  | `luacheck internal/templates/ --codes --no-unused --no-unused-args`        |
+| `just install-lua kaliscan` | Copy a Lua plugin into the plugins dir                           |
+| `just install-info mangadex` | Copy an info script into the info dir                           |
 
-All Go commands use `CGO_ENABLED=0` by default (pure Go SQLite). Tests in `make race` set `CGO_ENABLED=1`.
+All Go commands use `CGO_ENABLED=0` by default (pure Go SQLite). Tests in `just race` set `CGO_ENABLED=1`.
 
 ---
 
@@ -150,7 +155,7 @@ Plugin network calls route through `hostnet.Proxy` which handles TLS fingerprint
 
 - Tests live alongside source as `*_test.go`
 - Test data fixtures: `internal/pluginmanager/testdata/`
-- Run: `make test` (CGO_ENABLED=0) or `make race` (CGO_ENABLED=1 + `-race`)
+- Run: `just test` (CGO_ENABLED=0) or `just race` (CGO_ENABLED=1 + `-race`)
 - E2E CDP test: `internal/hostnet/cdp_e2e_test.go` (requires browser)
 - Test files for bridge, database, pluginmanager are all in their respective packages
 
