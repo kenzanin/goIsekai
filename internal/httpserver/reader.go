@@ -81,7 +81,9 @@ func (s *Server) viewReader(w http.ResponseWriter, r *http.Request) {
 			break
 		}
 	}
-	s.renderPage(w, r, "views/reader", "library", map[string]any{
+	// active "" on purpose: the reader has no nav (blank layout), so a partial
+	// response must not advertise one.
+	s.renderPage(w, r, "views/reader", "", map[string]any{
 		"_layout":        "blank",
 		"PluginID":       pluginID,
 		"MangaID":        mangaID,

@@ -579,7 +579,7 @@ global.document = {
   body: { appendChild: noop },
   addEventListener: (t, fn) => { listeners.document[t] = fn; },
   getElementById: () => ({ innerHTML: '', addEventListener: noop }),
-  querySelector: () => null,
+  querySelector: (sel) => (sel === 'nav' ? {} : null),
   querySelectorAll: (sel) => (sel === 'a[data-nav]' ? navLinks : []),
 };
 global.localStorage = { getItem: () => null, setItem: noop, removeItem: noop };
@@ -656,6 +656,91 @@ func TestFrontendSPANavHighlightFollowsPartialResponse(t *testing.T) {
 					path, got.Highlighted)
 			}
 		})
+	}
+}
+
+// spaShellSwapHarness drives one navigate() from a page with no nav in the DOM
+// (the reader's blank layout) to a page that has one. A partial swap only
+// replaces <main>, so the router must fall back to a full load instead of
+// leaving the nav bar permanently missing.
+const spaShellSwapHarness = `
+global.window = global;
+const noop = () => {};
+let swapped = false;
+global.document = {
+  createElement: () => ({ style: {}, appendChild: noop, setAttribute: noop }),
+  head: { appendChild: noop },
+  documentElement: { appendChild: noop },
+  body: { appendChild: noop },
+  addEventListener: noop,
+  getElementById: () => ({ innerHTML: '', addEventListener: noop }),
+  querySelector: () => null,
+  querySelectorAll: () => [],
+};
+global.localStorage = { getItem: () => null, setItem: noop, removeItem: noop };
+global.Alpine = { store: () => null, initTree: noop, data: noop, plugin: noop };
+global.addEventListener = noop;
+global.fetch = () => Promise.resolve({
+  ok: true,
+  status: 200,
+  headers: { get: (n) => (n === 'X-Active-Nav' ? 'detail' : null) },
+  text: () => { swapped = true; return Promise.resolve('<main id="content">page</main>'); },
+});
+global.history = { replaceState: noop, pushState: noop, state: null };
+global.location = {
+  origin: 'http://localhost', href: 'http://localhost/view/read/p/m/ch',
+  pathname: '/view/read/p/m/ch',
+  replace: (u) => { global.location.href = u; },
+};
+global.scrollTo = noop;
+global.scrollY = 0;
+global.MutationObserver = class { observe() {} disconnect() {} };
+global.requestAnimationFrame = noop;
+
+require(process.env.GOISEKAI_BUNDLE);
+
+window.navigate('/view/manga/p/m', { push: true });
+
+setTimeout(() => {
+  console.log(JSON.stringify({ swapped, href: global.location.href }));
+}, 10);
+`
+
+// TestFrontendSPAReloadsWhenTheShellChanges covers the reader -> detail case:
+// the reader renders the blank layout, so there is no nav in the document. A
+// <main>-only swap cannot bring it back, and the reader's Back button left the
+// nav bar missing until this guard.
+func TestFrontendSPAReloadsWhenTheShellChanges(t *testing.T) {
+	node := nodePath(t)
+	bundle, err := filepath.Abs(filepath.Join(frontendLibDir, "alpine-components.js"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	script := filepath.Join(t.TempDir(), "shell.js")
+	if err := os.WriteFile(script, []byte(spaShellSwapHarness), 0o644); err != nil {
+		t.Fatalf("write harness: %v", err)
+	}
+
+	cmd := exec.Command(node, script)
+	cmd.Env = append(os.Environ(), "GOISEKAI_BUNDLE="+bundle)
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("loading %s threw:\n%s", filepath.Base(bundle), out)
+	}
+	var got struct {
+		Swapped bool   `json:"swapped"`
+		Href    string `json:"href"`
+	}
+	if err := json.Unmarshal(out, &got); err != nil {
+		t.Fatalf("harness output %q is not JSON: %v", out, err)
+	}
+	if got.Swapped {
+		t.Error("navigation swapped only <main> into a document with no nav - " +
+			"the nav bar cannot come back that way")
+	}
+	if got.Href != "/view/manga/p/m" {
+		t.Errorf("fallback navigation landed on %q, want the requested /view/manga/p/m - "+
+			"a shell change must hand off to a full page load", got.Href)
 	}
 }
 

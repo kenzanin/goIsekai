@@ -613,6 +613,16 @@ const applyActiveNav = (activeNav) => {
     }
   });
 };
+// A partial swap replaces only <main>; the shell around it (the nav bar, or the
+// reader's blank layout) is whatever the current document already has. When the
+// destination's shell differs the swap would leave it permanently wrong, so
+// hand off to a full load. The server marks nav pages with X-Active-Nav.
+const needsFullLoad = (resp, url, replace) => {
+  if (!!resp.headers.get("X-Active-Nav") === !!document.querySelector("nav")) return false;
+  if (replace) window.location.replace(url);
+  else window.location.href = url;
+  return true;
+};
 const navigate = (url, opts) => {
   if (!url) return;
     const options = opts || {};
@@ -628,6 +638,7 @@ const navigate = (url, opts) => {
           window.location.href = url;
           return;
         }
+        if (needsFullLoad(resp, url, false)) return;
         return resp.text().then((html) => {
           const main = document.getElementById("content");
           if (!main || !html) {
@@ -713,6 +724,7 @@ const navigate = (url, opts) => {
           window.location.reload();
           return;
         }
+        if (needsFullLoad(resp, url, true)) return;
         return resp.text().then((html) => {
           const main = document.getElementById("content");
           if (!main || !html) return;
