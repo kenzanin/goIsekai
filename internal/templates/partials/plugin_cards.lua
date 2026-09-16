@@ -3,6 +3,16 @@
 -- Called as: plugin_cards(data) -> string
 -- data.Plugins: []PluginView
 
+-- The runtime a plugin ships in, shown as a badge so a source's kind is visible
+-- at a glance. The classes are ones the committed Tailwind build already
+-- contains, so the badge renders without regenerating the stylesheet.
+local KIND_BADGE = {
+	lua = { label = "Lua", class = "bg-indigo-500/15 text-indigo-400", title = "Lua plugin (main.lua)" },
+	js = { label = "JS", class = "bg-amber-500/15 text-amber-400", title = "JavaScript plugin (main.js)" },
+	go = { label = "Go", class = "bg-sky-500/15 text-sky-400", title = "Native Go plugin (.so)" },
+	yaegi = { label = "Yaegi", class = "bg-emerald-500/15 text-emerald-400", title = "Yaegi-interpreted Go plugin" },
+}
+
 return function(data)
 	local plugins = data.Plugins or {}
 
@@ -47,12 +57,24 @@ return function(data)
 					) .. "</span>")
 				or ""
 
+			local kind = KIND_BADGE[p.Kind]
+			local kindBadge = kind
+					and ('<span class="text-[10px] px-1.5 py-0.5 rounded-full font-medium '
+						.. kind.class
+						.. '" title="'
+						.. h(kind.title)
+						.. '">'
+						.. kind.label
+						.. "</span>")
+				or ""
+
 			cardHTML = cardHTML
 				.. '<div class="flex items-center gap-3">'
 				.. iconHTML
 				.. '<div class="min-w-0 flex-1">'
 				.. '<div class="font-medium text-sm flex items-center gap-2">'
 				.. h(name)
+				.. kindBadge
 				.. profileBadge
 				.. "</div>"
 				.. '<div class="text-xs font-mono text-neutral-500 truncate">'

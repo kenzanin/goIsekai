@@ -11,7 +11,8 @@ import (
 // declared thumbnail ratio for the plugins page.
 type PluginView struct {
 	database.Plugin
-	Loaded            bool // true once the runtime has been instantiated
+	Kind              string // runtime the plugin ships in: lua, js, go (native .so) or yaegi
+	Loaded            bool   // true once the runtime has been instantiated
 	VerifyURL         string
 	NeedsHumanVerify  bool
 	VerifyCookies     string
@@ -33,6 +34,7 @@ func (s *Server) viewPlugins(w http.ResponseWriter, r *http.Request) {
 	for _, p := range plugins {
 		v := PluginView{Plugin: p}
 		if m, ok := metas[p.ID]; ok {
+			v.Kind = m.Kind
 			v.Loaded = m.Loaded
 			v.VerifyURL = m.VerifyURL
 			v.NeedsHumanVerify = m.NeedsHumanVerify
