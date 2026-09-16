@@ -583,7 +583,9 @@ func TestLuaMangaKatanaExample(t *testing.T) {
 	if len(results) != 2 {
 		t.Fatalf("search = %+v, want the two stub cards", results)
 	}
-	if results[0].Title != "Chihayafuru" || results[0].ID != srv.URL+"/manga/chihayafuru.2" {
+	// The id becomes a path segment in /view/manga/{mangaID}, so it has to be
+	// the bare slug: an absolute URL carries slashes and 404s the route.
+	if results[0].Title != "Chihayafuru" || results[0].ID != "chihayafuru.2" {
 		t.Errorf("first result = %+v", results[0])
 	}
 	if results[0].CoverURL != "/imgs/cover/fccf5.jpg" {
@@ -629,6 +631,10 @@ func TestLuaMangaKatanaExample(t *testing.T) {
 	}
 	if chapters[1].ChapterNum != 230.5 {
 		t.Errorf("second chapter_num = %v, want the decimal read from the href", chapters[1].ChapterNum)
+	}
+	// Same path-segment rule as the manga id, for /view/read/{...}/{chapterID}.
+	if chapters[0].ID != "chihayafuru.2:c247" {
+		t.Errorf("chapter id = %q, want a slug plus a colon, never a slash", chapters[0].ID)
 	}
 
 	pages, err := mgr.GetPageList("mangakatana", chapters[0].URL)

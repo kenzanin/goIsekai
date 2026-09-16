@@ -23,13 +23,33 @@ local HEADERS = {
     ["Accept"] = "text/html,application/xhtml+xml",
 }
 
--- Ids coming back from search are absolute URLs; this only builds one for a
--- bare id, so a test can point the plugin at a stub host.
+-- Ids are pasted into host URL paths (/view/manga/{mangaID} and
+-- /view/read/{mangaID}/{chapterID}), and a bare path segment cannot hold a
+-- slash: a manga id is the slug and a chapter id is "<manga slug>:<cXXX>".
+-- Absolute URLs still work here so a test can point the plugin at a stub host.
 local function url_for(kind, id)
     if string.match(id, "^https?://") then
         return id
     end
     return BASE .. "/" .. kind .. "/" .. id
+end
+
+-- "https://mangakatana.com/manga/naruto.1205" and "/manga/naruto.1205" both
+-- reduce to "naruto.1205".
+local function slug_of(id)
+    return string.match(id, "/manga/([^/?#]+)") or id
+end
+
+-- "naruto.1205:c700" -> the chapter's absolute URL.
+local function chapter_url(id)
+    if string.match(id, "^https?://") then
+        return id
+    end
+    local slug, tail = string.match(id, "^([^:]+):(.+)$")
+    if not slug then
+        return id
+    end
+    return url_for("manga", slug) .. "/" .. tail
 end
 
 -- get returns the response body, or nil when the request failed.
@@ -95,7 +115,7 @@ function search_manga(arg)
 
     local out = {}
     for i, href in ipairs(hrefs) do
-        out[#out + 1] = { id = href, title = titles[i] or "", cover_url = covers[i] or "" }
+        out[#out + 1] = { id = slug_of(href), title = titles[i] or "", cover_url = covers[i] or "" }
     end
     log.debug("mangakatana: " .. #out .. " results for q=" .. tostring(args.query))
     return host.json.encode(out)
@@ -104,7 +124,7 @@ end
 -- ─── ABI: get_manga_detail(arg) ────────────────────────────────────────────
 -- arg: JSON-encoded manga id  ->  {id, title, author, description, cover_url, genres, status}
 function get_manga_detail(arg)
-    local manga_id = host.json.decode(arg)
+    local manga_id = slug_of(host.json.decode(arg))
     local doc = doc_for(url_for("manga", manga_id))
     if not doc then
         return host.json.encode({ id = manga_id })
@@ -142,7 +162,7 @@ end
 -- ─── ABI: get_chapter_list(arg) ────────────────────────────────────────────
 -- arg: JSON-encoded manga id  ->  array of {id, manga_id, title, chapter_num, url}
 function get_chapter_list(arg)
-    local manga_id = host.json.decode(arg)
+    local manga_id = slug_of(host.json.decode(arg))
     local doc = doc_for(url_for("manga", manga_id))
     if not doc then
         return host.json.encode({})
@@ -156,7 +176,8 @@ function get_chapter_list(arg)
     local out = {}
     for i, url in ipairs(urls) do
         out[#out + 1] = {
-            id = url,
+            -- .../c247, .../c230.5 and .../c0-v2 all end in the segment to keep.
+            id = manga_id .. ":" .. (string.match(url, "/([^/]+)$") or url),
             manga_id = manga_id,
             -- The number is the tail of the href: .../c247, .../c230.5, .../c0-v2
             chapter_num = tonumber(string.match(url, "/c([%d%.]+)")) or 0,
@@ -169,9 +190,9 @@ function get_chapter_list(arg)
 end
 
 -- ─── ABI: get_page_list(arg) ───────────────────────────────────────────────
--- arg: JSON-encoded chapter id (an absolute chapter URL)  ->  array of {index, url}
+-- arg: JSON-encoded chapter id ("<manga slug>:<cXXX>")  ->  array of {index, url}
 function get_page_list(arg)
-    local chapter_id = host.json.decode(arg)
+    local chapter_id = chapter_url(host.json.decode(arg))
     local body = get(chapter_id)
     if not body then
         return host.json.encode({})
