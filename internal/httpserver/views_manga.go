@@ -106,15 +106,14 @@ func (s *Server) viewMangaDetail(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "failed to load manga details", http.StatusBadGateway)
 		return
 	}
-	// SPA: if X-Partial is set, render the partial directly instead of
-	// redirecting — the SPA fetch uses `redirect: 'manual'` so 303s are
-	// opaque and unreadable.
-	// Use "detail" as active token so nav bar renders (no tab highlighted).
+	// Action handlers (library toggle, genre chips, enrichment) redirect back
+	// here, and the browser follows that 303 with X-Partial still set: render
+	// the partial so the handler can swap it into #content.
 	if r.Header.Get("X-Partial") == "true" {
-		s.renderPage(w, r, "views/detail", "detail", data)
+		s.renderPage(w, r, "views/detail", "", data)
 		return
 	}
-	s.renderPage(w, r, "views/detail", "detail", data)
+	s.renderPage(w, r, "views/detail", "", data)
 }
 
 // ContinuePoint names where the Continue button should resume.

@@ -47,8 +47,11 @@
             Alpine.initTree(main);
           }
           if (window.syncEnrichmentPanel) syncEnrichmentPanel();
-          const u = resp.url || action;
-          if (u && u.indexOf(window.location.origin) === 0) {
+          // An action mutates the current page, it does not navigate: the
+          // address bar keeps the page URL. `/action/` is never a page, and
+          // writing it in makes a reload or a back press land on the action.
+          const u = resp.url || '';
+          if (u.indexOf(window.location.origin) === 0 && u.indexOf('/action/') === -1) {
             history.replaceState(history.state, '', u);
           }
         });
@@ -446,8 +449,9 @@
                 Alpine.initTree(main);
               }
               if (window.syncEnrichmentPanel) syncEnrichmentPanel();
-              const u = resp.url || action;
-              if (u && u.indexOf(window.location.origin) === 0) {
+              // See submitForm: never leave an /action/ URL in the address bar.
+              const u = resp.url || '';
+              if (u.indexOf(window.location.origin) === 0 && u.indexOf('/action/') === -1) {
                 history.replaceState(history.state, '', u);
               }
             });
@@ -590,160 +594,3 @@ window.setLoading = (btn, loading) => {
   }
 };
 
-// =====================================================================
-// SPA router — intercept internal links and GET forms for in-place navigation.
-// Exports: navigate(url, {push}) - fetch with X-Partial, swap content, push/replace state
-// =====================================================================
-const navError = (msg) => {
-  if (typeof Alpine !== 'undefined' && Alpine.store('toast')) {
-    Alpine.store('toast').show(msg, 'error');
-  }
-};
-// Move the navigation highlight onto the token the server says is active. Both
-// a click and a popstate swap the body from a partial response, so both must
-// call this or the highlight goes stale after back/forward.
-const applyActiveNav = (activeNav) => {
-  if (!activeNav) return;
-  document.querySelectorAll("a[data-nav]").forEach((link) => {
-    link.classList.remove("border-b-2", "border-indigo-400", "bg-indigo-500/15", "text-indigo-300");
-    link.classList.add("rounded-md", "px-3", "py-2", "text-sm", "font-medium", "hover:bg-neutral-800");
-    if (link.getAttribute("data-nav") === activeNav) {
-      link.classList.remove("rounded-md", "px-3", "py-2", "text-sm", "font-medium", "hover:bg-neutral-800");
-      link.classList.add("border-b-2", "border-indigo-400", "bg-indigo-500/15", "text-indigo-300");
-    }
-  });
-};
-// A partial swap replaces only <main>; the shell around it (the nav bar, or the
-// reader's blank layout) is whatever the current document already has. When the
-// destination's shell differs the swap would leave it permanently wrong, so
-// hand off to a full load. The server marks nav pages with X-Active-Nav.
-const needsFullLoad = (resp, url, replace) => {
-  if (!!resp.headers.get("X-Active-Nav") === !!document.querySelector("nav")) return false;
-  if (replace) window.location.replace(url);
-  else window.location.href = url;
-  return true;
-};
-const navigate = (url, opts) => {
-  if (!url) return;
-    const options = opts || {};
-    const usePush = options.push !== false;
-    fetch(url, {
-      headers: { "X-Partial": "true" },
-      credentials: "same-origin"
-    })
-      .then((resp) => {
-        if (!resp.ok) {
-          // Non-2xx: report it, then let the browser do a standard navigation.
-          navError(`Navigation failed (${resp.status})`);
-          window.location.href = url;
-          return;
-        }
-        if (needsFullLoad(resp, url, false)) return;
-        return resp.text().then((html) => {
-          const main = document.getElementById("content");
-          if (!main || !html) {
-            window.location.href = url;
-            return;
-          }
-          const match = html.match(/<main[^>]*id="content"[\s\S]*?>([\s\S]*?)<\/main>/i);
-          const newContent = match ? match[1] : html;
-          main.innerHTML = newContent;
-          if (window.Alpine && Alpine.initTree) Alpine.initTree(main);
-          if (window.syncEnrichmentPanel) syncEnrichmentPanel();
-          // Get active nav token from response header
-          applyActiveNav(resp.headers.get("X-Active-Nav"));
-          // Update title
-          const titleMatch = html.match(/<title>([^<]+)<\/title>/i);
-          if (titleMatch) document.title = titleMatch[1];
-          // Stamp the entry being left with where the reader actually was, so
-          // coming back restores that position. Recording the offset on the new
-          // entry instead hands the next page the previous page's position.
-          const scrollY = window.scrollY;
-          if (usePush) {
-            history.replaceState({scrollY}, "", window.location.href);
-            history.pushState({scrollY: 0}, "", url);
-          } else {
-            history.replaceState({scrollY: 0}, "", url);
-          }
-          // A link opens a new page at the top; swapping innerHTML alone would
-          // otherwise leave the reader at the previous page's offset.
-          window.scrollTo(0, 0);
-        });
-      })
-      .catch(() => {
-        navError('Network error — check your connection');
-        window.location.href = url;
-      });
-  };
-  // Click handler for internal links (same origin, non-external, non-reader, non-action)
-  document.addEventListener("click", (e) => {
-    const link = e.target.closest("a");
-    if (!link || !link.href) return;
-    // Skip if target, download, modifier keys, non-https schemes, # fragment, action, image, plugin-static, or reader
-    if (link.target || link.download || e.ctrlKey || e.metaKey || e.shiftKey || e.altKey) return;
-    const url = new URL(link.href, window.location);
-    if (url.protocol !== "http:" && url.protocol !== "https:") return;
-    if (url.hash) return;
-    const path = url.pathname;
-    if (path.indexOf("/action/") === 0 || path.indexOf("/image") === 0 || path.indexOf("/plugin-static") === 0 || path.indexOf("/view/read/") === 0) return;
-    // Same origin check
-    if (url.origin !== window.location.origin) return;
-    // Prevent default and navigate
-    e.preventDefault();
-    navigate(url.pathname + url.search + url.hash, {push: true});
-  });
-  // Submit handler for GET forms
-  document.addEventListener("submit", (e) => {
-    const form = e.target;
-    if (!form || form.method.toLowerCase() !== "get") return;
-    const url = new URL(form.action || window.location.href, window.location);
-    if (url.origin !== window.location.origin) return;
-    if (url.pathname !== "/view/search" && url.pathname !== "/view/library") return;
-    e.preventDefault();
-    // form.action carries none of the values the user typed, so serialize the
-    // fields ourselves; without this the query is silently dropped.
-    const params = new URLSearchParams(url.search);
-    new FormData(form).forEach((value, key) => {
-      if (typeof value === "string" && value !== "") params.set(key, value);
-    });
-    const qs = params.toString();
-    navigate(url.pathname + (qs ? "?" + qs : ""), {push: true});
-  });
-  // Popstate handler for back/forward navigation
-  window.addEventListener("popstate", (e) => {
-    // No state guard here: the entry a freshly loaded document sits on carries
-    // null state, and returning to it must still swap the body.
-    const url = window.location.pathname + window.location.search;
-    fetch(url, {
-      headers: { "X-Partial": "true" },
-      credentials: "same-origin"
-    })
-      .then((resp) => {
-        if (!resp.ok) {
-          navError(`Navigation failed (${resp.status})`);
-          window.location.reload();
-          return;
-        }
-        if (needsFullLoad(resp, url, true)) return;
-        return resp.text().then((html) => {
-          const main = document.getElementById("content");
-          if (!main || !html) return;
-          const match = html.match(/<main[^>]*id="content"[\s\S]*?>([\s\S]*?)<\/main>/i);
-          const newContent = match ? match[1] : html;
-          main.innerHTML = newContent;
-          if (window.Alpine && Alpine.initTree) Alpine.initTree(main);
-          if (window.syncEnrichmentPanel) syncEnrichmentPanel();
-          // Keep the highlight in step with the page back/forward landed on.
-          applyActiveNav(resp.headers.get("X-Active-Nav"));
-          // Restore scroll position
-          const scrollY = (e.state && e.state.scrollY) || 0;
-          window.scrollTo(0, scrollY);
-        });
-      })
-      .catch(() => {
-        navError('Network error — check your connection');
-        window.location.reload();
-      });
-  });
-  // Export navigate for external use
-  window.navigate = navigate;

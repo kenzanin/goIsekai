@@ -6,6 +6,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"goisekai/internal/bridge"
@@ -39,22 +40,24 @@ func TestRenderPageNavToken(t *testing.T) {
 		engine:  engine,
 	}
 
+	// The nav only ships with a full page render, and `active` picks the
+	// highlighted link. An unknown token (detail pages, the reader) must
+	// highlight nothing rather than leaving the previous page's tab lit.
 	req := httptest.NewRequest("GET", "/view/library", nil)
-	req.Header.Set("X-Partial", "true")
 	rec := httptest.NewRecorder()
-
 	s.renderPage(rec, req, "views/library", "library", nil)
 
-	got := rec.Header().Get("X-Active-Nav")
-	if got != "library" {
-		t.Errorf("X-Active-Nav = %q, want %q", got, "library")
+	if body := rec.Body.String(); !strings.Contains(body, `data-nav="library"`) {
+		t.Fatal("full page render has no nav bar")
+	} else if n := strings.Count(body, "border-indigo-400"); n != 1 {
+		t.Errorf("library page highlights %d nav link(s), want exactly 1", n)
 	}
 
 	req2 := httptest.NewRequest("GET", "/view/library", nil)
 	rec2 := httptest.NewRecorder()
-	s.renderPage(rec2, req2, "views/library", "library", nil)
+	s.renderPage(rec2, req2, "views/library", "", nil)
 
-	if rec2.Header().Get("X-Active-Nav") != "" {
-		t.Error("full page should not carry X-Active-Nav")
+	if n := strings.Count(rec2.Body.String(), "border-indigo-400"); n != 0 {
+		t.Errorf("empty active token highlighted %d nav link(s), want 0", n)
 	}
 }

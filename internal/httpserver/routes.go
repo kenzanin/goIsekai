@@ -51,7 +51,7 @@ func (s *Server) registerViewRoutes() {
 
 // renderPage renders a Lua template with the `active` nav var set.
 // When the client sends X-Partial: true, only the <main> content is rendered
-// (no layout wrapper) — used by the SPA router.
+// (no layout wrapper) — used by the in-place action handlers.
 func (s *Server) renderPage(w http.ResponseWriter, r *http.Request, name, active string, data any) {
 	var m map[string]any
 	if data == nil {
@@ -63,9 +63,6 @@ func (s *Server) renderPage(w http.ResponseWriter, r *http.Request, name, active
 	}
 	m["active"] = active
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	if r != nil && r.Header.Get("X-Partial") == "true" && active != "" {
-		w.Header().Set("X-Active-Nav", active)
-	}
 	var err error
 	if r != nil && r.Header.Get("X-Partial") == "true" {
 		err = s.engine.RenderPartial(w, name, m)
