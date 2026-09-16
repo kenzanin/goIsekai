@@ -114,10 +114,13 @@ func (d *DB) LibraryOverview(aliases StatusAlias) (LibraryOverview, error) {
 	// track most/fewest chapters with tie counts
 	maxCount, minCount := -1, -1
 	for _, r := range rows {
-		switch classifyStatus(r.Status, aliases) {
-		case "done":
+		// classifyStatus returns the configured canonical name, so the bucket
+		// comparison is case-insensitive: a user may spell it "completed" or
+		// "Completed" and both land in the same bucket.
+		switch bucket := classifyStatus(r.Status, aliases); {
+		case strings.EqualFold(bucket, "Completed"):
 			ov.StatusDone++
-		case "ongoing":
+		case strings.EqualFold(bucket, "Ongoing"), strings.EqualFold(bucket, "Hiatus"):
 			ov.StatusOngoing++
 		default:
 			ov.StatusUnknown++
