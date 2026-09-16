@@ -27,10 +27,14 @@ func (s *AppService) GetImage(pluginID, url string, headers map[string]string, m
 	}
 	s.imageMu.RUnlock()
 
-	// L2: disk cache. Converted images are stored as <key>.webp, everything
-	// else (gif/webp passthrough, legacy entries) as <key>.img; try webp first.
+	// L2: disk cache. Converted images are stored as <key>.<format>, anything
+	// that kept its original bytes (gif passthrough, undecodable, "original"
+	// mode) as <key>.img. Older builds used ".webp"/".img" only, so every
+	// format we can write is tried before declaring a miss.
 	if base := s.diskCachePath(pluginID, mangaID, chapterID, url); base != "" {
-		for _, ext := range []string{".webp", ".img"} {
+		for _, ext := range []string{
+			"." + string(FormatAVIF), "." + string(FormatWebP), ".img",
+		} {
 			if data, err := os.ReadFile(base + ext); err == nil {
 				if validateImageFast(data) {
 					s.imageMu.Lock()
@@ -102,14 +106,15 @@ func (s *AppService) GetImage(pluginID, url string, headers map[string]string, m
 	s.imageCache[url] = body
 	s.imageMu.Unlock()
 
-	// L2 cache: write to disk, converting to webp when the input is a decodable
-	// jpeg/png. Fail-open: unconvertible bytes are stored as-is.
+	// L2 cache: write to disk, converting to the configured format. Covers
+	// (mangaID empty) are also downscaled. Fail-open: unconvertible bytes are
+	// stored as-is under .img.
 	if base := s.diskCachePath(pluginID, mangaID, chapterID, url); base != "" {
 		if err := os.MkdirAll(filepath.Dir(base), 0o755); err == nil {
-			data, converted := webpOrOriginal(body)
+			data, converted := encodeForCache(body, s.imgFormat, mangaID == "", s.coverMaxDim)
 			ext := ".img"
 			if converted {
-				ext = ".webp"
+				ext = s.imgFormat.extension()
 			}
 			_ = os.WriteFile(base+ext, data, 0o644)
 		}

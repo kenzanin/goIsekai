@@ -37,6 +37,8 @@ type AppService struct {
 	enrich      *enrich.Registry
 	genres      *genreIndex
 	statusAlias map[string][]string
+	imgFormat   ImageFormat
+	coverMaxDim int
 }
 
 // NewAppService returns an AppService backed by the supplied database, plugin
@@ -52,7 +54,33 @@ func NewAppService(db *database.DB, mgr *pluginmanager.Manager, proxy *hostnet.P
 		enrich:      enrichReg,
 		genres:      loadGenreIndex(cfgPath),
 		statusAlias: loadStatusAlias(cfgPath),
+		imgFormat:   loadImageFormat(cfgPath),
+		coverMaxDim: loadCoverMaxDim(cfgPath),
 	}
+}
+
+// loadImageFormat reads the cache encoding from the INI at cfgPath, defaulting
+// to webp when the file is missing or names a format the build cannot encode.
+func loadImageFormat(cfgPath string) ImageFormat {
+	cfg, err := config.Load(cfgPath)
+	if err != nil || cfg == nil {
+		return FormatWebP
+	}
+	switch ImageFormat(cfg.ImageFormat) {
+	case FormatAVIF, FormatOriginal, FormatWebP:
+		return ImageFormat(cfg.ImageFormat)
+	default:
+		return FormatWebP
+	}
+}
+
+// loadCoverMaxDim reads the cover downscale cap in pixels; 0 disables it.
+func loadCoverMaxDim(cfgPath string) int {
+	cfg, err := config.Load(cfgPath)
+	if err != nil || cfg == nil {
+		return config.Default().CoverMaxDim
+	}
+	return cfg.CoverMaxDim
 }
 
 // loadStatusAlias reads the status alias map from the INI at cfgPath, falling

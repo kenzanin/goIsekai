@@ -136,6 +136,15 @@ func (c *Config) set(section, key, val string) {
 			c.Host = val
 		case "api_key":
 			c.APIKey = val
+		case "image_format":
+			switch val {
+			case "webp", "avif", "original":
+				c.ImageFormat = val
+			}
+		case "cover_max_dim":
+			if n, err := strconv.Atoi(val); err == nil && n >= 0 {
+				c.CoverMaxDim = n
+			}
 		case "port":
 			if n, err := strconv.Atoi(val); err == nil {
 				c.Port = n

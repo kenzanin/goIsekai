@@ -80,6 +80,13 @@ type Config struct {
 	// send for it, e.g. {"Hiatus": ["uncertain", "on hold"]}.
 	StatusAlias map[string][]string
 
+	// ImageFormat is the on-disk encoding for cached images: "webp" (default),
+	// "avif" (smaller, slower to encode), or "original" (no conversion).
+	ImageFormat string
+	// CoverMaxDim caps the longer side of a cover in pixels when it is cached.
+	// 0 disables downscaling. Page images are never resized.
+	CoverMaxDim int
+
 	// aliasTouched records the names a config file line already supplied, so
 	// the first line for a name replaces the built-in variants instead of
 	// appending to them.
@@ -112,6 +119,9 @@ func Default() *Config {
 
 		GenreAlias:  DefaultGenreAlias(),
 		StatusAlias: DefaultStatusAlias(),
+
+		ImageFormat: "webp",
+		CoverMaxDim: 720,
 	}
 	c.CacheDir = filepath.Join(c.DataDir, "cache")
 	c.InfoDir = filepath.Join(c.DataDir, "info")
@@ -139,6 +149,8 @@ func (c *Config) Save(path string) error {
 	fmt.Fprintf(&b, "host = %s\n", c.Host)
 	fmt.Fprintf(&b, "port = %d\n", c.Port)
 	fmt.Fprintf(&b, "api_key = %s\n", c.APIKey)
+	fmt.Fprintf(&b, "image_format = %s\n", c.ImageFormat)
+	fmt.Fprintf(&b, "cover_max_dim = %d\n", c.CoverMaxDim)
 	fmt.Fprintf(&b, "\n[network]\n")
 	fmt.Fprintf(&b, "user_agent = %s\n", c.UserAgent)
 	fmt.Fprintf(&b, "accept_language = %s\n", c.AcceptLanguage)

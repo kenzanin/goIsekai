@@ -28,6 +28,15 @@ func newTestServiceWithCache(t *testing.T) *AppService {
 	return NewAppService(db, nil, hostnet.NewProxy(), "", t.TempDir(), nil)
 }
 
+// newTestServiceWithFormat is newTestServiceWithCache with the cache encoding
+// pinned, so tests cover avif and webp through the real GetImage path.
+func newTestServiceWithFormat(t *testing.T, format ImageFormat) *AppService {
+	t.Helper()
+	s := newTestServiceWithCache(t)
+	s.imgFormat = format
+	return s
+}
+
 // serveImage starts an httptest server that returns payload with the given
 // content type and the URL it serves.
 func serveImage(t *testing.T, contentType string, payload []byte) string {
@@ -165,4 +174,58 @@ func validPNG(t *testing.T) []byte {
 		t.Fatalf("png.Encode: %v", err)
 	}
 	return buf.Bytes()
+}
+
+func TestImageCacheWritesConfiguredFormat(t *testing.T) {
+	for _, tc := range []struct {
+		format ImageFormat
+		ext    string
+		sniff  func([]byte) bool
+	}{
+		{FormatWebP, ".webp", isWebP},
+		{FormatAVIF, ".avif", isAVIF},
+	} {
+		t.Run(string(tc.format), func(t *testing.T) {
+			url := serveImage(t, "image/jpeg", validJPEG(t, 900, 1400))
+			s := newTestServiceWithFormat(t, tc.format)
+			if _, err := s.GetImage("plugin-x", url, nil, "", ""); err != nil {
+				t.Fatalf("GetImage: %v", err)
+			}
+
+			base := s.diskCachePath("plugin-x", "", "", url)
+			data, err := os.ReadFile(base + tc.ext)
+			if err != nil {
+				t.Fatalf("expected cached %s file: %v", tc.ext, err)
+			}
+			if !tc.sniff(data) {
+				t.Errorf("%s bytes failed its magic-number check", tc.ext)
+			}
+			// The cover is 900x1400, so the default 720 cap must have shrunk it.
+			cfg, err := webpConfig(data)
+			if err == nil && cfg.Height > 720 {
+				t.Errorf("cover height %d exceeds the 720 cap", cfg.Height)
+			}
+			if _, err := os.Stat(base + ".img"); !os.IsNotExist(err) {
+				t.Errorf("expected no .img file, stat err = %v", err)
+			}
+		})
+	}
+}
+
+func TestImageCacheOriginalFormatStoresSourceBytes(t *testing.T) {
+	payload := validJPEG(t, 64, 64)
+	url := serveImage(t, "image/jpeg", payload)
+	s := newTestServiceWithFormat(t, FormatOriginal)
+	if _, err := s.GetImage("plugin-x", url, nil, "", ""); err != nil {
+		t.Fatalf("GetImage: %v", err)
+	}
+
+	base := s.diskCachePath("plugin-x", "", "", url)
+	data, err := os.ReadFile(base + ".img")
+	if err != nil {
+		t.Fatalf("expected cached .img file: %v", err)
+	}
+	if !bytes.Equal(data, payload) {
+		t.Error("original format should store the source bytes untouched")
+	}
 }
