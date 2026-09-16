@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 )
 
@@ -68,6 +69,21 @@ type Config struct {
 	CacheTTLHours int
 	// PreconnectEnabled toggles HTTP preconnect to plugin hosts at startup.
 	PreconnectEnabled bool
+
+	// GenreAlias maps a canonical genre name to the alternate spellings
+	// plugins may send for it, e.g. {"Sci-Fi": ["scifi", "sci fi"]}. Plugins
+	// disagree on spelling, so a match rewrites the value to the canonical
+	// key; anything unmatched passes through unchanged.
+	GenreAlias map[string][]string
+
+	// StatusAlias maps a canonical publication status to the spellings plugins
+	// send for it, e.g. {"Hiatus": ["uncertain", "on hold"]}.
+	StatusAlias map[string][]string
+
+	// aliasTouched records the names a config file line already supplied, so
+	// the first line for a name replaces the built-in variants instead of
+	// appending to them.
+	aliasTouched map[string]bool
 }
 
 // Default returns the built-in defaults.
@@ -93,6 +109,9 @@ func Default() *Config {
 		PruneOrphans:        true,
 		CacheTTLHours:       24,
 		PreconnectEnabled:   false,
+
+		GenreAlias:  DefaultGenreAlias(),
+		StatusAlias: DefaultStatusAlias(),
 	}
 	c.CacheDir = filepath.Join(c.DataDir, "cache")
 	c.InfoDir = filepath.Join(c.DataDir, "info")
@@ -133,5 +152,22 @@ func (c *Config) Save(path string) error {
 	fmt.Fprintf(&b, "backup_interval_hours = %d\n", c.BackupIntervalHours)
 	fmt.Fprintf(&b, "backup_keep = %d\n", c.BackupKeep)
 	fmt.Fprintf(&b, "prune_orphans = %t\n", c.PruneOrphans)
+	writeAliasSection(&b, "genre", c.GenreAlias)
+	writeAliasSection(&b, "status", c.StatusAlias)
 	return os.WriteFile(path, []byte(b.String()), 0o644)
+}
+
+func writeAliasSection(b *strings.Builder, section string, aliases map[string][]string) {
+	if len(aliases) == 0 {
+		return
+	}
+	names := make([]string, 0, len(aliases))
+	for name := range aliases {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	fmt.Fprintf(b, "\n[%s]\n", section)
+	for _, name := range names {
+		fmt.Fprintf(b, "%s = %s\n", name, strings.Join(aliases[name], ", "))
+	}
 }

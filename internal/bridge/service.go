@@ -12,6 +12,7 @@ import (
 	"sync"
 	"time"
 
+	"goisekai/internal/config"
 	"goisekai/internal/database"
 	"goisekai/internal/enrich"
 	"goisekai/internal/hostnet"
@@ -23,31 +24,56 @@ import (
 // AppService wires the plugin manager, hostnet proxy, and SQLite database into
 // the single entry point the frontend calls.
 type AppService struct {
-	db         *database.DB
-	mgr        *pluginmanager.Manager
-	proxy      *hostnet.Proxy
-	cfgPath    string
-	cacheDir   string
-	imageMu    sync.RWMutex
-	imageCache map[string][]byte
-	imgSem     chan struct{} // caps concurrent image fetches per host process
-	imgPaceMu  sync.Mutex
-	imgPace    map[string]time.Time // host -> earliest allowed next request (MD@Home pacing)
-	enrich     *enrich.Registry
+	db          *database.DB
+	mgr         *pluginmanager.Manager
+	proxy       *hostnet.Proxy
+	cfgPath     string
+	cacheDir    string
+	imageMu     sync.RWMutex
+	imageCache  map[string][]byte
+	imgSem      chan struct{} // caps concurrent image fetches per host process
+	imgPaceMu   sync.Mutex
+	imgPace     map[string]time.Time // host -> earliest allowed next request (MD@Home pacing)
+	enrich      *enrich.Registry
+	genres      *genreIndex
+	statusAlias map[string][]string
 }
 
 // NewAppService returns an AppService backed by the supplied database, plugin
 // manager, hostnet proxy, and enrichment registry.
 func NewAppService(db *database.DB, mgr *pluginmanager.Manager, proxy *hostnet.Proxy, cfgPath, cacheDir string, enrichReg *enrich.Registry) *AppService {
 	return &AppService{
-		db:         db,
-		mgr:        mgr,
-		proxy:      proxy,
-		cfgPath:    cfgPath,
-		cacheDir:   cacheDir,
-		imageCache: make(map[string][]byte),
-		enrich:     enrichReg,
+		db:          db,
+		mgr:         mgr,
+		proxy:       proxy,
+		cfgPath:     cfgPath,
+		cacheDir:    cacheDir,
+		imageCache:  make(map[string][]byte),
+		enrich:      enrichReg,
+		genres:      loadGenreIndex(cfgPath),
+		statusAlias: loadStatusAlias(cfgPath),
 	}
+}
+
+// loadStatusAlias reads the status alias map from the INI at cfgPath, falling
+// back to the built-in defaults when the file is missing or unreadable.
+func loadStatusAlias(cfgPath string) map[string][]string {
+	cfg, err := config.Load(cfgPath)
+	if err != nil || cfg == nil {
+		return config.DefaultStatusAlias()
+	}
+	return cfg.StatusAlias
+}
+
+// loadGenreIndex reads the genre alias map from the INI at cfgPath, falling
+// back to the built-in defaults when the file is missing or unreadable. The
+// map is static, so it is resolved once here rather than per manga detail.
+func loadGenreIndex(cfgPath string) *genreIndex {
+	cfg, err := config.Load(cfgPath)
+	if err != nil || cfg == nil {
+		return indexGenreAliases()
+	}
+	return newGenreIndex(cfg.GenreAlias)
 }
 
 // Log receives a console message from the frontend and writes it to the Go logger.
@@ -142,7 +168,7 @@ func (s *AppService) ListLibraryWithProgress() ([]database.LibraryMangaStats, er
 
 // LibraryOverview returns aggregated library-wide stats for the stats row.
 func (s *AppService) LibraryOverview() (database.LibraryOverview, error) {
-	return s.db.LibraryOverview()
+	return s.db.LibraryOverview(database.StatusAlias(s.statusAlias))
 }
 
 // FindPotentialDuplicates returns groups of in-library manga that share a

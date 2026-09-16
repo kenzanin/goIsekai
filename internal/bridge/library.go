@@ -45,6 +45,7 @@ func (s *AppService) GetMangaDetails(pluginID, mangaID string) (types.Manga, []t
 
 	manga, err := s.mgr.GetMangaDetail(pluginID, mangaID)
 	if err == nil {
+		manga.Genres = s.genres.normalize(manga.Genres)
 		manga.RawGenres = make([]string, len(manga.Genres))
 		copy(manga.RawGenres, manga.Genres)
 		chapters, chapErr := s.mgr.GetChapterList(pluginID, mangaID)
