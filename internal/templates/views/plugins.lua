@@ -45,12 +45,6 @@ document.querySelectorAll('input[type=file]').forEach(inp => {
   });
 });
 
-document.querySelectorAll('form[data-confirm]').forEach(function(f) {
-  f.addEventListener('submit', function(e) {
-    if (!window.confirm(f.getAttribute('data-confirm'))) e.preventDefault();
-  });
-});
-
 var pluginFilter = document.getElementById('plugin-filter');
 if (pluginFilter) {
   pluginFilter.addEventListener('input', function() {
