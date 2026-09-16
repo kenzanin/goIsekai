@@ -4,28 +4,13 @@ Provide host-managed enrichment of manga metadata, across alternative titles, al
 
 ## Requirements
 
-### Requirement: Built-in enrichment providers
-
-The host SHALL provide built-in enrichment providers for MangaDex and MangaUpdates that function without any plugin installed. A built-in provider SHALL declare which enrichment kinds it supports:
-
-- MangaDex: `titles`, `categories`, `related`
-- MangaUpdates: `titles`, `summaries`, `categories`, `related`
-
-#### Scenario: Built-in provider available with no plugins installed
-- **WHEN** no plugin is active and the enrichment source catalog is requested
-- **THEN** the catalog lists the MangaDex and MangaUpdates sources with their supported kinds
-
-#### Scenario: Built-in provider resolves by title
-- **WHEN** an enrichment fetch is requested for a source and kind the built-in provider supports, supplying a search title
-- **THEN** the provider queries the external API using that title and returns items tagged with the provider's source label
-
 ### Requirement: Enrichment source catalog
 
-The system SHALL expose a catalog of available enrichment sources aggregated from built-in providers and from active plugins that declare enrichment providers. Each catalog entry SHALL contain the source identifier, a display name, and the set of enrichment kinds the source supports. The catalog SHALL be filterable by kind.
+The system SHALL expose a catalog of available enrichment sources aggregated from the enrichment sources discovered in the info directory and from active plugins that declare enrichment providers, including declarations from sources that have not yet been invoked. Each catalog entry SHALL contain the source identifier, a display name, and the set of enrichment kinds the source supports. The catalog SHALL be filterable by kind. Reading the catalog SHALL instantiate only the scripts needed to learn their declarations, leaving manga source plugins unloaded.
 
 #### Scenario: Catalog includes built-in and plugin sources
-- **WHEN** the catalog is requested and one plugin declares a custom source for `titles`
-- **THEN** the catalog contains the built-in MangaDex/MangaUpdates entries plus the plugin source entry with its supported kinds
+- **WHEN** the catalog is requested and one info script and one plugin each declare a source for `titles`
+- **THEN** the catalog contains both entries with their supported kinds
 
 #### Scenario: Catalog filtered by kind
 - **WHEN** the catalog is requested for a specific kind (e.g. `categories`)
@@ -35,13 +20,17 @@ The system SHALL expose a catalog of available enrichment sources aggregated fro
 - **WHEN** no provider supports the requested kind
 - **THEN** the catalog returns an empty list without error
 
+#### Scenario: Catalog does not load source plugins
+- **WHEN** the catalog is requested while a manga source plugin is registered but not yet invoked
+- **THEN** no runtime is instantiated for it by reading the catalog alone
+
 ### Requirement: On-demand enrichment fetch
 
 The system SHALL fetch enrichment items for a library manga by kind and source, resolve the manga's current title, dispatch to the resolved provider, and merge the returned items into persistent storage tagged with the provider-reported source label. Items already stored for that manga and kind SHALL be skipped (no duplicates). An empty provider result SHALL NOT delete existing rows.
 
 #### Scenario: Fetch categories from a built-in source
-- **WHEN** an enrichment fetch for kind `categories` and source `mangadex` is requested for a library manga
-- **THEN** the provider's categories are persisted with the MangaDex source label and previously stored categories are unchanged
+- **WHEN** an enrichment fetch for kind `categories` and source `mangadex` is requested for a library manga and the `mangadex` source declares `categories`
+- **THEN** the provider's categories are persisted with the `mangadex` source label and previously stored categories are unchanged
 
 #### Scenario: Duplicate items are not stored twice
 - **WHEN** a fetch returns an item already stored for that manga and kind
@@ -75,19 +64,19 @@ The system SHALL store fetched related/recommended manga per manga with their so
 
 ### Requirement: Plugin-declared enrichment providers
 
-The system SHALL allow a plugin to declare one or more enrichment providers in its metadata, each with a source identifier, a display name, and supported kinds, and SHALL invoke the plugin's enrichment export when a fetch targets a plugin-declared source. A plugin that declares no enrichment providers SHALL remain a fully functional source plugin. When a plugin-declared provider is unavailable or fails, the failure SHALL surface as an error for that fetch only and SHALL NOT prevent other sources from being used.
+The system SHALL allow an enrichment script or a source plugin to declare one or more enrichment providers, each with a source identifier, a display name, and supported kinds, and SHALL invoke the declaring script's enrichment export when a fetch targets that source. A source plugin that declares no enrichment providers SHALL remain a fully functional manga source. When a declaring script is unavailable or fails, the failure SHALL surface as an error for that fetch only and SHALL NOT prevent other sources from being used.
 
 #### Scenario: Plugin-declared provider participates in catalog
-- **WHEN** an active plugin declares an enrichment source supported for `titles`
+- **WHEN** an active script declares an enrichment source supported for `titles`
 - **THEN** the source appears in the catalog and is selectable for `titles` fetches
 
 #### Scenario: Plugin without enrichment capability
-- **WHEN** a plugin declares no enrichment providers
-- **THEN** it loads and operates normally and contributes no catalog entries
+- **WHEN** a source plugin declares no enrichment providers
+- **THEN** it loads and operates normally as a manga source and contributes no catalog entries
 
 #### Scenario: Plugin provider failure isolated
-- **WHEN** a fetch against a plugin-declared source fails or times out
-- **THEN** the fetch returns an error and built-in sources remain usable
+- **WHEN** a fetch against a declared source fails or times out
+- **THEN** the fetch returns an error and the remaining sources stay usable
 
 ### Requirement: Compact enrichment fetch panel
 
@@ -104,3 +93,39 @@ The manga detail view SHALL present a single enrichment control consisting of a 
 #### Scenario: Submit fetches and reflects result
 - **WHEN** the user selects a kind and source and submits
 - **THEN** the fetch runs for that combination and the resulting items appear in the corresponding detail section
+
+### Requirement: Enrichment script sources
+
+The host SHALL treat each folder under the configured info directory (`info_dir`, default `<data_dir>/info`) that contains a `main.lua` as one enrichment source, using the folder name as the source identifier. A source SHALL declare its providers in `PLUGIN.enrichment_providers`, each with a source id, a display name, and the enrichment kinds it supports, and SHALL implement `getEnrichment` to serve a fetch. Adding, changing, or removing a source SHALL require no host rebuild: the info directory SHALL be rescanned at startup. An enrichment source SHALL NOT be usable as a manga source.
+
+#### Scenario: Source discovered from a folder
+- **WHEN** the host starts with `info_dir` containing a `mangadex/main.lua` that declares a provider for `titles`
+- **THEN** `mangadex` appears in the enrichment catalog with the kinds it declared
+
+#### Scenario: Source added without a rebuild
+- **WHEN** a new folder containing a `main.lua` is added under `info_dir` and the host restarts
+- **THEN** the new source is offered in the catalog with no host code change
+
+#### Scenario: Enrichment source is not a manga source
+- **WHEN** an enrichment source is discovered
+- **THEN** it is absent from the plugin list, is not offered as a search target, and is not asked for chapter pages
+
+#### Scenario: Missing info directory does not fail startup
+- **WHEN** `info_dir` does not exist
+- **THEN** the host starts normally with an empty enrichment catalog
+
+### Requirement: Author enrichment
+
+The system SHALL support `authors` as an enrichment kind, and SHALL store a fetched author on the manga rather than as a list of alternative rows. A fetched author SHALL replace the stored value, blank author names in a result SHALL be ignored, and the manga detail view SHALL use the stored author when the source plugin supplies none.
+
+#### Scenario: Author stored on the manga
+- **WHEN** an enrichment fetch for kind `authors` returns author names for a library manga
+- **THEN** the manga's author is set to those names and a later fetch replaces the stored value
+
+#### Scenario: Stored author fills a gap
+- **WHEN** the detail view is requested for a manga whose source plugin reported no author and a stored author exists
+- **THEN** the view shows the stored author
+
+#### Scenario: Source plugin author wins
+- **WHEN** the source plugin supplies an author while a stored author also exists
+- **THEN** the view shows the plugin's author and the stored value is left untouched
