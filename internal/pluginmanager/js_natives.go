@@ -22,6 +22,9 @@ func registerJSHostNatives(vm *goja.Runtime, m *Manager, id string) error {
 			"strip_html":     jsStr1(vm, pluginutil.StripHTML),
 			"strip_markdown": jsStr1(vm, pluginutil.StripMarkdown),
 			"titlecase":      jsStr1(vm, pluginutil.Titlecase),
+			"chapter_num":    jsFloat1(vm, pluginutil.ChapterNum),
+			"json_blob":      jsStr2(vm, pluginutil.JSONBlob),
+			"date_to_iso":    jsStr1(vm, pluginutil.DateToISONow),
 		}},
 		{"codecs", map[string]any{
 			"base64_encode":     jsStr1(vm, pluginutil.Base64Encode),

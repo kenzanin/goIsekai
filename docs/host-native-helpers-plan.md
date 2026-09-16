@@ -156,6 +156,7 @@ tables/glue stay plugin-side (site-specific, rotate with extension updates).
 | **P5b** | Failure logging hoisted into `hostnet.HandleRequest`; plugin HTTP wrappers collapse to `host.http.*` aliases | ✅ done | (this change) |
 | **P6** | `host.json.*` — shared JSON codec for Lua + JS; the Lua `json` global removed | ✅ done | see `add-host-json-helpers` |
 | **P7** | **`host.html.*`** (9 functions) for Lua + JS, and the same nine on the Yaegi `hostnet` bridge, over one `internal/htmldoc` implementation | ✅ done | see `add-host-html-helpers` |
+| **P8** | `host.text.chapter_num`, `host.text.date_to_iso`, `host.text.json_blob` — scraper leftovers (chapter numbering, release dates, embedded JSON) hoisted into `internal/pluginutil` for Lua + JS | ✅ done | see `add-host-text-extractors` |
 
 P0–P5 delivers the full surface: 10 plugins migrated, ~530 LOC deleted, 16 native functions wired to both Lua and JS runtimes.
 

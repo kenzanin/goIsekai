@@ -25,6 +25,9 @@ func registerHostNatives(state *lua.State, m *Manager, id string) {
 	_ = text.RawSetString("unescape", luaStr1(state, pluginutil.HTMLEntityUnescape))
 	_ = text.RawSetString("trim", luaStr1(state, strings.TrimSpace))
 	_ = text.RawSetString("lua_escape", luaStr1(state, pluginutil.LuaEscape))
+	_ = text.RawSetString("chapter_num", luaFloat1(state, pluginutil.ChapterNum))
+	_ = text.RawSetString("json_blob", luaStr2(state, pluginutil.JSONBlob))
+	_ = text.RawSetString("date_to_iso", luaStr1(state, pluginutil.DateToISONow))
 
 	codecs, _ := state.NewTable()
 	_ = codecs.RawSetString("base64_encode", luaStr1(state, pluginutil.Base64Encode))

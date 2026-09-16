@@ -29,6 +29,13 @@ func jsStr2(vm *goja.Runtime, fn func(string, string) string) func(goja.Function
 	}
 }
 
+// jsFloat1 wraps a string->float64 helper as a Goja native function.
+func jsFloat1(vm *goja.Runtime, fn func(string) float64) func(goja.FunctionCall) goja.Value {
+	return func(call goja.FunctionCall) goja.Value {
+		return vm.ToValue(fn(call.Arguments[0].String()))
+	}
+}
+
 // jsStr2Err wraps a (string,string)->(string,error) helper, panicking on error.
 func jsStr2Err(vm *goja.Runtime, fn func(string, string) (string, error)) func(goja.FunctionCall) goja.Value {
 	return func(call goja.FunctionCall) goja.Value {

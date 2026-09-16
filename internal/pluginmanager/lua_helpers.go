@@ -36,6 +36,15 @@ func luaStr2(state *lua.State, fn func(string, string) string) lua.Value {
 	return v.Value()
 }
 
+// luaFloat1 wraps a string->float64 helper as a Lua native.
+func luaFloat1(state *lua.State, fn func(string) float64) lua.Value {
+	v, _ := state.NewNativeFunction(func(frame lua.Frame) lua.Outcome {
+		s, _ := frame.String(0)
+		return frame.ReturnValue(lua.Number(fn(s)))
+	})
+	return v.Value()
+}
+
 // luaStr2Err wraps a (string,string)->(string,error) helper.
 func luaStr2Err(state *lua.State, fn func(string, string) (string, error)) lua.Value {
 	v, _ := state.NewNativeFunction(func(frame lua.Frame) lua.Outcome {
