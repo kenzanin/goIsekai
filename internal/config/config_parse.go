@@ -181,6 +181,12 @@ func (c *Config) set(section, key, val string) {
 			if n, err := strconv.Atoi(val); err == nil && n > 0 {
 				c.CDPSolveTimeout = n
 			}
+		case "cache_ttl_hours":
+			if n, err := strconv.Atoi(val); err == nil && n >= 0 {
+				c.CacheTTLHours = n
+			}
+		case "preconnect_enabled":
+			c.PreconnectEnabled = val == "true" || val == "1" || val == "yes"
 		}
 	}
 }

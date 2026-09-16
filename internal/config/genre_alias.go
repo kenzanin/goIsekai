@@ -90,6 +90,9 @@ func addAliasLine(m map[string][]string, touched *map[string]bool, canonical, va
 			list = append(list, v)
 		}
 	}
+	if list == nil {
+		list = []string{}
+	}
 	m[canonical] = list
 	return m
 }

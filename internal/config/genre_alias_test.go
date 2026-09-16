@@ -3,6 +3,7 @@ package config
 import (
 	"os"
 	"path/filepath"
+	"reflect"
 	"testing"
 )
 
@@ -76,5 +77,33 @@ func TestSaveRoundTripsAliases(t *testing.T) {
 	}
 	if s := got.StatusAlias["Hiatus"]; len(s) != 1 || s[0] != "uncertain" {
 		t.Errorf("Hiatus = %v, want [uncertain]", s)
+	}
+}
+
+// TestSaveRoundTripsEveryField pins the app's generation contract: a
+// goisekai.ini written by Save() must carry every config option filled with a
+// value, so nothing silently disappears on a load round-trip. It walks the
+// Config struct, which means a new field fails the test until it is written
+// and parsed.
+func TestSaveRoundTripsEveryField(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "goisekai.ini")
+	c := Default()
+	if err := c.Save(path); err != nil {
+		t.Fatal(err)
+	}
+	got, err := Load(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want, have := reflect.ValueOf(*c), reflect.ValueOf(*got)
+	typ := want.Type()
+	for i := 0; i < want.NumField(); i++ {
+		field := typ.Field(i)
+		if !field.IsExported() {
+			continue
+		}
+		if a, b := want.Field(i).Interface(), have.Field(i).Interface(); !reflect.DeepEqual(a, b) {
+			t.Errorf("%s = %v after round-trip, want %v", field.Name, b, a)
+		}
 	}
 }
