@@ -19,17 +19,13 @@ func (s *Server) viewHistory(w http.ResponseWriter, r *http.Request) {
 		s.logger.Error("history list", "error", err)
 	}
 	var entries []database.HistoryEntry
-	metas := s.service.PluginMetas()
+	names, icons := s.pluginDisplayMaps()
 	for _, h := range history {
 		h.PluginName = h.PluginID
-		if m, ok := metas[h.PluginID]; ok {
-			if m.Name != "" {
-				h.PluginName = m.Name
-			}
-			if m.Logo != "" {
-				h.PluginIcon = resolveLogoURL(m.Logo, h.PluginID)
-			}
+		if name := names[h.PluginID]; name != "" {
+			h.PluginName = name
 		}
+		h.PluginIcon = icons[h.PluginID]
 		entries = append(entries, h)
 	}
 
@@ -87,14 +83,11 @@ func (s *Server) viewSearch(w http.ResponseWriter, r *http.Request) {
 	pluginName := pluginID
 	pluginIcon := ""
 	if pluginID != "" {
-		if m, ok := s.service.PluginMetas()[pluginID]; ok {
-			if m.Name != "" {
-				pluginName = m.Name
-			}
-			if m.Logo != "" {
-				pluginIcon = resolveLogoURL(m.Logo, pluginID)
-			}
+		names, icons := s.pluginDisplayMaps()
+		if name := names[pluginID]; name != "" {
+			pluginName = name
 		}
+		pluginIcon = icons[pluginID]
 	}
 	s.renderPage(w, r, "views/search", "search", map[string]any{
 		"Plugins":    plugins,

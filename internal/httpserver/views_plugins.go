@@ -72,6 +72,30 @@ func (s *Server) viewSettings(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+// pluginDisplayMaps returns pluginID -> display name and pluginID -> icon URL.
+// DB rows, written by SyncPluginMeta on first load, are the base so names and
+// icons survive restarts; runtime metas overlay when they are fresher.
+// PluginMetas alone is runtime-only and is empty for plugins whose VM is still
+// deferred, which renders raw IDs and blank icons in the UI.
+func (s *Server) pluginDisplayMaps() (map[string]string, map[string]string) {
+	dbPlugins, _ := s.service.ListPlugins()
+	names := make(map[string]string, len(dbPlugins))
+	icons := make(map[string]string, len(dbPlugins))
+	for _, p := range dbPlugins {
+		names[p.ID] = p.Name
+		icons[p.ID] = p.IconURL
+	}
+	for pid, m := range s.service.PluginMetas() {
+		if m.Name != "" {
+			names[pid] = m.Name
+		}
+		if m.Logo != "" {
+			icons[pid] = resolveLogoURL(m.Logo, pid)
+		}
+	}
+	return names, icons
+}
+
 // resolveLogoURL maps a plugin's Logo field to a URL. Bare filenames become
 // /plugin-static/{id}/{file}; absolute URLs and data URIs pass through as-is.
 func resolveLogoURL(logo, pluginID string) string {
