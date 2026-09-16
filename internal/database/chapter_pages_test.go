@@ -14,22 +14,32 @@ func TestChapterPagesRoundTrip(t *testing.T) {
 	defer func() { _ = d.Close() }()
 
 	// Seed a manga + chapter so the FK is satisfied.
-	if _, err := d.db.Exec(`INSERT INTO mangas (id, plugin_id, source_manga_id, title, in_library) VALUES ('m1','p1','s1','T',0)`); err != nil {
+	if _, err := d.db.Exec(`INSERT INTO mangas (plugin_id, source_manga_id, title, in_library) VALUES ('p1','s1','T',0)`); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := d.db.Exec(`INSERT INTO chapters (id, manga_id, source_chapter_id, title, chapter_num) VALUES ('c1','m1','sc1','Ch1',1)`); err != nil {
+	// Get the auto-assigned manga ID.
+	var mangaID int64
+	if err := d.db.QueryRow(`SELECT id FROM mangas WHERE plugin_id = 'p1' AND source_manga_id = 's1'`).Scan(&mangaID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := d.db.Exec(`INSERT INTO chapters (manga_id, source_chapter_id, title, chapter_num) VALUES (?, 'sc1','Ch1',1)`, mangaID); err != nil {
+		t.Fatal(err)
+	}
+	// Get the auto-assigned chapter ID.
+	var chapterID int64
+	if err := d.db.QueryRow(`SELECT id FROM chapters WHERE source_chapter_id = 'sc1'`).Scan(&chapterID); err != nil {
 		t.Fatal(err)
 	}
 
 	payload := []byte(`[{"index":0,"url":"https://img.example/1.png"},{"index":1,"url":"https://img.example/2.png"}]`)
 
 	// Save
-	if err := d.SaveChapterPages("c1", payload); err != nil {
+	if err := d.SaveChapterPages(chapterID, payload); err != nil {
 		t.Fatalf("SaveChapterPages: %v", err)
 	}
 
 	// Read back
-	got, err := d.GetChapterPages("c1")
+	got, err := d.GetChapterPages(chapterID)
 	if err != nil {
 		t.Fatalf("GetChapterPages: %v", err)
 	}
@@ -39,10 +49,10 @@ func TestChapterPagesRoundTrip(t *testing.T) {
 
 	// INSERT OR REPLACE: overwrite with new payload.
 	payload2 := []byte(`[{"index":0,"url":"https://img.example/v2.png"}]`)
-	if err := d.SaveChapterPages("c1", payload2); err != nil {
+	if err := d.SaveChapterPages(chapterID, payload2); err != nil {
 		t.Fatalf("SaveChapterPages overwrite: %v", err)
 	}
-	got2, err := d.GetChapterPages("c1")
+	got2, err := d.GetChapterPages(chapterID)
 	if err != nil {
 		t.Fatalf("GetChapterPages after overwrite: %v", err)
 	}
@@ -51,7 +61,7 @@ func TestChapterPagesRoundTrip(t *testing.T) {
 	}
 
 	// Cache miss: nonexistent chapter returns (nil, nil).
-	gotNil, errNil := d.GetChapterPages("garbage_nonexistent_id")
+	gotNil, errNil := d.GetChapterPages(0)
 	if errNil != nil {
 		t.Fatalf("expected nil error for cache miss, got: %v", errNil)
 	}

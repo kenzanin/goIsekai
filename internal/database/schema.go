@@ -10,6 +10,16 @@ const altTitlesMigration = 9
 // the CREATE TABLE DDL, making a plain ALTER TABLE fail with "duplicate column".
 const skipColumnMigration = 18
 
+// authorMigration is the index for the mangas.author ALTER TABLE migration.
+// Special-cased for the same reason as skipColumnMigration: the storage
+// migration rebuilds mangas with the column already present, so replaying
+// older migrations on such a database would fail with "duplicate column".
+const authorMigration = 21
+
+// dbStorageMigration is the index for the database storage optimization migration
+// that switches chapters to integer surrogate keys and implements purge policies.
+const dbStorageMigration = 22
+
 // migrations is an ordered list of DDL statements applied in sequence.
 // Version is tracked via PRAGMA user_version; migrations[i] is applied when
 // user_version < len(migrations) so partial upgrades resume correctly.
@@ -136,4 +146,8 @@ var migrations = []string{
 	// Index 21: author captured by an enrichment provider (plugins do not
 	// always supply one). Empty string means "not fetched yet".
 	`ALTER TABLE mangas ADD COLUMN author TEXT NOT NULL DEFAULT '';`,
+	// Index 22: database storage optimization migration — switch chapters to
+	// integer surrogate keys, purge non-library chapters, dedupe read_history,
+	// prune chapter_pages for fully-read chapters, then VACUUM.
+	`/* db-storage-optimization: see migrateDbStorage */`,
 }

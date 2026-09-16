@@ -47,7 +47,7 @@ func (s *Server) viewUpdates(w http.ResponseWriter, r *http.Request) {
 	}
 
 	buildRow := func(m database.Manga, typ, date string) map[string]any {
-		st := statsMap[m.ID]
+		st := statsMap[strconv.FormatInt(m.ID, 10)]
 		name := pluginNameMap[m.PluginID]
 		if name == "" {
 			name = m.PluginID
@@ -75,7 +75,7 @@ func (s *Server) viewUpdates(w http.ResponseWriter, r *http.Request) {
 			continue
 		}
 		for _, m := range mangas {
-			if m.ID == st.MangaID {
+			if strconv.FormatInt(m.ID, 10) == st.MangaID {
 				items = append(items, buildRow(m, "update", st.NewSince.UTC().Format(time.RFC3339)))
 				break
 			}

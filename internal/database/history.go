@@ -8,15 +8,24 @@ import (
 	. "github.com/go-jet/jet/v2/sqlite"
 )
 
-// RecordRead inserts a read-history row for a chapter.
-func (d *DB) RecordRead(chapterID string, pageNum int) error {
+// RecordRead upserts the read-history row for a chapter: re-reading keeps a
+// single row carrying the latest page and timestamp.
+func (d *DB) RecordRead(chapterID int64, pageNum int) error {
+	// 0 is never a valid row id (AUTOINCREMENT starts at 1), so the chapter was
+	// never mirrored — it belongs to a manga outside the library. Nothing to record.
+	if chapterID == 0 {
+		return nil
+	}
 	_, err := ReadHistory.INSERT(
 		ReadHistory.ChapterID,
 		ReadHistory.PageNum,
 	).VALUES(
 		chapterID,
 		int64(pageNum),
-	).Exec(d.db)
+	).ON_CONFLICT(ReadHistory.ChapterID).DO_UPDATE(SET(
+		ReadHistory.PageNum.SET(ReadHistory.EXCLUDED.PageNum),
+		ReadHistory.ReadAt.SET(RawTimestamp("CURRENT_TIMESTAMP")),
+	)).Exec(d.db)
 	return err
 }
 
@@ -62,7 +71,7 @@ func (d *DB) GetReadHistory() ([]HistoryEntry, error) {
 }
 
 // LastReadChapter returns the most recently read chapter for a manga, or nil.
-func (d *DB) LastReadChapter(mangaRowID string) (sourceChapterID string, pageNum int, ok bool) {
+func (d *DB) LastReadChapter(mangaIntID int64) (sourceChapterID string, pageNum int, ok bool) {
 	var rows []struct {
 		SourceChapterID string
 		PageNum         int
@@ -70,7 +79,7 @@ func (d *DB) LastReadChapter(mangaRowID string) (sourceChapterID string, pageNum
 	err := SELECT(Chapters.SourceChapterID.AS("source_chapter_id"), ReadHistory.PageNum.AS("page_num")).
 		FROM(ReadHistory.
 			INNER_JOIN(Chapters, Chapters.ID.EQ(ReadHistory.ChapterID))).
-		WHERE(Chapters.MangaID.EQ(String(mangaRowID))).
+		WHERE(Chapters.MangaID.EQ(Int(mangaIntID))).
 		ORDER_BY(ReadHistory.ReadAt.DESC(), ReadHistory.ID.DESC()).
 		LIMIT(1).
 		Query(d.db, &rows)

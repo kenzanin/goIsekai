@@ -12,7 +12,7 @@ import (
 )
 
 type Mangas struct {
-	ID                *string `sql:"primary_key"`
+	ID                *int64 `sql:"primary_key"`
 	PluginID          string
 	SourceMangaID     string
 	Title             string

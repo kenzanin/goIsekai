@@ -11,20 +11,20 @@ import (
 
 // SetChapterTotalPages records a chapter's page count (best-effort metadata
 // from the plugin; ignored if it would lower an already-known count).
-func (d *DB) SetChapterTotalPages(chapterID string, total int) error {
+func (d *DB) SetChapterTotalPages(chapterID int64, total int) error {
 	_, err := Chapters.UPDATE().
 		SET(Chapters.TotalPages.SET(Int(int64(total)))).
-		WHERE(Chapters.ID.EQ(String(chapterID))).
+		WHERE(Chapters.ID.EQ(Int(chapterID))).
 		Exec(d.db)
 	return err
 }
 
 // GetChapterTotalPages returns a chapter's recorded page count (0 when absent).
-func (d *DB) GetChapterTotalPages(chapterID string) (int, error) {
+func (d *DB) GetChapterTotalPages(chapterID int64) (int, error) {
 	var out []struct{ TotalPages int64 }
 	err := SELECT(Chapters.TotalPages.AS("total_pages")).
 		FROM(Chapters).
-		WHERE(Chapters.ID.EQ(String(chapterID))).
+		WHERE(Chapters.ID.EQ(Int(chapterID))).
 		Query(d.db, &out)
 	if err != nil || len(out) == 0 {
 		return 0, err
@@ -33,22 +33,22 @@ func (d *DB) GetChapterTotalPages(chapterID string) (int, error) {
 }
 
 // MarkChapterRead marks a single chapter as read without touching its page.
-func (d *DB) MarkChapterRead(chapterRowID string) error {
+func (d *DB) MarkChapterRead(chapterRowID int64) error {
 	_, err := Chapters.UPDATE().
 		SET(Chapters.IsRead.SET(Int(1))).
-		WHERE(Chapters.ID.EQ(String(chapterRowID))).
+		WHERE(Chapters.ID.EQ(Int(chapterRowID))).
 		Exec(d.db)
 	return err
 }
 
 // ToggleChapterSkip toggles the is_skipped flag for a chapter.
-func (d *DB) ToggleChapterSkip(chapterRowID string) error {
+func (d *DB) ToggleChapterSkip(chapterRowID int64) error {
 	_, err := d.db.Exec(`UPDATE chapters SET is_skipped = 1 - is_skipped WHERE id = ?`, chapterRowID)
 	return err
 }
 
 // SetChaptersSkip sets the is_skipped flag for the given source chapters of a manga.
-func (d *DB) SetChaptersSkip(mangaRowID string, sourceIDs []string, skip bool) error {
+func (d *DB) SetChaptersSkip(mangaIntID int64, sourceIDs []string, skip bool) error {
 	if len(sourceIDs) == 0 {
 		return nil
 	}
@@ -58,7 +58,7 @@ func (d *DB) SetChaptersSkip(mangaRowID string, sourceIDs []string, skip bool) e
 	}
 	_, err := Chapters.UPDATE().
 		SET(Chapters.IsSkipped.SET(Int(readFlag(skip)))).
-		WHERE(Chapters.MangaID.EQ(String(mangaRowID)).AND(Chapters.SourceChapterID.IN(ids...))).
+		WHERE(Chapters.MangaID.EQ(Int(mangaIntID)).AND(Chapters.SourceChapterID.IN(ids...))).
 		Exec(d.db)
 	return err
 }
@@ -73,7 +73,7 @@ func readFlag(read bool) int64 {
 
 // SetChaptersRead marks (read=true) or unmarks (read=false) the given source
 // chapters of a manga, leaving per-chapter page progress untouched.
-func (d *DB) SetChaptersRead(mangaRowID string, sourceIDs []string, read bool) error {
+func (d *DB) SetChaptersRead(mangaIntID int64, sourceIDs []string, read bool) error {
 	if len(sourceIDs) == 0 {
 		return nil
 	}
@@ -83,14 +83,14 @@ func (d *DB) SetChaptersRead(mangaRowID string, sourceIDs []string, read bool) e
 	}
 	_, err := Chapters.UPDATE().
 		SET(Chapters.IsRead.SET(Int(readFlag(read)))).
-		WHERE(Chapters.MangaID.EQ(String(mangaRowID)).AND(Chapters.SourceChapterID.IN(ids...))).
+		WHERE(Chapters.MangaID.EQ(Int(mangaIntID)).AND(Chapters.SourceChapterID.IN(ids...))).
 		Exec(d.db)
 	return err
 }
 
 // SetChaptersUpTo marks (or unmarks) every chapter of a manga whose chapter_num
 // is <= the highest chapter_num among the given source chapters.
-func (d *DB) SetChaptersUpTo(mangaRowID string, sourceIDs []string, read bool) error {
+func (d *DB) SetChaptersUpTo(mangaIntID int64, sourceIDs []string, read bool) error {
 	if len(sourceIDs) == 0 {
 		return fmt.Errorf("set chapters up to: no chapters given")
 	}
@@ -101,7 +101,7 @@ func (d *DB) SetChaptersUpTo(mangaRowID string, sourceIDs []string, read bool) e
 	var nums []struct{ ChapterNum float64 }
 	err := SELECT(Chapters.ChapterNum.AS("chapter_num")).
 		FROM(Chapters).
-		WHERE(Chapters.MangaID.EQ(String(mangaRowID)).AND(Chapters.SourceChapterID.IN(ids...))).
+		WHERE(Chapters.MangaID.EQ(Int(mangaIntID)).AND(Chapters.SourceChapterID.IN(ids...))).
 		Query(d.db, &nums)
 	if err != nil {
 		return err
@@ -117,24 +117,24 @@ func (d *DB) SetChaptersUpTo(mangaRowID string, sourceIDs []string, read bool) e
 	}
 	_, err = Chapters.UPDATE().
 		SET(Chapters.IsRead.SET(Int(readFlag(read)))).
-		WHERE(Chapters.MangaID.EQ(String(mangaRowID)).AND(Chapters.ChapterNum.LT_EQ(Float(bound)))).
+		WHERE(Chapters.MangaID.EQ(Int(mangaIntID)).AND(Chapters.ChapterNum.LT_EQ(Float(bound)))).
 		Exec(d.db)
 	return err
 }
 
 // SetMangaChaptersRead marks (or unmarks) every chapter of a manga, leaving
 // per-chapter page progress untouched.
-func (d *DB) SetMangaChaptersRead(mangaRowID string, read bool) error {
+func (d *DB) SetMangaChaptersRead(mangaIntID int64, read bool) error {
 	_, err := Chapters.UPDATE().
 		SET(Chapters.IsRead.SET(Int(readFlag(read)))).
-		WHERE(Chapters.MangaID.EQ(String(mangaRowID))).
+		WHERE(Chapters.MangaID.EQ(Int(mangaIntID))).
 		Exec(d.db)
 	return err
 }
 
 // GetChapterProgressForManga returns per-chapter read progress for every
 // stored chapter of a manga.
-func (d *DB) GetChapterProgressForManga(mangaRowID string) ([]ChapterProgress, error) {
+func (d *DB) GetChapterProgressForManga(mangaIntID int64) ([]ChapterProgress, error) {
 	var rows []struct {
 		SourceChapterID string
 		LastPageRead    int64
@@ -144,7 +144,7 @@ func (d *DB) GetChapterProgressForManga(mangaRowID string) ([]ChapterProgress, e
 	}
 	err := SELECT(Chapters.SourceChapterID.AS("source_chapter_id"), Chapters.LastPageRead.AS("last_page_read"), Chapters.TotalPages.AS("total_pages"), Chapters.IsRead.AS("is_read"), Chapters.IsSkipped.AS("is_skipped")).
 		FROM(Chapters).
-		WHERE(Chapters.MangaID.EQ(String(mangaRowID))).
+		WHERE(Chapters.MangaID.EQ(Int(mangaIntID))).
 		Query(d.db, &rows)
 	if err != nil {
 		return nil, err
@@ -165,11 +165,11 @@ func (d *DB) GetChapterProgressForManga(mangaRowID string) ([]ChapterProgress, e
 }
 
 // CountChaptersForManga returns how many chapter rows exist for a manga.
-func (d *DB) CountChaptersForManga(mangaRowID string) (int, error) {
+func (d *DB) CountChaptersForManga(mangaIntID int64) (int, error) {
 	var out []struct{ N int64 }
 	err := SELECT(COUNT(Chapters.ID).AS("n")).
 		FROM(Chapters).
-		WHERE(Chapters.MangaID.EQ(String(mangaRowID))).
+		WHERE(Chapters.MangaID.EQ(Int(mangaIntID))).
 		Query(d.db, &out)
 	if err != nil || len(out) == 0 {
 		return 0, err
@@ -180,8 +180,8 @@ func (d *DB) CountChaptersForManga(mangaRowID string) (int, error) {
 // ResetChapterProgress clears a chapter's read progress: last_page_read back
 // to 0 and is_read off. total_pages is left intact (page-count metadata, not
 // read state).
-func (d *DB) ResetChapterProgress(chapterRowID string) error {
-	return d.resetProgress(Chapters.ID.EQ(String(chapterRowID)))
+func (d *DB) ResetChapterProgress(chapterRowID int64) error {
+	return d.resetProgress(Chapters.ID.EQ(Int(chapterRowID)))
 }
 
 func (d *DB) resetProgress(where BoolExpression) error {
@@ -198,10 +198,10 @@ func (d *DB) resetProgress(where BoolExpression) error {
 // ListChaptersCached returns all chapters for a manga from the database cache,
 // ordered newest-first (descending chapter_num, then by ID for ties). Returns
 // an empty slice (not nil) when no chapters are cached.
-func (d *DB) ListChaptersCached(mangaRowID string) ([]Chapter, error) {
+func (d *DB) ListChaptersCached(mangaIntID int64) ([]Chapter, error) {
 	var models []model.Chapters
 	err := Chapters.SELECT(Chapters.AllColumns).
-		WHERE(Chapters.MangaID.EQ(String(mangaRowID))).
+		WHERE(Chapters.MangaID.EQ(Int(mangaIntID))).
 		ORDER_BY(Chapters.ChapterNum.DESC(), Chapters.ID.DESC()).
 		Query(d.db, &models)
 	if err != nil {
@@ -209,27 +209,7 @@ func (d *DB) ListChaptersCached(mangaRowID string) ([]Chapter, error) {
 	}
 	out := make([]Chapter, len(models))
 	for i, m := range models {
-		out[i] = Chapter{
-			ID:              derefStr(m.ID),
-			MangaID:         m.MangaID,
-			SourceChapterID: m.SourceChapterID,
-			Title:           m.Title,
-			ChapterNum:      m.ChapterNum,
-			VolumeNum:       derefFloat(m.VolumeNum),
-			IsRead:          derefBool(m.IsRead),
-			LastPageRead:    int(derefFloatPtr(m.LastPageRead)),
-			TotalPages:      int(derefFloatPtr(m.TotalPages)),
-			DownloadStatus:  derefStr(m.DownloadStatus),
-			FetchedAt:       derefTime(m.FetchedAt),
-		}
+		out[i] = chapterFromModel(m)
 	}
 	return out, nil
-}
-
-// derefFloatPtr converts *int64 to float64 for int64 fields that we treat as floats.
-func derefFloatPtr(p *int64) float64 {
-	if p != nil {
-		return float64(*p)
-	}
-	return 0
 }

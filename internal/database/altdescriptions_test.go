@@ -1,17 +1,19 @@
 package database
 
 import (
+	"fmt"
 	"testing"
 )
 
 func TestAddAltDescriptionsDedupCount(t *testing.T) {
 	db := openTestDB(t)
-	if err := db.UpsertManga(Manga{ID: "m1", PluginID: "p1", SourceMangaID: "s1", Title: "Main", InLibrary: true}); err != nil {
+	mangaID, err := db.UpsertManga(Manga{PluginID: "p1", SourceMangaID: "s1", Title: "Main", InLibrary: true})
+	if err != nil {
 		t.Fatalf("upsert manga: %v", err)
 	}
 
 	// First batch: 2 distinct + 1 duplicate within the batch.
-	n, err := db.AddAltDescriptions("m1", []string{"Short synopsis", "Long synopsis", "Short synopsis"}, "MU")
+	n, err := db.AddAltDescriptions(fmt.Sprint(mangaID), []string{"Short synopsis", "Long synopsis", "Short synopsis"}, "MU")
 	if err != nil {
 		t.Fatalf("add 1: %v", err)
 	}
@@ -20,7 +22,7 @@ func TestAddAltDescriptionsDedupCount(t *testing.T) {
 	}
 
 	// Re-adding the same descriptions must insert nothing.
-	n, err = db.AddAltDescriptions("m1", []string{"Short synopsis", "Long synopsis"}, "MU")
+	n, err = db.AddAltDescriptions(fmt.Sprint(mangaID), []string{"Short synopsis", "Long synopsis"}, "MU")
 	if err != nil {
 		t.Fatalf("add 2: %v", err)
 	}
@@ -28,7 +30,7 @@ func TestAddAltDescriptionsDedupCount(t *testing.T) {
 		t.Fatalf("expected 0 inserted on dedup, got %d", n)
 	}
 
-	descs, err := db.ListAltDescriptions("m1")
+	descs, err := db.ListAltDescriptions(fmt.Sprint(mangaID))
 	if err != nil {
 		t.Fatalf("list: %v", err)
 	}
@@ -48,17 +50,18 @@ func TestAddAltDescriptionsDedupCount(t *testing.T) {
 
 func TestRemoveAltDescription(t *testing.T) {
 	db := openTestDB(t)
-	if err := db.UpsertManga(Manga{ID: "m1", PluginID: "p1", SourceMangaID: "s1", Title: "Main"}); err != nil {
+	mangaID, err := db.UpsertManga(Manga{PluginID: "p1", SourceMangaID: "s1", Title: "Main"})
+	if err != nil {
 		t.Fatalf("upsert manga: %v", err)
 	}
-	if _, err := db.AddAltDescriptions("m1", []string{"Synopsis A", "Synopsis B"}, "MU"); err != nil {
+	if _, err := db.AddAltDescriptions(fmt.Sprint(mangaID), []string{"Synopsis A", "Synopsis B"}, "MU"); err != nil {
 		t.Fatalf("add: %v", err)
 	}
 
-	if err := db.RemoveAltDescription("m1", "Synopsis A"); err != nil {
+	if err := db.RemoveAltDescription(fmt.Sprint(mangaID), "Synopsis A"); err != nil {
 		t.Fatalf("remove: %v", err)
 	}
-	descs, err := db.ListAltDescriptions("m1")
+	descs, err := db.ListAltDescriptions(fmt.Sprint(mangaID))
 	if err != nil {
 		t.Fatalf("list: %v", err)
 	}
@@ -74,10 +77,11 @@ func TestRemoveAltDescription(t *testing.T) {
 
 func TestAltDescriptionsCascadeDelete(t *testing.T) {
 	db := openTestDB(t)
-	if err := db.UpsertManga(Manga{ID: "m1", PluginID: "p1", SourceMangaID: "s1", Title: "Main", InLibrary: true}); err != nil {
+	mangaID, err := db.UpsertManga(Manga{PluginID: "p1", SourceMangaID: "s1", Title: "Main", InLibrary: true})
+	if err != nil {
 		t.Fatalf("upsert manga: %v", err)
 	}
-	if _, err := db.AddAltDescriptions("m1", []string{"Alpha", "Beta"}, "MU"); err != nil {
+	if _, err := db.AddAltDescriptions(fmt.Sprint(mangaID), []string{"Alpha", "Beta"}, "MU"); err != nil {
 		t.Fatalf("add alts: %v", err)
 	}
 

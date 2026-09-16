@@ -2,6 +2,7 @@ package httpserver
 
 import (
 	"bytes"
+	"fmt"
 	"net/http/httptest"
 	"net/url"
 	"strings"
@@ -109,8 +110,8 @@ func TestAPIRemoveRelatedMissingBody(t *testing.T) {
 // and the handler must populate the field via ParseForm/FormValue.
 func TestActionSetTitleParsesFormField(t *testing.T) {
 	s, db := testServerFullDB(t, "", true)
-	seedManga(t, db, "p1|m1", "p1", "m1", "Main Title")
-	if _, err := db.AddAltTitles("p1|m1", []string{"Some Alt Title"}, "src"); err != nil {
+	mangaID := seedManga(t, db, "p1", "m1", "Main Title")
+	if _, err := db.AddAltTitles(fmt.Sprint(mangaID), []string{"Some Alt Title"}, "src"); err != nil {
 		t.Fatalf("add alt titles: %v", err)
 	}
 

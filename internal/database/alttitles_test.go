@@ -1,17 +1,19 @@
 package database
 
 import (
+	"fmt"
 	"testing"
 )
 
 func TestAddAltTitlesDedupCount(t *testing.T) {
 	db := openTestDB(t)
-	if err := db.UpsertManga(Manga{ID: "m1", PluginID: "p1", SourceMangaID: "s1", Title: "Main", InLibrary: true}); err != nil {
+	mangaID, err := db.UpsertManga(Manga{PluginID: "p1", SourceMangaID: "s1", Title: "Main", InLibrary: true})
+	if err != nil {
 		t.Fatalf("upsert manga: %v", err)
 	}
 
 	// First batch: 2 distinct + 1 duplicate within the batch.
-	n, err := db.AddAltTitles("m1", []string{"Alpha", "Beta", "Alpha"}, "mal")
+	n, err := db.AddAltTitles(fmt.Sprint(mangaID), []string{"Alpha", "Beta", "Alpha"}, "mal")
 	if err != nil {
 		t.Fatalf("add 1: %v", err)
 	}
@@ -20,7 +22,7 @@ func TestAddAltTitlesDedupCount(t *testing.T) {
 	}
 
 	// Re-adding the same titles must insert nothing.
-	n, err = db.AddAltTitles("m1", []string{"Alpha", "Beta"}, "mal")
+	n, err = db.AddAltTitles(fmt.Sprint(mangaID), []string{"Alpha", "Beta"}, "mal")
 	if err != nil {
 		t.Fatalf("add 2: %v", err)
 	}
@@ -28,7 +30,7 @@ func TestAddAltTitlesDedupCount(t *testing.T) {
 		t.Fatalf("expected 0 inserted on dedup, got %d", n)
 	}
 
-	alts, err := db.ListAltTitles("m1")
+	alts, err := db.ListAltTitles(fmt.Sprint(mangaID))
 	if err != nil {
 		t.Fatalf("list: %v", err)
 	}
@@ -45,17 +47,18 @@ func TestAddAltTitlesDedupCount(t *testing.T) {
 
 func TestRemoveAltTitle(t *testing.T) {
 	db := openTestDB(t)
-	if err := db.UpsertManga(Manga{ID: "m1", PluginID: "p1", SourceMangaID: "s1", Title: "Main"}); err != nil {
+	mangaID, err := db.UpsertManga(Manga{PluginID: "p1", SourceMangaID: "s1", Title: "Main"})
+	if err != nil {
 		t.Fatalf("upsert manga: %v", err)
 	}
-	if _, err := db.AddAltTitles("m1", []string{"Alpha", "Beta"}, "mal"); err != nil {
+	if _, err := db.AddAltTitles(fmt.Sprint(mangaID), []string{"Alpha", "Beta"}, "mal"); err != nil {
 		t.Fatalf("add: %v", err)
 	}
 
-	if err := db.RemoveAltTitle("m1", "Alpha"); err != nil {
+	if err := db.RemoveAltTitle(fmt.Sprint(mangaID), "Alpha"); err != nil {
 		t.Fatalf("remove: %v", err)
 	}
-	alts, err := db.ListAltTitles("m1")
+	alts, err := db.ListAltTitles(fmt.Sprint(mangaID))
 	if err != nil {
 		t.Fatalf("list: %v", err)
 	}
@@ -71,14 +74,15 @@ func TestRemoveAltTitle(t *testing.T) {
 
 func TestSwapMainTitle(t *testing.T) {
 	db := openTestDB(t)
-	if err := db.UpsertManga(Manga{ID: "m1", PluginID: "p1", SourceMangaID: "s1", Title: "Old Main", InLibrary: true}); err != nil {
+	mangaID, err := db.UpsertManga(Manga{PluginID: "p1", SourceMangaID: "s1", Title: "Old Main", InLibrary: true})
+	if err != nil {
 		t.Fatalf("upsert manga: %v", err)
 	}
 	// newTitle is currently an alt title; it must leave alt_titles on swap.
-	if _, err := db.AddAltTitles("m1", []string{"New Main", "Other Alt"}, "mal"); err != nil {
+	if _, err := db.AddAltTitles(fmt.Sprint(mangaID), []string{"New Main", "Other Alt"}, "mal"); err != nil {
 		t.Fatalf("add alts: %v", err)
 	}
-	if err := db.SyncFTS("m1"); err != nil {
+	if err := db.SyncFTS(fmt.Sprint(mangaID)); err != nil {
 		t.Fatalf("sync fts: %v", err)
 	}
 
@@ -88,7 +92,7 @@ func TestSwapMainTitle(t *testing.T) {
 
 	// Main title updated.
 	var title string
-	if err := db.db.QueryRow(`SELECT title FROM mangas WHERE id = ?`, "m1").Scan(&title); err != nil {
+	if err := db.db.QueryRow(`SELECT title FROM mangas WHERE id = ?`, mangaID).Scan(&title); err != nil {
 		t.Fatalf("scan title: %v", err)
 	}
 	if title != "New Main" {
@@ -96,7 +100,7 @@ func TestSwapMainTitle(t *testing.T) {
 	}
 
 	// Old main demoted to an alt with source 'user'; promoted title removed.
-	alts, err := db.ListAltTitles("m1")
+	alts, err := db.ListAltTitles(fmt.Sprint(mangaID))
 	if err != nil {
 		t.Fatalf("list alts: %v", err)
 	}
@@ -122,13 +126,14 @@ func TestSwapMainTitle(t *testing.T) {
 
 func TestSearchLibraryFTSAfterSwap(t *testing.T) {
 	db := openTestDB(t)
-	if err := db.UpsertManga(Manga{ID: "m1", PluginID: "p1", SourceMangaID: "s1", Title: "Old Main", InLibrary: true}); err != nil {
+	mangaID, err := db.UpsertManga(Manga{PluginID: "p1", SourceMangaID: "s1", Title: "Old Main", InLibrary: true})
+	if err != nil {
 		t.Fatalf("upsert manga: %v", err)
 	}
-	if _, err := db.AddAltTitles("m1", []string{"New Main"}, "mal"); err != nil {
+	if _, err := db.AddAltTitles(fmt.Sprint(mangaID), []string{"New Main"}, "mal"); err != nil {
 		t.Fatalf("add alts: %v", err)
 	}
-	if err := db.SyncFTS("m1"); err != nil {
+	if err := db.SyncFTS(fmt.Sprint(mangaID)); err != nil {
 		t.Fatalf("sync fts: %v", err)
 	}
 	if err := db.SwapMainTitle("p1", "s1", "New Main"); err != nil {
@@ -139,7 +144,7 @@ func TestSearchLibraryFTSAfterSwap(t *testing.T) {
 	if err != nil {
 		t.Fatalf("search: %v", err)
 	}
-	if len(hits) != 1 || hits[0].MangaRowID != "m1" || hits[0].SourceMangaID != "s1" || hits[0].PluginID != "p1" {
+	if len(hits) != 1 || hits[0].MangaRowID != fmt.Sprint(mangaID) || hits[0].SourceMangaID != "s1" || hits[0].PluginID != "p1" {
 		t.Fatalf("expected single hit m1, got %+v", hits)
 	}
 	if hits[0].Title != "New Main" {
@@ -175,18 +180,19 @@ func TestSearchLibraryFTSSanitization(t *testing.T) {
 
 func TestAltTitlesCascadeDelete(t *testing.T) {
 	db := openTestDB(t)
-	if err := db.UpsertManga(Manga{ID: "m1", PluginID: "p1", SourceMangaID: "s1", Title: "Main", InLibrary: true}); err != nil {
+	mangaID, err := db.UpsertManga(Manga{PluginID: "p1", SourceMangaID: "s1", Title: "Main", InLibrary: true})
+	if err != nil {
 		t.Fatalf("upsert manga: %v", err)
 	}
-	if _, err := db.AddAltTitles("m1", []string{"Alpha", "Beta"}, "mal"); err != nil {
+	if _, err := db.AddAltTitles(fmt.Sprint(mangaID), []string{"Alpha", "Beta"}, "mal"); err != nil {
 		t.Fatalf("add alts: %v", err)
 	}
 
-	if _, err := db.db.Exec(`DELETE FROM mangas WHERE id = ?`, "m1"); err != nil {
+	if _, err := db.db.Exec(`DELETE FROM mangas WHERE id = ?`, mangaID); err != nil {
 		t.Fatalf("delete manga: %v", err)
 	}
 	var count int
-	if err := db.db.QueryRow(`SELECT COUNT(*) FROM alt_titles WHERE manga_row_id = ?`, "m1").Scan(&count); err != nil {
+	if err := db.db.QueryRow(`SELECT COUNT(*) FROM alt_titles WHERE manga_row_id = ?`, mangaID).Scan(&count); err != nil {
 		t.Fatalf("count: %v", err)
 	}
 	if count != 0 {
@@ -196,13 +202,15 @@ func TestAltTitlesCascadeDelete(t *testing.T) {
 
 func TestRebuildLibraryFTS(t *testing.T) {
 	db := openTestDB(t)
-	if err := db.UpsertManga(Manga{ID: "m1", PluginID: "p1", SourceMangaID: "s1", Title: "Main", InLibrary: true}); err != nil {
+	mangaID1, err := db.UpsertManga(Manga{PluginID: "p1", SourceMangaID: "s1", Title: "Main", InLibrary: true})
+	if err != nil {
 		t.Fatalf("upsert manga: %v", err)
 	}
-	if err := db.UpsertManga(Manga{ID: "m2", PluginID: "p1", SourceMangaID: "s2", Title: "Not In Lib"}); err != nil {
+	_, err = db.UpsertManga(Manga{PluginID: "p1", SourceMangaID: "s2", Title: "Not In Lib"})
+	if err != nil {
 		t.Fatalf("upsert manga 2: %v", err)
 	}
-	if _, err := db.AddAltTitles("m1", []string{"Alt One", "Alt Two"}, "mal"); err != nil {
+	if _, err := db.AddAltTitles(fmt.Sprint(mangaID1), []string{"Alt One", "Alt Two"}, "mal"); err != nil {
 		t.Fatalf("add alts: %v", err)
 	}
 
@@ -218,7 +226,7 @@ func TestRebuildLibraryFTS(t *testing.T) {
 	}
 
 	var alt string
-	if err := db.db.QueryRow(`SELECT alt FROM library_fts WHERE manga_row_id = ?`, "m1").Scan(&alt); err != nil {
+	if err := db.db.QueryRow(`SELECT alt FROM library_fts WHERE manga_row_id = ?`, mangaID1).Scan(&alt); err != nil {
 		t.Fatalf("scan alt: %v", err)
 	}
 	if alt != "Alt One Alt Two" {

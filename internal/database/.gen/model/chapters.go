@@ -12,8 +12,8 @@ import (
 )
 
 type Chapters struct {
-	ID              *string `sql:"primary_key"`
-	MangaID         string
+	ID              *int64 `sql:"primary_key"`
+	MangaID         int64
 	SourceChapterID string
 	Title           string
 	ChapterNum      float64

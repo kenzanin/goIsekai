@@ -104,8 +104,8 @@ func TestViewMangaDetailNonexistent(t *testing.T) {
 func TestViewLibrarySearchFiltersNonMatching(t *testing.T) {
 	s, db := testServerFullDB(t, "", true)
 
-	seedManga(t, db, "s1|a", "s1", "a", "Solo Leveling")
-	seedManga(t, db, "s2|b", "s2", "b", "Berserk")
+	seedManga(t, db, "s1", "a", "Solo Leveling")
+	seedManga(t, db, "s2", "b", "Berserk")
 
 	req := httptest.NewRequest("GET", "/view/library?q=Solo", nil)
 	rec := httptest.NewRecorder()
@@ -126,7 +126,7 @@ func TestViewLibrarySearchFiltersNonMatching(t *testing.T) {
 func TestViewLibrarySearchHidesStatsRow(t *testing.T) {
 	s, db := testServerFullDB(t, "", true)
 
-	seedManga(t, db, "s1|a", "s1", "a", "Solo Leveling")
+	seedManga(t, db, "s1", "a", "Solo Leveling")
 
 	req := httptest.NewRequest("GET", "/view/library?q=Solo", nil)
 	rec := httptest.NewRecorder()

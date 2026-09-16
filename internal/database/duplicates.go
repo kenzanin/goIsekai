@@ -1,6 +1,9 @@
 package database
 
 import (
+	"fmt"
+	. "github.com/go-jet/jet/v2/sqlite"
+	. "goisekai/internal/database/.gen/table"
 	"sort"
 )
 
@@ -8,6 +11,27 @@ import (
 // title or alternative title (or, when from different plugins, a normalised
 // description or alternative description).  The UI consumes these to flag
 // likely dupes.
+// getMangaIntIDFromRowID looks up the integer manga ID from source-based rowID.
+// Returns 0 if not found.
+func (d *DB) getMangaIntIDFromRowID(rowID string) (int64, error) {
+	var pluginID, sourceMangaID string
+	for i, c := range rowID {
+		if c == '|' {
+			pluginID = rowID[:i]
+			sourceMangaID = rowID[i+1:]
+			break
+		}
+	}
+	if pluginID == "" {
+		return 0, fmt.Errorf("invalid rowID format: %s", rowID)
+	}
+	var id int64
+	err := Mangas.SELECT(Mangas.ID).
+		WHERE(Mangas.PluginID.EQ(String(pluginID)).AND(Mangas.SourceMangaID.EQ(String(sourceMangaID)))).
+		Query(d.db, &id)
+	return id, err
+}
+
 type DuplicateGroup struct {
 	Key     string  // normalised key that was matched
 	Title   string  // most readable original title (main title preferred)
@@ -37,7 +61,7 @@ func (d *DB) FindPotentialDuplicates() ([]DuplicateGroup, error) {
 		return nil, nil
 	}
 
-	idIndex := make(map[string]int, len(allManga))
+	idIndex := make(map[int64]int, len(allManga))
 	for i, m := range allManga {
 		idIndex[m.ID] = i
 	}
@@ -107,12 +131,16 @@ func (d *DB) FindPotentialDuplicates() ([]DuplicateGroup, error) {
 		addDesc(normalizeTitle(m.Description), i)
 	}
 	for _, a := range titleAlts {
-		if idx, ok := idIndex[a.MangaRowID]; ok {
+		// Look up integer ID from rowID
+		mangaIntID, _ := d.getMangaIntIDFromRowID(a.MangaRowID)
+		if idx, ok := idIndex[mangaIntID]; ok {
 			addTitle(normalizeTitle(a.Value), idx)
 		}
 	}
 	for _, a := range descAlts {
-		if idx, ok := idIndex[a.MangaRowID]; ok {
+		// Look up integer ID from rowID
+		mangaIntID, _ := d.getMangaIntIDFromRowID(a.MangaRowID)
+		if idx, ok := idIndex[mangaIntID]; ok {
 			addDesc(normalizeTitle(a.Value), idx)
 		}
 	}

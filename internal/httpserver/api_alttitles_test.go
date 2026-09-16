@@ -2,6 +2,7 @@ package httpserver
 
 import (
 	"bytes"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
@@ -64,20 +65,22 @@ func testServerFullDB(t *testing.T, apiKey string, registerViews bool) (*Server,
 }
 
 // seedManga inserts a manga row with in_library=true and syncs FTS.
-func seedManga(t *testing.T, db *database.DB, id, pluginID, sourceID, title string) {
+// It returns the integer row ID.
+func seedManga(t *testing.T, db *database.DB, pluginID, sourceID, title string) int64 {
 	t.Helper()
-	if err := db.UpsertManga(database.Manga{
-		ID:            id,
+	mangaID, err := db.UpsertManga(database.Manga{
 		PluginID:      pluginID,
 		SourceMangaID: sourceID,
 		Title:         title,
 		InLibrary:     true,
-	}); err != nil {
-		t.Fatalf("upsert manga %s: %v", id, err)
+	})
+	if err != nil {
+		t.Fatalf("upsert manga %s|%s: %v", pluginID, sourceID, err)
 	}
-	if err := db.SyncFTS(id); err != nil {
-		t.Fatalf("sync fts %s: %v", id, err)
+	if err := db.SyncFTS(fmt.Sprintf("%d", mangaID)); err != nil {
+		t.Fatalf("sync fts %d: %v", mangaID, err)
 	}
+	return mangaID
 }
 
 // ── PUT title with unknown title ────────────────────────────────────────────
@@ -86,7 +89,7 @@ func TestSetTitleUnknownTitle(t *testing.T) {
 	s, db := testServerFullDB(t, "", false)
 
 	// Seed a manga with one alt title.
-	seedManga(t, db, "p1|m1", "p1", "m1", "Main Title")
+	seedManga(t, db, "p1", "m1", "Main Title")
 	db.AddAltTitles("p1|m1", []string{"Known Alt"}, "src") //nolint:errcheck
 
 	body := bytes.NewBufferString(`{"title":"Totally Unknown"}`)
@@ -104,7 +107,7 @@ func TestSetTitleUnknownTitle(t *testing.T) {
 func TestRemoveAltTitleEqualsMainTitle(t *testing.T) {
 	s, db := testServerFullDB(t, "", false)
 
-	seedManga(t, db, "p1|m1", "p1", "m1", "Main Title")
+	seedManga(t, db, "p1", "m1", "Main Title")
 
 	body := bytes.NewBufferString(`{"title":"Main Title"}`)
 	req := httptest.NewRequest("DELETE", "/api/manga/p1/m1/alt-titles", body)

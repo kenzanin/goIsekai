@@ -20,7 +20,7 @@ import (
 // generated types stay in sync with the applied schema.
 var ddl = []string{
 	`CREATE TABLE IF NOT EXISTS mangas (
-    id TEXT PRIMARY KEY,
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
     plugin_id TEXT NOT NULL,
     source_manga_id TEXT NOT NULL,
     title TEXT NOT NULL,
@@ -33,8 +33,8 @@ var ddl = []string{
     UNIQUE(plugin_id, source_manga_id)
 );`,
 	`CREATE TABLE IF NOT EXISTS chapters (
-    id TEXT PRIMARY KEY,
-    manga_id TEXT NOT NULL,
+    id INTEGER PRIMARY KEY,
+    manga_id INTEGER NOT NULL,
     source_chapter_id TEXT NOT NULL,
     title TEXT NOT NULL,
     chapter_num REAL NOT NULL,
@@ -44,14 +44,17 @@ var ddl = []string{
     last_page_read INTEGER DEFAULT 0,
     download_status TEXT DEFAULT 'NOT_DOWNLOADED',
     fetched_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY(manga_id) REFERENCES mangas(id) ON DELETE CASCADE
+    total_pages INTEGER DEFAULT 0,
+    FOREIGN KEY(manga_id) REFERENCES mangas(id) ON DELETE CASCADE,
+    UNIQUE(manga_id, source_chapter_id)
 );`,
 	`CREATE TABLE IF NOT EXISTS read_history (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    chapter_id TEXT NOT NULL,
+    chapter_id INTEGER NOT NULL,
     page_num INTEGER NOT NULL,
     read_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY(chapter_id) REFERENCES chapters(id) ON DELETE CASCADE
+    FOREIGN KEY(chapter_id) REFERENCES chapters(id) ON DELETE CASCADE,
+    UNIQUE(chapter_id)
 );`,
 	`CREATE TABLE IF NOT EXISTS plugins (
     id TEXT PRIMARY KEY,
@@ -61,7 +64,6 @@ var ddl = []string{
     is_active INTEGER DEFAULT 1,
     icon_url TEXT
 );`,
-	`ALTER TABLE chapters ADD COLUMN total_pages INTEGER DEFAULT 0;`,
 	`CREATE TABLE IF NOT EXISTS plugin_verify (
     plugin_id TEXT PRIMARY KEY,
     verify_url TEXT NOT NULL DEFAULT '',

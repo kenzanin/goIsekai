@@ -13,12 +13,16 @@ func longDesc(s string) string {
 func TestFindPotentialDuplicatesTitleAndDesc(t *testing.T) {
 	db := openTestDB(t)
 
-	insert := func(id, plugin, src, title, desc string, inLib bool) {
-		t.Helper()
-		m := Manga{ID: id, PluginID: plugin, SourceMangaID: src, Title: title, Description: desc, InLibrary: inLib}
-		if err := db.UpsertManga(m); err != nil {
-			t.Fatalf("upsert %s: %v", id, err)
+	// Map from label to manga ID.
+	ids := make(map[string]int64)
+
+	insert := func(label, plugin, src, title, desc string, inLib bool) {
+		m := Manga{PluginID: plugin, SourceMangaID: src, Title: title, Description: desc, InLibrary: inLib}
+		id, err := db.UpsertManga(m)
+		if err != nil {
+			t.Fatalf("upsert %s: %v", label, err)
 		}
+		ids[label] = id
 	}
 
 	// Two titles differ only in punctuation → must group.
@@ -47,13 +51,18 @@ func TestFindPotentialDuplicatesTitleAndDesc(t *testing.T) {
 
 	// pairGrouped reports whether both IDs appear together in one group.
 	pairGrouped := func(a, b string) bool {
+		aID, okA := ids[a]
+		bID, okB := ids[b]
+		if !okA || !okB {
+			return false
+		}
 		for _, g := range groups {
 			hasA, hasB := false, false
 			for _, m := range g.Members {
-				if m.ID == a {
+				if m.ID == aID {
 					hasA = true
 				}
-				if m.ID == b {
+				if m.ID == bID {
 					hasB = true
 				}
 			}
@@ -88,7 +97,7 @@ func TestFindPotentialDuplicatesTitleAndDesc(t *testing.T) {
 	// i is not in library → no pair with it.
 	for _, g := range groups {
 		for _, m := range g.Members {
-			if m.ID == "i" {
+			if m.ID == ids["i"] {
 				t.Errorf("out-of-library manga must not appear in groups")
 			}
 		}

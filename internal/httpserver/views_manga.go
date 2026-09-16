@@ -159,8 +159,7 @@ func computeContinue(chapters []types.Chapter, progress map[string]database.Chap
 // continueFromHistory checks read_history for the most recently read chapter
 // and returns it as the resume point if it's not fully read yet.
 func (s *Server) continueFromHistory(pluginID, mangaID string, chapters []types.Chapter, progress map[string]database.ChapterProgress) *ContinuePoint {
-	mangaRow := pluginID + "|" + mangaID
-	lastChID, lastPage, ok := s.service.LastReadChapter(mangaRow)
+	lastChID, lastPage, ok := s.service.LastReadChapter(pluginID, mangaID)
 	if !ok {
 		return nil
 	}

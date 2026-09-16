@@ -24,21 +24,24 @@ func TestGetMangaDetailsNilManagerFallback(t *testing.T) {
 	defer func() { _ = db.Close() }()
 
 	// Pre-populate DB with a cached manga + chapters.
-	if err := db.UpsertManga(database.Manga{
-		ID: "offline-plugin|src-99", PluginID: "offline-plugin", SourceMangaID: "src-99",
+	mangaID, err := db.UpsertManga(database.Manga{
+		PluginID: "offline-plugin", SourceMangaID: "src-99",
 		Title: "Offline Manga", CoverURL: "http://example.com/offline.jpg",
 		Description: "Offline description", Status: "Ongoing",
-	}); err != nil {
+	})
+	if err != nil {
 		t.Fatalf("upsert manga: %v", err)
 	}
 	chapters := []database.Chapter{
-		{ID: "c1", MangaID: "offline-plugin|src-99", SourceChapterID: "ch-1", Title: "Ch1", ChapterNum: 1},
-		{ID: "c2", MangaID: "offline-plugin|src-99", SourceChapterID: "ch-2", Title: "Ch2", ChapterNum: 2},
+		{MangaID: mangaID, SourceChapterID: "ch-1", Title: "Ch1", ChapterNum: 1},
+		{MangaID: mangaID, SourceChapterID: "ch-2", Title: "Ch2", ChapterNum: 2},
 	}
 	for _, c := range chapters {
-		if err := db.UpsertChapter(c); err != nil {
-			t.Fatalf("upsert chapter %s: %v", c.ID, err)
+		chapterID, err := db.UpsertChapter(c)
+		if err != nil {
+			t.Fatalf("upsert chapter %s: %v", c.SourceChapterID, err)
 		}
+		_ = chapterID
 	}
 
 	// Build a service with nil manager — simulates plugin-unreachable state.
@@ -139,15 +142,14 @@ func TestGetMangaDetailsPersists(t *testing.T) {
 		t.Fatalf("expected 1 library item after toggle, got %d", len(lib))
 	}
 	got := lib[0]
-	rowID := "plugin-a|source-42"
-	if got.ID != rowID {
-		t.Errorf("manga id = %q, want %q", got.ID, rowID)
+	if got.PluginID != "plugin-a" {
+		t.Errorf("plugin_id = %q, want %q", got.PluginID, "plugin-a")
 	}
 	if got.SourceMangaID != manga.ID {
 		t.Errorf("source_manga_id = %q, want %q", got.SourceMangaID, manga.ID)
 	}
-	if got.PluginID != "plugin-a" {
-		t.Errorf("plugin_id = %q, want %q", got.PluginID, "plugin-a")
+	if got.ID == 0 {
+		t.Error("expected non-zero integer ID")
 	}
 	if got.Title != manga.Title {
 		t.Errorf("title = %q, want %q", got.Title, manga.Title)
@@ -195,6 +197,129 @@ func TestToggleLibraryRoundTrip(t *testing.T) {
 	lib, _ = s.ListLibrary()
 	if len(lib) != 0 {
 		t.Fatalf("expected empty library after toggle off, got %d", len(lib))
+	}
+}
+
+// TestPersistMangaDetailsSkipsNonLibraryChapters: chapters are mirrored only for
+// library manga. A detail-view cache row must not drag a chapter list into the
+// database, while the caller still returns the live list it fetched.
+func TestPersistMangaDetailsSkipsNonLibraryChapters(t *testing.T) {
+	s := newTestService(t)
+	manga := types.Manga{ID: "source-77", Title: "Detail Cache Only"}
+	chapters := []types.Chapter{{ID: "c1", MangaID: "source-77", Title: "Ch 1", ChapterNum: 1}}
+
+	if err := s.persistMangaDetails("plugin-z", manga, chapters); err != nil {
+		t.Fatalf("persistMangaDetails: %v", err)
+	}
+	mangaIntID, err := s.db.ResolveMangaIntID("plugin-z", "source-77")
+	if err != nil {
+		t.Fatalf("resolve manga: %v", err)
+	}
+	if got, err := s.db.ListChaptersCached(mangaIntID); err != nil {
+		t.Fatalf("ListChaptersCached: %v", err)
+	} else if len(got) != 0 {
+		t.Fatalf("non-library manga persisted %d chapters, want none", len(got))
+	}
+
+	// Once it is in the library the same call does persist them.
+	if err := s.ToggleLibraryItem("plugin-z", "source-77"); err != nil {
+		t.Fatalf("ToggleLibraryItem: %v", err)
+	}
+	if err := s.persistMangaDetails("plugin-z", manga, chapters); err != nil {
+		t.Fatalf("persistMangaDetails (in library): %v", err)
+	}
+	if got, err := s.db.ListChaptersCached(mangaIntID); err != nil {
+		t.Fatalf("ListChaptersCached: %v", err)
+	} else if len(got) != 1 {
+		t.Fatalf("in-library manga persisted %d chapters, want 1", len(got))
+	}
+}
+
+// TestReadingFlowPrunesPageCacheAndKeepsProgress walks the reader's sequence:
+// cache a page list, mark a chapter read, read a page of another, then confirm a
+// prune drops the finished chapter's cached pages (so the reader re-fetches
+// them) while the progress it reports survives.
+func TestReadingFlowPrunesPageCacheAndKeepsProgress(t *testing.T) {
+	s := newTestService(t)
+
+	if _, err := s.db.UpsertManga(database.Manga{
+		PluginID: "plugin-r", SourceMangaID: "source-5", Title: "Reader", InLibrary: true,
+	}); err != nil {
+		t.Fatalf("upsert manga: %v", err)
+	}
+	if err := s.persistMangaDetails("plugin-r",
+		types.Manga{ID: "source-5", Title: "Reader"},
+		[]types.Chapter{
+			{ID: "ch-1", MangaID: "source-5", Title: "Chapter 1", ChapterNum: 1},
+			{ID: "ch-2", MangaID: "source-5", Title: "Chapter 2", ChapterNum: 2},
+		}); err != nil {
+		t.Fatalf("persistMangaDetails: %v", err)
+	}
+
+	ch1, err := s.db.ResolveChapterIntID("plugin-r", "source-5", "ch-1")
+	if err != nil || ch1 == 0 {
+		t.Fatalf("resolve ch-1: id=%d err=%v", ch1, err)
+	}
+	ch2, err := s.db.ResolveChapterIntID("plugin-r", "source-5", "ch-2")
+	if err != nil || ch2 == 0 {
+		t.Fatalf("resolve ch-2: id=%d err=%v", ch2, err)
+	}
+
+	pages := []byte(`[{"URL":"http://example.com/1.png","Index":1}]`)
+	if err := s.db.SaveChapterPages(ch1, pages); err != nil {
+		t.Fatalf("cache ch-1 pages: %v", err)
+	}
+	if err := s.MarkChapterRead("plugin-r", "source-5", "ch-1"); err != nil {
+		t.Fatalf("MarkChapterRead: %v", err)
+	}
+	if err := s.db.SaveChapterPages(ch2, pages); err != nil {
+		t.Fatalf("cache ch-2 pages: %v", err)
+	}
+	if err := s.SetChapterProgress("plugin-r", "source-5", "ch-2", 5); err != nil {
+		t.Fatalf("SetChapterProgress: %v", err)
+	}
+
+	assertProgress := func(when string) {
+		t.Helper()
+		progress, err := s.GetChapterProgresses("plugin-r", "source-5")
+		if err != nil {
+			t.Fatalf("GetChapterProgresses %s: %v", when, err)
+		}
+		if !progress["ch-1"].Done {
+			t.Errorf("%s: ch-1 not marked read", when)
+		}
+		if got := progress["ch-2"].LastPageRead; got != 5 {
+			t.Errorf("%s: ch-2 last page = %d, want 5", when, got)
+		}
+	}
+	assertProgress("after reading")
+
+	if _, err := s.db.PruneOrphans(); err != nil {
+		t.Fatalf("PruneOrphans: %v", err)
+	}
+
+	// The finished chapter's cached list is gone, so the reader re-fetches it.
+	if cached, err := s.db.GetChapterPages(ch1); err != nil {
+		t.Fatalf("GetChapterPages ch-1: %v", err)
+	} else if cached != nil {
+		t.Errorf("finished chapter kept its cached page list")
+	}
+	// The chapter still being read keeps its cache.
+	if cached, err := s.db.GetChapterPages(ch2); err != nil {
+		t.Fatalf("GetChapterPages ch-2: %v", err)
+	} else if cached == nil {
+		t.Errorf("in-progress chapter lost its cached page list")
+	}
+	// Pruning storage must not lose the reading state the UI renders.
+	assertProgress("after prune")
+	mangaIntID, err := s.db.ResolveMangaIntID("plugin-r", "source-5")
+	if err != nil {
+		t.Fatalf("resolve manga: %v", err)
+	}
+	if inLibrary, err := s.db.IsInLibrary(mangaIntID); err != nil {
+		t.Fatalf("IsInLibrary: %v", err)
+	} else if !inLibrary {
+		t.Error("library manga was pruned")
 	}
 }
 

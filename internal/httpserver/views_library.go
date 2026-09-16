@@ -121,7 +121,7 @@ func (s *Server) viewLibrary(w http.ResponseWriter, r *http.Request) {
 		seen := make(map[string]struct{}, len(groups)*2)
 		for _, g := range groups {
 			for _, m := range g.Members {
-				seen[m.ID] = struct{}{}
+				seen[strconv.FormatInt(m.ID, 10)] = struct{}{}
 			}
 		}
 		duplicateCount = len(seen)

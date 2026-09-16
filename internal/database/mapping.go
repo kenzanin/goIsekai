@@ -54,7 +54,7 @@ func derefTime(p *time.Time) time.Time {
 // mangaFromModel maps a jet-managed Manga struct onto the public Manga.
 func mangaFromModel(m model.Mangas) Manga {
 	return Manga{
-		ID:            derefStr(m.ID),
+		ID:            derefInt64(m.ID),
 		PluginID:      m.PluginID,
 		SourceMangaID: m.SourceMangaID,
 		Title:         m.Title,
@@ -65,6 +65,23 @@ func mangaFromModel(m model.Mangas) Manga {
 		InLibrary:     derefBool(m.InLibrary),
 		CreatedAt:     derefTime(m.CreatedAt),
 		UpdatedAt:     derefTime(m.UpdatedAt),
+	}
+}
+
+// chapterFromModel maps a jet-managed Chapter struct onto the public Chapter.
+func chapterFromModel(m model.Chapters) Chapter {
+	return Chapter{
+		ID:              derefInt64(m.ID),
+		MangaID:         m.MangaID,
+		SourceChapterID: m.SourceChapterID,
+		Title:           m.Title,
+		ChapterNum:      m.ChapterNum,
+		VolumeNum:       derefFloat(m.VolumeNum),
+		IsRead:          derefBool(m.IsRead),
+		LastPageRead:    int(derefInt64(m.LastPageRead)),
+		TotalPages:      int(derefInt64(m.TotalPages)),
+		DownloadStatus:  derefStr(m.DownloadStatus),
+		FetchedAt:       derefTime(m.FetchedAt),
 	}
 }
 

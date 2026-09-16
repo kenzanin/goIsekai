@@ -17,8 +17,8 @@ type chaptersTable struct {
 	sqlite.Table
 
 	// Columns
-	ID              sqlite.ColumnString
-	MangaID         sqlite.ColumnString
+	ID              sqlite.ColumnInteger
+	MangaID         sqlite.ColumnInteger
 	SourceChapterID sqlite.ColumnString
 	Title           sqlite.ColumnString
 	ChapterNum      sqlite.ColumnFloat
@@ -70,8 +70,8 @@ func newChaptersTable(schemaName, tableName, alias string) *ChaptersTable {
 
 func newChaptersTableImpl(schemaName, tableName, alias string) chaptersTable {
 	var (
-		IDColumn              = sqlite.StringColumn("id")
-		MangaIDColumn         = sqlite.StringColumn("manga_id")
+		IDColumn              = sqlite.IntegerColumn("id")
+		MangaIDColumn         = sqlite.IntegerColumn("manga_id")
 		SourceChapterIDColumn = sqlite.StringColumn("source_chapter_id")
 		TitleColumn           = sqlite.StringColumn("title")
 		ChapterNumColumn      = sqlite.FloatColumn("chapter_num")

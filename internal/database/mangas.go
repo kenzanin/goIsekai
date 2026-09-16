@@ -12,10 +12,9 @@ import (
 )
 
 // UpsertManga inserts a manga or, on a duplicate (plugin_id, source_manga_id),
-// refreshes the mutable columns and updated_at.
-func (d *DB) UpsertManga(m Manga) error {
-	_, err := Mangas.INSERT(
-		Mangas.ID,
+// refreshes the mutable columns and updated_at. Returns the manga ID.
+func (d *DB) UpsertManga(m Manga) (int64, error) {
+	res, err := Mangas.INSERT(
 		Mangas.PluginID,
 		Mangas.SourceMangaID,
 		Mangas.Title,
@@ -26,7 +25,6 @@ func (d *DB) UpsertManga(m Manga) error {
 		Mangas.CreatedAt,
 		Mangas.UpdatedAt,
 	).VALUES(
-		m.ID,
 		m.PluginID,
 		m.SourceMangaID,
 		m.Title,
@@ -45,26 +43,30 @@ func (d *DB) UpsertManga(m Manga) error {
 			Mangas.UpdatedAt.SET(RawTimestamp("CURRENT_TIMESTAMP")),
 		),
 	).Exec(d.db)
-	return err
+	if err != nil {
+		return 0, err
+	}
+	id, err := res.LastInsertId()
+	return id, err
 }
 
 // ToggleLibrary flips the in_library flag (0 <-> 1) for a manga.
-func (d *DB) ToggleLibrary(mangaID string) error {
+func (d *DB) ToggleLibrary(mangaID int64) error {
 	_, err := Mangas.UPDATE().
 		SET(Mangas.InLibrary.SET(Int(1).SUB(Mangas.InLibrary))).
-		WHERE(Mangas.ID.EQ(String(mangaID))).
+		WHERE(Mangas.ID.EQ(Int(mangaID))).
 		Exec(d.db)
 	return err
 }
 
 // IsInLibrary reports whether a manga is currently saved in the library.
 // A missing row simply means "not in library".
-func (d *DB) IsInLibrary(mangaID string) (bool, error) {
+func (d *DB) IsInLibrary(mangaID int64) (bool, error) {
 	var rows []struct {
 		InLibrary int
 	}
 	err := Mangas.SELECT(Mangas.InLibrary.AS("in_library")).
-		WHERE(Mangas.ID.EQ(String(mangaID))).
+		WHERE(Mangas.ID.EQ(Int(mangaID))).
 		Query(d.db, &rows)
 	if len(rows) == 0 {
 		return false, nil
@@ -167,16 +169,25 @@ func (d *DB) ListLibraryWithProgress() ([]LibraryMangaStats, error) {
 
 // MarkMangaNew stamps new_since so the library card shows the [New] badge
 // until the manga is opened.
-func (d *DB) MarkMangaNew(mangaRowID string) error {
+func (d *DB) MarkMangaNew(mangaID int64) error {
 	_, err := Mangas.UPDATE().
 		SET(Mangas.NewSince.SET(RawTimestamp("CURRENT_TIMESTAMP"))).
-		WHERE(Mangas.ID.EQ(String(mangaRowID))).
+		WHERE(Mangas.ID.EQ(Int(mangaID))).
 		Exec(d.db)
 	return err
 }
 
 // ClearMangaNew resets the [New] badge after the manga is opened.
 func (d *DB) ClearMangaNew(pluginID, sourceMangaID string) error {
+	_, err := Mangas.UPDATE().
+		SET(Mangas.NewSince.SET(TimestampExp(NULL))).
+		WHERE(Mangas.PluginID.EQ(String(pluginID)).AND(Mangas.SourceMangaID.EQ(String(sourceMangaID)))).
+		Exec(d.db)
+	return err
+}
+
+// ClearMangaNewString resets the [New] badge using source identifiers.
+func (d *DB) ClearMangaNewString(pluginID, sourceMangaID string) error {
 	_, err := Mangas.UPDATE().
 		SET(Mangas.NewSince.SET(TimestampExp(NULL))).
 		WHERE(Mangas.PluginID.EQ(String(pluginID)).AND(Mangas.SourceMangaID.EQ(String(sourceMangaID)))).
@@ -202,7 +213,7 @@ func (d *DB) QueryMangaPluginIDs() ([]MangaPluginIDRow, error) {
 
 // SetMangaGenres stores a user-defined genre override as a JSON text array.
 // Pass nil to clear the override (return to plugin-supplied genres).
-func (d *DB) SetMangaGenres(mangaRowID string, genres []string) error {
+func (d *DB) SetMangaGenres(mangaID int64, genres []string) error {
 	var payload *string
 	if genres != nil {
 		raw, err := json.Marshal(genres)
@@ -212,28 +223,28 @@ func (d *DB) SetMangaGenres(mangaRowID string, genres []string) error {
 		s := string(raw)
 		payload = &s
 	}
-	_, err := d.db.Exec(`UPDATE mangas SET genres = ? WHERE id = ?`, payload, mangaRowID)
+	_, err := d.db.Exec(`UPDATE mangas SET genres = ? WHERE id = ?`, payload, mangaID)
 	return err
 }
 
 // SetMangaCoverDim sets the cover dim overlay flag (0 = off, 1 = on).
-func (d *DB) SetMangaCoverDim(mangaRowID string, dim int64) error {
-	_, err := d.db.Exec(`UPDATE mangas SET cover_dim = ? WHERE id = ?`, dim, mangaRowID)
+func (d *DB) SetMangaCoverDim(mangaID int64, dim int64) error {
+	_, err := d.db.Exec(`UPDATE mangas SET cover_dim = ? WHERE id = ?`, dim, mangaID)
 	return err
 }
 
 // SetMangaAuthor stores the author captured by an enrichment provider.
 // An empty author clears the value.
-func (d *DB) SetMangaAuthor(mangaRowID, author string) error {
-	_, err := d.db.Exec(`UPDATE mangas SET author = ? WHERE id = ?`, author, mangaRowID)
+func (d *DB) SetMangaAuthor(mangaID int64, author string) error {
+	_, err := d.db.Exec(`UPDATE mangas SET author = ? WHERE id = ?`, author, mangaID)
 	return err
 }
 
 // GetMangaAuthor returns the stored enrichment author for a manga.
 // Returns ("", false) when nothing was fetched yet.
-func (d *DB) GetMangaAuthor(mangaRowID string) (string, bool, error) {
+func (d *DB) GetMangaAuthor(mangaID int64) (string, bool, error) {
 	var author string
-	err := d.db.QueryRow(`SELECT author FROM mangas WHERE id = ?`, mangaRowID).Scan(&author)
+	err := d.db.QueryRow(`SELECT author FROM mangas WHERE id = ?`, mangaID).Scan(&author)
 	if err != nil {
 		return "", false, err
 	}
@@ -245,9 +256,9 @@ func (d *DB) GetMangaAuthor(mangaRowID string) (string, bool, error) {
 
 // GetMangaCoverDim returns the current cover_dim flag for a manga.
 // Returns (0, false) when no override exists.
-func (d *DB) GetMangaCoverDim(mangaRowID string) (int64, bool, error) {
+func (d *DB) GetMangaCoverDim(mangaID int64) (int64, bool, error) {
 	var dim *int64
-	err := d.db.QueryRow(`SELECT cover_dim FROM mangas WHERE id = ?`, mangaRowID).Scan(&dim)
+	err := d.db.QueryRow(`SELECT cover_dim FROM mangas WHERE id = ?`, mangaID).Scan(&dim)
 	if err != nil {
 		return 0, false, err
 	}
@@ -259,9 +270,9 @@ func (d *DB) GetMangaCoverDim(mangaRowID string) (int64, bool, error) {
 
 // GetMangaGenres returns the stored genre override for a manga.
 // Returns the genre list and true on success; returns (nil, false) when no override exists.
-func (d *DB) GetMangaGenres(mangaRowID string) ([]string, bool, error) {
+func (d *DB) GetMangaGenres(mangaID int64) ([]string, bool, error) {
 	var genresJSON *string
-	err := d.db.QueryRow(`SELECT genres FROM mangas WHERE id = ?`, mangaRowID).Scan(&genresJSON)
+	err := d.db.QueryRow(`SELECT genres FROM mangas WHERE id = ?`, mangaID).Scan(&genresJSON)
 	if err != nil {
 		return nil, false, err
 	}

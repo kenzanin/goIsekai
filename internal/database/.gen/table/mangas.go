@@ -17,7 +17,7 @@ type mangasTable struct {
 	sqlite.Table
 
 	// Columns
-	ID                sqlite.ColumnString
+	ID                sqlite.ColumnInteger
 	PluginID          sqlite.ColumnString
 	SourceMangaID     sqlite.ColumnString
 	Title             sqlite.ColumnString
@@ -73,7 +73,7 @@ func newMangasTable(schemaName, tableName, alias string) *MangasTable {
 
 func newMangasTableImpl(schemaName, tableName, alias string) mangasTable {
 	var (
-		IDColumn                = sqlite.StringColumn("id")
+		IDColumn                = sqlite.IntegerColumn("id")
 		PluginIDColumn          = sqlite.StringColumn("plugin_id")
 		SourceMangaIDColumn     = sqlite.StringColumn("source_manga_id")
 		TitleColumn             = sqlite.StringColumn("title")

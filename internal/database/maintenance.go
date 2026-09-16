@@ -49,9 +49,10 @@ func (d *DB) pruneBackups(dir string, keep int) {
 	}
 }
 
-// PruneOrphans deletes rows that reference data which no longer exists and
-// non-library manga with no chapters (abandoned detail views / search cache).
-// It returns a human-readable summary of what was removed.
+// PruneOrphans deletes rows that reference data which no longer exists, plus
+// the storage the purge policy no longer requires: chapters of non-library
+// manga, duplicate read-history rows (newest kept), and cached pages of
+// finished chapters. It returns a human-readable summary of what was removed.
 func (d *DB) PruneOrphans() (string, error) {
 	var b strings.Builder
 	run := func(label, query string) {
@@ -70,6 +71,14 @@ func (d *DB) PruneOrphans() (string, error) {
 	run("orphan_chapter_pages", `DELETE FROM chapter_pages WHERE chapter_id NOT IN (SELECT id FROM chapters)`)
 	run("orphan_read_history", `DELETE FROM read_history WHERE chapter_id NOT IN (SELECT id FROM chapters)`)
 	run("orphan_chapters", `DELETE FROM chapters WHERE manga_id NOT IN (SELECT id FROM mangas)`)
+
+	// Same purge policy the storage migration applies once: only library manga
+	// keep chapters, a chapter keeps only its newest history row, and pages of
+	// finished chapters are dropped (the reader re-fetches them on the next open).
+	run("non_library_chapters", `DELETE FROM chapters WHERE manga_id IN (SELECT id FROM mangas WHERE in_library = 0)`)
+	run("read_chapter_pages", `DELETE FROM chapter_pages WHERE chapter_id IN (SELECT id FROM chapters WHERE is_read = 1)`)
+	run("duplicate_read_history", `DELETE FROM read_history WHERE id NOT IN (SELECT MAX(id) FROM read_history GROUP BY chapter_id)`)
+
 	run("orphan_alt_titles", `DELETE FROM alt_titles WHERE manga_row_id NOT IN (SELECT id FROM mangas)`)
 	run("non_library_no_chapters", `DELETE FROM mangas WHERE in_library = 0 AND id NOT IN (SELECT DISTINCT manga_id FROM chapters)`)
 

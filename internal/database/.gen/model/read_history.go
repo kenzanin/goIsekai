@@ -13,7 +13,7 @@ import (
 
 type ReadHistory struct {
 	ID        *int64 `sql:"primary_key"`
-	ChapterID string
+	ChapterID int64
 	PageNum   int64
 	ReadAt    *time.Time
 }

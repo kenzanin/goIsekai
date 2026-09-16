@@ -166,8 +166,9 @@ func (s *AppService) GetReadHistory() ([]database.HistoryEntry, error) {
 }
 
 // LastReadChapter returns the most recently read chapter for a manga.
-func (s *AppService) LastReadChapter(mangaRowID string) (sourceChapterID string, pageNum int, ok bool) {
-	return s.db.LastReadChapter(mangaRowID)
+func (s *AppService) LastReadChapter(pluginID, mangaID string) (sourceChapterID string, pageNum int, ok bool) {
+	mangaIntID, _ := s.db.ResolveMangaIntID(pluginID, mangaID)
+	return s.db.LastReadChapter(mangaIntID)
 }
 
 // QueryMangaPluginIDs returns (manga_id, plugin_id) pairs for all in-library manga.

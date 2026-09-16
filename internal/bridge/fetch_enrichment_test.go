@@ -2,6 +2,7 @@ package bridge
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"path/filepath"
 	"testing"
@@ -41,11 +42,13 @@ func TestFetchEnrichmentStoresAllKinds(t *testing.T) {
 	}
 	defer func() { _ = db.Close() }()
 
-	if err := db.UpsertManga(database.Manga{
-		ID: "p1|m1", PluginID: "p1", SourceMangaID: "m1", Title: "Title",
-	}); err != nil {
+	mangaID, err := db.UpsertManga(database.Manga{
+		PluginID: "p1", SourceMangaID: "m1", Title: "Title",
+	})
+	if err != nil {
 		t.Fatalf("upsert manga: %v", err)
 	}
+	_ = mangaID
 
 	reg := enrich.NewRegistry()
 	reg.Register(&enrichMockProvider{
@@ -99,11 +102,13 @@ func TestFetchEnrichmentPrefersTheFirstSource(t *testing.T) {
 	}
 	defer func() { _ = db.Close() }()
 
-	if err := db.UpsertManga(database.Manga{
-		ID: "p1|m1", PluginID: "p1", SourceMangaID: "m1", Title: "Title",
-	}); err != nil {
+	mangaID, err := db.UpsertManga(database.Manga{
+		PluginID: "p1", SourceMangaID: "m1", Title: "Title",
+	})
+	if err != nil {
 		t.Fatalf("upsert manga: %v", err)
 	}
+	_ = mangaID
 
 	primary := &enrichMockProvider{
 		id:   "mangadex",
@@ -159,21 +164,23 @@ func TestGetEnrichmentReturnsEveryStoredSection(t *testing.T) {
 	}
 	defer func() { _ = db.Close() }()
 
-	if err := db.UpsertManga(database.Manga{
-		ID: "p1|m1", PluginID: "p1", SourceMangaID: "m1", Title: "Title",
-	}); err != nil {
+	mangaID, err := db.UpsertManga(database.Manga{
+		PluginID: "p1", SourceMangaID: "m1", Title: "Title",
+	})
+	if err != nil {
 		t.Fatalf("upsert manga: %v", err)
 	}
-	if _, err := db.AddAltTitles("p1|m1", []string{"Alt Title"}, "p1"); err != nil {
+	rowID := fmt.Sprint(mangaID)
+	if _, err := db.AddAltTitles(rowID, []string{"Alt Title"}, "p1"); err != nil {
 		t.Fatalf("add alt titles: %v", err)
 	}
-	if _, err := db.AddAltDescriptions("p1|m1", []string{"Alt Summary"}, "p1"); err != nil {
+	if _, err := db.AddAltDescriptions(rowID, []string{"Alt Summary"}, "p1"); err != nil {
 		t.Fatalf("add alt summaries: %v", err)
 	}
-	if _, err := db.AddCategories("p1|m1", []string{"Action"}, "p1"); err != nil {
+	if _, err := db.AddCategories(rowID, []string{"Action"}, "p1"); err != nil {
 		t.Fatalf("add categories: %v", err)
 	}
-	if _, err := db.AddRelated("p1|m1", []database.RelatedRow{{Title: "Related Manga", URL: "http://x"}}, "p1"); err != nil {
+	if _, err := db.AddRelated(rowID, []database.RelatedRow{{Title: "Related Manga", URL: "http://x"}}, "p1"); err != nil {
 		t.Fatalf("add related: %v", err)
 	}
 

@@ -1,6 +1,7 @@
 package httpserver
 
 import (
+	"fmt"
 	"net/http/httptest"
 	"net/url"
 	"strings"
@@ -18,21 +19,22 @@ import (
 
 // seedMangaDesc seeds a manga that already has a plugin-supplied description,
 // which is what the alt-summary swap demotes into alt_descriptions.
-func seedMangaDesc(t *testing.T, db *database.DB, id, pluginID, sourceID, title, desc string) {
+func seedMangaDesc(t *testing.T, db *database.DB, pluginID, sourceID, title, desc string) int64 {
 	t.Helper()
-	if err := db.UpsertManga(database.Manga{
-		ID:            id,
+	mangaID, err := db.UpsertManga(database.Manga{
 		PluginID:      pluginID,
 		SourceMangaID: sourceID,
 		Title:         title,
 		Description:   desc,
 		InLibrary:     true,
-	}); err != nil {
-		t.Fatalf("upsert manga %s: %v", id, err)
+	})
+	if err != nil {
+		t.Fatalf("upsert manga %s|%s: %v", pluginID, sourceID, err)
 	}
-	if err := db.SyncFTS(id); err != nil {
-		t.Fatalf("sync fts %s: %v", id, err)
+	if err := db.SyncFTS(fmt.Sprintf("%d", mangaID)); err != nil {
+		t.Fatalf("sync fts %d: %v", mangaID, err)
 	}
+	return mangaID
 }
 
 // postAction drives one action route with a form body and returns the recorder.
@@ -47,8 +49,8 @@ func postAction(t *testing.T, s *Server, path string, form url.Values) *httptest
 
 func TestActionSetTitleSwapsMainAndDemotesOld(t *testing.T) {
 	s, db := testServerFullDB(t, "", true)
-	seedManga(t, db, "p1|m1", "p1", "m1", "Main Title")
-	if _, err := db.AddAltTitles("p1|m1", []string{"Alt One", "Alt Two"}, "src"); err != nil {
+	mangaID := seedManga(t, db, "p1", "m1", "Main Title")
+	if _, err := db.AddAltTitles(fmt.Sprint(mangaID), []string{"Alt One", "Alt Two"}, "src"); err != nil {
 		t.Fatalf("add alt titles: %v", err)
 	}
 
@@ -63,7 +65,7 @@ func TestActionSetTitleSwapsMainAndDemotesOld(t *testing.T) {
 	if got != "Alt One" {
 		t.Errorf("main title = %q, want Alt One", got)
 	}
-	alts := altTitleNames(t, db, "p1|m1")
+	alts := altTitleNames(t, db, fmt.Sprint(mangaID))
 	if !contains(alts, "Main Title") {
 		t.Errorf("old main title was not demoted into alt_titles: %v", alts)
 	}
@@ -77,7 +79,7 @@ func TestActionSetTitleSwapsMainAndDemotesOld(t *testing.T) {
 
 func TestActionSetTitleRejectsUnknownTitle(t *testing.T) {
 	s, db := testServerFullDB(t, "", true)
-	seedManga(t, db, "p1|m1", "p1", "m1", "Main Title")
+	_ = seedManga(t, db, "p1", "m1", "Main Title")
 
 	rec := postAction(t, s, "/action/set-title/p1/m1", url.Values{"title": {"Never Fetched"}})
 	if rec.Code != 400 {
@@ -94,15 +96,15 @@ func TestActionSetTitleRejectsUnknownTitle(t *testing.T) {
 
 func TestActionRemoveAltTitleDropsRow(t *testing.T) {
 	s, db := testServerFullDB(t, "", true)
-	seedManga(t, db, "p1|m1", "p1", "m1", "Main Title")
-	if _, err := db.AddAltTitles("p1|m1", []string{"Alt One", "Alt Two"}, "src"); err != nil {
+	mangaID := seedManga(t, db, "p1", "m1", "Main Title")
+	if _, err := db.AddAltTitles(fmt.Sprint(mangaID), []string{"Alt One", "Alt Two"}, "src"); err != nil {
 		t.Fatalf("add alt titles: %v", err)
 	}
 
 	if rec := postAction(t, s, "/action/remove-alt-title/p1/m1", url.Values{"title": {"Alt One"}}); rec.Code != 200 {
 		t.Fatalf("status = %d, want 200\n%s", rec.Code, rec.Body)
 	}
-	alts := altTitleNames(t, db, "p1|m1")
+	alts := altTitleNames(t, db, fmt.Sprint(mangaID))
 	if contains(alts, "Alt One") {
 		t.Errorf("Alt One was not removed: %v", alts)
 	}
@@ -113,8 +115,8 @@ func TestActionRemoveAltTitleDropsRow(t *testing.T) {
 
 func TestActionSetSummarySwapsMainAndDemotesOld(t *testing.T) {
 	s, db := testServerFullDB(t, "", true)
-	seedMangaDesc(t, db, "p1|m1", "p1", "m1", "Main Title", "Original synopsis.")
-	if _, err := db.AddAltDescriptions("p1|m1", []string{"Better synopsis."}, "src"); err != nil {
+	mangaID := seedMangaDesc(t, db, "p1", "m1", "Main Title", "Original synopsis.")
+	if _, err := db.AddAltDescriptions(fmt.Sprint(mangaID), []string{"Better synopsis."}, "src"); err != nil {
 		t.Fatalf("add alt descriptions: %v", err)
 	}
 
@@ -132,7 +134,7 @@ func TestActionSetSummarySwapsMainAndDemotesOld(t *testing.T) {
 	if !custom {
 		t.Error("description was not flagged custom, so a plugin refresh would overwrite it")
 	}
-	sums := altSummaryTexts(t, db, "p1|m1")
+	sums := altSummaryTexts(t, db, fmt.Sprint(mangaID))
 	if !contains(sums, "Original synopsis.") {
 		t.Errorf("old main synopsis was not demoted: %v", sums)
 	}
@@ -143,7 +145,7 @@ func TestActionSetSummarySwapsMainAndDemotesOld(t *testing.T) {
 
 func TestActionSetSummaryRejectsEmpty(t *testing.T) {
 	s, db := testServerFullDB(t, "", true)
-	seedMangaDesc(t, db, "p1|m1", "p1", "m1", "Main Title", "Original synopsis.")
+	_ = seedMangaDesc(t, db, "p1", "m1", "Main Title", "Original synopsis.")
 
 	for _, in := range []string{"", "   "} {
 		rec := postAction(t, s, "/action/set-summary/p1/m1", url.Values{"description": {in}})
@@ -162,15 +164,15 @@ func TestActionSetSummaryRejectsEmpty(t *testing.T) {
 
 func TestActionRemoveAltSummaryDropsRow(t *testing.T) {
 	s, db := testServerFullDB(t, "", true)
-	seedMangaDesc(t, db, "p1|m1", "p1", "m1", "Main Title", "Original synopsis.")
-	if _, err := db.AddAltDescriptions("p1|m1", []string{"Alt synopsis A", "Alt synopsis B"}, "src"); err != nil {
+	mangaID := seedMangaDesc(t, db, "p1", "m1", "Main Title", "Original synopsis.")
+	if _, err := db.AddAltDescriptions(fmt.Sprint(mangaID), []string{"Alt synopsis A", "Alt synopsis B"}, "src"); err != nil {
 		t.Fatalf("add alt descriptions: %v", err)
 	}
 
 	if rec := postAction(t, s, "/action/remove-alt-summary/p1/m1", url.Values{"description": {"Alt synopsis A"}}); rec.Code != 200 {
 		t.Fatalf("status = %d, want 200\n%s", rec.Code, rec.Body)
 	}
-	sums := altSummaryTexts(t, db, "p1|m1")
+	sums := altSummaryTexts(t, db, fmt.Sprint(mangaID))
 	if contains(sums, "Alt synopsis A") {
 		t.Errorf("Alt synopsis A was not removed: %v", sums)
 	}
@@ -181,19 +183,19 @@ func TestActionRemoveAltSummaryDropsRow(t *testing.T) {
 
 func TestActionAddCategoryStoresAndTogglesGenre(t *testing.T) {
 	s, db := testServerFullDB(t, "", true)
-	seedManga(t, db, "p1|m1", "p1", "m1", "Main Title")
+	mangaID := seedManga(t, db, "p1", "m1", "Main Title")
 
 	if rec := postAction(t, s, "/action/add-category/p1/m1", url.Values{"category": {"Isekai"}}); rec.Code != 200 {
 		t.Fatalf("status = %d, want 200\n%s", rec.Code, rec.Body)
 	}
 
-	cats := categoryValues(t, db, "p1|m1")
+	cats := categoryValues(t, db, fmt.Sprint(mangaID))
 	if !contains(cats, "Isekai") {
 		t.Errorf("category was not stored: %v", cats)
 	}
 	// The handler also toggles the genre override so the library reflects it.
-	if !contains(genreOverride(t, db, "p1|m1"), "Isekai") {
-		t.Errorf("category was not mirrored into the genre override: %v", genreOverride(t, db, "p1|m1"))
+	if !contains(genreOverride(t, db, mangaID), "Isekai") {
+		t.Errorf("category was not mirrored into the genre override: %v", genreOverride(t, db, mangaID))
 	}
 
 	// Second click removes it again (add-category is only offered when absent,
@@ -201,43 +203,43 @@ func TestActionAddCategoryStoresAndTogglesGenre(t *testing.T) {
 	if rec := postAction(t, s, "/action/add-category/p1/m1", url.Values{"category": {"Isekai"}}); rec.Code != 200 {
 		t.Fatalf("second add: status = %d, want 200", rec.Code)
 	}
-	if contains(genreOverride(t, db, "p1|m1"), "Isekai") {
+	if contains(genreOverride(t, db, mangaID), "Isekai") {
 		t.Error("genre override did not toggle back off")
 	}
 }
 
 func TestActionRemoveCategoryDropsRowAndTogglesGenre(t *testing.T) {
 	s, db := testServerFullDB(t, "", true)
-	seedManga(t, db, "p1|m1", "p1", "m1", "Main Title")
-	if err := db.AddCategory("p1|m1", "Drama"); err != nil {
+	mangaID := seedManga(t, db, "p1", "m1", "Main Title")
+	if err := db.AddCategory(fmt.Sprint(mangaID), "Drama"); err != nil {
 		t.Fatalf("add category: %v", err)
 	}
-	if err := db.SetMangaGenres("p1|m1", []string{"Drama"}); err != nil {
+	if err := db.SetMangaGenres(mangaID, []string{"Drama"}); err != nil {
 		t.Fatalf("set genres: %v", err)
 	}
 
 	if rec := postAction(t, s, "/action/remove-category/p1/m1", url.Values{"category": {"Drama"}}); rec.Code != 200 {
 		t.Fatalf("status = %d, want 200\n%s", rec.Code, rec.Body)
 	}
-	if cats := categoryValues(t, db, "p1|m1"); contains(cats, "Drama") {
+	if cats := categoryValues(t, db, fmt.Sprint(mangaID)); contains(cats, "Drama") {
 		t.Errorf("category was not removed: %v", cats)
 	}
-	if contains(genreOverride(t, db, "p1|m1"), "Drama") {
+	if contains(genreOverride(t, db, mangaID), "Drama") {
 		t.Error("genre override was not toggled off with the category")
 	}
 }
 
 func TestActionRemoveRelatedDropsRow(t *testing.T) {
 	s, db := testServerFullDB(t, "", true)
-	seedManga(t, db, "p1|m1", "p1", "m1", "Main Title")
-	if _, err := db.AddRelated("p1|m1", []database.RelatedRow{{Title: "Other Manga"}, {Title: "Keep Me"}}, "src"); err != nil {
+	mangaID := seedManga(t, db, "p1", "m1", "Main Title")
+	if _, err := db.AddRelated(fmt.Sprint(mangaID), []database.RelatedRow{{Title: "Other Manga"}, {Title: "Keep Me"}}, "src"); err != nil {
 		t.Fatalf("add related: %v", err)
 	}
 
 	if rec := postAction(t, s, "/action/remove-related/p1/m1", url.Values{"title": {"Other Manga"}}); rec.Code != 200 {
 		t.Fatalf("status = %d, want 200\n%s", rec.Code, rec.Body)
 	}
-	rel, err := db.ListRelated("p1|m1")
+	rel, err := db.ListRelated(fmt.Sprint(mangaID))
 	if err != nil {
 		t.Fatalf("list related: %v", err)
 	}
@@ -255,20 +257,20 @@ func TestActionRemoveRelatedDropsRow(t *testing.T) {
 
 func TestActionResetEnrichmentClearsEverything(t *testing.T) {
 	s, db := testServerFullDB(t, "", true)
-	seedMangaDesc(t, db, "p1|m1", "p1", "m1", "Main Title", "Original synopsis.")
-	if _, err := db.AddAltTitles("p1|m1", []string{"Alt One"}, "src"); err != nil {
+	mangaID := seedMangaDesc(t, db, "p1", "m1", "Main Title", "Original synopsis.")
+	if _, err := db.AddAltTitles(fmt.Sprint(mangaID), []string{"Alt One"}, "src"); err != nil {
 		t.Fatalf("add alt titles: %v", err)
 	}
-	if _, err := db.AddAltDescriptions("p1|m1", []string{"Alt synopsis"}, "src"); err != nil {
+	if _, err := db.AddAltDescriptions(fmt.Sprint(mangaID), []string{"Alt synopsis"}, "src"); err != nil {
 		t.Fatalf("add alt descriptions: %v", err)
 	}
-	if err := db.AddCategory("p1|m1", "Drama"); err != nil {
+	if err := db.AddCategory(fmt.Sprint(mangaID), "Drama"); err != nil {
 		t.Fatalf("add category: %v", err)
 	}
-	if _, err := db.AddRelated("p1|m1", []database.RelatedRow{{Title: "Other Manga"}}, "src"); err != nil {
+	if _, err := db.AddRelated(fmt.Sprint(mangaID), []database.RelatedRow{{Title: "Other Manga"}}, "src"); err != nil {
 		t.Fatalf("add related: %v", err)
 	}
-	if err := db.SetMangaGenres("p1|m1", []string{"Drama"}); err != nil {
+	if err := db.SetMangaGenres(mangaID, []string{"Drama"}); err != nil {
 		t.Fatalf("set genres: %v", err)
 	}
 	// Promote a title first so the reset has an override to undo.
@@ -280,21 +282,21 @@ func TestActionResetEnrichmentClearsEverything(t *testing.T) {
 		t.Fatalf("status = %d, want 200\n%s", rec.Code, rec.Body)
 	}
 
-	if got := altTitleNames(t, db, "p1|m1"); len(got) != 0 {
+	if got := altTitleNames(t, db, fmt.Sprint(mangaID)); len(got) != 0 {
 		t.Errorf("alt titles survived the reset: %v", got)
 	}
-	if got := altSummaryTexts(t, db, "p1|m1"); len(got) != 0 {
+	if got := altSummaryTexts(t, db, fmt.Sprint(mangaID)); len(got) != 0 {
 		t.Errorf("alt summaries survived the reset: %v", got)
 	}
-	if got := categoryValues(t, db, "p1|m1"); len(got) != 0 {
+	if got := categoryValues(t, db, fmt.Sprint(mangaID)); len(got) != 0 {
 		t.Errorf("categories survived the reset: %v", got)
 	}
-	if rel, err := db.ListRelated("p1|m1"); err != nil {
+	if rel, err := db.ListRelated(fmt.Sprint(mangaID)); err != nil {
 		t.Fatalf("list related: %v", err)
 	} else if len(rel) != 0 {
 		t.Errorf("related rows survived the reset: %v", rel)
 	}
-	if got := genreOverride(t, db, "p1|m1"); len(got) != 0 {
+	if got := genreOverride(t, db, mangaID); len(got) != 0 {
 		t.Errorf("genre override survived the reset: %v", got)
 	}
 	if _, custom, err := db.MangaDescriptionIfCustom("p1", "m1"); err != nil {
@@ -345,9 +347,9 @@ func categoryValues(t *testing.T, db *database.DB, rowID string) []string {
 	return out
 }
 
-func genreOverride(t *testing.T, db *database.DB, rowID string) []string {
+func genreOverride(t *testing.T, db *database.DB, mangaID int64) []string {
 	t.Helper()
-	genres, _, err := db.GetMangaGenres(rowID)
+	genres, _, err := db.GetMangaGenres(mangaID)
 	if err != nil {
 		t.Fatalf("get manga genres: %v", err)
 	}

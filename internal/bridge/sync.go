@@ -40,34 +40,35 @@ func (s *AppService) SyncLibrary() error {
 	return nil
 }
 
-// persistMangaDetails mirrors a fetched manga and its chapters into SQLite.
-//
-// database.Manga.ID is set to a stable, globally-unique key derived from the
-// plugin id and source manga id. UpsertManga takes the caller-provided ID as
-// the row id (it returns no generated id), and the row id is a plain TEXT
-// primary key unique across every plugin — qualifying it with the plugin id
-// keeps distinct sources from colliding while still letting the upsert's
-// UNIQUE(plugin_id, source_manga_id) conflict clause do its job. The same key
-// is reused as each chapter's manga_id, so the row id is known without a
-// read-back query (ListLibrary can't be used for that: it filters in_library=1,
-// but a freshly upserted manga is in_library=0).
+// persistMangaDetails mirrors a fetched manga and its chapters into SQLite. The
+// manga row id is an auto-increment integer, so the plugin and source ids live in
+// their own columns and chapters reference the row id the upsert returns.
+// Chapters are kept only for library manga: a non-library row is detail-view
+// cache whose chapter list is re-fetched from the plugin on open.
 func (s *AppService) persistMangaDetails(pluginID string, m types.Manga, chapters []types.Chapter) error {
-	rowID := mangaRowID(pluginID, m.ID)
-	if err := s.db.UpsertManga(database.Manga{
-		ID:            rowID,
+	mangaIntID, err := s.db.UpsertManga(database.Manga{
 		PluginID:      pluginID,
 		SourceMangaID: m.ID,
 		Title:         m.Title,
 		CoverURL:      m.CoverURL,
 		Description:   m.Description,
 		Status:        m.Status,
-	}); err != nil {
+	})
+	if err != nil {
 		return err
 	}
+
+	inLibrary, err := s.db.IsInLibrary(mangaIntID)
+	if err != nil {
+		return err
+	}
+	if !inLibrary {
+		return nil
+	}
+
 	for _, c := range chapters {
-		if err := s.db.UpsertChapter(database.Chapter{
-			ID:              mangaRowID(rowID, c.ID),
-			MangaID:         rowID,
+		if _, err := s.db.UpsertChapter(database.Chapter{
+			MangaID:         mangaIntID,
 			SourceChapterID: c.ID,
 			Title:           c.Title,
 			ChapterNum:      c.ChapterNum,
@@ -78,19 +79,4 @@ func (s *AppService) persistMangaDetails(pluginID string, m types.Manga, chapter
 		}
 	}
 	return nil
-}
-
-// mangaRowID builds the stable database primary key for a source row:
-// "<pluginID>|<sourceID>". The pipe separator cannot appear in a plugin id
-// (it is a trimmed base filename) and is extremely unlikely in a source id,
-// keeping the hierarchy unambiguous. Upgrade to a delimiter-free scheme only if
-// a source id is ever observed containing '|'.
-func mangaRowID(pluginID, sourceID string) string {
-	return pluginID + "|" + sourceID
-}
-
-// chapterRowID builds the database primary key for a chapter row:
-// "<pluginID>|<sourceMangaID>|<sourceChapterID>".
-func chapterRowID(pluginID, mangaID, chapterID string) string {
-	return mangaRowID(pluginID, mangaID) + "|" + chapterID
 }

@@ -52,18 +52,20 @@ func TestMigrationsRun(t *testing.T) {
 func TestUpsertMangaUniqueConstraint(t *testing.T) {
 	db := openTestDB(t)
 
-	m := Manga{ID: "m1", PluginID: "p1", SourceMangaID: "s1", Title: "First", InLibrary: true}
-	if err := db.UpsertManga(m); err != nil {
+	m := Manga{PluginID: "p1", SourceMangaID: "s1", Title: "First", InLibrary: true}
+	mangaID1, err := db.UpsertManga(m)
+	if err != nil {
 		t.Fatalf("upsert 1: %v", err)
 	}
 	m.Title = "Second"
-	if err := db.UpsertManga(m); err != nil {
+	if _, err := db.UpsertManga(m); err != nil {
 		t.Fatalf("upsert 2: %v", err)
 	}
 
 	// Different source id for the same plugin must be a distinct row.
-	m2 := Manga{ID: "m2", PluginID: "p1", SourceMangaID: "s2", Title: "Other"}
-	if err := db.UpsertManga(m2); err != nil {
+	m2 := Manga{PluginID: "p1", SourceMangaID: "s2", Title: "Other"}
+	mangaID2, err := db.UpsertManga(m2)
+	if err != nil {
 		t.Fatalf("upsert 3: %v", err)
 	}
 
@@ -77,44 +79,54 @@ func TestUpsertMangaUniqueConstraint(t *testing.T) {
 
 	// The upsert should have updated the title in place.
 	var title string
-	if err := db.db.QueryRow(`SELECT title FROM mangas WHERE id = ?`, "m1").Scan(&title); err != nil {
+	if err := db.db.QueryRow(`SELECT title FROM mangas WHERE id = ?`, mangaID1).Scan(&title); err != nil {
 		t.Fatalf("title: %v", err)
 	}
 	if title != "Second" {
 		t.Fatalf("expected title updated to Second, got %q", title)
+	}
+
+	// Ensure the second manga is a different row.
+	var title2 string
+	if err := db.db.QueryRow(`SELECT title FROM mangas WHERE id = ?`, mangaID2).Scan(&title2); err != nil {
+		t.Fatalf("title2: %v", err)
+	}
+	if title2 != "Other" {
+		t.Fatalf("expected title2 to be Other, got %q", title2)
 	}
 }
 
 func TestToggleLibrary(t *testing.T) {
 	db := openTestDB(t)
 
-	m := Manga{ID: "m1", PluginID: "p1", SourceMangaID: "s1", Title: "X", InLibrary: false}
-	if err := db.UpsertManga(m); err != nil {
+	m := Manga{PluginID: "p1", SourceMangaID: "s1", Title: "X", InLibrary: false}
+	mangaID, err := db.UpsertManga(m)
+	if err != nil {
 		t.Fatalf("upsert: %v", err)
 	}
 
 	var inLib int
-	if err := db.db.QueryRow(`SELECT in_library FROM mangas WHERE id = ?`, "m1").Scan(&inLib); err != nil {
+	if err := db.db.QueryRow(`SELECT in_library FROM mangas WHERE id = ?`, mangaID).Scan(&inLib); err != nil {
 		t.Fatalf("scan initial: %v", err)
 	}
 	if inLib != 0 {
 		t.Fatalf("expected in_library=0, got %d", inLib)
 	}
 
-	if err := db.ToggleLibrary("m1"); err != nil {
+	if err := db.ToggleLibrary(mangaID); err != nil {
 		t.Fatalf("toggle 1: %v", err)
 	}
-	if err := db.db.QueryRow(`SELECT in_library FROM mangas WHERE id = ?`, "m1").Scan(&inLib); err != nil {
+	if err := db.db.QueryRow(`SELECT in_library FROM mangas WHERE id = ?`, mangaID).Scan(&inLib); err != nil {
 		t.Fatalf("scan after toggle: %v", err)
 	}
 	if inLib != 1 {
 		t.Fatalf("expected in_library=1 after toggle, got %d", inLib)
 	}
 
-	if err := db.ToggleLibrary("m1"); err != nil {
+	if err := db.ToggleLibrary(mangaID); err != nil {
 		t.Fatalf("toggle 2: %v", err)
 	}
-	if err := db.db.QueryRow(`SELECT in_library FROM mangas WHERE id = ?`, "m1").Scan(&inLib); err != nil {
+	if err := db.db.QueryRow(`SELECT in_library FROM mangas WHERE id = ?`, mangaID).Scan(&inLib); err != nil {
 		t.Fatalf("scan after toggle back: %v", err)
 	}
 	if inLib != 0 {
@@ -125,21 +137,23 @@ func TestToggleLibrary(t *testing.T) {
 func TestRecordReadCascade(t *testing.T) {
 	db := openTestDB(t)
 
-	m := Manga{ID: "m1", PluginID: "p1", SourceMangaID: "s1", Title: "X"}
-	if err := db.UpsertManga(m); err != nil {
+	m := Manga{PluginID: "p1", SourceMangaID: "s1", Title: "X"}
+	mangaID, err := db.UpsertManga(m)
+	if err != nil {
 		t.Fatalf("upsert manga: %v", err)
 	}
-	c := Chapter{ID: "c1", MangaID: "m1", SourceChapterID: "cs1", Title: "Ch1", ChapterNum: 1}
-	if err := db.UpsertChapter(c); err != nil {
+	c := Chapter{MangaID: mangaID, SourceChapterID: "cs1", Title: "Ch1", ChapterNum: 1}
+	chapterID, err := db.UpsertChapter(c)
+	if err != nil {
 		t.Fatalf("upsert chapter: %v", err)
 	}
-	if err := db.RecordRead("c1", 5); err != nil {
+	if err := db.RecordRead(chapterID, 5); err != nil {
 		t.Fatalf("record read: %v", err)
 	}
 
 	// Verify rows exist before deletion.
 	var chapterCount, historyCount int
-	if err := db.db.QueryRow(`SELECT COUNT(*) FROM chapters WHERE manga_id = ?`, "m1").Scan(&chapterCount); err != nil {
+	if err := db.db.QueryRow(`SELECT COUNT(*) FROM chapters WHERE manga_id = ?`, mangaID).Scan(&chapterCount); err != nil {
 		t.Fatalf("chapter count: %v", err)
 	}
 	if chapterCount != 1 {
@@ -153,7 +167,7 @@ func TestRecordReadCascade(t *testing.T) {
 	}
 
 	// Deleting the manga must cascade-delete its chapters and read_history rows.
-	if _, err := db.db.Exec(`DELETE FROM mangas WHERE id = ?`, "m1"); err != nil {
+	if _, err := db.db.Exec(`DELETE FROM mangas WHERE id = ?`, mangaID); err != nil {
 		t.Fatalf("delete manga: %v", err)
 	}
 
@@ -171,22 +185,69 @@ func TestRecordReadCascade(t *testing.T) {
 	}
 }
 
+// TestRecordReadUpserts: re-reading a chapter keeps a single history row and
+// refreshes its page and timestamp instead of appending a duplicate.
+func TestRecordReadUpserts(t *testing.T) {
+	db := openTestDB(t)
+
+	mangaID, err := db.UpsertManga(Manga{PluginID: "p1", SourceMangaID: "s1", Title: "X", InLibrary: true})
+	if err != nil {
+		t.Fatalf("upsert manga: %v", err)
+	}
+	chapterID, err := db.UpsertChapter(Chapter{MangaID: mangaID, SourceChapterID: "c1", Title: "C1", ChapterNum: 1})
+	if err != nil {
+		t.Fatalf("upsert chapter: %v", err)
+	}
+
+	if err := db.RecordRead(chapterID, 3); err != nil {
+		t.Fatalf("record read 1: %v", err)
+	}
+	var firstStamp string
+	if err := db.db.QueryRow(`SELECT read_at FROM read_history WHERE chapter_id = ?`, chapterID).Scan(&firstStamp); err != nil {
+		t.Fatalf("read stamp: %v", err)
+	}
+
+	if err := db.RecordRead(chapterID, 9); err != nil {
+		t.Fatalf("record read 2: %v", err)
+	}
+
+	var count, page int
+	var lastStamp string
+	if err := db.db.QueryRow(`SELECT COUNT(*) FROM read_history WHERE chapter_id = ?`, chapterID).Scan(&count); err != nil {
+		t.Fatalf("count: %v", err)
+	}
+	if count != 1 {
+		t.Fatalf("expected 1 history row after re-read, got %d", count)
+	}
+	if err := db.db.QueryRow(`SELECT page_num, read_at FROM read_history WHERE chapter_id = ?`, chapterID).Scan(&page, &lastStamp); err != nil {
+		t.Fatalf("latest row: %v", err)
+	}
+	if page != 9 {
+		t.Fatalf("page_num = %d, want 9", page)
+	}
+	if lastStamp < firstStamp {
+		t.Fatalf("read_at did not advance: first=%s after=%s", firstStamp, lastStamp)
+	}
+}
+
 func TestUpsertChapterPreservesProgress(t *testing.T) {
 	db := openTestDB(t)
 
-	m := Manga{ID: "m1", PluginID: "p1", SourceMangaID: "s1", Title: "X"}
-	if err := db.UpsertManga(m); err != nil {
+	m := Manga{PluginID: "p1", SourceMangaID: "s1", Title: "X"}
+	mangaID, err := db.UpsertManga(m)
+	if err != nil {
 		t.Fatalf("upsert manga: %v", err)
 	}
 
-	c := Chapter{ID: "c1", MangaID: "m1", SourceChapterID: "cs1", Title: "Ch1", ChapterNum: 1, IsRead: true, LastPageRead: 42, DownloadStatus: DownloadDownloaded}
-	if err := db.UpsertChapter(c); err != nil {
+	c := Chapter{MangaID: mangaID, SourceChapterID: "cs1", Title: "Ch1", ChapterNum: 1, IsRead: true, LastPageRead: 42, DownloadStatus: DownloadDownloaded}
+	chapterID, err := db.UpsertChapter(c)
+	if err != nil {
 		t.Fatalf("upsert 1: %v", err)
 	}
 
 	// Refresh with different metadata; progress must survive.
 	c.Title = "Ch1 Updated"
-	if err := db.UpsertChapter(c); err != nil {
+	if _, err := db.UpsertChapter(c); err != nil {
 		t.Fatalf("upsert 2: %v", err)
 	}
 
@@ -194,7 +255,7 @@ func TestUpsertChapterPreservesProgress(t *testing.T) {
 	var isRead int
 	var lastPage int
 	var status string
-	if err := db.db.QueryRow(`SELECT title, is_read, last_page_read, download_status FROM chapters WHERE id = ?`, "c1").
+	if err := db.db.QueryRow(`SELECT title, is_read, last_page_read, download_status FROM chapters WHERE id = ?`, chapterID).
 		Scan(&title, &isRead, &lastPage, &status); err != nil {
 		t.Fatalf("scan: %v", err)
 	}
@@ -215,15 +276,17 @@ func TestPersistenceAcrossRestart(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Open: %v", err)
 	}
-	m := Manga{ID: "m1", PluginID: "p1", SourceMangaID: "s1", Title: "Persist", InLibrary: true}
-	if err := db.UpsertManga(m); err != nil {
+	m := Manga{PluginID: "p1", SourceMangaID: "s1", Title: "Persist", InLibrary: true}
+	mangaID, err := db.UpsertManga(m)
+	if err != nil {
 		t.Fatalf("upsert manga: %v", err)
 	}
-	c := Chapter{ID: "c1", MangaID: "m1", SourceChapterID: "cs1", Title: "Ch1", ChapterNum: 1}
-	if err := db.UpsertChapter(c); err != nil {
+	c := Chapter{MangaID: mangaID, SourceChapterID: "cs1", Title: "Ch1", ChapterNum: 1}
+	chapterID, err := db.UpsertChapter(c)
+	if err != nil {
 		t.Fatalf("upsert chapter: %v", err)
 	}
-	if err := db.SetChapterProgress("c1", 7); err != nil {
+	if err := db.SetChapterProgress(chapterID, 7); err != nil {
 		t.Fatalf("set progress: %v", err)
 	}
 	if err := db.Close(); err != nil {
@@ -248,7 +311,7 @@ func TestPersistenceAcrossRestart(t *testing.T) {
 	}
 
 	var isRead, lastPage int
-	if err := db2.db.QueryRow(`SELECT is_read, last_page_read FROM chapters WHERE id = ?`, "c1").Scan(&isRead, &lastPage); err != nil {
+	if err := db2.db.QueryRow(`SELECT is_read, last_page_read FROM chapters WHERE id = ?`, chapterID).Scan(&isRead, &lastPage); err != nil {
 		t.Fatalf("scan chapter: %v", err)
 	}
 	// SetChapterProgress records the page but does NOT mark read.
@@ -261,17 +324,21 @@ func TestPersistenceAcrossRestart(t *testing.T) {
 func TestMarkChapterRead(t *testing.T) {
 	db := openTestDB(t)
 
-	if err := db.UpsertManga(Manga{ID: "m1", PluginID: "p1", SourceMangaID: "s1", Title: "R"}); err != nil {
+	m := Manga{PluginID: "p1", SourceMangaID: "s1", Title: "R"}
+	mangaID, err := db.UpsertManga(m)
+	if err != nil {
 		t.Fatalf("upsert manga: %v", err)
 	}
-	if err := db.UpsertChapter(Chapter{ID: "c1", MangaID: "m1", SourceChapterID: "cs1", Title: "Ch1", ChapterNum: 1}); err != nil {
+	c := Chapter{MangaID: mangaID, SourceChapterID: "cs1", Title: "Ch1", ChapterNum: 1}
+	chapterID, err := db.UpsertChapter(c)
+	if err != nil {
 		t.Fatalf("upsert chapter: %v", err)
 	}
-	if err := db.MarkChapterRead("c1"); err != nil {
+	if err := db.MarkChapterRead(chapterID); err != nil {
 		t.Fatalf("MarkChapterRead: %v", err)
 	}
 	var isRead, lastPage int
-	if err := db.db.QueryRow(`SELECT is_read, last_page_read FROM chapters WHERE id = ?`, "c1").Scan(&isRead, &lastPage); err != nil {
+	if err := db.db.QueryRow(`SELECT is_read, last_page_read FROM chapters WHERE id = ?`, chapterID).Scan(&isRead, &lastPage); err != nil {
 		t.Fatalf("scan: %v", err)
 	}
 	if isRead != 1 {
@@ -282,9 +349,9 @@ func TestMarkChapterRead(t *testing.T) {
 	}
 }
 
-func chapterProgressBySource(t *testing.T, db *DB, mangaRowID string) map[string]ChapterProgress {
+func chapterProgressBySource(t *testing.T, db *DB, mangaID int64) map[string]ChapterProgress {
 	t.Helper()
-	rows, err := db.GetChapterProgressForManga(mangaRowID)
+	rows, err := db.GetChapterProgressForManga(mangaID)
 	if err != nil {
 		t.Fatalf("GetChapterProgressForManga: %v", err)
 	}
@@ -301,29 +368,37 @@ func chapterProgressBySource(t *testing.T, db *DB, mangaRowID string) map[string
 func TestSetChaptersBulkRead(t *testing.T) {
 	db := openTestDB(t)
 
-	if err := db.UpsertManga(Manga{ID: "m1", PluginID: "p1", SourceMangaID: "s1", Title: "B"}); err != nil {
+	m := Manga{PluginID: "p1", SourceMangaID: "s1", Title: "B"}
+	mangaID, err := db.UpsertManga(m)
+	if err != nil {
 		t.Fatalf("upsert manga: %v", err)
 	}
+
+	chapterIDs := make(map[string]int64)
 	for _, c := range []Chapter{
-		{ID: "c1", MangaID: "m1", SourceChapterID: "cs1", Title: "A", ChapterNum: 1},
-		{ID: "c2", MangaID: "m1", SourceChapterID: "cs2", Title: "B", ChapterNum: 2},
-		{ID: "c3", MangaID: "m1", SourceChapterID: "cs3", Title: "C", ChapterNum: 3},
-		{ID: "c4", MangaID: "m1", SourceChapterID: "cs4", Title: "D", ChapterNum: 4},
+		{SourceChapterID: "cs1", Title: "A", ChapterNum: 1},
+		{SourceChapterID: "cs2", Title: "B", ChapterNum: 2},
+		{SourceChapterID: "cs3", Title: "C", ChapterNum: 3},
+		{SourceChapterID: "cs4", Title: "D", ChapterNum: 4},
 	} {
-		if err := db.UpsertChapter(c); err != nil {
-			t.Fatalf("upsert chapter %s: %v", c.ID, err)
+		c.MangaID = mangaID
+		id, err := db.UpsertChapter(c)
+		if err != nil {
+			t.Fatalf("upsert chapter %s: %v", c.SourceChapterID, err)
 		}
+		chapterIDs[c.SourceChapterID] = id
 	}
+
 	// Page progress must survive every one of these toggles.
-	if err := db.SetChapterProgress("c1", 5); err != nil {
+	if err := db.SetChapterProgress(chapterIDs["cs1"], 5); err != nil {
 		t.Fatalf("set progress: %v", err)
 	}
 
 	// Explicit selection: only the listed chapters flip.
-	if err := db.SetChaptersRead("m1", []string{"cs1", "cs3"}, true); err != nil {
+	if err := db.SetChaptersRead(mangaID, []string{"cs1", "cs3"}, true); err != nil {
 		t.Fatalf("SetChaptersRead: %v", err)
 	}
-	p := chapterProgressBySource(t, db, "m1")
+	p := chapterProgressBySource(t, db, mangaID)
 	if !p["cs1"].IsRead || !p["cs3"].IsRead {
 		t.Fatalf("selected chapters should be read: %+v", p)
 	}
@@ -335,23 +410,23 @@ func TestSetChaptersBulkRead(t *testing.T) {
 	}
 
 	// Unmark restores the flag but keeps page progress.
-	if err := db.SetChaptersRead("m1", []string{"cs1"}, false); err != nil {
+	if err := db.SetChaptersRead(mangaID, []string{"cs1"}, false); err != nil {
 		t.Fatalf("SetChaptersRead unread: %v", err)
 	}
-	p = chapterProgressBySource(t, db, "m1")
+	p = chapterProgressBySource(t, db, mangaID)
 	if p["cs1"].IsRead || p["cs1"].LastPageRead != 5 {
 		t.Fatalf("cs1 should be unread with progress intact: %+v", p["cs1"])
 	}
 
 	// "Up to" boundary is the highest chapter_num of the selection: from cs3
 	// that means cs1..cs3 become read, cs4 stays as-is.
-	if err := db.SetChaptersRead("m1", []string{"cs1", "cs3"}, false); err != nil {
+	if err := db.SetChaptersRead(mangaID, []string{"cs1", "cs3"}, false); err != nil {
 		t.Fatalf("reset flags: %v", err)
 	}
-	if err := db.SetChaptersUpTo("m1", []string{"cs3"}, true); err != nil {
+	if err := db.SetChaptersUpTo(mangaID, []string{"cs3"}, true); err != nil {
 		t.Fatalf("SetChaptersUpTo: %v", err)
 	}
-	p = chapterProgressBySource(t, db, "m1")
+	p = chapterProgressBySource(t, db, mangaID)
 	for _, src := range []string{"cs1", "cs2", "cs3"} {
 		if !p[src].IsRead {
 			t.Fatalf("%s should be read by up-to cs3: %+v", src, p[src])
@@ -362,33 +437,33 @@ func TestSetChaptersBulkRead(t *testing.T) {
 	}
 
 	// A multi-selection uses its maximum as the boundary (cs2,cs4 -> 4).
-	if err := db.SetChaptersUpTo("m1", []string{"cs2", "cs4"}, false); err != nil {
+	if err := db.SetChaptersUpTo(mangaID, []string{"cs2", "cs4"}, false); err != nil {
 		t.Fatalf("SetChaptersUpTo clear: %v", err)
 	}
-	p = chapterProgressBySource(t, db, "m1")
+	p = chapterProgressBySource(t, db, mangaID)
 	for src, c := range p {
 		if c.IsRead {
 			t.Fatalf("%s should be cleared by up-to cs4: %+v", src, c)
 		}
 	}
-	if err := db.SetChaptersUpTo("m1", []string{"cs9"}, true); err == nil {
+	if err := db.SetChaptersUpTo(mangaID, []string{"cs9"}, true); err == nil {
 		t.Fatal("unknown chapter should error")
 	}
 
 	// Whole-manga toggle.
-	if err := db.SetMangaChaptersRead("m1", true); err != nil {
+	if err := db.SetMangaChaptersRead(mangaID, true); err != nil {
 		t.Fatalf("SetMangaChaptersRead: %v", err)
 	}
-	p = chapterProgressBySource(t, db, "m1")
+	p = chapterProgressBySource(t, db, mangaID)
 	for src, c := range p {
 		if !c.IsRead {
 			t.Fatalf("%s should be read: %+v", src, c)
 		}
 	}
-	if err := db.SetMangaChaptersRead("m1", false); err != nil {
+	if err := db.SetMangaChaptersRead(mangaID, false); err != nil {
 		t.Fatalf("SetMangaChaptersRead unread: %v", err)
 	}
-	for src, c := range chapterProgressBySource(t, db, "m1") {
+	for src, c := range chapterProgressBySource(t, db, mangaID) {
 		if c.IsRead {
 			t.Fatalf("%s should be unread: %+v", src, c)
 		}
@@ -404,25 +479,33 @@ func TestChapterProgressForManga(t *testing.T) {
 	}
 	defer func() { _ = db.Close() }()
 
-	if err := db.UpsertManga(Manga{ID: "m1", PluginID: "p1", SourceMangaID: "s1", Title: "P"}); err != nil {
+	m := Manga{PluginID: "p1", SourceMangaID: "s1", Title: "P"}
+	mangaID, err := db.UpsertManga(m)
+	if err != nil {
 		t.Fatalf("upsert manga: %v", err)
 	}
-	for _, c := range []Chapter{
-		{ID: "c1", MangaID: "m1", SourceChapterID: "cs1", Title: "Ch1", ChapterNum: 1},
-		{ID: "c2", MangaID: "m1", SourceChapterID: "cs2", Title: "Ch2", ChapterNum: 2},
+
+	var chapterIDs [2]int64
+	for i, c := range []Chapter{
+		{SourceChapterID: "cs1", Title: "Ch1", ChapterNum: 1},
+		{SourceChapterID: "cs2", Title: "Ch2", ChapterNum: 2},
 	} {
-		if err := db.UpsertChapter(c); err != nil {
-			t.Fatalf("upsert chapter %s: %v", c.ID, err)
+		c.MangaID = mangaID
+		id, err := db.UpsertChapter(c)
+		if err != nil {
+			t.Fatalf("upsert chapter %s: %v", c.SourceChapterID, err)
 		}
+		chapterIDs[i] = id
 	}
-	if err := db.SetChapterTotalPages("c1", 18); err != nil {
+
+	if err := db.SetChapterTotalPages(chapterIDs[0], 18); err != nil {
 		t.Fatalf("set total pages: %v", err)
 	}
-	if err := db.SetChapterProgress("c1", 5); err != nil {
+	if err := db.SetChapterProgress(chapterIDs[0], 5); err != nil {
 		t.Fatalf("set progress: %v", err)
 	}
 
-	rows, err := db.GetChapterProgressForManga("m1")
+	rows, err := db.GetChapterProgressForManga(mangaID)
 	if err != nil {
 		t.Fatalf("GetChapterProgressForManga: %v", err)
 	}
@@ -453,21 +536,28 @@ func TestChapterDoneDerivation(t *testing.T) {
 	}
 	defer func() { _ = db.Close() }()
 
-	if err := db.UpsertManga(Manga{ID: "m1", PluginID: "p1", SourceMangaID: "s1", Title: "D"}); err != nil {
+	m := Manga{PluginID: "p1", SourceMangaID: "s1", Title: "D"}
+	mangaID, err := db.UpsertManga(m)
+	if err != nil {
 		t.Fatalf("upsert manga: %v", err)
 	}
-	for _, c := range []Chapter{
-		{ID: "c1", MangaID: "m1", SourceChapterID: "cs1", Title: "A", ChapterNum: 1},
-		{ID: "c2", MangaID: "m1", SourceChapterID: "cs2", Title: "B", ChapterNum: 2},
-		{ID: "c3", MangaID: "m1", SourceChapterID: "cs3", Title: "C", ChapterNum: 3},
+
+	var chapterIDs [3]int64
+	for i, c := range []Chapter{
+		{SourceChapterID: "cs1", Title: "A", ChapterNum: 1},
+		{SourceChapterID: "cs2", Title: "B", ChapterNum: 2},
+		{SourceChapterID: "cs3", Title: "C", ChapterNum: 3},
 	} {
-		if err := db.UpsertChapter(c); err != nil {
-			t.Fatalf("upsert chapter %s: %v", c.ID, err)
+		c.MangaID = mangaID
+		id, err := db.UpsertChapter(c)
+		if err != nil {
+			t.Fatalf("upsert chapter %s: %v", c.SourceChapterID, err)
 		}
+		chapterIDs[i] = id
 	}
 
 	get := func() map[string]ChapterProgress {
-		rows, err := db.GetChapterProgressForManga("m1")
+		rows, err := db.GetChapterProgressForManga(mangaID)
 		if err != nil {
 			t.Fatalf("GetChapterProgressForManga: %v", err)
 		}
@@ -479,10 +569,10 @@ func TestChapterDoneDerivation(t *testing.T) {
 	}
 
 	// Fully read: last == total == 10 => Done, IsRead false.
-	if err := db.SetChapterTotalPages("c1", 10); err != nil {
+	if err := db.SetChapterTotalPages(chapterIDs[0], 10); err != nil {
 		t.Fatalf("set total pages: %v", err)
 	}
-	if err := db.SetChapterProgress("c1", 10); err != nil {
+	if err := db.SetChapterProgress(chapterIDs[0], 10); err != nil {
 		t.Fatalf("set progress: %v", err)
 	}
 	p := get()["cs1"]
@@ -491,7 +581,7 @@ func TestChapterDoneDerivation(t *testing.T) {
 	}
 
 	// Manually marked read with no page read => Done via IsRead.
-	if err := db.MarkChapterRead("c2"); err != nil {
+	if err := db.MarkChapterRead(chapterIDs[1]); err != nil {
 		t.Fatalf("mark read: %v", err)
 	}
 	p = get()["cs2"]
@@ -500,9 +590,9 @@ func TestChapterDoneDerivation(t *testing.T) {
 	}
 
 	// Reset clears both the full-read and the manual-read chapter.
-	for _, id := range []string{"c1", "c2"} {
+	for _, id := range []int64{chapterIDs[0], chapterIDs[1]} {
 		if err := db.ResetChapterProgress(id); err != nil {
-			t.Fatalf("reset chapter progress %s: %v", id, err)
+			t.Fatalf("reset chapter progress %d: %v", id, err)
 		}
 	}
 	for _, src := range []string{"cs1", "cs2", "cs3"} {
@@ -519,16 +609,19 @@ func TestChapterDoneDerivation(t *testing.T) {
 func TestNewBadgeLifecycle(t *testing.T) {
 	db := openTestDB(t)
 
-	if err := db.UpsertManga(Manga{ID: "m1", PluginID: "p1", SourceMangaID: "s1", Title: "B", InLibrary: true}); err != nil {
+	m := Manga{PluginID: "p1", SourceMangaID: "s1", Title: "B", InLibrary: true}
+	mangaID, err := db.UpsertManga(m)
+	if err != nil {
 		t.Fatalf("upsert manga: %v", err)
 	}
-	if err := db.UpsertChapter(Chapter{ID: "c1", MangaID: "m1", SourceChapterID: "cs1", Title: "Ch1", ChapterNum: 1}); err != nil {
+	c := Chapter{MangaID: mangaID, SourceChapterID: "cs1", Title: "Ch1", ChapterNum: 1}
+	if _, err := db.UpsertChapter(c); err != nil {
 		t.Fatalf("upsert chapter: %v", err)
 	}
 
 	count := func() int {
 		t.Helper()
-		n, err := db.CountChaptersForManga("m1")
+		n, err := db.CountChaptersForManga(mangaID)
 		if err != nil {
 			t.Fatalf("CountChaptersForManga: %v", err)
 		}
@@ -552,10 +645,11 @@ func TestNewBadgeLifecycle(t *testing.T) {
 	}
 
 	// Sync finds a new chapter: count grows, badge goes on.
-	if err := db.UpsertChapter(Chapter{ID: "c2", MangaID: "m1", SourceChapterID: "cs2", Title: "Ch2", ChapterNum: 2}); err != nil {
+	c2 := Chapter{MangaID: mangaID, SourceChapterID: "cs2", Title: "Ch2", ChapterNum: 2}
+	if _, err := db.UpsertChapter(c2); err != nil {
 		t.Fatalf("upsert new chapter: %v", err)
 	}
-	if err := db.MarkMangaNew("m1"); err != nil {
+	if err := db.MarkMangaNew(mangaID); err != nil {
 		t.Fatalf("MarkMangaNew: %v", err)
 	}
 	if count() != 2 {
@@ -576,30 +670,34 @@ func TestNewBadgeLifecycle(t *testing.T) {
 
 func TestToggleChapterSkip(t *testing.T) {
 	db := openTestDB(t)
-	if err := db.UpsertManga(Manga{ID: "m1", PluginID: "p1", SourceMangaID: "s1", Title: "S"}); err != nil {
+	m := Manga{PluginID: "p1", SourceMangaID: "s1", Title: "S"}
+	mangaID, err := db.UpsertManga(m)
+	if err != nil {
 		t.Fatalf("upsert manga: %v", err)
 	}
-	if err := db.UpsertChapter(Chapter{ID: "c1", MangaID: "m1", SourceChapterID: "cs1", Title: "Ch1", ChapterNum: 1}); err != nil {
+	c := Chapter{MangaID: mangaID, SourceChapterID: "cs1", Title: "Ch1", ChapterNum: 1}
+	chapterID, err := db.UpsertChapter(c)
+	if err != nil {
 		t.Fatalf("upsert chapter: %v", err)
 	}
 	// Initial state: not skipped.
-	progress := chapterProgressBySource(t, db, "m1")
+	progress := chapterProgressBySource(t, db, mangaID)
 	if progress["cs1"].IsSkipped {
 		t.Fatal("chapter should not be skipped initially")
 	}
 	// Toggle on.
-	if err := db.ToggleChapterSkip("c1"); err != nil {
+	if err := db.ToggleChapterSkip(chapterID); err != nil {
 		t.Fatalf("ToggleChapterSkip: %v", err)
 	}
-	progress = chapterProgressBySource(t, db, "m1")
+	progress = chapterProgressBySource(t, db, mangaID)
 	if !progress["cs1"].IsSkipped {
 		t.Fatal("chapter should be skipped after first toggle")
 	}
 	// Toggle off.
-	if err := db.ToggleChapterSkip("c1"); err != nil {
+	if err := db.ToggleChapterSkip(chapterID); err != nil {
 		t.Fatalf("ToggleChapterSkip: %v", err)
 	}
-	progress = chapterProgressBySource(t, db, "m1")
+	progress = chapterProgressBySource(t, db, mangaID)
 	if progress["cs1"].IsSkipped {
 		t.Fatal("chapter should not be skipped after second toggle")
 	}

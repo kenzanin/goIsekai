@@ -100,7 +100,7 @@ return function(data)
 <script>
 (function() {
   var title = ']] .. h(mangaTitle) .. [[';
-  var chNum = ]] .. tostring(chNum) .. [[';
+  var chNum = ]] .. tostring(chNum) .. [[;
   var chTitle = ']] .. h(chTitle) .. [[';
   if (title) {
     var label = title;

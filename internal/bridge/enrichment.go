@@ -115,7 +115,8 @@ func (s *AppService) FetchEnrichment(pluginID, mangaID, title string, sources []
 			}
 		}
 		if len(names) > 0 {
-			if err := s.db.SetMangaAuthor(rowID, strings.Join(names, ", ")); err != nil {
+			mangaIntID, _ := s.db.ResolveMangaIntID(pluginID, mangaID)
+			if err := s.db.SetMangaAuthor(mangaIntID, strings.Join(names, ", ")); err != nil {
 				logger.Warn("store author", "error", err)
 			} else {
 				logger.Info("enrich author stored", "author", strings.Join(names, ", "), "source", authors[0].Source)
@@ -259,10 +260,12 @@ func (s *AppService) ResetEnrichment(pluginID, mangaID string) error {
 	if err := s.db.ResetEnrichment(rowID); err != nil {
 		return fmt.Errorf("reset enrichment: %w", err)
 	}
-	if err := s.db.SetMangaGenres(rowID, nil); err != nil {
+	mangaIntID, _ := s.db.ResolveMangaIntID(pluginID, mangaID)
+	if err := s.db.SetMangaGenres(mangaIntID, nil); err != nil {
 		return fmt.Errorf("reset genres: %w", err)
 	}
-	if err := s.db.SetMangaAuthor(rowID, ""); err != nil {
+	mangaIntID, _ = s.db.ResolveMangaIntID(pluginID, mangaID)
+	if err := s.db.SetMangaAuthor(mangaIntID, ""); err != nil {
 		return fmt.Errorf("reset author: %w", err)
 	}
 	return nil
@@ -271,11 +274,8 @@ func (s *AppService) ResetEnrichment(pluginID, mangaID string) error {
 // StoredAuthor returns the author captured by an enrichment provider.
 // ok is false when nothing was fetched yet.
 func (s *AppService) StoredAuthor(pluginID, mangaID string) (author string, ok bool) {
-	rowID, err := s.db.ResolveMangaRowID(pluginID, mangaID)
-	if err != nil {
-		return "", false
-	}
-	author, ok, err = s.db.GetMangaAuthor(rowID)
+	mangaIntID, _ := s.db.ResolveMangaIntID(pluginID, mangaID)
+	author, ok, err := s.db.GetMangaAuthor(mangaIntID)
 	if err != nil {
 		return "", false
 	}

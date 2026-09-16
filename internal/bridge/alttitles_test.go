@@ -1,6 +1,7 @@
 package bridge
 
 import (
+	"fmt"
 	"testing"
 
 	"goisekai/internal/database"
@@ -9,16 +10,16 @@ import (
 func TestSetMainTitleRejectsUnknownTitle(t *testing.T) {
 	s := newTestService(t)
 
-	if err := s.db.UpsertManga(database.Manga{
-		ID:            "p2|s2",
+	mangaID, err := s.db.UpsertManga(database.Manga{
 		PluginID:      "p2",
 		SourceMangaID: "s2",
 		Title:         "Original",
 		InLibrary:     true,
-	}); err != nil {
+	})
+	if err != nil {
 		t.Fatalf("upsert: %v", err)
 	}
-	if _, err := s.db.AddAltTitles("p2|s2", []string{"Known Alt"}, "src"); err != nil {
+	if _, err := s.db.AddAltTitles(fmt.Sprint(mangaID), []string{"Known Alt"}, "src"); err != nil {
 		t.Fatalf("add alt: %v", err)
 	}
 
@@ -52,18 +53,21 @@ func TestSearchLibraryRanksExactAboveSubstring(t *testing.T) {
 	s := newTestService(t)
 
 	// Insert two manga with related titles.
-	for _, m := range []database.Manga{
-		{ID: "exact|1", PluginID: "exact", SourceMangaID: "1", Title: "Solo Leveling", InLibrary: true},
-		{ID: "sub|1", PluginID: "sub", SourceMangaID: "1", Title: "Solo Leveling Ragnarok", InLibrary: true},
+	var ids [2]int64
+	for i, m := range []database.Manga{
+		{PluginID: "exact", SourceMangaID: "1", Title: "Solo Leveling", InLibrary: true},
+		{PluginID: "sub", SourceMangaID: "1", Title: "Solo Leveling Ragnarok", InLibrary: true},
 	} {
-		if err := s.db.UpsertManga(m); err != nil {
-			t.Fatalf("upsert %s: %v", m.ID, err)
+		id, err := s.db.UpsertManga(m)
+		if err != nil {
+			t.Fatalf("upsert %s: %v", m.SourceMangaID, err)
 		}
+		ids[i] = id
 	}
-	if err := s.db.SyncFTS("exact|1"); err != nil {
+	if err := s.db.SyncFTS(fmt.Sprint(ids[0])); err != nil {
 		t.Fatalf("sync fts 1: %v", err)
 	}
-	if err := s.db.SyncFTS("sub|1"); err != nil {
+	if err := s.db.SyncFTS(fmt.Sprint(ids[1])); err != nil {
 		t.Fatalf("sync fts 2: %v", err)
 	}
 
@@ -89,19 +93,19 @@ func TestSearchLibraryRanksExactAboveSubstring(t *testing.T) {
 func TestRemoveAltTitleKeepsFTSInSync(t *testing.T) {
 	s := newTestService(t)
 
-	if err := s.db.UpsertManga(database.Manga{
-		ID:            "rm|1",
+	mangaID, err := s.db.UpsertManga(database.Manga{
 		PluginID:      "rm",
 		SourceMangaID: "1",
 		Title:         "Tower of God",
 		InLibrary:     true,
-	}); err != nil {
+	})
+	if err != nil {
 		t.Fatalf("upsert: %v", err)
 	}
-	if _, err := s.db.AddAltTitles("rm|1", []string{"Kami no Tou"}, "src"); err != nil {
+	if _, err := s.db.AddAltTitles(fmt.Sprint(mangaID), []string{"Kami no Tou"}, "src"); err != nil {
 		t.Fatalf("add alt: %v", err)
 	}
-	if err := s.db.SyncFTS("rm|1"); err != nil {
+	if err := s.db.SyncFTS(fmt.Sprint(mangaID)); err != nil {
 		t.Fatalf("sync fts: %v", err)
 	}
 

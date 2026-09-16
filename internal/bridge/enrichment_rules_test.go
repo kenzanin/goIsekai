@@ -32,15 +32,16 @@ func newEnrichService(t *testing.T, provider *enrichMockProvider) *AppService {
 
 func seedMangaRow(t *testing.T, s *AppService, id, pluginID, sourceID, title, desc string) {
 	t.Helper()
-	if err := s.db.UpsertManga(database.Manga{
-		ID:            id,
+	mangaID, err := s.db.UpsertManga(database.Manga{
 		PluginID:      pluginID,
 		SourceMangaID: sourceID,
 		Title:         title,
 		Description:   desc,
-	}); err != nil {
+	})
+	if err != nil {
 		t.Fatalf("upsert manga %s: %v", id, err)
 	}
+	_ = mangaID // TODO: use for verification if needed
 }
 
 func TestFetchEnrichmentBlankTitleUsesStoredTitle(t *testing.T) {
@@ -99,16 +100,20 @@ func TestFetchEnrichmentWithoutAnyTitleErrors(t *testing.T) {
 func TestSetMainTitleUnknownTitleErrorNamesIt(t *testing.T) {
 	s := newTestService(t)
 	seedMangaRow(t, s, "p2|s2", "p2", "s2", "Original", "")
-	if _, err := s.db.AddAltTitles("p2|s2", []string{"Known Alt"}, "src"); err != nil {
+	rowID, err := s.db.ResolveMangaRowID("p2", "s2")
+	if err != nil {
+		t.Fatalf("resolve row ID: %v", err)
+	}
+	if _, err := s.db.AddAltTitles(rowID, []string{"Known Alt"}, "src"); err != nil {
 		t.Fatalf("add alt: %v", err)
 	}
 
-	err := s.SetMainTitle("p2", "s2", "Nonexistent")
-	if err == nil {
+	setErr := s.SetMainTitle("p2", "s2", "Nonexistent")
+	if setErr == nil {
 		t.Fatal("expected an error for an unknown title")
 	}
-	if !strings.Contains(err.Error(), `"Nonexistent"`) {
-		t.Errorf("error %q should name the rejected title", err)
+	if !strings.Contains(setErr.Error(), `"Nonexistent"`) {
+		t.Errorf("error %q should name the rejected title", setErr)
 	}
 	got, err2 := s.db.MangaTitle("p2", "s2")
 	if err2 != nil {
@@ -122,7 +127,11 @@ func TestSetMainTitleUnknownTitleErrorNamesIt(t *testing.T) {
 func TestSetMainTitleRejectsBlank(t *testing.T) {
 	s := newTestService(t)
 	seedMangaRow(t, s, "p2|s2", "p2", "s2", "Original", "")
-	if _, err := s.db.AddAltTitles("p2|s2", []string{"Known Alt"}, "src"); err != nil {
+	rowID, err := s.db.ResolveMangaRowID("p2", "s2")
+	if err != nil {
+		t.Fatalf("resolve row ID: %v", err)
+	}
+	if _, err := s.db.AddAltTitles(rowID, []string{"Known Alt"}, "src"); err != nil {
 		t.Fatalf("add alt: %v", err)
 	}
 
@@ -138,7 +147,11 @@ func TestSetMainTitleRejectsBlank(t *testing.T) {
 func TestSetMainSummarySwapsAndDemotesOld(t *testing.T) {
 	s := newTestService(t)
 	seedMangaRow(t, s, "p2|s2", "p2", "s2", "Title", "Original synopsis.")
-	if _, err := s.db.AddAltDescriptions("p2|s2", []string{"Better synopsis."}, "src"); err != nil {
+	rowID, err := s.db.ResolveMangaRowID("p2", "s2")
+	if err != nil {
+		t.Fatalf("resolve row ID: %v", err)
+	}
+	if _, err := s.db.AddAltDescriptions(rowID, []string{"Better synopsis."}, "src"); err != nil {
 		t.Fatalf("add alt descriptions: %v", err)
 	}
 
@@ -155,7 +168,7 @@ func TestSetMainSummarySwapsAndDemotesOld(t *testing.T) {
 	if !custom {
 		t.Error("description was not locked from plugin overwrites")
 	}
-	sums, err := s.db.ListAltDescriptions("p2|s2")
+	sums, err := s.db.ListAltDescriptions(rowID)
 	if err != nil {
 		t.Fatalf("ListAltDescriptions: %v", err)
 	}
@@ -197,7 +210,11 @@ func TestSetMainSummaryRejectsBlank(t *testing.T) {
 func TestSetMainSummaryAcceptsRoundTrippedText(t *testing.T) {
 	s := newTestService(t)
 	seedMangaRow(t, s, "p2|s2", "p2", "s2", "Title", "Original synopsis.")
-	if _, err := s.db.AddAltDescriptions("p2|s2", []string{`Tom & Jerry's "best"`}, "src"); err != nil {
+	rowID, err := s.db.ResolveMangaRowID("p2", "s2")
+	if err != nil {
+		t.Fatalf("resolve row ID: %v", err)
+	}
+	if _, err := s.db.AddAltDescriptions(rowID, []string{`Tom & Jerry's "best"`}, "src"); err != nil {
 		t.Fatalf("add alt descriptions: %v", err)
 	}
 
@@ -221,14 +238,18 @@ func TestSetMainSummaryAcceptsRoundTrippedText(t *testing.T) {
 func TestRemoveAltSummaryDropsRow(t *testing.T) {
 	s := newTestService(t)
 	seedMangaRow(t, s, "p2|s2", "p2", "s2", "Title", "Original synopsis.")
-	if _, err := s.db.AddAltDescriptions("p2|s2", []string{"Alt synopsis"}, "src"); err != nil {
+	rowID, err := s.db.ResolveMangaRowID("p2", "s2")
+	if err != nil {
+		t.Fatalf("resolve row ID: %v", err)
+	}
+	if _, err := s.db.AddAltDescriptions(rowID, []string{"Alt synopsis"}, "src"); err != nil {
 		t.Fatalf("add alt descriptions: %v", err)
 	}
 
 	if err := s.RemoveAltSummary("p2", "s2", "Alt synopsis"); err != nil {
 		t.Fatalf("RemoveAltSummary: %v", err)
 	}
-	sums, err := s.db.ListAltDescriptions("p2|s2")
+	sums, err := s.db.ListAltDescriptions(rowID)
 	if err != nil {
 		t.Fatalf("ListAltDescriptions: %v", err)
 	}

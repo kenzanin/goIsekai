@@ -18,7 +18,7 @@ type readHistoryTable struct {
 
 	// Columns
 	ID        sqlite.ColumnInteger
-	ChapterID sqlite.ColumnString
+	ChapterID sqlite.ColumnInteger
 	PageNum   sqlite.ColumnInteger
 	ReadAt    sqlite.ColumnTimestamp
 
@@ -63,7 +63,7 @@ func newReadHistoryTable(schemaName, tableName, alias string) *ReadHistoryTable 
 func newReadHistoryTableImpl(schemaName, tableName, alias string) readHistoryTable {
 	var (
 		IDColumn        = sqlite.IntegerColumn("id")
-		ChapterIDColumn = sqlite.StringColumn("chapter_id")
+		ChapterIDColumn = sqlite.IntegerColumn("chapter_id")
 		PageNumColumn   = sqlite.IntegerColumn("page_num")
 		ReadAtColumn    = sqlite.TimestampColumn("read_at")
 		allColumns      = sqlite.ColumnList{IDColumn, ChapterIDColumn, PageNumColumn, ReadAtColumn}

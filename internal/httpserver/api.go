@@ -133,7 +133,7 @@ func (s *Server) apiLibrary(w http.ResponseWriter, r *http.Request) {
 			SourceMangaID: m.SourceMangaID,
 			CoverURL:      m.CoverURL,
 		}
-		if st, ok := statsMap[m.ID]; ok {
+		if st, ok := statsMap[strconv.FormatInt(m.ID, 10)]; ok {
 			item.TotalChapters = st.TotalChapters
 			item.ReadChapters = st.ReadChapters
 			item.HasNew = st.HasNew

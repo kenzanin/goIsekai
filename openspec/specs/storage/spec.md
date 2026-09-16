@@ -7,18 +7,18 @@ Persists the reader's library bookmarks, chapter metadata and read progress, dow
 ## Requirements
 
 ### Requirement: Manga library persistence
-The system SHALL store manga in a `mangas` table keyed by `id`, with `plugin_id`, `source_manga_id`, `title`, `cover_url`, optional `description` and `status`, an `in_library` flag, and a unique constraint on `(plugin_id, source_manga_id)`.
+The system SHALL store manga in a `mangas` table with an integer primary key `id` (auto-increment), `plugin_id`, `source_manga_id`, `title`, `cover_url`, optional `description` and `status`, an `in_library` flag, and a unique constraint on `(plugin_id, source_manga_id)`.
 
 #### Scenario: Store manga from a source
 - **WHEN** the host saves a manga fetched from a plugin
 - **THEN** it persists `plugin_id`, `source_manga_id`, and `title` such that re-importing the same source manga does not create a duplicate row
 
 ### Requirement: Chapter persistence
-The system SHALL store chapters in a `chapters` table with `id`, `manga_id`, `source_chapter_id`, `title`, numeric `chapter_num`, optional `volume_num`, `is_read`, `last_page_read`, and a `download_status` field defaulting to `NOT_DOWNLOADED`.
+The system SHALL store chapters in a `chapters` table with an integer primary key `id`, `manga_id` foreign key referencing `mangas(id)` with cascade delete, `source_chapter_id`, `title`, numeric `chapter_num`, optional `volume_num`, `is_read`, `last_page_read`, `is_skipped`, `download_status` defaulting to `NOT_DOWNLOADED`, and `total_pages`. A unique constraint on `(manga_id, source_chapter_id)` ensures one row per source chapter.
 
 #### Scenario: Record chapter read progress
 - **WHEN** the reader advances to a page within a chapter
-- **THEN** the chapter's `last_page_read` and `is_read` state persist across restarts
+- **THEN** the chapter's `last_page_read`, `is_read`, and `is_skipped` state persist across restarts
 
 ### Requirement: Download status tracking
 The system SHALL track a chapter's download lifecycle using `download_status` values `NOT_DOWNLOADED`, `DOWNLOADING`, and `DOWNLOADED`.
@@ -28,21 +28,21 @@ The system SHALL track a chapter's download lifecycle using `download_status` va
 - **THEN** its `download_status` transitions through `DOWNLOADING` and ends at `DOWNLOADED`
 
 ### Requirement: Read history persistence
-The system SHALL store per-page read events in a `read_history` table referencing the chapter with cascade delete.
+The system SHALL store per-page read events in a `read_history` table with an integer primary key `id`, `chapter_id` foreign key referencing `chapters(id)` with cascade delete, `page_num`, and `read_at` timestamp. A unique constraint on `chapter_id` ensures one row per chapter (the most recent read).
 
 #### Scenario: Record a read event
 - **WHEN** the reader opens a page
-- **THEN** a `read_history` row is written recording the chapter id, page number, and read timestamp
+- **THEN** a `read_history` row is written recording the chapter id, page number, and read timestamp (overwriting any previous row for that chapter)
 
 ### Requirement: Plugin registry persistence
-The system SHALL store installed plugins in a `plugins` table with `id`, `name`, `version`, `wasm_path`, `is_active`, and optional `icon_url`.
+The system SHALL store installed plugins in a `plugins` table with `id`, `name`, `version`, `wasm_path`, `is_active`, and optional `icon_url`, `thumb_ratio`, `cover_dim`, and `author`.
 
 #### Scenario: Register an installed plugin
 - **WHEN** a plugin is installed from a `.wasm` file
 - **THEN** its metadata (name, version, wasm path, active flag) is recorded and survives restarts
 
 ### Requirement: Cascading cleanup
-Deleting a manga SHALL cascade-delete its chapters, and deleting a chapter SHALL cascade-delete its read history.
+Deleting a manga SHALL cascade-delete its chapters, and deleting a chapter SHALL cascade-delete its read history and chapter pages.
 
 #### Scenario: Remove manga from library
 - **WHEN** a manga is removed
@@ -56,7 +56,7 @@ Manga progress, offline chapter downloads, and library bookmarks SHALL persist a
 - **THEN** all three are restored exactly as last saved
 
 ### Requirement: Alternative titles table
-The system SHALL store alternative titles in an `alt_titles` table keyed by row id, with `manga_row_id` referencing `mangas(id)` with `ON DELETE CASCADE`, a `title` text column, and a `source` text column holding the provider-reported badge label, unique on `(manga_row_id, title)`. The stopgap `mangas.alt_titles` JSON text column SHALL be dropped in the same migration.
+The system SHALL store alternative titles in an `alt_titles` table with an integer primary key `id`, `manga_row_id` foreign key referencing `mangas(id)` with `ON DELETE CASCADE`, a `title` text column, and a `source` text column holding the provider-reported badge label, unique on `(manga_row_id, title)`. The stopgap `mangas.alt_titles` JSON text column is dropped in the same migration.
 
 #### Scenario: Cascade on manga delete
 - **WHEN** a manga row is deleted
@@ -72,3 +72,10 @@ The system SHALL maintain an FTS5 virtual table `library_fts` indexing each libr
 #### Scenario: Index reflects title promotion
 - **WHEN** a manga's main title is swapped with an alternative title
 - **THEN** subsequent full-text queries match both the new main title and the old one (now an alternative)
+
+### Requirement: Storage optimization via purge policy
+The system SHALL apply a purge policy to reclaim space: chapters of non-library manga are deleted, cached pages of finished chapters are dropped, and duplicate read history rows (keeping the newest per chapter) are removed.
+
+#### Scenario: Prune storage
+- **WHEN** the database is migrated or maintenance runs
+- **THEN** non-library chapters and their pages are dropped, read history is deduplicated, and the file size shrinks
