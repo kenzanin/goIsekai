@@ -8,15 +8,12 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
-	"strconv"
 	"syscall"
-	"time"
 
 	"goisekai/internal/bridge"
 	"goisekai/internal/config"
 	"goisekai/internal/database"
 	"goisekai/internal/enrich"
-	"goisekai/internal/hostnet"
 	"goisekai/internal/httpserver"
 	"goisekai/internal/logger"
 	"goisekai/internal/pluginmanager"
@@ -94,121 +91,25 @@ func main() {
 	}
 	logger.Info("starting goIsekai", "log_level", level, "data_dir", cfg.DataDir, "addr", cfg.Host, "port", cfg.Port)
 
-	// Data directory holds the SQLite file and the plugins/ wasm directory.
-	dataDir := cfg.DataDir
-	pluginsDir := filepath.Join(dataDir, "plugins")
-	if err := os.MkdirAll(pluginsDir, 0o755); err != nil {
-		logger.Fatal("mkdir plugins dir", "error", err)
-	}
-	infoDir := cfg.InfoDir
-	if infoDir == "" {
-		infoDir = filepath.Join(dataDir, "info")
-	}
-	if err := os.MkdirAll(infoDir, 0o755); err != nil {
-		logger.Fatal("mkdir info dir", "error", err)
-	}
-
-	cacheDir := cfg.CacheDir
-	if cacheDir == "" {
-		cacheDir = filepath.Join(dataDir, "cache")
-	}
-	if err := os.MkdirAll(filepath.Join(cacheDir, "images"), 0o755); err != nil {
-		logger.Fatal("mkdir cache dir", "error", err)
-	}
+	dataDir, pluginsDir, infoDir, cacheDir := setupDirs(cfg)
 
 	// PID file — written after dataDir exists, removed on shutdown.
-	pidPath := filepath.Join(dataDir, "goisekai.pid")
-	if err := os.WriteFile(pidPath, []byte(strconv.Itoa(os.Getpid())+"\n"), 0o644); err != nil {
-		logger.Warn("write PID file", "error", err)
-	} else {
-		defer func() {
-			logger.Info("removing PID file", "path", pidPath)
-			if err := os.Remove(pidPath); err != nil {
-				logger.Warn("remove PID file", "error", err)
-			}
-		}()
-	}
+	removePID := writePIDFile(dataDir)
+	defer removePID()
 
 	db, err := database.Open(filepath.Join(dataDir, "goisekai.db"))
 	if err != nil {
 		logger.Fatal("open database", "error", err)
 	}
 
-	proxy := hostnet.NewProxy()
-	proxy.SetDefaultHeader("User-Agent", cfg.UserAgent)
-	proxy.SetDefaultHeader("Accept-Language", cfg.AcceptLanguage)
-	proxy.SetDefaultHeader("Referer", cfg.Referer)
-	proxy.ConfigureCDP(hostnet.CDPConfig{
-		Engine:  cfg.CDPEngine,
-		Path:    cfg.CDPPath,
-		Timeout: time.Duration(cfg.CDPSolveTimeout) * time.Second,
-	})
+	proxy := setupProxy(cfg, db)
 
-	// Restore persisted TLS-profile pins and wire persistence so a plugin's
-	// winning profile survives restarts without a re-probe.
-	if pins, perr := db.GetPluginProfiles(); perr == nil {
-		proxy.SetPinnedProfiles(pins)
-	} else {
-		logger.Warn("load plugin profile pins", "error", perr)
-	}
-
-	proxy.SetPersistPin(func(pluginID, profile string) {
-		if err := db.SetPluginProfile(pluginID, profile); err != nil {
-			logger.Warn("persist plugin profile", "plugin", pluginID, "error", err)
-		}
-	})
-
-	// Hot-reload: poll goisekai.ini every 5s and apply the safe subset
-	// (log level, user-agent, referer) live. Unsafe fields like host/port/
-	// cdp_engine need a restart, so they are deliberately not applied here.
-	_ = config.Watch(cfgPath, 5*time.Second, func(updated *config.Config) {
-		if err := logger.Init(updated.LogLevel); err == nil {
-			logger.Info("config reloaded", "log_level", updated.LogLevel)
-		}
-		proxy.SetDefaultHeader("User-Agent", updated.UserAgent)
-		proxy.SetDefaultHeader("Referer", updated.Referer)
-	})
+	// Hot-reload the safe config subset (log level, user-agent, referer).
+	startConfigWatch(cfgPath, proxy)
 
 	// Maintenance: prune orphaned rows at startup, then back up + re-prune
 	// on the configured interval until shutdown.
-	backupsDir := filepath.Join(dataDir, "backups")
-	if cfg.PruneOrphans {
-		if summary, err := db.PruneOrphans(); err != nil {
-			logger.Error("prune orphans", "error", err)
-		} else if summary != "clean" {
-			logger.Info("pruned orphaned rows", "summary", summary)
-		}
-	}
-	maintenanceStop := make(chan struct{})
-	go func() {
-		interval := time.Duration(cfg.BackupIntervalHours) * time.Hour
-		if interval <= 0 {
-			return // backups disabled
-		}
-		backup := func() {
-			if _, err := db.BackupTo(backupsDir, cfg.BackupKeep); err != nil {
-				logger.Error("db backup", "error", err)
-			} else {
-				logger.Info("db backup written", "dir", backupsDir, "keep", cfg.BackupKeep)
-			}
-		}
-		backup() // first backup at startup
-		ticker := time.NewTicker(interval)
-		defer ticker.Stop()
-		for {
-			select {
-			case <-maintenanceStop:
-				return
-			case <-ticker.C:
-				if cfg.PruneOrphans {
-					if summary, err := db.PruneOrphans(); err == nil && summary != "clean" {
-						logger.Info("pruned orphaned rows", "summary", summary)
-					}
-				}
-				backup()
-			}
-		}
-	}()
+	maintenanceStop := startMaintenance(db, cfg, dataDir)
 	defer close(maintenanceStop)
 
 	mgr := pluginmanager.NewManager(proxy, pluginsDir)
@@ -217,37 +118,15 @@ func main() {
 		logger.Fatal("discover plugins", "error", err)
 	}
 
-	// Track known hosts and trigger preconnect for all discovered plugins
+	// Track known hosts and trigger preconnect for all discovered plugins.
 	mgr.TrackKnownHosts()
 
-	// Preconnect all known hosts on startup (warm connection pool)
-	go func() {
-		hosts := mgr.GetKnownHosts()
-		logger.Info("preconnecting to known hosts", "count", len(hosts))
-		sem := make(chan struct{}, 4) // concurrency limit 4
-		for _, host := range hosts {
-			sem <- struct{}{}
-			go func(h string) {
-				defer func() { <-sem }()
-				mgr.Proxy().Preconnect(h)
-			}(host)
-		}
-	}()
+	// Preconnect all known hosts on startup (warm connection pool).
+	go preconnectHosts(mgr)
 
 	// Register plugins loaded from the plugins dir so they appear in
 	// ListPlugins (Discover only loads them into memory).
-	for _, p := range mgr.LoadedPlugins() {
-		if err := db.RegisterPlugin(database.Plugin{
-			ID:         p.ID,
-			Name:       p.ID,
-			Version:    p.Version,
-			WasmPath:   p.WasmPath,
-			IsActive:   true,
-			ThumbRatio: p.ThumbRatio,
-		}); err != nil {
-			logger.Error("register discovered plugin", "id", p.ID, "error", err)
-		}
-	}
+	registerLoadedPlugins(db, mgr)
 
 	// Build the enrichment registry. It starts empty: every provider is
 	// plugin-declared and registers itself when its plugin first loads, so
@@ -288,23 +167,5 @@ func main() {
 	}
 
 	// Ordered shutdown: HTTP → plugins → DB → logs → PID file (PID is deferred).
-	shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
-
-	logger.Info("shutting down HTTP server")
-	if err := srv.Shutdown(shutdownCtx); err != nil {
-		logger.Error("http server shutdown", "error", err)
-	}
-
-	logger.Info("closing plugins")
-	if err := mgr.Close(); err != nil {
-		logger.Error("plugin manager close", "error", err)
-	}
-
-	logger.Info("closing database")
-	if err := db.Close(); err != nil {
-		logger.Error("database close", "error", err)
-	}
-
-	logger.Info("shutdown complete")
+	shutdown(srv, mgr, db)
 }

@@ -12,7 +12,6 @@ import (
 	"sync"
 	"time"
 
-	"goisekai/internal/config"
 	"goisekai/internal/database"
 	"goisekai/internal/enrich"
 	"goisekai/internal/hostnet"
@@ -59,51 +58,6 @@ func NewAppService(db *database.DB, mgr *pluginmanager.Manager, proxy *hostnet.P
 	}
 }
 
-// loadImageFormat reads the cache encoding from the INI at cfgPath, defaulting
-// to webp when the file is missing or names a format the build cannot encode.
-func loadImageFormat(cfgPath string) ImageFormat {
-	cfg, err := config.Load(cfgPath)
-	if err != nil || cfg == nil {
-		return FormatWebP
-	}
-	switch ImageFormat(cfg.ImageFormat) {
-	case FormatAVIF, FormatOriginal, FormatWebP:
-		return ImageFormat(cfg.ImageFormat)
-	default:
-		return FormatWebP
-	}
-}
-
-// loadCoverMaxDim reads the cover downscale cap in pixels; 0 disables it.
-func loadCoverMaxDim(cfgPath string) int {
-	cfg, err := config.Load(cfgPath)
-	if err != nil || cfg == nil {
-		return config.Default().CoverMaxDim
-	}
-	return cfg.CoverMaxDim
-}
-
-// loadStatusAlias reads the status alias map from the INI at cfgPath, falling
-// back to the built-in defaults when the file is missing or unreadable.
-func loadStatusAlias(cfgPath string) map[string][]string {
-	cfg, err := config.Load(cfgPath)
-	if err != nil || cfg == nil {
-		return config.DefaultStatusAlias()
-	}
-	return cfg.StatusAlias
-}
-
-// loadGenreIndex reads the genre alias map from the INI at cfgPath, falling
-// back to the built-in defaults when the file is missing or unreadable. The
-// map is static, so it is resolved once here rather than per manga detail.
-func loadGenreIndex(cfgPath string) *genreIndex {
-	cfg, err := config.Load(cfgPath)
-	if err != nil || cfg == nil {
-		return indexGenreAliases()
-	}
-	return newGenreIndex(cfg.GenreAlias)
-}
-
 // Log receives a console message from the frontend and writes it to the Go logger.
 func (s *AppService) Log(level string, msg string) {
 	switch level {
@@ -119,37 +73,6 @@ func (s *AppService) Log(level string, msg string) {
 // GetConfigPath returns the path to goisekai.ini.
 func (s *AppService) GetConfigPath() string {
 	return s.cfgPath
-}
-
-// CDPStatus returns the current CDP engine configuration.
-func (s *AppService) CDPStatus() hostnet.CDPConfig {
-	return s.proxy.CDPConfig()
-}
-
-// CDPCookies returns cookies from all per-plugin jars matching the domain.
-func (s *AppService) CDPCookies(domain string) []hostnet.CDPCookie {
-	return s.proxy.CDPCookies(domain)
-}
-
-// TestCDP launches the configured CDP engine against the given URL, waits for
-// the challenge to clear, and returns the harvested cookies and User-Agent.
-func (s *AppService) TestCDP(targetURL string) ([]hostnet.CDPCookie, string, error) {
-	cfg := s.proxy.CDPConfig()
-	if cfg.Engine == "" || cfg.Engine == "off" {
-		return nil, "", fmt.Errorf("CDP engine is not configured")
-	}
-	cookies, ua, err := s.proxy.TestCDP(cfg, targetURL)
-	if err != nil {
-		return nil, "", err
-	}
-	var out []hostnet.CDPCookie
-	for _, c := range cookies {
-		out = append(out, hostnet.CDPCookie{
-			Name: c.Name, Value: c.Value, Domain: c.Domain,
-			Path: c.Path, Secure: c.Secure, HTTPOnly: c.HttpOnly,
-		})
-	}
-	return out, ua, nil
 }
 
 // PluginDir returns the directory containing the plugin's main file, or "" if

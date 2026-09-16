@@ -8,7 +8,6 @@ import (
 	"goisekai/pkg/types"
 
 	"github.com/goccy/go-json"
-	"slices"
 )
 
 // SearchManga delegates to the plugin's Search function.
@@ -89,78 +88,6 @@ func (s *AppService) GetMangaDetails(pluginID, mangaID string) (types.Manga, []t
 	return s.cachedMangaFallback(pluginID, mangaID, mangaIntID)
 }
 
-// liveChaptersFallback returns cached chapters when live fetch fails.
-func (s *AppService) liveChaptersFallback(mangaIntID int64, liveChapters []types.Chapter) []types.Chapter {
-	if len(liveChapters) > 0 {
-		return liveChapters
-	}
-	dbChapters, err := s.db.ListChaptersCached(mangaIntID)
-	if err != nil || len(dbChapters) == 0 {
-		return nil
-	}
-	out := make([]types.Chapter, len(dbChapters))
-	for i, c := range dbChapters {
-		out[i] = types.Chapter{
-			ID:         c.SourceChapterID,
-			MangaID:    fmt.Sprintf("%d", c.MangaID),
-			Title:      c.Title,
-			ChapterNum: c.ChapterNum,
-			VolumeNum:  c.VolumeNum,
-			ReleasedAt: c.FetchedAt,
-		}
-	}
-	return out
-}
-
-// cachedMangaFallback returns cached data when plugin is unreachable.
-func (s *AppService) cachedMangaFallback(pluginID, mangaID string, mangaIntID int64) (types.Manga, []types.Chapter, error) {
-	cachedManga, err := s.db.GetMangaCached(pluginID, mangaID)
-	if err != nil {
-		return types.Manga{}, nil, fmt.Errorf("bridge: get manga detail: %w", err)
-	}
-	if cachedManga.ID == 0 {
-		return types.Manga{}, nil, fmt.Errorf("bridge: plugin %s is unreachable and manga %s has no cached copy", pluginID, mangaID)
-	}
-
-	manga := types.Manga{
-		ID:          cachedManga.SourceMangaID,
-		Title:       cachedManga.Title,
-		CoverURL:    cachedManga.CoverURL,
-		Description: cachedManga.Description,
-		Status:      cachedManga.Status,
-	}
-
-	if dbTitle, custom, err := s.db.MangaTitleIfCustom(pluginID, mangaID); err == nil && custom {
-		manga.Title = dbTitle
-	}
-	if dbDesc, custom, err := s.db.MangaDescriptionIfCustom(pluginID, mangaID); err == nil && custom {
-		manga.Description = dbDesc
-	}
-	if genres, has, err := s.GetMangaGenres(pluginID, mangaID); err == nil && has && len(genres) > 0 {
-		manga.Genres = genres
-	}
-	if dim, has, _ := s.db.GetMangaCoverDim(mangaIntID); has && dim == 1 {
-		manga.CoverDim = dim
-	}
-	dbChapters, err := s.db.ListChaptersCached(mangaIntID)
-	if err != nil || len(dbChapters) == 0 {
-		return manga, nil, nil
-	}
-
-	chapters := make([]types.Chapter, len(dbChapters))
-	for i, c := range dbChapters {
-		chapters[i] = types.Chapter{
-			ID:         c.SourceChapterID,
-			MangaID:    mangaID,
-			Title:      c.Title,
-			ChapterNum: c.ChapterNum,
-			VolumeNum:  c.VolumeNum,
-			ReleasedAt: c.FetchedAt,
-		}
-	}
-	return manga, chapters, nil
-}
-
 // resolveChapterIntID looks up the integer chapter ID from source identifiers.
 func (s *AppService) resolveChapterIntID(pluginID, mangaID, chapterID string) (int64, error) {
 	return s.db.ResolveChapterIntID(pluginID, mangaID, chapterID)
@@ -236,94 +163,4 @@ func (s *AppService) ListLibrary() ([]database.Manga, error) {
 		return nil, fmt.Errorf("bridge: list library: %w", err)
 	}
 	return list, nil
-}
-
-// SetMangaGenres stores a user-defined genre override for a manga.
-func (s *AppService) SetMangaGenres(pluginID, mangaID string, genres []string) error {
-	mangaIntID, _ := s.db.ResolveMangaIntID(pluginID, mangaID)
-	if err := s.db.SetMangaGenres(mangaIntID, genres); err != nil {
-		return fmt.Errorf("bridge: set manga genres: %w", err)
-	}
-	return nil
-}
-
-// GetMangaGenres returns the stored genre override for a manga.
-func (s *AppService) GetMangaGenres(pluginID, mangaID string) ([]string, bool, error) {
-	mangaIntID, _ := s.db.ResolveMangaIntID(pluginID, mangaID)
-	genres, has, err := s.db.GetMangaGenres(mangaIntID)
-	if err != nil {
-		return nil, false, fmt.Errorf("bridge: get manga genres: %w", err)
-	}
-	return genres, has, nil
-}
-
-// AddGenre appends a genre to a manga's user-defined override.
-func (s *AppService) AddGenre(pluginID, mangaID, genre string) error {
-	mangaIntID, _ := s.db.ResolveMangaIntID(pluginID, mangaID)
-	genres, has, err := s.db.GetMangaGenres(mangaIntID)
-	if err != nil {
-		return fmt.Errorf("bridge: add genre: %w", err)
-	}
-	if !has {
-		genres = nil
-	}
-	if slices.Contains(genres, genre) {
-		return nil
-	}
-	genres = append(genres, genre)
-	if err := s.db.SetMangaGenres(mangaIntID, genres); err != nil {
-		return fmt.Errorf("bridge: add genre: %w", err)
-	}
-	return nil
-}
-
-// ToggleGenre adds a genre to the override if not present, or removes it if present.
-func (s *AppService) ToggleGenre(pluginID, mangaID, genre string) error {
-	mangaIntID, _ := s.db.ResolveMangaIntID(pluginID, mangaID)
-	genres, has, err := s.db.GetMangaGenres(mangaIntID)
-	if err != nil {
-		return fmt.Errorf("bridge: toggle genre: %w", err)
-	}
-	if !has {
-		genres = nil
-	}
-	for i, g := range genres {
-		if g == genre {
-			genres = append(genres[:i], genres[i+1:]...)
-			if len(genres) == 0 {
-				genres = nil
-			}
-			if err := s.db.SetMangaGenres(mangaIntID, genres); err != nil {
-				return fmt.Errorf("bridge: toggle genre: %w", err)
-			}
-			return nil
-		}
-	}
-	genres = append(genres, genre)
-	if err := s.db.SetMangaGenres(mangaIntID, genres); err != nil {
-		return fmt.Errorf("bridge: toggle genre: %w", err)
-	}
-	return nil
-}
-
-// RemoveGenre removes one genre from a manga's user-defined override.
-func (s *AppService) RemoveGenre(pluginID, mangaID, genre string) error {
-	mangaIntID, _ := s.db.ResolveMangaIntID(pluginID, mangaID)
-	genres, has, err := s.db.GetMangaGenres(mangaIntID)
-	if err != nil {
-		return fmt.Errorf("bridge: remove genre: %w", err)
-	}
-	if !has || genres == nil {
-		return nil
-	}
-	filtered := make([]string, 0, len(genres))
-	for _, g := range genres {
-		if g != genre {
-			filtered = append(filtered, g)
-		}
-	}
-	if err := s.db.SetMangaGenres(mangaIntID, filtered); err != nil {
-		return fmt.Errorf("bridge: remove genre: %w", err)
-	}
-	return nil
 }
