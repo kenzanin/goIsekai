@@ -10,10 +10,10 @@ import (
 	"goisekai/internal/config"
 )
 
-// registerActionRoutes mounts the HTMX form-action endpoints. Every handler
-// mutates state then answers with an HX-Redirect so htmx performs a fresh
-// full-page navigation to the owning view (no fragment templates to keep
-// in sync).
+// registerActionRoutes mounts the form-action endpoints. Most handlers mutate
+// state then redirect to the owning view with hxRedirect, so a plain browser
+// form post reloads that view and the client-side action layer can swap the
+// response into the page (no fragment templates to keep in sync).
 func (s *Server) registerActionRoutes() {
 	s.Router.Post("/action/install-plugin", s.handleInstallPlugin)
 	s.Router.Post("/action/toggle-plugin/{pluginID}", s.handleTogglePlugin)
@@ -48,8 +48,8 @@ func (s *Server) registerActionRoutes() {
 }
 
 // hxRedirect answers a successful action with a 303 See Other redirect —
-// plain HTML form posts (browser follows it) and HTMX (follows redirects
-// natively) both land on the target page. 303 forces GET after POST.
+// the browser (and fetch) follows it natively, landing on the target page.
+// 303 forces GET after POST. The name is a leftover from the old HTMX layer.
 func (s *Server) hxRedirect(w http.ResponseWriter, location string) {
 	w.Header().Set("Location", location)
 	w.WriteHeader(http.StatusSeeOther)

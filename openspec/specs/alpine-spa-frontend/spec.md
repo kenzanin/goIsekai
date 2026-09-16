@@ -1,6 +1,6 @@
 ## Purpose
 
-Provides Alpine.js-based client-side interactivity and SPA navigation, replacing hand-written vanilla JS (toast system, confirm modal, data-confirm delegation) and dead HTMX imports with a unified reactive framework that makes page transitions instant and UI interactions declarative.
+Provides Alpine.js-based client-side interactivity, replacing hand-written vanilla JS (toast system, confirm modal, data-confirm delegation) and dead HTMX imports with a unified reactive framework that makes UI interactions declarative. Page-to-page navigation is left to the browser; only mutating form actions are posted in place.
 
 ## Requirements
 
@@ -34,30 +34,41 @@ The system SHALL provide a global `Alpine.store('confirm')` that displays a cent
 - **WHEN** a button has `data-confirm="Clear all cache?"` and is clicked
 - **THEN** the confirm modal appears before the button's default action proceeds (only proceeds on confirm)
 
-### Requirement: SPA client-side navigation
-The system SHALL provide a client-side SPA router that intercepts internal link clicks and navigates via `fetch()` without full page reloads. The router SHALL extract the `<main>` content from the fetched HTML, morph the DOM, update `history.pushState`, and handle `popstate` for back/forward navigation. External links, reader pages, and API endpoints SHALL bypass the router and perform standard navigation.
+### Requirement: Browser-native navigation
+Internal links SHALL NOT be intercepted. Every link click SHALL perform a standard browser navigation so that history, the back/forward buttons, scroll restoration, and link affordances (middle-click, ctrl-click, "open in new tab") behave as the browser intends, and the page a reader returns to is the page they actually came from.
 
 #### Scenario: Internal link click
 - **WHEN** a user clicks a link to `/view/library` from the search page
-- **THEN** the router fetches `/view/library`, extracts `<main>`, morphs the DOM, and updates the URL bar — without a full page reload
+- **THEN** the browser performs a normal navigation with no click interception
 
-#### Scenario: Back button
-- **WHEN** the user presses the browser back button after SPA navigation
-- **THEN** the `popstate` handler fetches the previous URL and restores its content
+#### Scenario: Back button restores the origin page
+- **WHEN** the user opens a manga detail page from a search result, performs actions there, and presses the browser back button
+- **THEN** the browser returns to the search URL with the original query and results intact
 
-#### Scenario: External link bypass
-- **WHEN** a link points to an external domain or `/view/manga/{plugin}/{id}` (reader)
-- **THEN** the router performs standard full-page navigation
+#### Scenario: Shell differences are handled by the server
+- **WHEN** the user moves between a nav-bearing page and the nav-less reader
+- **THEN** the destination page is rendered and served complete by the server, so the nav bar is present on every page that has one
+
+### Requirement: In-place action submission
+Mutating form actions posted to `/action/` from a manga detail page SHALL be submitted with `fetch()` and have their response swapped into `#content`, so that repeated clicks (genre chips, library toggle, enrichment) never reload the page and never add a history entry. The address bar SHALL keep the page URL and SHALL NOT be updated to the `/action/` URL.
+
+#### Scenario: Repeated genre clicks
+- **WHEN** the user clicks several genre chips in a row on a detail page
+- **THEN** each click updates the page in place, with no reload and no change to the address bar
+
+#### Scenario: Library toggle
+- **WHEN** the user clicks the library toggle on a detail page
+- **THEN** the button flips state in place and the address bar still shows `/view/manga/...`
 
 #### Scenario: Fetch error fallback
-- **WHEN** a SPA navigation fetch returns a non-2xx status
-- **THEN** the router falls back to standard full-page navigation and shows an error toast
+- **WHEN** an in-place action fetch returns a non-2xx status
+- **THEN** an error toast is shown and the page is left unchanged
 
 ### Requirement: Per-page Alpine.js components
 Each view page SHALL use Alpine.js `x-data` for local interactive state. The following page-specific interactions SHALL be declarative Alpine.js components instead of hand-written JS:
 
 - **Library**: sidebar collapse/expand toggle, stats accordion, duplicate groups expand/collapse
-- **Search**: search input with debounced fetch, plugin dropdown filter that refreshes results via SPA router
+- **Search**: search input with debounced fetch, plugin dropdown filter that refreshes results
 - **Detail**: alt-title dropdown with add/remove/promote via fetch, cache clear with confirm
 - **Plugins**: profile dropdown with test button (shows toast result), reset pin button
 - **Settings**: clear cache with confirm modal
@@ -80,7 +91,7 @@ Forms and interactive elements SHALL use Alpine.js `x-model`, `x-on:click`, `x-s
 
 #### Scenario: Alt-title promote
 - **WHEN** the user selects a new main title from the alt-title dropdown on the detail page
-- **THEN** the component calls `PUT /api/manga/{plugin}/{id}/title`, shows a success toast, and refreshes the page content via SPA morph
+- **THEN** the form is posted to `/action/set-title/{plugin}/{id}`, the response is swapped into `#content`, and a success toast is shown
 
 #### Scenario: Settings clear cache
 - **WHEN** the user clicks "Clear All Cache" on settings
@@ -94,5 +105,5 @@ The system SHALL remove the HTMX CDN import and all dead HTMX error handlers fro
 - **THEN** there are zero `hx-get`, `hx-post`, `hx-target`, or `hx-swap` attributes, and no HTMX script tag
 
 #### Scenario: Error handling preserved
-- **WHEN** a fetch-based action (SPA navigation or component action) fails
+- **WHEN** a fetch-based action fails
 - **THEN** the error toast appears — same user-visible behavior as the old HTMX error handler
