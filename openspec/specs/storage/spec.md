@@ -14,11 +14,19 @@ The system SHALL store manga in a `mangas` table with an integer primary key `id
 - **THEN** it persists `plugin_id`, `source_manga_id`, and `title` such that re-importing the same source manga does not create a duplicate row
 
 ### Requirement: Chapter persistence
-The system SHALL store chapters in a `chapters` table with an integer primary key `id`, `manga_id` foreign key referencing `mangas(id)` with cascade delete, `source_chapter_id`, `title`, numeric `chapter_num`, optional `volume_num`, `is_read`, `last_page_read`, `is_skipped`, `download_status` defaulting to `NOT_DOWNLOADED`, and `total_pages`. A unique constraint on `(manga_id, source_chapter_id)` ensures one row per source chapter.
+The system SHALL store chapters in a `chapters` table with an integer surrogate `id` primary key, an integer `manga_id` referencing the manga row, `source_chapter_id`, `title`, numeric `chapter_num`, optional `volume_num`, `is_read`, `last_page_read`, and a `download_status` field defaulting to `NOT_DOWNLOADED`. A unique constraint SHALL hold on `(manga_id, source_chapter_id)` and an index SHALL exist on `manga_id` so chapter lists are index lookups rather than scans.
 
 #### Scenario: Record chapter read progress
 - **WHEN** the reader advances to a page within a chapter
-- **THEN** the chapter's `last_page_read`, `is_read`, and `is_skipped` state persist across restarts
+- **THEN** the chapter's `last_page_read` and `is_read` state persist across restarts
+
+#### Scenario: Chapter list lookup uses the index
+- **WHEN** the chapter list of a manga is queried
+- **THEN** the rows are found via the `manga_id` index without scanning other manga's chapters
+
+#### Scenario: Re-syncing does not duplicate chapters
+- **WHEN** the same chapter is persisted twice for the same manga
+- **THEN** the unique constraint on `(manga_id, source_chapter_id)` updates the existing row instead of inserting a duplicate
 
 ### Requirement: Download status tracking
 The system SHALL track a chapter's download lifecycle using `download_status` values `NOT_DOWNLOADED`, `DOWNLOADING`, and `DOWNLOADED`.
@@ -28,11 +36,15 @@ The system SHALL track a chapter's download lifecycle using `download_status` va
 - **THEN** its `download_status` transitions through `DOWNLOADING` and ends at `DOWNLOADED`
 
 ### Requirement: Read history persistence
-The system SHALL store per-page read events in a `read_history` table with an integer primary key `id`, `chapter_id` foreign key referencing `chapters(id)` with cascade delete, `page_num`, and `read_at` timestamp. A unique constraint on `chapter_id` ensures one row per chapter (the most recent read).
+The system SHALL store read history in a `read_history` table referencing the chapter's integer key with cascade delete, keeping at most one row per chapter that is updated (page number, timestamp) on each read event.
 
 #### Scenario: Record a read event
 - **WHEN** the reader opens a page
-- **THEN** a `read_history` row is written recording the chapter id, page number, and read timestamp (overwriting any previous row for that chapter)
+- **THEN** the chapter's read-history row reflects the page number and read timestamp of the latest event
+
+#### Scenario: History does not grow per page turn
+- **WHEN** the reader turns through many pages of one chapter
+- **THEN** the read-history table holds a single row for that chapter
 
 ### Requirement: Plugin registry persistence
 The system SHALL store installed plugins in a `plugins` table with `id`, `name`, `version`, `wasm_path`, `is_active`, and optional `icon_url`, `thumb_ratio`, `cover_dim`, and `author`.
