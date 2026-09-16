@@ -120,3 +120,38 @@ func TestThumbRatioPersistence(t *testing.T) {
 		t.Fatalf("expected thumb_ratio reset to 0, got %v", got)
 	}
 }
+
+// TestRegisterPluginKeepsInactive covers is_active surviving re-registration:
+// discovery re-registers every plugin on each startup, so an upsert must not
+// re-enable a plugin the user switched off.
+func TestRegisterPluginKeepsInactive(t *testing.T) {
+	db := openTestDB(t)
+
+	reg := Plugin{ID: "p1", Name: "p1", Version: "1", WasmPath: "/p1.wasm", IsActive: true}
+	if err := db.RegisterPlugin(reg); err != nil {
+		t.Fatalf("register: %v", err)
+	}
+	if err := db.TogglePluginActive("p1"); err != nil {
+		t.Fatalf("toggle: %v", err)
+	}
+
+	// Re-register with the same IsActive=true that discovery always passes.
+	if err := db.RegisterPlugin(reg); err != nil {
+		t.Fatalf("re-register: %v", err)
+	}
+
+	plugins, err := db.ListPlugins()
+	if err != nil {
+		t.Fatalf("ListPlugins: %v", err)
+	}
+	for _, p := range plugins {
+		if p.ID != "p1" {
+			continue
+		}
+		if p.IsActive {
+			t.Fatalf("expected p1 to stay inactive after re-register")
+		}
+		return
+	}
+	t.Fatalf("p1 missing from ListPlugins")
+}

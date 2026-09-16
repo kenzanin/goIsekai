@@ -8,6 +8,10 @@ import (
 )
 
 // RegisterPlugin inserts a plugin or, on a duplicate id, refreshes its metadata.
+//
+// is_active is only written on insert: discovery re-registers every plugin on
+// each startup, and letting it overwrite the column would silently re-enable
+// plugins the user had switched off. The stored flag stays the source of truth.
 func (d *DB) RegisterPlugin(p Plugin) error {
 	_, err := Plugins.INSERT(
 		Plugins.ID,
@@ -29,7 +33,6 @@ func (d *DB) RegisterPlugin(p Plugin) error {
 		SET(
 			Plugins.Version.SET(Plugins.EXCLUDED.Version),
 			Plugins.WasmPath.SET(Plugins.EXCLUDED.WasmPath),
-			Plugins.IsActive.SET(Plugins.EXCLUDED.IsActive),
 			Plugins.ThumbRatio.SET(Plugins.EXCLUDED.ThumbRatio),
 		),
 	).Exec(d.db)
