@@ -32,12 +32,12 @@ return function(data)
 
 		if entry.Type == "update" then
 			badge =
-				'<span class="shrink-0 text-[10px] px-1.5 py-0.5 rounded-full bg-red-500 text-white font-medium">New</span>'
+				'<span class="shrink-0 text-xs px-2 py-0.5 rounded-full bg-red-500 text-white font-medium">New</span>'
 			tsAttr = h(tostring(entry.Date or ""))
 			formattedDate = h(formatDate(tostring(entry.Date or "")))
 		else
 			badge =
-				'<span class="shrink-0 text-[10px] px-1.5 py-0.5 rounded-full bg-indigo-500/15 text-indigo-400">New title</span>'
+				'<span class="shrink-0 text-xs px-2 py-0.5 rounded-full bg-indigo-500/15 text-indigo-400">New title</span>'
 			tsAttr = h(tostring(entry.Date or ""))
 			formattedDate = h(formatDate(tostring(entry.Date or "")))
 		end
@@ -45,21 +45,21 @@ return function(data)
 		local coverHtml
 		if coverURL ~= "" then
 			coverHtml = string.format(
-				'<img src="/image?pluginID=%s&amp;url=%s" alt="%s" class="w-16 aspect-[2/3] object-cover rounded shrink-0" loading="lazy" onerror="this.onerror=null;this.src=\'/static/img/placeholder.svg\';">',
+				'<img src="/image?pluginID=%s&amp;url=%s" alt="%s" class="w-24 aspect-[2/3] object-cover rounded shrink-0" loading="lazy" onerror="this.onerror=null;this.src=\'/static/img/placeholder.svg\';">',
 				h(pluginID),
 				h(coverURL),
 				h(title)
 			)
 		else
 			coverHtml = string.format(
-				'<div class="w-16 aspect-[2/3] bg-neutral-800 rounded flex items-center justify-center text-neutral-500 text-sm font-semibold shrink-0">%s</div>',
+				'<div class="w-24 aspect-[2/3] bg-neutral-800 rounded flex items-center justify-center text-neutral-500 text-base font-semibold shrink-0">%s</div>',
 				h(getInitials(title))
 			)
 		end
 
 		local iconHtml = ""
 		if pluginIcon ~= "" then
-			iconHtml = string.format('<img src="%s" alt="" class="h-3.5 w-3.5 rounded-sm object-cover">', h(pluginIcon))
+			iconHtml = string.format('<img src="%s" alt="" class="h-4 w-4 rounded-sm object-cover">', h(pluginIcon))
 		end
 
 		rows[#rows + 1] = string.format(
@@ -68,13 +68,13 @@ return function(data)
         %s
         <div class="flex-1 min-w-0">
           <div class="flex items-center justify-between">
-            <div class="text-sm font-medium truncate">%s</div>
-            <div class="text-xs text-neutral-500 shrink-0 hidden sm:block" data-ts="%s" title="%s">%s</div>
+            <div class="text-base font-medium truncate">%s</div>
+            <div class="text-sm text-neutral-500 shrink-0 hidden sm:block" data-ts="%s" title="%s">%s</div>
           </div>
           <div class="flex items-center gap-2 mt-1">
-            <span class="text-xs text-neutral-400">%s/%s chapters</span>
-            <span class="inline-flex items-center gap-1.5 text-xs px-2 py-0.5 rounded-full bg-neutral-800 text-neutral-500">%s%s</span>
-            <div class="text-xs text-neutral-500 sm:hidden" data-ts="%s" title="%s">%s</div>
+            <span class="text-sm text-neutral-400">%s/%s chapters</span>
+            <span class="inline-flex items-center gap-1.5 text-sm px-2.5 py-1 rounded-full bg-neutral-800 text-neutral-500">%s%s</span>
+            <div class="text-sm text-neutral-500 sm:hidden" data-ts="%s" title="%s">%s</div>
           </div>
         </div>
     </a>]],
