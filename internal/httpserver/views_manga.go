@@ -109,11 +109,12 @@ func (s *Server) viewMangaDetail(w http.ResponseWriter, r *http.Request) {
 	// SPA: if X-Partial is set, render the partial directly instead of
 	// redirecting — the SPA fetch uses `redirect: 'manual'` so 303s are
 	// opaque and unreadable.
+	// Use "detail" as active token so nav bar renders (no tab highlighted).
 	if r.Header.Get("X-Partial") == "true" {
-		s.renderPage(w, r, "views/detail", "", data)
+		s.renderPage(w, r, "views/detail", "detail", data)
 		return
 	}
-	s.renderPage(w, r, "views/detail", "", data)
+	s.renderPage(w, r, "views/detail", "detail", data)
 }
 
 // ContinuePoint names where the Continue button should resume.
