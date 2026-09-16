@@ -95,21 +95,7 @@ return function(data)
 <h1 class="text-xl font-semibold mb-6">History</h1>
 <div class="divide-y divide-neutral-800">
 %s
-</div>
-<script>
-function refreshRelativeTimes() {
-  document.querySelectorAll('[data-ts]').forEach(el => {
-    const d = new Date(el.dataset.ts);
-    const diff = Date.now() - d.getTime();
-    const mins = Math.floor(diff/60000);
-    if (mins < 60) el.textContent = mins + 'm ago';
-    else if (mins < 1440) el.textContent = Math.floor(mins/60) + 'h ago';
-    else el.textContent = Math.floor(mins/1440) + 'd ago';
-  });
-}
-refreshRelativeTimes();
-setInterval(refreshRelativeTimes, 60000);
-</script>]],
+</div>]],
 		table.concat(rows, "\n")
 	)
 

@@ -594,3 +594,19 @@ window.setLoading = (btn, loading) => {
   }
 };
 
+// =====================================================================
+// Relative timestamps: any element carrying data-ts shows "3h ago"
+// =====================================================================
+document.addEventListener('DOMContentLoaded', () => {
+  if (!document.querySelector('[data-ts]')) return;
+  const refresh = () => {
+    document.querySelectorAll('[data-ts]').forEach((el) => {
+      const mins = Math.floor((Date.now() - new Date(el.dataset.ts).getTime()) / 60000);
+      if (mins < 60) el.textContent = mins + 'm ago';
+      else if (mins < 1440) el.textContent = Math.floor(mins / 60) + 'h ago';
+      else el.textContent = Math.floor(mins / 1440) + 'd ago';
+    });
+  };
+  refresh();
+  setInterval(refresh, 60000);
+});
