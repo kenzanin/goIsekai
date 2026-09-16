@@ -19,7 +19,7 @@ return function(data)
 	else
 		mangaCards = '<div class="view-container grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">'
 		for _, m in ipairs(mangas) do
-			local mid = m.ID or ""
+			local mid = tostring(m.ID or "")
 			local pluginID = m.PluginID or ""
 			local sourceMangaID = m.SourceMangaID or ""
 			local title = m.Title or ""
@@ -76,7 +76,7 @@ return function(data)
 					.. "</span></span>"
 			end
 
-			-- read/total in the title area (finished = green check after the count)
+			-- read/total in the title area (finished = "Done" pill after the count)
 			local statsBadge = ""
 			local finishedMark = ""
 			if statsObj then
@@ -94,7 +94,7 @@ return function(data)
 					)
 				if total > 0 and read >= total then
 					finishedMark =
-						' <svg class="w-3.5 h-3.5 text-emerald-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" title="Semua chapter sudah dibaca"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"></path></svg>'
+						' <span class="text-[10px] px-1.5 py-0.5 rounded-full bg-emerald-600 text-white font-medium align-middle">Done</span>'
 				end
 			end
 
