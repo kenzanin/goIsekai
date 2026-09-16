@@ -49,7 +49,7 @@ function getChapterList(arg) {
                 title: chTitle,
                 chapter_num: chNum,
                 volume_num: volNum,
-                released_at: parseTime(a.publishAt),
+                released_at: host.text.date_to_iso(a.publishAt || "") || undefined,
                 url: "https://mangadex.org/chapter/" + cd.id,
             });
         }

@@ -10,6 +10,8 @@ import (
 	"time"
 
 	lua "github.com/mmcdole/lunar"
+
+	"goisekai/internal/pluginutil"
 )
 
 // luaHelpers returns all helper functions to register as Lua globals.
@@ -66,10 +68,8 @@ func formatDateHelper(S *lua.State) lua.NativeFunc {
 		if s == "" {
 			return frame.ReturnString("—")
 		}
-		for _, layout := range dateLayouts {
-			if t, err := time.Parse(layout, s); err == nil {
-				return frame.ReturnString(t.Format("Jan 2, 2006"))
-			}
+		if t, ok := pluginutil.ParseDate(s, time.Now()); ok {
+			return frame.ReturnString(t.Format("Jan 2, 2006"))
 		}
 		return frame.ReturnString("—")
 	}

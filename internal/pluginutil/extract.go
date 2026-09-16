@@ -22,9 +22,6 @@ var (
 	relativeDate = regexp.MustCompile(
 		`(?i)^(\d+)\s*(minutes?|mins?|hours?|hrs?|days?|weeks?|months?|years?)\s+ago\b`)
 
-	// dateLayouts covers the shapes sites actually put in markup and JSON.
-	// Slash-only dates ("02/01/2026") are deliberately absent: day-first and
-	// month-first are indistinguishable without the site's locale.
 	dateLayouts = []string{
 		time.RFC3339Nano,
 		time.RFC3339,
@@ -76,33 +73,47 @@ func parseDecimal(s string) float64 {
 }
 
 // DateToISO normalizes a release date to RFC 3339 in UTC, so plugins hand the
-// host one shape instead of each guessing a layout. now anchors relative
-// phrases ("2 days ago", "yesterday") and unix-second inputs.
+// host one shape instead of each guessing a layout. now anchors the relative
+// phrases ("2 days ago", "yesterday").
 //
-// Returns "" when nothing parses, which lets a plugin omit released_at rather
-// than invent a timestamp.
-//
-// ponytail: no millisecond epochs and no locale-dependent slash dates; add them
-// when a site needs them.
+// Returns "" when nothing parses, and the caller must then leave released_at
+// out of the payload entirely: the ABI decodes it into a time.Time, which
+// rejects "" and would fail the whole chapter list.
 func DateToISO(s string, now time.Time) string {
-	s = strings.TrimSpace(s)
-	if s == "" {
+	t, ok := ParseDate(s, now)
+	if !ok {
 		return ""
 	}
-	if l := len(s); l >= 9 && l <= 11 && isDigits(s) {
-		if secs, err := strconv.ParseInt(s, 10, 64); err == nil {
-			return formatISO(time.Unix(secs, 0))
+	return formatISO(t)
+}
+
+// ParseDate resolves the date shapes sites put in markup and JSON: unix seconds
+// or milliseconds, the relative phrases listing pages use for their newest
+// chapters, and the layouts in dateLayouts. Slash-only dates never resolve:
+// day-first and month-first are indistinguishable without the site's locale.
+func ParseDate(s string, now time.Time) (time.Time, bool) {
+	s = strings.TrimSpace(s)
+	if s == "" {
+		return time.Time{}, false
+	}
+	if isDigits(s) {
+		n, err := strconv.ParseInt(s, 10, 64)
+		switch l := len(s); {
+		case err == nil && l >= 9 && l <= 11:
+			return time.Unix(n, 0), true
+		case err == nil && l >= 12 && l <= 14:
+			return time.UnixMilli(n), true
 		}
 	}
 	if d, ok := parseRelative(s, now); ok {
-		return formatISO(d)
+		return d, true
 	}
 	for _, layout := range dateLayouts {
 		if t, err := time.Parse(layout, s); err == nil {
-			return formatISO(t)
+			return t, true
 		}
 	}
-	return ""
+	return time.Time{}, false
 }
 
 // relativeUnits maps a site's unit word to its duration. Months and years use

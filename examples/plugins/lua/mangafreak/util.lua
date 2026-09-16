@@ -137,10 +137,9 @@ function util.parse_chapter_list(html, manga_id)
             local chapter_id = manga_id .. ":" .. (ch_path or ch_name)
             if not seen[chapter_id] then
                 seen[chapter_id] = true
-                local num_str = ch_name:match("[Cc]hapter%s+([%d%.]+)")
                 chapters[#chapters + 1] = {
                     id = chapter_id, manga_id = manga_id,
-                    chapter_num = tonumber(num_str) or 0,
+                    chapter_num = host.text.chapter_num(ch_name),
                     title = ch_name, url = href
                 }
             end

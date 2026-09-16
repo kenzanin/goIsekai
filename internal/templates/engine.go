@@ -7,11 +7,7 @@ import (
 	"io/fs"
 	"sort"
 	"strconv"
-	"time"
 )
-
-// dateLayouts are tried in order by formatDate.
-var dateLayouts = []string{time.RFC3339Nano, time.RFC3339, "2006-01-02T15:04:05", "2006-01-02 15:04:05", "2006-01-02"}
 
 // Engine wraps LuaEngine for template rendering.
 type Engine struct {

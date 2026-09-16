@@ -89,11 +89,6 @@ function parseFloatSafe(s) {
     return isNaN(f) ? 0 : f;
 }
 
-function parseTime(s) {
-    if (!s) return "";
-    return s; // ISO8601 string, Go side parses it
-}
-
 function contentRatingParams() {
     return "contentRating[]=safe&contentRating[]=suggestive&contentRating[]=erotica";
 }

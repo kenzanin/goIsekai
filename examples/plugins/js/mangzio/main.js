@@ -184,35 +184,27 @@ function getChapterList(arg) {
     var combined = chunks.join("");
 
     var chapters = [];
-    var allChIdx = combined.indexOf('\"chapters\":[');
-    if (allChIdx >= 0) {
-        var arrStart = combined.indexOf("[", allChIdx);
-        if (arrStart >= 0) {
-            var depth = 0;
-            var arrEnd = arrStart;
-            for (var j = arrStart; j < combined.length; j++) {
-                if (combined[j] === "[") depth++;
-                else if (combined[j] === "]") depth--;
-                if (depth === 0) { arrEnd = j + 1; break; }
+    // host.text.json_blob returns the array as one balanced value, so a bracket
+    // inside a string can no longer truncate it.
+    var chaptersRaw = host.text.json_blob(combined, '\"chapters\":');
+    if (chaptersRaw) {
+        try {
+            var arr = JSON.parse(chaptersRaw);
+            for (var k = 0; k < arr.length; k++) {
+                var ch = arr[k];
+                chapters.push({
+                    id: slug + ":chapter-" + ch.chapterNumber,
+                    manga_id: slug,
+                    title: ch.chapterTitle || "Chapter " + ch.chapterNumber,
+                    chapter_num: ch.chapterNumber,
+                    released_at: host.text.date_to_iso(ch.releaseDate || "") || undefined,
+                    url: "/en/" + slug + "-en-chapter-" + ch.chapterNumber,
+                });
             }
-                try {
-                    var arr = JSON.parse(combined.substring(arrStart, arrEnd));
-                    for (var k = 0; k < arr.length; k++) {
-                        var ch = arr[k];
-                        chapters.push({
-                            id: slug + ":chapter-" + ch.chapterNumber,
-                            manga_id: slug,
-                            title: ch.chapterTitle || "Chapter " + ch.chapterNumber,
-                            chapter_num: ch.chapterNumber,
-                            released_at: ch.releaseDate || undefined,
-                            url: "/en/" + slug + "-en-chapter-" + ch.chapterNumber,
-                        });
-                    }
-                    // ABI convention: newest chapter first (site order is ascending).
-                    chapters.sort(function (a, b) { return b.chapter_num - a.chapter_num; });
-            } catch (e) {
-                log.error("mangzio chapters: parse error: " + e);
-            }
+            // ABI convention: newest chapter first (site order is ascending).
+            chapters.sort(function (a, b) { return b.chapter_num - a.chapter_num; });
+        } catch (e) {
+            log.error("mangzio chapters: parse error: " + e);
         }
     }
 
@@ -241,24 +233,13 @@ function getPageList(arg) {
     // Find pageImageUrls array in the RSC data
     for (var ci = 0; ci < chunks.length; ci++) {
         var chunk = chunks[ci];
-        var key = "\"pageImageUrls\"";
-        var idx = chunk.indexOf(key);
-        if (idx < 0) continue;
-
-        // Extract the array after the key
-        var arrStart = chunk.indexOf("[", idx);
-        if (arrStart < 0) continue;
-
-        var depth = 0;
-        var arrEnd = arrStart;
-        for (var j = arrStart; j < Math.min(arrStart + 200000, chunk.length); j++) {
-            if (chunk[j] === "[") depth++;
-            else if (chunk[j] === "]") depth--;
-            if (depth === 0) { arrEnd = j + 1; break; }
-        }
+        // host.text.json_blob does the balanced walk and keeps a bracket inside
+        // a string from closing the array early.
+        var pagesRaw = host.text.json_blob(chunk, '\"pageImageUrls\"');
+        if (!pagesRaw) continue;
 
         try {
-            var urls = JSON.parse(chunk.substring(arrStart, arrEnd));
+            var urls = JSON.parse(pagesRaw);
             var pages = [];
             for (var k = 0; k < urls.length; k++) {
                 pages.push({

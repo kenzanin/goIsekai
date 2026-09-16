@@ -158,14 +158,18 @@ function get_chapter_list(arg)
         local items = body.items or {}
         if #items == 0 then break end
         for _, c in ipairs(items) do
-            chapters[#chapters + 1] = {
+            local entry = {
                 id = tostring(c.id),
                 manga_id = hid,
                 chapter_num = c.number,
                 title = c.name or "",
-                released_at = os.date("!%Y-%m-%dT%H:%M:%SZ", (c.created_at or 0)),
                 url = "",
             }
+            -- created_at is unix seconds. A missing one becomes no released_at
+            -- key, rather than the 1970 timestamp os.date used to emit.
+            local iso = host.text.date_to_iso(tostring(c.created_at or 0))
+            if iso ~= "" then entry.released_at = iso end
+            chapters[#chapters + 1] = entry
         end
         local meta = body.meta or {}
         if page >= meta.last_page or not meta.has_next or page >= 3 then break end

@@ -10,6 +10,7 @@ import (
 	"reflect"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/dop251/goja"
 
@@ -818,6 +819,12 @@ func TestLuaMadaraChapterIDs(t *testing.T) {
 			}
 			if chapters[0].Title != "Chapter 96" {
 				t.Errorf("chapter title = %q", chapters[0].Title)
+			}
+			// The site prints the Madara date as "July 7, 2026"; the host native
+			// normalizes it, and any empty or malformed value would have failed
+			// the decode into time.Time before reaching this assertion.
+			if got := chapters[0].ReleasedAt.UTC().Format(time.RFC3339); got != "2026-07-07T00:00:00Z" {
+				t.Errorf("released_at = %q, want the site date normalized", got)
 			}
 
 			pages, err := mgr.GetPageList(id, chapters[0].ID)

@@ -70,10 +70,14 @@ The host SHALL expose a `chapter_num` text native in both the Lua and the JS plu
 
 ### Requirement: Release date normalization native
 
-The host SHALL expose a `date_to_iso` text native in both the Lua and the JS plugin runtime. The native SHALL accept a raw date string and SHALL return RFC 3339 in UTC. The native SHALL recognize at least unix seconds, the relative phrases (`N minutes|hours|days|weeks|months|years ago`, `yesterday`, `today`, `just now`), and the common ISO, `2006-01-02`, `2 Jan 2006` and `Jan 2, 2006` layouts. The native SHALL return an empty string when the input does not parse, so a plugin omits `released_at` rather than inventing a timestamp. Locale-ambiguous slash-only dates SHALL NOT be parsed.
+The host SHALL expose a `date_to_iso` text native in both the Lua and the JS plugin runtime. The native SHALL accept a raw date string and SHALL return RFC 3339 in UTC. The native SHALL recognize at least unix seconds, unix milliseconds, the relative phrases (`N minutes|hours|days|weeks|months|years ago`, `yesterday`, `today`, `just now`), and the common ISO, `2006-01-02`, `2 Jan 2006` and `Jan 2, 2006` layouts. The native SHALL return an empty string when the input does not parse, so a plugin omits `released_at` rather than inventing a timestamp. Locale-ambiguous slash-only dates SHALL NOT be parsed.
 
 #### Scenario: Unix seconds
 - **WHEN** the native is called with `1789482933`
+- **THEN** it returns `2026-09-15T14:35:33Z`
+
+#### Scenario: Unix milliseconds
+- **WHEN** the native is called with `1789482933123`
 - **THEN** it returns `2026-09-15T14:35:33Z`
 
 #### Scenario: Relative phrase

@@ -148,17 +148,20 @@ function get_chapter_list(arg)
         local label = trim(li:match('>([^<]*[Cc]hapter[^<]*)<') or "")
         local date = trim(li:match('chapter%-release%-date[^>]*>.-<i>([^<]+)</i>') or "")
         if href and label ~= "" then
-            local num = label:match('[Cc]hapter%s+([%d%.%-]+)')
             local cid = href:match('/manga/[^/]+/([^/]+)/?$') or href:match('/([^/]+)/?$')
             if cid and not seen[cid] then
                 seen[cid] = true
-                chapters[#chapters + 1] = {
+                -- Released dates normalize through host.text; "" means the site
+                -- gave nothing usable, which leaves released_at out entirely.
+                local iso = host.text.date_to_iso(date)
+                local ch = {
                     id = slug .. ":" .. cid,
-                    chapter_num = tonumber(num) or 0,
+                    chapter_num = host.text.chapter_num(label),
                     title = label,
-                    uploaded_at = date,
                     url = href
                 }
+                if iso ~= "" then ch.released_at = iso end
+                chapters[#chapters + 1] = ch
             end
         end
     end
@@ -169,10 +172,9 @@ function get_chapter_list(arg)
             local cid = href:match('/([^/]+)/?$')
             if cid and not seen[cid] then
                 seen[cid] = true
-                local num = label:match('[Cc]hapter%s+([%d%.%-]+)')
                 chapters[#chapters + 1] = {
                     id = slug .. ":" .. cid,
-                    chapter_num = tonumber(num) or 0,
+                    chapter_num = host.text.chapter_num(label),
                     title = trim(label),
                     url = href
                 }

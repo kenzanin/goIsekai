@@ -147,24 +147,17 @@ function get_chapter_list(arg)
         local label = trim(li:match(">([^<]*[Cc]hapter[^<]*)<") or "")
         local date = trim(li:match('chapter%-release%-date[^>]*>%s*<i[^>]*>([^<]+)</i>') or li:match('chapter%-release%-date[^>]*>%s*<a[^>]*>([^<]+)</a>') or "")
         if href and label ~= "" then
-            local num = label:match("[Cc]hapter%s+([%d%.%-]+)")
             local cid = href:match("/manga/[^/]+/([^/]+)/$")
-            -- released_at: Madara emits "July 7, 2026" → convert to ISO 8601
-            local months = { January="01", February="02", March="03", April="04",
-                May="05", June="06", July="07", August="08", September="09",
-                October="10", November="11", December="12" }
-            local mon, day, yr = date:match("(%a+)%s+(%d+),%s+(%d+)")
-            local iso = nil
-            if mon and months[mon] then
-                iso = string.format("%s-%02d-%02dT12:00:00Z", yr, tonumber(months[mon]), tonumber(day))
-            end
+            -- Madara emits "July 7, 2026"; the host knows the layouts sites use
+            -- and returns "" for the rest, which leaves released_at out.
+            local iso = host.text.date_to_iso(date)
             local ch = {
                 id = slug .. ":" .. (cid or label),
-                chapter_num = tonumber(num) or 0,
+                chapter_num = host.text.chapter_num(label),
                 title = label,
                 url = href
             }
-            if iso then ch.released_at = iso end
+            if iso ~= "" then ch.released_at = iso end
             chapters[#chapters + 1] = ch
         end
     end

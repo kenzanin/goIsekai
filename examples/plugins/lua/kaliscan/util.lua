@@ -123,17 +123,19 @@ function util.parse_chapter_list(html, manga_id)
         end
         chapter_id = chapter_id:gsub("/", ":")
 
-        chapters[#chapters + 1] = {
+        local entry = {
             id = chapter_id,
             manga_id = manga_id,
             chapter_num = tonumber(number) or 0,
             title = title,
-            url = BASE .. href,
-            uploaded_at = upload_time
+            url = BASE .. href
         }
-    -- ponytail: uploaded_at field kept for completeness, sorting by date not needed
-    -- ponytail: uploaded_at (human-relative, e.g. "2 days ago") dropped:
-    -- types.Chapter wants RFC3339 time; add a parser when sorting by date matters.
+        -- The site prints a relative time ("2 days ago"); host.text knows those
+        -- as well as absolute dates. A row that still does not parse gets no
+        -- released_at key at all, since an empty one fails the ABI decode.
+        local iso = host.text.date_to_iso(upload_time)
+        if iso ~= "" then entry.released_at = iso end
+        chapters[#chapters + 1] = entry
     end
 
     -- ABI convention: newest-first (chapters[1] = newest) — the site HTML is

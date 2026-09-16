@@ -156,16 +156,25 @@ function get_chapter_list(arg)
 
     local chapters = {}
     for _, ch in ipairs(body.data) do
-        local num = ch.chapter_num or tonumber((ch.chapter_slug or ""):match("(%d+)$"))
-        if num then
-            chapters[#chapters + 1] = {
+        -- chapter_num is missing on some rows; the slug still ends in the
+        -- number, which host.text parses. A row with neither carries no usable
+        -- id or URL, so it is dropped.
+        local slug = ch.chapter_slug or ""
+        local num = ch.chapter_num or host.text.chapter_num(slug)
+        if num > 0 or slug ~= "" then
+            local entry = {
                 id = manga_id .. ":" .. (ch.chapter_slug or ("chapter-" .. num)),
                 manga_id = manga_id,
                 chapter_num = num,
                 title = ch.chapter_name or ("Chapter " .. tostring(num)),
-                url = BASE .. "/series/" .. manga_id .. "/" .. (ch.chapter_slug or ("chapter-" .. num)),
-                released_at = ch.updated_at or ""
+                url = BASE .. "/series/" .. manga_id .. "/" .. (ch.chapter_slug or ("chapter-" .. num))
             }
+            -- updated_at is an ISO timestamp or a relative phrase; the host
+            -- knows both. A row with no date gets no released_at key at all,
+            -- because an empty one fails the ABI decode of the whole list.
+            local iso = host.text.date_to_iso(ch.updated_at or "")
+            if iso ~= "" then entry.released_at = iso end
+            chapters[#chapters + 1] = entry
         end
     end
     table.sort(chapters, function(a, b) return a.chapter_num > b.chapter_num end)

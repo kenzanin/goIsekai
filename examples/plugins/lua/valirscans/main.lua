@@ -44,18 +44,18 @@ local http_get = host.http.get
 function jsonld_book(html)
     local i = 1
     while true do
-        local s, e = string.find(html, '<script type="application/ld%+json">', i)
+        local s = string.find(html, '<script type="application/ld%+json">', i)
         if not s then return nil end
-        local e2 = string.find(html, '</script>', e + 1)
-        if not e2 then return nil end
-        local chunk = html:sub(e + 1, e2 - 1)
-        if string.find(chunk, '"@type"%s*:%s*"Book"', 1) then
-            local ok, obj = pcall(host.json.decode, chunk)
-            if ok and type(obj) == "table" then
+        -- The page carries several ld+json blocks; host.text.json_blob returns
+        -- one balanced object without tripping over braces inside strings.
+        local raw = host.text.json_blob(html:sub(s), "application/ld+json")
+        if raw ~= "" then
+            local ok, obj = pcall(host.json.decode, raw)
+            if ok and type(obj) == "table" and obj["@type"] == "Book" then
                 return obj
             end
         end
-        i = e2 + 1
+        i = s + 1
     end
 end
 

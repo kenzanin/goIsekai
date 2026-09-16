@@ -99,21 +99,6 @@ function _escapeGQL(s) {
     return s.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
 }
 
-// Normalize MangaHub's date field to an RFC3339 string (or undefined when
-// unparseable, so the key is omitted and Go keeps time.Time zero). MangaHub
-// sends either epoch seconds, epoch millis, or a parseable date string.
-function _toISO(dateVal) {
-    if (!dateVal) return undefined;
-    var ms;
-    if (typeof dateVal === "number") {
-        ms = dateVal > 1e12 ? dateVal : dateVal * 1000; // ms vs seconds
-    } else {
-        ms = Date.parse(dateVal);
-    }
-    if (isNaN(ms)) return undefined;
-    return new Date(ms).toISOString();
-}
-
 // ---------------------------------------------------------------------------
 // ABI functions
 // ---------------------------------------------------------------------------
@@ -224,7 +209,10 @@ function getChapterList(arg) {
             manga_id: slug,
             title: ch.title || ("Chapter " + ch.number),
             chapter_num: num,
-            released_at: _toISO(ch.date),
+            // MangaHub sends epoch seconds, epoch millis or a date string; the
+            // host normalizes all three. An unparseable date leaves the key
+            // out, so Go keeps time.Time zero instead of failing the decode.
+            released_at: host.text.date_to_iso(ch.date) || undefined,
             url: "https://1manga.co/" + slug + "/" + ch.number,
         });
     }
