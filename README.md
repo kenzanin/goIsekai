@@ -278,7 +278,7 @@ function search_manga(filterJson) {
 }
 ```
 
-Same ABI as Lua — `PLUGIN` metadata + PascalCase globals. `http_request` takes a JSON string, returns a JSON string. `json` is native JS. See `examples/plugins/js/mangadex/` for a complete example.
+Same ABI as Lua — `PLUGIN` metadata + PascalCase globals. `http_request` takes a JSON string, returns a JSON string. `json` is native JS. See `examples/plugins/js/mangzio/` for a complete example.
 
 ### Yaegi plugins (interpreted Go)
 
