@@ -61,11 +61,11 @@ function search_manga(arg)
     log.debug("search q=" .. query)
     -- /home?keyword= renders the plain home feed (no server-side filtering);
     -- the search modal calls /api/search?search=Q instead.
-    local resp = http_get(BASE .. "/api/search?search=" .. host.text.url_encode(query), true)
-    if not resp or resp.status ~= 200 then
+    local raw = http_get(BASE .. "/api/search?search=" .. host.text.url_encode(query), true)
+    if not raw then
         return host.json.encode({})
     end
-    local ok, data = pcall(host.json.decode, resp.body)
+    local ok, data = pcall(host.json.decode, raw)
     if not ok or not data or type(data.comics) ~= "table" then
         return host.json.encode({})
     end
@@ -87,11 +87,10 @@ end
 -- arg: '"slug.ZID"'  ->  {id, title, author, description, cover_url, genres, status}
 function get_manga_detail(arg)
     local manga_id = host.json.decode(arg)
-    local resp = http_get(BASE .. "/series/" .. manga_id)
-    if not resp or resp.status ~= 200 then
+    local html = http_get(BASE .. "/series/" .. manga_id)
+    if not html then
         return host.json.encode({id = manga_id}) -- detail must stay an OBJECT
     end
-    local html = resp.body
 
     local title = string.match(html, '<meta property="og:title" content="([^"]*)"') or ""
     title = title:gsub("^Read%s+", "")
@@ -144,11 +143,11 @@ function get_chapter_list(arg)
         return host.json.encode({})
     end
     -- JSON endpoint wants the bare slug (no .zid suffix)
-    local resp = http_get(BASE .. "/get-chapter-list?slug=" .. slug)
-    if not resp or resp.status ~= 200 then
+    local raw = http_get(BASE .. "/get-chapter-list?slug=" .. slug)
+    if not raw then
         return host.json.encode({})
     end
-    local ok, body = pcall(host.json.decode, resp.body)
+    local ok, body = pcall(host.json.decode, raw)
     if not ok or not body or not body.success or type(body.data) ~= "table" then
         log.error("get-chapter-list bad payload for " .. slug)
         return host.json.encode({})
@@ -190,11 +189,10 @@ function get_page_list(arg)
     if not manga_id or not chslug then
         return host.json.encode({})
     end
-    local resp = http_get(BASE .. "/series/" .. manga_id .. "/" .. chslug)
-    if not resp or resp.status ~= 200 then
+    local html = http_get(BASE .. "/series/" .. manga_id .. "/" .. chslug)
+    if not html then
         return host.json.encode({})
     end
-    local html = resp.body
 
     -- Page images: data-src="https://cdn1.love4awalk.xyz/{slug}/{ch}/{i}.webp"
     -- (chapter cover /thumb/ images and the discord gif don't match this shape).

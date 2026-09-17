@@ -17,7 +17,7 @@ const wantHostPayload = "a%20b|a b|&|hi|bold x|Abc|aGk=|hi|YT9i|6869|hi|" +
 	"f7bc83f430538424b13298e6aa6fb143ef4d59a14946175997479dbc2d1a3cd8|" +
 	"0206|6869|6869|aGk|6869|HjB2RwY5YAtJKGYJESc|" +
 	`12.5|7.5|{"a":[1,2]}|2026-01-02T00:00:00Z|` +
-	`{"a":1,"b":"x"}|[1,2,3]|{"a":1,"b":"x"}`
+	`{"a":1,"b":"x"}|[1,2,3]|{"a":1,"b":"x"}|true`
 
 // hostFixtureDetail copies a host-native fixture into a temp dir and returns the
 // manga detail it produces. The fixture reports the JSON natives' failure texts
@@ -70,5 +70,32 @@ func TestHostJSONFailureTextIdentical(t *testing.T) {
 		if part == "" || part == "no error" {
 			t.Fatalf("failure %d was not reported: %q", i, part)
 		}
+	}
+}
+
+// TestHTTPBodyHelper pins host.http.get_body's contract: only a 200 with a
+// usable body counts as success, so a plugin can treat nil as "the fetch
+// failed" and drop the status guard it otherwise repeats at every call site.
+// The host logs the reason, so no plugin-side status handling is needed.
+func TestHTTPBodyHelper(t *testing.T) {
+	tests := []struct {
+		name string
+		resp map[string]any
+		want string
+		ok   bool
+	}{
+		{"200 with body", map[string]any{"status": float64(200), "body": "hi"}, "hi", true},
+		{"200 with empty body", map[string]any{"status": float64(200)}, "", true},
+		{"404", map[string]any{"status": float64(404), "body": "gone"}, "", false},
+		{"transport failure", map[string]any{"status": float64(0), "error": "boom"}, "", false},
+		{"missing status", map[string]any{"body": "hi"}, "", false},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			got, ok := responseBody(tc.resp)
+			if got != tc.want || ok != tc.ok {
+				t.Fatalf("responseBody = %q, %v; want %q, %v", got, ok, tc.want, tc.ok)
+			}
+		})
 	}
 }

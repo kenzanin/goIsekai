@@ -78,12 +78,12 @@ function search_manga(arg)
     local all = {}
     local page = 1
     while true do
-        local resp = http_get(vrf_url("/titles", {keyword = query, limit = "50", page = "" .. page}))
-        if not resp or resp.status ~= 200 then
-            log.error("mangafire search: HTTP error page=" .. page)
+        local raw = http_get(vrf_url("/titles", {keyword = query, limit = "50", page = "" .. page}))
+        if not raw then
+            log.error("mangafire search: request failed page=" .. page)
             break
         end
-        local body = host.json.decode(resp.body)
+        local body = host.json.decode(raw)
         if not body then break end
         local items = body.items or {}
         if #items == 0 then break end
@@ -111,9 +111,9 @@ function get_manga_detail(arg)
 
     log.debug("mangafire detail: id=" .. hid)
 
-    local resp = http_get(vrf_url("/titles/" .. hid, nil))
-    if not resp or resp.status ~= 200 then return host.json.encode(nil) end
-    local body = host.json.decode(resp.body)
+    local raw = http_get(vrf_url("/titles/" .. hid, nil))
+    if not raw then return host.json.encode(nil) end
+    local body = host.json.decode(raw)
     if not body then return host.json.encode(nil) end
     local d = body.data
     if not d then return host.json.encode(nil) end
@@ -148,12 +148,12 @@ function get_chapter_list(arg)
     local chapters = {}
     local page = 1
     while true do
-        local resp = http_get(vrf_url("/titles/" .. hid .. "/chapters", {
+        local raw = http_get(vrf_url("/titles/" .. hid .. "/chapters", {
             language = "en", limit = "200", order = "desc",
             page = "" .. page, sort = "number",
         }))
-        if not resp or resp.status ~= 200 then break end
-        local body = host.json.decode(resp.body)
+        if not raw then break end
+        local body = host.json.decode(raw)
         if not body then break end
         local items = body.items or {}
         if #items == 0 then break end
@@ -188,9 +188,9 @@ function get_page_list(arg)
 
     log.debug("mangafire pages: chapter=" .. chapter_id)
 
-    local resp = http_get(vrf_url("/chapters/" .. chapter_id, nil))
-    if not resp or resp.status ~= 200 then return host.json.encode({}) end
-    local body = host.json.decode(resp.body)
+    local raw = http_get(vrf_url("/chapters/" .. chapter_id, nil))
+    if not raw then return host.json.encode({}) end
+    local body = host.json.decode(raw)
     if not body then return host.json.encode({}) end
     local raw_pages = (body.data and body.data.pages) or {}
     if #raw_pages == 0 then return host.json.encode({}) end

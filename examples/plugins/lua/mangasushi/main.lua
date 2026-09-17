@@ -20,24 +20,6 @@ BASE = "https://mangasushi.org"
 local trim = host.text.trim
 local unescape = host.text.unescape
 
--- The wrappers keep this site's 200-check and collapse the response to a body;
--- the request itself is shaped by the host, which also logs failures.
-local function http_post(url, body)
-    local headers = {
-        ["X-Requested-With"] = "xmlhttprequest",
-        ["Content-Type"] = "application/x-www-form-urlencoded",
-    }
-    local resp = host.http.post(url, body or "", headers)
-    if not resp or resp.status ~= 200 then return nil end
-    return resp.body
-end
-
-local function http_get(url)
-    local resp = host.http.get(url)
-    if not resp or resp.status ~= 200 then return nil end
-    return resp.body
-end
-
 -- ─── ABI: search_manga ──────────────────────────────────────────────────────
 
 function search_manga(arg)
@@ -47,7 +29,7 @@ function search_manga(arg)
 
     -- Madara GET search: admin-ajax.php returns 0 bytes, use server-rendered GET instead
     local url = BASE .. "/?s=" .. host.text.url_encode(query) .. "&post_type=wp-manga"
-    local body = http_get(url)
+    local body = host.http.get_body(url)
     if not body or body == "" then
         log.error("mangasushi search empty response")
         return host.json.encode({})
@@ -89,7 +71,7 @@ end
 
 function get_manga_detail(arg)
     local slug = host.json.decode(arg)
-    local body = http_get(BASE .. "/manga/" .. slug .. "/")
+    local body = host.http.get_body(BASE .. "/manga/" .. slug .. "/")
     if not body then return host.json.encode({id = slug}) end
 
     local detail = { id = slug, title = "", author = "", description = "",
@@ -136,7 +118,10 @@ end
 
 function get_chapter_list(arg)
     local slug = host.json.decode(arg)
-    local body = http_post(BASE .. "/manga/" .. slug .. "/ajax/chapters/", "")
+    local body = host.http.post_body(BASE .. "/manga/" .. slug .. "/ajax/chapters/", "", {
+        ["X-Requested-With"] = "xmlhttprequest",
+        ["Content-Type"] = "application/x-www-form-urlencoded",
+    })
     if not body then return host.json.encode({}) end
 
     local chapters = {}
@@ -191,7 +176,7 @@ end
 function get_page_list(arg)
     local path = host.json.decode(arg)
     path = path:gsub(":", "/")
-    local body = http_get(BASE .. "/manga/" .. path .. "/")
+    local body = host.http.get_body(BASE .. "/manga/" .. path .. "/")
     if not body then return host.json.encode({}) end
 
     local pages = {}

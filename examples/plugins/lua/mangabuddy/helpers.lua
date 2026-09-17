@@ -6,7 +6,7 @@
 -- Globals provided:
 --   normalizeStatus(s)  raw status -> canonical (Ongoing/Completed/Hiatus/
 --                       Dropped/Upcoming); unknown passes through, empty -> "unknown"
---   http_get(url, opts) GET wrapper over host.http.get with logging
+--   http_get(url, opts) GET wrapper over host.http.get_body
 --
 -- The escaping and status vocabulary live in the host (host.text.*); only the
 -- site-shaped bits stay here.
@@ -34,10 +34,10 @@ end
 
 local defaultUA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 Safari/537.36"
 
--- http_get issues GET via host.http.get, which logs transport failures and
--- non-2xx responses. Uses the global UA when the plugin set one, else
--- defaultUA; JSON calls get a Referer of BASE .. "/" unless overridden via
--- opts.referer.
+-- http_get returns the response BODY, or nil when the request failed or the
+-- server did not answer 200 (the host logs both). Uses the global UA when the
+-- plugin set one, else defaultUA; JSON calls get a Referer of BASE .. "/"
+-- unless overridden via opts.referer.
 function http_get(url, opts)
     local o = opts
     if type(o) ~= "table" then
@@ -59,5 +59,5 @@ function http_get(url, opts)
     if o.headers then
         for k, v in pairs(o.headers) do headers[k] = v end
     end
-    return host.http.get(url, headers)
+    return host.http.get_body(url, headers)
 end

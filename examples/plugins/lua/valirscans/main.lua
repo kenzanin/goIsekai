@@ -37,7 +37,7 @@ local normalizeStatus = host.text.normalize_status
 local lua_escape = host.text.lua_escape
 
 -- Thin alias for host.http.get, which logs transport failures and non-2xx.
-local http_get = host.http.get
+local http_get = host.http.get_body
 
 -- Extract the <script type="application/ld+json"> block whose decoded JSON
 -- carries "@type":"Book". Returns decoded table or nil.
@@ -77,11 +77,11 @@ function search_manga(arg)
     local args = host.json.decode(arg)
     local query = args.query or ""
     log.debug("search q=" .. query)
-    local resp = http_get(BASE .. "/api/search?q=" .. host.text.url_encode(query))
-    if not resp or resp.status ~= 200 then
+    local body = http_get(BASE .. "/api/search?q=" .. host.text.url_encode(query))
+    if not body then
         return host.json.encode({})
     end
-    local ok, data = pcall(host.json.decode, resp.body)
+    local ok, data = pcall(host.json.decode, body)
     if not ok or not data or not data.series then
         return host.json.encode({})
     end
@@ -105,11 +105,10 @@ end
 -- arg: '"urlSlug"'  ->  {id, title, author, description, cover_url, genres, status}
 function get_manga_detail(arg)
     local manga_id = host.json.decode(arg) -- plain string (urlSlug)
-    local resp = http_get(BASE .. "/series/comic/" .. manga_id)
-    if not resp or resp.status ~= 200 then
+    local html = http_get(BASE .. "/series/comic/" .. manga_id)
+    if not html then
         return host.json.encode({id = manga_id}) -- detail must stay an OBJECT
     end
-    local html = resp.body
     local detail = { id = manga_id, title = "", author = "", description = "",
                      cover_url = "", genres = {}, status = "" }
 
@@ -165,11 +164,10 @@ end
 -- Chapters are newest-first (descending number) per ABI convention.
 function get_chapter_list(arg)
     local manga_id = host.json.decode(arg)
-    local resp = http_get(BASE .. "/series/comic/" .. manga_id)
-    if not resp or resp.status ~= 200 then
+    local html = http_get(BASE .. "/series/comic/" .. manga_id)
+    if not html then
         return host.json.encode({})
     end
-    local html = resp.body
 
     -- Chapter rows are <a href="/series/comic/{slug}/chapter/{N}">; the
     -- same URL repeats for the "latest chapter" card, so dedupe by number.
@@ -207,11 +205,10 @@ function get_page_list(arg)
     if not manga_id or not num then
         return host.json.encode({})
     end
-    local resp = http_get(BASE .. "/series/comic/" .. manga_id .. "/chapter/" .. num)
-    if not resp or resp.status ~= 200 then
+    local html = http_get(BASE .. "/series/comic/" .. manga_id .. "/chapter/" .. num)
+    if not html then
         return host.json.encode({})
     end
-    local html = resp.body
 
     -- Page images are direct media.valirscans.org URLs embedded in reading
     -- order; dedupe keeps order (chapter cover can repeat via srcset).

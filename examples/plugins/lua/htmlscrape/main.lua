@@ -6,7 +6,7 @@
 -- Yaegi runtimes with the same names and the same argument order, so the
 -- lookups below port across unchanged.
 --
---   local doc = host.html.parse(resp.body)
+--   local doc = host.html.parse(host.http.get_body(url))
 --   host.html.find_text(doc, "h1.title")            first match text (trimmed)
 --   host.html.find_attr(doc, "img.cover", "src")    first match attribute
 --   host.html.find_list_text(doc, "a.chapter")      every match, document order
@@ -49,15 +49,14 @@ end
 
 -- fetch returns a parsed document handle, or nil when the request failed.
 local function fetch(url)
-    local resp = host.http.get(url, {
+    local body = host.http.get_body(url, {
         ["User-Agent"] = "Mozilla/5.0 (compatible; goIsekai-plugin/1.0)",
         ["Accept"] = "text/html,application/xhtml+xml",
     })
-    if not resp or resp.status ~= 200 then
-        log.warn("htmlscrape: GET " .. url .. " -> " .. tostring(resp and resp.status))
+    if not body then
         return nil
     end
-    return host.html.parse(resp.body)
+    return host.html.parse(body)
 end
 
 -- ─── ABI: search_manga(arg) ────────────────────────────────────────────────

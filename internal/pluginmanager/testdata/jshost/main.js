@@ -33,6 +33,8 @@ function payload() {
     host.json.encode(host.json.decode('{"b":"x","a":1}')),
     host.json.encode(host.json.decode("[1,2,3]")),
     host.json.encode({a: 1, b: "x"}),
+    // get_body reports every failure mode as null, transport errors included.
+    String(host.http.get_body("http://127.0.0.1:1/") === null),
   ].join("|");
 }
 

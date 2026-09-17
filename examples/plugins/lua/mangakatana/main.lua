@@ -54,12 +54,7 @@ end
 
 -- get returns the response body, or nil when the request failed.
 local function get(url)
-    local resp = host.http.get(url, HEADERS)
-    if not resp or resp.status ~= 200 then
-        log.warn("mangakatana: GET " .. url .. " -> " .. tostring(resp and resp.status))
-        return nil
-    end
-    return resp.body
+    return host.http.get_body(url, HEADERS)
 end
 
 local function doc_for(url)

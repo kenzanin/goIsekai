@@ -25,20 +25,20 @@ function search_manga(arg)
     log.debug("search q=" .. query)
 
     -- Fetch page 1 to discover total pages, then loop all pages.
-    local resp = host.http.get("https://kaliscan.io/search?q=" .. host.text.url_encode(query) .. "&page=1")
-    if not resp or resp.status ~= 200 then
+    local body = host.http.get_body(BASE .. "/search?q=" .. host.text.url_encode(query) .. "&page=1")
+    if not body then
         return host.json.encode({})
     end
-    local first = util.parse_search(resp.body)
+    local first = util.parse_search(body)
     local all = first.results
     local max_page = first.total or 1
 
     for p = 2, max_page do
-        local presp = host.http.get("https://kaliscan.io/search?q=" .. host.text.url_encode(query) .. "&page=" .. tostring(p))
-        if not presp or presp.status ~= 200 then
+        local page_body = host.http.get_body(BASE .. "/search?q=" .. host.text.url_encode(query) .. "&page=" .. tostring(p))
+        if not page_body then
             break
         end
-        local page_results = util.parse_search(presp.body).results
+        local page_results = util.parse_search(page_body).results
         if #page_results == 0 then
             break
         end
@@ -55,23 +55,23 @@ end
 -- Returns: {id, title, author, description, cover_url, genres, status}
 function get_manga_detail(arg)
     local manga_id = host.json.decode(arg) -- yields a plain string
-    local resp = host.http.get("https://kaliscan.io/manga/" .. manga_id)
-    if not resp or resp.status ~= 200 then
+    local body = host.http.get_body(BASE .. "/manga/" .. manga_id)
+    if not body then
         -- empty table encodes as []; detail must stay an OBJECT — emit {id} only
         return host.json.encode({id = manga_id})
     end
-    return host.json.encode(util.parse_manga_detail(resp.body, manga_id))
+    return host.json.encode(util.parse_manga_detail(body, manga_id))
 end
 
 -- get_chapter_list(arg) — arg is a JSON-encoded plain string (e.g. '"104-love-shuttle"')
 -- Returns: array of {id, number, title, uploaded_at}
 function get_chapter_list(arg)
     local manga_id = host.json.decode(arg) -- yields a plain string
-    local resp = host.http.get("https://kaliscan.io/manga/" .. manga_id)
-    if not resp or resp.status ~= 200 then
+    local body = host.http.get_body(BASE .. "/manga/" .. manga_id)
+    if not body then
         return host.json.encode({})
     end
-    return host.json.encode(util.parse_chapter_list(resp.body, manga_id))
+    return host.json.encode(util.parse_chapter_list(body, manga_id))
 end
 
 -- get_page_list(arg) — arg is a JSON-encoded plain string (e.g. '"104-love-shuttle/chapter-98"')
@@ -80,23 +80,23 @@ function get_page_list(arg)
     local chapter_path = host.json.decode(arg) -- e.g. "SLUG:chapter-98"
     chapter_path = chapter_path:gsub(":", "/") -- restore real path
     -- Step 1: fetch the chapter page to extract the numeric chapterId
-    local resp = host.http.get("https://kaliscan.io/manga/" .. chapter_path)
-    if not resp or resp.status ~= 200 then
+    local body = host.http.get_body(BASE .. "/manga/" .. chapter_path)
+    if not body then
         return host.json.encode({})
     end
-    local chapter_id = string.match(resp.body, "chapterId%s*=%s*(%d+)")
+    local chapter_id = string.match(body, "chapterId%s*=%s*(%d+)")
     if not chapter_id then
         return host.json.encode({})
     end
     -- Step 2: fetch page images from the chapter server (requires Referer)
-    local api_url = "https://kaliscan.io/service/backend/chapterServer/?server_id=1&chapter_id=" .. chapter_id
-    local img_resp = host.http.get(api_url, {
-        ["Referer"] = "https://kaliscan.io/manga/" .. chapter_path,
+    local api_url = BASE .. "/service/backend/chapterServer/?server_id=1&chapter_id=" .. chapter_id
+    local img_body = host.http.get_body(api_url, {
+        ["Referer"] = BASE .. "/manga/" .. chapter_path,
         ["X-Requested-With"] = "XMLHttpRequest"
     })
-    if not img_resp or img_resp.status ~= 200 then
+    if not img_body then
         return host.json.encode({})
     end
-    return host.json.encode(util.parse_page_list(img_resp.body, "https://kaliscan.io/manga/" .. chapter_path))
+    return host.json.encode(util.parse_page_list(img_body, BASE .. "/manga/" .. chapter_path))
 end
 

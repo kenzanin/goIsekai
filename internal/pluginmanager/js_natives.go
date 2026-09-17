@@ -85,6 +85,12 @@ func registerJSHostNatives(vm *goja.Runtime, m *Manager, id string) error {
 	if err := httpObj.Set("post", jsHttpPost(vm, m, id)); err != nil {
 		return err
 	}
+	if err := httpObj.Set("get_body", jsHTTPGetBody(vm, m, id)); err != nil {
+		return err
+	}
+	if err := httpObj.Set("post_body", jsHTTPPostBody(vm, m, id)); err != nil {
+		return err
+	}
 	if err := host.Set("http", httpObj); err != nil {
 		return err
 	}
@@ -92,75 +98,99 @@ func registerJSHostNatives(vm *goja.Runtime, m *Manager, id string) error {
 	return vm.Set("host", host)
 }
 
-// jsHttpGet wraps host.http.get(url, headers?) → {status, headers, body}.
-func jsHttpGet(vm *goja.Runtime, m *Manager, id string) func(goja.FunctionCall) goja.Value {
+// jsHTTPHeaders reads an http native's optional trailing object argument.
+func jsHTTPHeaders(vm *goja.Runtime, call goja.FunctionCall, index int) any {
+	if len(call.Arguments) <= index {
+		return nil
+	}
+	arg := call.Arguments[index]
+	if arg.SameAs(goja.Undefined()) || arg.SameAs(goja.Null()) {
+		return nil
+	}
+	obj := arg.ToObject(vm)
+	m := make(map[string]any, len(obj.Keys()))
+	for _, key := range obj.Keys() {
+		m[key] = obj.Get(key).Export()
+	}
+	return m
+}
+
+// jsHTTPRequest runs one proxied request and decodes the response object.
+func jsHTTPRequest(m *Manager, id, method, url, body string, headers any) (map[string]any, error) {
+	req := map[string]any{"url": url, "method": method}
+	if body != "" {
+		req["body"] = body
+	}
+	if headers != nil {
+		req["headers"] = headers
+	}
+	reqJSON, err := json.Marshal(req)
+	if err != nil {
+		return nil, err
+	}
+	respJSON, err := m.proxy.HandleRequest(id, string(reqJSON))
+	if err != nil {
+		return nil, err
+	}
+	var resp map[string]any
+	if err := json.Unmarshal([]byte(respJSON), &resp); err != nil {
+		return nil, err
+	}
+	return resp, nil
+}
+
+// jsHTTPFn builds one host.http native, mirroring the Lua runtime. The _body
+// variants hand back only the response body, or null when the request failed or
+// the server did not answer 200.
+func jsHTTPFn(vm *goja.Runtime, m *Manager, id, method string, bodyOnly bool) func(goja.FunctionCall) goja.Value {
+	post := method == "POST"
 	return func(call goja.FunctionCall) goja.Value {
 		url := call.Arguments[0].String()
-		var headers any
-		if len(call.Arguments) > 1 {
-			arg := call.Arguments[1]
-			if !arg.SameAs(goja.Undefined()) && !arg.SameAs(goja.Null()) {
-				obj := arg.ToObject(vm)
-				m := make(map[string]any)
-				for _, key := range obj.Keys() {
-					m[key] = obj.Get(key).Export()
-				}
-				headers = m
+		body := ""
+		headersIndex := 1
+		if post {
+			headersIndex = 2
+			if len(call.Arguments) > 1 {
+				body = call.Arguments[1].String()
 			}
 		}
-		req := map[string]any{"url": url, "method": "GET"}
-		if headers != nil {
-			req["headers"] = headers
+		resp, err := jsHTTPRequest(m, id, method, url, body, jsHTTPHeaders(vm, call, headersIndex))
+		if bodyOnly {
+			// Null covers both a transport failure and a non-200 answer, so a
+			// plugin can treat one nil check as "the fetch failed".
+			if err != nil {
+				return goja.Null()
+			}
+			if text, ok := responseBody(resp); ok {
+				return vm.ToValue(text)
+			}
+			return goja.Null()
 		}
-		reqJSON, err := json.Marshal(req)
-		if err != nil {
-			panic(vm.NewGoError(err))
-		}
-		respJSON, err := m.proxy.HandleRequest(id, string(reqJSON))
 		if err != nil {
 			return vm.ToValue(map[string]any{"status": 0, "body": err.Error()})
 		}
-		var respVal any
-		if err := json.Unmarshal([]byte(respJSON), &respVal); err != nil {
-			return vm.ToValue(map[string]any{"status": 0, "body": err.Error()})
-		}
-		return vm.ToValue(respVal)
+		return vm.ToValue(resp)
 	}
+}
+
+// jsHttpGet wraps host.http.get(url, headers?) → {status, headers, body}.
+func jsHttpGet(vm *goja.Runtime, m *Manager, id string) func(goja.FunctionCall) goja.Value {
+	return jsHTTPFn(vm, m, id, "GET", false)
 }
 
 // jsHttpPost wraps host.http.post(url, body, headers?) → {status, headers, body}.
 func jsHttpPost(vm *goja.Runtime, m *Manager, id string) func(goja.FunctionCall) goja.Value {
-	return func(call goja.FunctionCall) goja.Value {
-		url := call.Arguments[0].String()
-		body := call.Arguments[1].String()
-		var headers any
-		if len(call.Arguments) > 2 {
-			arg := call.Arguments[2]
-			if !arg.SameAs(goja.Undefined()) && !arg.SameAs(goja.Null()) {
-				obj := arg.ToObject(vm)
-				m := make(map[string]any)
-				for _, key := range obj.Keys() {
-					m[key] = obj.Get(key).Export()
-				}
-				headers = m
-			}
-		}
-		req := map[string]any{"url": url, "method": "POST", "body": body}
-		if headers != nil {
-			req["headers"] = headers
-		}
-		reqJSON, err := json.Marshal(req)
-		if err != nil {
-			panic(vm.NewGoError(err))
-		}
-		respJSON, err := m.proxy.HandleRequest(id, string(reqJSON))
-		if err != nil {
-			return vm.ToValue(map[string]any{"status": 0, "body": err.Error()})
-		}
-		var respVal any
-		if err := json.Unmarshal([]byte(respJSON), &respVal); err != nil {
-			return vm.ToValue(map[string]any{"status": 0, "body": err.Error()})
-		}
-		return vm.ToValue(respVal)
-	}
+	return jsHTTPFn(vm, m, id, "POST", false)
+}
+
+// jsHTTPGetBody wraps host.http.get_body(url, headers?) → body, or null on a
+// failed request or a non-200 response.
+func jsHTTPGetBody(vm *goja.Runtime, m *Manager, id string) func(goja.FunctionCall) goja.Value {
+	return jsHTTPFn(vm, m, id, "GET", true)
+}
+
+// jsHTTPPostBody wraps host.http.post_body(url, body, headers?) → body, or null
+// on a failed request or a non-200 response.
+func jsHTTPPostBody(vm *goja.Runtime, m *Manager, id string) func(goja.FunctionCall) goja.Value {
+	return jsHTTPFn(vm, m, id, "POST", true)
 }

@@ -32,12 +32,12 @@ function search_manga(arg)
     end
 
     local url = BASE .. "/Find/" .. host.text.url_encode(query)
-    local resp = host.http.get(url)
-    if not resp or resp.status ~= 200 then
+    local body = host.http.get_body(url)
+    if not body then
         return host.json.encode({})
     end
 
-    local results = util.parse_search(resp.body)
+    local results = util.parse_search(body)
     log.debug("mangafreak search: found " .. #results .. " results for q=" .. query)
     return host.json.encode(results)
 end
@@ -49,11 +49,11 @@ end
 
 function get_manga_detail(arg)
     local manga_id = host.json.decode(arg)
-    local resp = host.http.get(BASE .. "/Manga/" .. manga_id)
-    if not resp or resp.status ~= 200 then
+    local body = host.http.get_body(BASE .. "/Manga/" .. manga_id)
+    if not body then
         return host.json.encode({ id = manga_id })
     end
-    return host.json.encode(util.parse_manga_detail(resp.body, manga_id))
+    return host.json.encode(util.parse_manga_detail(body, manga_id))
 end
 
 -- ─── ABI: get_chapter_list ─────────────────────────────────────────────────
@@ -64,11 +64,11 @@ end
 
 function get_chapter_list(arg)
     local manga_id = host.json.decode(arg)
-    local resp = host.http.get(BASE .. "/Manga/" .. manga_id)
-    if not resp or resp.status ~= 200 then
+    local body = host.http.get_body(BASE .. "/Manga/" .. manga_id)
+    if not body then
         return host.json.encode({})
     end
-    local chapters = util.parse_chapter_list(resp.body, manga_id)
+    local chapters = util.parse_chapter_list(body, manga_id)
     log.debug("mangafreak chapters slug=" .. manga_id .. " count=" .. tostring(#chapters))
     return host.json.encode(chapters)
 end
@@ -83,11 +83,11 @@ function get_page_list(arg)
     -- Extract Read1_ path from "SLUG:Read1_SLUG_CHNUM"
     local _, _, ch_path = chapter_id:find(":(.+)$")
     local url = BASE .. "/Read1_" .. ch_path
-    local resp = host.http.get(url)
-    if not resp or resp.status ~= 200 then
+    local body = host.http.get_body(url)
+    if not body then
         return host.json.encode({})
     end
-    local pages = util.parse_page_list(resp.body)
+    local pages = util.parse_page_list(body)
     log.debug("mangafreak pages " .. chapter_id .. " count=" .. tostring(#pages))
     return host.json.encode(pages)
 end

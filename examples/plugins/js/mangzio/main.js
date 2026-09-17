@@ -75,13 +75,11 @@ function searchManga(arg) {
 
     // Mangzio search is server-rendered at /en?q={query}
     // All results are on the first page; pagination not supported by the site.
-    var resp = host.http.get(BASE + "/en?q=" + encodeURIComponent(query));
-    if (!resp || resp.status !== 200) {
-        log.error("mangzio search: HTTP " + (resp ? resp.status : "null"));
+    var html = host.http.get_body(BASE + "/en?q=" + encodeURIComponent(query));
+    if (html === null) {
+        log.error("mangzio search: request failed");
         return JSON.stringify([]);
     }
-
-    var html = resp.body;
     var chunks = extractRSCChunks(html);
     var results = [];
 
@@ -132,13 +130,11 @@ function getMangaDetail(arg) {
     var slug = JSON.parse(arg);
     log.info("mangzio detail: slug=" + slug);
 
-    var resp = host.http.get(BASE + "/en/" + encodeURIComponent(slug));
-    if (!resp || resp.status !== 200) {
-        log.error("mangzio detail: HTTP " + (resp ? resp.status : "null"));
+    var html = host.http.get_body(BASE + "/en/" + encodeURIComponent(slug));
+    if (html === null) {
+        log.error("mangzio detail: request failed");
         return JSON.stringify(null);
     }
-
-    var html = resp.body;
     var chunks = extractRSCChunks(html);
 
     // Find the manga object with the full metadata
@@ -172,13 +168,11 @@ function getChapterList(arg) {
     var slug = JSON.parse(arg);
     log.info("mangzio chapters: slug=" + slug);
 
-    var resp = host.http.get(BASE + "/en/" + encodeURIComponent(slug));
-    if (!resp || resp.status !== 200) {
-        log.error("mangzio chapters: HTTP " + (resp ? resp.status : "null"));
+    var html = host.http.get_body(BASE + "/en/" + encodeURIComponent(slug));
+    if (html === null) {
+        log.error("mangzio chapters: request failed");
         return JSON.stringify([]);
     }
-
-    var html = resp.body;
     var chunks = extractRSCChunks(html);
     // Concatenate all chunks — the chapters array may span chunk boundaries
     var combined = chunks.join("");
@@ -221,13 +215,11 @@ function getPageList(arg) {
     log.info("mangzio pages: slug=" + slug + " ch=" + chapterNum);
 
     var chapterURL = BASE + "/en/" + slug + "-en-chapter-" + chapterNum;
-    var resp = host.http.get(chapterURL);
-    if (!resp || resp.status !== 200) {
-        log.error("mangzio pages: HTTP " + (resp ? resp.status : "null"));
+    var html = host.http.get_body(chapterURL);
+    if (html === null) {
+        log.error("mangzio pages: request failed");
         return JSON.stringify([]);
     }
-
-    var html = resp.body;
     var chunks = extractRSCChunks(html);
 
     // Find pageImageUrls array in the RSC data
