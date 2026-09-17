@@ -109,11 +109,14 @@ func (s *AppService) GetImage(pluginID, url string, headers map[string]string, m
 	s.imageMu.Unlock()
 
 	// L2 cache: write to disk, converting to the configured format. Covers
-	// (mangaID empty) are also downscaled. Fail-open: unconvertible bytes are
-	// stored as-is under .img.
+	// (mangaID empty) are also downscaled. Only a real page is ever enhanced:
+	// requiring both ids excludes covers, library thumbnails, and anything else
+	// that is not a chapter image. Fail-open: unconvertible bytes are stored
+	// as-is under .img.
 	if base := s.diskCachePath(pluginID, mangaID, chapterID, url); base != "" {
 		if err := os.MkdirAll(filepath.Dir(base), 0o755); err == nil {
-			data, converted := encodeForCache(body, s.imgFormat, mangaID == "", s.coverMaxDim)
+			enhance := mangaID != "" && chapterID != "" && s.enhance.modeFor(pluginID) == EnhanceAuto
+			data, converted := encodeForCache(body, s.imgFormat, mangaID == "", s.coverMaxDim, enhance)
 			ext := ".img"
 			if converted {
 				ext = s.imgFormat.extension()

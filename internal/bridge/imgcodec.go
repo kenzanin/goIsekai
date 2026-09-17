@@ -49,13 +49,14 @@ func (f ImageFormat) extension() string {
 func (f ImageFormat) FormatExtension() string { return f.extension() }
 
 // encodeForCache converts data to the configured format, downscaling covers
-// (cover is non-empty) so neither side exceeds maxDim. It returns the bytes to
+// (cover is non-empty) so neither side exceeds maxDim, and, when enhance is set,
+// rewriting greyscale pages through enhanceScan first. It returns the bytes to
 // store and whether they differ from the input.
 //
 // Fail-open by design: gif input, undecodable bytes, and encode errors all keep
 // the original bytes, because a cache that silently drops images is worse than
 // one that stores a few large files. A malformed maxDim is ignored the same way.
-func encodeForCache(data []byte, format ImageFormat, cover bool, maxDim int) ([]byte, bool) {
+func encodeForCache(data []byte, format ImageFormat, cover bool, maxDim int, enhance bool) ([]byte, bool) {
 	if format == FormatOriginal || bytes.HasPrefix(data, []byte("GIF8")) {
 		return data, false
 	}
@@ -79,6 +80,11 @@ func encodeForCache(data []byte, format ImageFormat, cover bool, maxDim int) ([]
 	}
 	if b := src.Bounds(); cover && needsDownscale(b.Dx(), b.Dy(), maxDim) {
 		src = imaging.Fit(src, maxDim, maxDim, imaging.Lanczos)
+	}
+	// Colour pages are never enhanced. Deciding here, before the pipeline runs,
+	// means the bytes cannot be touched twice: the original is what gets encoded.
+	if enhance && !isColourPage(src) {
+		src = enhanceScan(src)
 	}
 
 	var buf bytes.Buffer

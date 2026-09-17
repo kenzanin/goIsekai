@@ -229,3 +229,57 @@ func TestImageCacheOriginalFormatStoresSourceBytes(t *testing.T) {
 		t.Error("original format should store the source bytes untouched")
 	}
 }
+
+// jpegBytes encodes img as jpeg, the format the manga sources actually serve.
+func jpegBytes(t *testing.T, img image.Image) []byte {
+	t.Helper()
+	var buf bytes.Buffer
+	if err := jpeg.Encode(&buf, img, nil); err != nil {
+		t.Fatalf("jpeg.Encode: %v", err)
+	}
+	return buf.Bytes()
+}
+
+// TestImageCacheEnhanceScope pins exactly which requests the enhancement
+// pipeline is allowed to touch. The blast radius has to stay at "a chapter page
+// from a plugin that did not opt out": covers, library thumbnails, and opted-out
+// plugins all have to come out byte-identical to the plain encoding.
+func TestImageCacheEnhanceScope(t *testing.T) {
+	auto := enhanceConfig{defaultMode: EnhanceAuto, byPlugin: map[string]EnhanceMode{"opted-out": EnhanceOff}}
+	for _, tc := range []struct {
+		name               string
+		pluginID           string
+		mangaID, chapterID string
+		enhance            enhanceConfig
+		wantEnhanced       bool
+	}{
+		{"chapter page", "plugin-x", "m1", "c1", auto, true},
+		{"cover has no chapter id", "plugin-x", "m1", "", auto, false},
+		{"thumbnail has no manga id", "plugin-x", "", "", auto, false},
+		{"plugin opted out", "opted-out", "m1", "c1", auto, false},
+		{"enhancement off", "plugin-x", "m1", "c1", enhanceConfig{defaultMode: EnhanceOff}, false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			payload := jpegBytes(t, greyPage(300, 400))
+			// A fresh URL per case: the L1 cache is keyed by URL alone, so
+			// reusing one would skip the L2 write this test is checking.
+			url := serveImage(t, "image/jpeg", payload)
+
+			s := newTestServiceWithFormat(t, FormatWebP)
+			s.enhance = tc.enhance
+			if _, err := s.GetImage(tc.pluginID, url, nil, tc.mangaID, tc.chapterID); err != nil {
+				t.Fatalf("GetImage: %v", err)
+			}
+
+			base := s.diskCachePath(tc.pluginID, tc.mangaID, tc.chapterID, url)
+			got, err := os.ReadFile(base + ".webp")
+			if err != nil {
+				t.Fatalf("expected cached .webp file: %v", err)
+			}
+			plain, _ := encodeForCache(payload, FormatWebP, tc.mangaID == "", s.coverMaxDim, false)
+			if enhanced := !bytes.Equal(got, plain); enhanced != tc.wantEnhanced {
+				t.Errorf("enhanced = %v, want %v", enhanced, tc.wantEnhanced)
+			}
+		})
+	}
+}

@@ -88,6 +88,16 @@ type Config struct {
 	// 0 disables downscaling. Page images are never resized.
 	CoverMaxDim int
 
+	// EnhanceDefault is the scan-enhancement mode for plugins without an
+	// override in EnhancePlugins: "auto" rewrites black-and-white page images
+	// before they are cached, "off" stores the source bytes untouched. Colour
+	// pages are always skipped, whatever the mode says.
+	EnhanceDefault string
+	// EnhancePlugins overrides EnhanceDefault per plugin ID, from the
+	// `[enhance]` section of goisekai.ini where every key but "default" names
+	// a plugin.
+	EnhancePlugins map[string]string
+
 	// aliasTouched records the names a config file line already supplied, so
 	// the first line for a name replaces the built-in variants instead of
 	// appending to them.
@@ -123,6 +133,9 @@ func Default() *Config {
 
 		ImageFormat: "webp",
 		CoverMaxDim: 720,
+
+		EnhanceDefault: "auto",
+		EnhancePlugins: map[string]string{},
 	}
 	c.CacheDir = filepath.Join(c.DataDir, "cache")
 	c.InfoDir = filepath.Join(c.DataDir, "info")
@@ -152,6 +165,7 @@ func (c *Config) Save(path string) error {
 	fmt.Fprintf(&b, "api_key = %s\n", c.APIKey)
 	fmt.Fprintf(&b, "image_format = %s\n", c.ImageFormat)
 	fmt.Fprintf(&b, "cover_max_dim = %d\n", c.CoverMaxDim)
+	writeEnhanceSection(&b, c.EnhanceDefault, c.EnhancePlugins)
 	fmt.Fprintf(&b, "\n[network]\n")
 	fmt.Fprintf(&b, "user_agent = %s\n", c.UserAgent)
 	fmt.Fprintf(&b, "accept_language = %s\n", c.AcceptLanguage)
@@ -182,5 +196,24 @@ func writeAliasSection(b *strings.Builder, section string, aliases map[string][]
 	fmt.Fprintf(b, "\n[%s]\n", section)
 	for _, name := range names {
 		fmt.Fprintf(b, "%s = %s\n", name, strings.Join(aliases[name], ", "))
+	}
+}
+
+// writeEnhanceSection emits the `[enhance]` block: the global default first,
+// then every per-plugin override sorted, so a rewrite of the file (the settings
+// page does one) preserves hand-written overrides instead of dropping them.
+func writeEnhanceSection(b *strings.Builder, def string, plugins map[string]string) {
+	if def == "" {
+		def = "auto"
+	}
+	fmt.Fprintf(b, "\n[enhance]\n")
+	fmt.Fprintf(b, "default = %s\n", def)
+	names := make([]string, 0, len(plugins))
+	for name := range plugins {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	for _, name := range names {
+		fmt.Fprintf(b, "%s = %s\n", name, plugins[name])
 	}
 }

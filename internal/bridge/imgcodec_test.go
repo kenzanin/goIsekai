@@ -37,7 +37,7 @@ func validJPEG(t *testing.T, w, h int) []byte {
 
 func TestEncodeForCacheCoverDownscales(t *testing.T) {
 	// "Fit" scales the longer side down to maxDim and keeps the aspect ratio.
-	got, converted := encodeForCache(validJPEG(t, 900, 1400), FormatWebP, true, 720)
+	got, converted := encodeForCache(validJPEG(t, 900, 1400), FormatWebP, true, 720, false)
 	if !converted {
 		t.Fatal("expected conversion")
 	}
@@ -51,7 +51,7 @@ func TestEncodeForCacheCoverDownscales(t *testing.T) {
 }
 
 func TestEncodeForCachePageNotResized(t *testing.T) {
-	got, _ := encodeForCache(validJPEG(t, 900, 1400), FormatWebP, false, 720)
+	got, _ := encodeForCache(validJPEG(t, 900, 1400), FormatWebP, false, 720, false)
 	cfg, err := webpConfig(got)
 	if err != nil {
 		t.Fatalf("decode webp config: %v", err)
@@ -62,7 +62,7 @@ func TestEncodeForCachePageNotResized(t *testing.T) {
 }
 
 func TestEncodeForCacheSmallCoverLeftAlone(t *testing.T) {
-	got, _ := encodeForCache(validJPEG(t, 300, 400), FormatWebP, true, 720)
+	got, _ := encodeForCache(validJPEG(t, 300, 400), FormatWebP, true, 720, false)
 	cfg, err := webpConfig(got)
 	if err != nil {
 		t.Fatalf("decode webp config: %v", err)
@@ -73,7 +73,7 @@ func TestEncodeForCacheSmallCoverLeftAlone(t *testing.T) {
 }
 
 func TestEncodeForCacheAvif(t *testing.T) {
-	got, converted := encodeForCache(validJPEG(t, 900, 1400), FormatAVIF, true, 720)
+	got, converted := encodeForCache(validJPEG(t, 900, 1400), FormatAVIF, true, 720, false)
 	if !converted {
 		t.Fatal("expected conversion to avif")
 	}
@@ -90,7 +90,7 @@ func TestEncodeForCacheAvif(t *testing.T) {
 }
 
 func TestEncodeForCacheJXL(t *testing.T) {
-	got, converted := encodeForCache(validJPEG(t, 900, 1400), FormatJXL, true, 720)
+	got, converted := encodeForCache(validJPEG(t, 900, 1400), FormatJXL, true, 720, false)
 	if !converted {
 		t.Fatal("expected conversion to jxl")
 	}
@@ -113,8 +113,8 @@ func TestEncodeForCacheJXL(t *testing.T) {
 }
 
 func TestEncodeForCacheDoesNotReEncodeJXL(t *testing.T) {
-	once, _ := encodeForCache(validJPEG(t, 400, 600), FormatJXL, true, 0)
-	twice, converted := encodeForCache(once, FormatJXL, true, 0)
+	once, _ := encodeForCache(validJPEG(t, 400, 600), FormatJXL, true, 0, false)
+	twice, converted := encodeForCache(once, FormatJXL, true, 0, false)
 	if converted {
 		t.Error("jxl input under jxl format should not be re-encoded")
 	}
@@ -125,7 +125,7 @@ func TestEncodeForCacheDoesNotReEncodeJXL(t *testing.T) {
 
 func TestEncodeForCacheOriginalFormatUntouched(t *testing.T) {
 	src := validJPEG(t, 900, 1400)
-	got, converted := encodeForCache(src, FormatOriginal, true, 720)
+	got, converted := encodeForCache(src, FormatOriginal, true, 720, false)
 	if converted {
 		t.Error("original format should never report conversion")
 	}
@@ -148,7 +148,7 @@ func TestEncodeForCacheGifAndGarbagePassThrough(t *testing.T) {
 		if tc.name == "avif mode, gif input" {
 			format = FormatAVIF
 		}
-		got, converted := encodeForCache(tc.in, format, true, 720)
+		got, converted := encodeForCache(tc.in, format, true, 720, false)
 		if converted {
 			t.Errorf("%s: reported conversion", tc.name)
 		}
@@ -159,8 +159,8 @@ func TestEncodeForCacheGifAndGarbagePassThrough(t *testing.T) {
 }
 
 func TestEncodeForCacheDoesNotReEncodeSameFormat(t *testing.T) {
-	once, _ := encodeForCache(validJPEG(t, 400, 600), FormatWebP, true, 720)
-	twice, converted := encodeForCache(once, FormatWebP, true, 720)
+	once, _ := encodeForCache(validJPEG(t, 400, 600), FormatWebP, true, 720, false)
+	twice, converted := encodeForCache(once, FormatWebP, true, 720, false)
 	if converted {
 		t.Error("webp input under webp format should not be re-encoded")
 	}
@@ -168,8 +168,8 @@ func TestEncodeForCacheDoesNotReEncodeSameFormat(t *testing.T) {
 		t.Error("re-encoding changed bytes")
 	}
 
-	avifOnce, _ := encodeForCache(validJPEG(t, 400, 600), FormatAVIF, true, 0)
-	avifTwice, converted := encodeForCache(avifOnce, FormatAVIF, true, 0)
+	avifOnce, _ := encodeForCache(validJPEG(t, 400, 600), FormatAVIF, true, 0, false)
+	avifTwice, converted := encodeForCache(avifOnce, FormatAVIF, true, 0, false)
 	if converted || !bytes.Equal(avifOnce, avifTwice) {
 		t.Error("avif input under avif format should pass through unchanged")
 	}

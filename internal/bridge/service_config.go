@@ -28,6 +28,24 @@ func loadCoverMaxDim(cfgPath string) int {
 	return cfg.CoverMaxDim
 }
 
+// loadEnhanceConfig reads the `[enhance]` section: a global mode plus per-plugin
+// overrides. config.Load already validated both against the two known modes, so
+// this only translates them. A missing INI is the documented first-run state and
+// yields the defaults; an INI that exists but cannot be read yields off, the
+// non-destructive direction for a broken config.
+func loadEnhanceConfig(cfgPath string) enhanceConfig {
+	out := enhanceConfig{defaultMode: EnhanceOff, byPlugin: map[string]EnhanceMode{}}
+	cfg, err := config.Load(cfgPath)
+	if err != nil || cfg == nil {
+		return out
+	}
+	out.defaultMode = EnhanceMode(cfg.EnhanceDefault)
+	for id, mode := range cfg.EnhancePlugins {
+		out.byPlugin[id] = EnhanceMode(mode)
+	}
+	return out
+}
+
 // loadStatusAlias reads the status alias map from the INI at cfgPath, falling
 // back to the built-in defaults when the file is missing or unreadable.
 func loadStatusAlias(cfgPath string) map[string][]string {

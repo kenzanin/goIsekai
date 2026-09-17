@@ -38,6 +38,7 @@ type AppService struct {
 	statusAlias map[string][]string
 	imgFormat   ImageFormat
 	coverMaxDim int
+	enhance     enhanceConfig
 }
 
 // NewAppService returns an AppService backed by the supplied database, plugin
@@ -55,6 +56,7 @@ func NewAppService(db *database.DB, mgr *pluginmanager.Manager, proxy *hostnet.P
 		statusAlias: loadStatusAlias(cfgPath),
 		imgFormat:   loadImageFormat(cfgPath),
 		coverMaxDim: loadCoverMaxDim(cfgPath),
+		enhance:     loadEnhanceConfig(cfgPath),
 	}
 }
 

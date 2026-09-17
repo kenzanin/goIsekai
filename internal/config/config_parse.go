@@ -86,6 +86,24 @@ func Watch(path string, interval time.Duration, onChange func(*Config)) (stop fu
 	return func() { close(done) }
 }
 
+// addEnhanceMode records one `[enhance]` line. "default" sets the global mode;
+// any other key overrides it for that plugin ID. An unrecognized value is
+// ignored, so a typo leaves the previous (safer) mode in place.
+func (c *Config) addEnhanceMode(key, val string) {
+	mode := strings.ToLower(strings.TrimSpace(val))
+	if mode != "auto" && mode != "off" {
+		return
+	}
+	if strings.EqualFold(key, "default") {
+		c.EnhanceDefault = mode
+		return
+	}
+	if c.EnhancePlugins == nil {
+		c.EnhancePlugins = map[string]string{}
+	}
+	c.EnhancePlugins[strings.ToLower(key)] = mode
+}
+
 // set applies a single key=value pair under a section, normalizing the key to
 // lowercase with '-' mapped to '_' so "User-Agent" and "user_agent" both work.
 // Unknown keys and invalid integers are ignored (the default is kept).
@@ -99,6 +117,12 @@ func (c *Config) set(section, key, val string) {
 	}
 	if strings.EqualFold(section, "status") {
 		c.addStatusAlias(key, val)
+		return
+	}
+	// [enhance] is `default` plus one line per plugin ID, so it does not fit the
+	// key=field switch below.
+	if strings.EqualFold(section, "enhance") {
+		c.addEnhanceMode(key, val)
 		return
 	}
 	key = strings.ToLower(strings.ReplaceAll(key, "-", "_"))
