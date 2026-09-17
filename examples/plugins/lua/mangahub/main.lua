@@ -222,9 +222,7 @@ function get_chapter_list(arg)
             id = slug .. ":chapter-" .. tostring(ch.number),
             manga_id = slug,
             title = title,
-            -- The API sends the number as a JSON number, which the host text
-            -- helpers cannot parse because they take strings.
-            chapter_num = tonumber(ch.number) or 0,
+            chapter_num = host.text.chapter_num(ch.number),
             url = SITE_URL .. "/chapter/" .. slug .. "/chapter-" .. tostring(ch.number),
         }
         -- MangaHub sends epoch seconds, epoch millis or a date string; the host

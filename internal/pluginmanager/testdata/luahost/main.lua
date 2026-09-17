@@ -27,6 +27,7 @@ local function payload()
         {iv = 0x5A, key = "aw==", tbl = "AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8gISIjJCUmJygpKissLS4vMDEyMzQ1Njc4OTo7PD0+P0BBQkNERUZHSElKS0xNTk9QUVJTVFVWV1hZWltcXV5fYGFiY2RlZmdoaWprbG1ub3BxcnN0dXZ3eHl6e3x9fn+AgYKDhIWGh4iJiouMjY6PkJGSk5SVlpeYmZqbnJ2en6ChoqOkpaanqKmqq6ytrq+wsbKztLW2t7i5uru8vb6/wMHCw8TFxsfIycrLzM3Oz9DR0tPU1dbX2Nna29zd3t/g4eLj5OXm5+jp6uvs7e7v8PHy8/T19vf4+fr7/P3+/w=="},
     }),
     host.text.chapter_num("Vol. 3 Ch. 12.5"),
+    host.text.chapter_num(7.5),
     host.text.json_blob('<div>{"a":[1,2]}</div>', ""),
     host.text.date_to_iso("2026-01-02"),
     host.json.encode(host.json.decode('{"b":"x","a":1}')),
