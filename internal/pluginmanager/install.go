@@ -35,9 +35,7 @@ func (m *Manager) Install(dirPath string) (string, error) {
 			logger.Error("lua plugin install failed", "id", id, "error", err)
 			return "", fmt.Errorf("install lua plugin %s: %w", id, err)
 		}
-		m.plugins[id] = p
-		m.proxy.SetNeedsJS(id, p.meta.NeedsJS)
-		m.proxy.SetHTTPProfiles(id, p.meta.HTTPProfiles)
+		m.registerLoaded(id, p)
 		logger.Debug("lua plugin installed", "id", id)
 		return filepath.Join(destDir, "main.lua"), nil
 	}
@@ -58,9 +56,7 @@ func (m *Manager) Install(dirPath string) (string, error) {
 			logger.Error("js plugin install failed", "id", id, "error", err)
 			return "", fmt.Errorf("install js plugin %s: %w", id, err)
 		}
-		m.plugins[id] = p
-		m.proxy.SetNeedsJS(id, p.meta.NeedsJS)
-		m.proxy.SetHTTPProfiles(id, p.meta.HTTPProfiles)
+		m.registerLoaded(id, p)
 		logger.Debug("js plugin installed", "id", id)
 		return filepath.Join(destDir, "main.js"), nil
 	}
@@ -81,9 +77,7 @@ func (m *Manager) Install(dirPath string) (string, error) {
 			logger.Error("yaegi plugin install failed", "id", id, "error", err)
 			return "", fmt.Errorf("install yaegi plugin %s: %w", id, err)
 		}
-		m.plugins[id] = p
-		m.proxy.SetNeedsJS(id, p.meta.NeedsJS)
-		m.proxy.SetHTTPProfiles(id, p.meta.HTTPProfiles)
+		m.registerLoaded(id, p)
 		logger.Debug("yaegi plugin installed", "id", id)
 		return filepath.Join(destDir, "main.go"), nil
 	}
@@ -111,9 +105,7 @@ func (m *Manager) LoadPlugin(path string) (string, error) {
 		if err != nil {
 			return "", err
 		}
-		m.plugins[id] = p
-		m.proxy.SetNeedsJS(id, p.meta.NeedsJS)
-		m.proxy.SetHTTPProfiles(id, p.meta.HTTPProfiles)
+		m.registerLoaded(id, p)
 		logger.Info("plugin loaded (hot)", "id", id, "kind", "lua")
 		return id, nil
 	}
@@ -128,9 +120,7 @@ func (m *Manager) LoadPlugin(path string) (string, error) {
 		if err != nil {
 			return "", err
 		}
-		m.plugins[id] = p
-		m.proxy.SetNeedsJS(id, p.meta.NeedsJS)
-		m.proxy.SetHTTPProfiles(id, p.meta.HTTPProfiles)
+		m.registerLoaded(id, p)
 		logger.Info("plugin loaded (hot)", "id", id, "kind", "js")
 		return id, nil
 	}
@@ -145,9 +135,7 @@ func (m *Manager) LoadPlugin(path string) (string, error) {
 		if err != nil {
 			return "", err
 		}
-		m.plugins[id] = p
-		m.proxy.SetNeedsJS(id, p.meta.NeedsJS)
-		m.proxy.SetHTTPProfiles(id, p.meta.HTTPProfiles)
+		m.registerLoaded(id, p)
 		logger.Info("plugin loaded (hot)", "id", id, "kind", "yaegi")
 		return id, nil
 	}

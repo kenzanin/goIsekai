@@ -69,11 +69,28 @@ func (m *Manager) ensureLoaded(id string) error {
 		}
 	}
 
-	if m.onLoad != nil {
-		go m.onLoad(id)
-		go m.preconnectOnLoad(id)
-	}
+	m.notifyLoaded(id)
 	return nil
+}
+
+// registerLoaded publishes a freshly instantiated runtime into the plugin map
+// and fires the load hooks. Every eager load goes through here, so a plugin
+// that is loaded at install or reload time still has its metadata re-read.
+func (m *Manager) registerLoaded(id string, p *loadedPlugin) {
+	m.plugins[id] = p
+	m.proxy.SetNeedsJS(id, p.meta.NeedsJS)
+	m.proxy.SetHTTPProfiles(id, p.meta.HTTPProfiles)
+	m.notifyLoaded(id)
+}
+
+// notifyLoaded fires the load hooks. Each runs in its own goroutine because a
+// hook re-enters the manager, which the caller may be holding a lock on.
+func (m *Manager) notifyLoaded(id string) {
+	if m.onLoad == nil {
+		return
+	}
+	go m.onLoad(id)
+	go m.preconnectOnLoad(id)
 }
 
 // preconnectOnLoad triggers preconnect in the background after plugin lazy-load.

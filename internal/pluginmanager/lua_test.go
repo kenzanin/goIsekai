@@ -279,3 +279,31 @@ func TestUnloadPluginDoesNotDeadlock(t *testing.T) {
 		t.Fatalf("GetMangaDetail after unload: %v", err)
 	}
 }
+
+// TestReloadPluginFiresLoadHook guards the edit-then-reload workflow. Reload
+// re-reads the plugin from disk, and the onLoad hook is what re-publishes the
+// plugin's metadata to the database the plugins page renders. Skipping the hook
+// leaves the page showing the cached logo of the version just replaced.
+func TestReloadPluginFiresLoadHook(t *testing.T) {
+	dir := luaPluginsDir(t)
+	mgr := NewManager(hostnet.NewProxy(), dir)
+	if err := mgr.Discover(); err != nil {
+		t.Fatalf("Discover: %v", err)
+	}
+	defer func() { _ = mgr.Close() }()
+
+	loaded := make(chan string, 4)
+	mgr.SetOnLoad(func(id string) { loaded <- id })
+
+	if _, err := mgr.ReloadPlugin("luatest"); err != nil {
+		t.Fatalf("ReloadPlugin: %v", err)
+	}
+	select {
+	case id := <-loaded:
+		if id != "luatest" {
+			t.Fatalf("load hook fired for %q, want luatest", id)
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("ReloadPlugin skipped the load hook: metadata stays cached")
+	}
+}
