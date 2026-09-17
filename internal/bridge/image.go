@@ -116,11 +116,17 @@ func (s *AppService) GetImage(pluginID, url string, headers map[string]string, m
 	if base := s.diskCachePath(pluginID, mangaID, chapterID, url); base != "" {
 		if err := os.MkdirAll(filepath.Dir(base), 0o755); err == nil {
 			enhance := mangaID != "" && chapterID != "" && s.enhance.modeFor(pluginID) == EnhanceAuto
-			data, converted := encodeForCache(body, s.imgFormat, mangaID == "", s.coverMaxDim, enhance)
+			var stats encodeStats
+			data, converted := encodeForCache(body, s.imgFormat, mangaID == "", s.coverMaxDim, enhance, &stats)
 			ext := ".img"
 			if converted {
 				ext = s.imgFormat.extension()
 			}
+			logger.Debug("image cache: write",
+				"url", url, "plugin", pluginID, "enhance", enhance,
+				"enhance_ms", stats.enhance.Milliseconds(),
+				"convert_ms", stats.encode.Milliseconds(),
+				"in_bytes", len(body), "out_bytes", len(data), "ext", ext)
 			_ = os.WriteFile(base+ext, data, 0o644)
 		}
 	}

@@ -276,7 +276,7 @@ func TestImageCacheEnhanceScope(t *testing.T) {
 			if err != nil {
 				t.Fatalf("expected cached .webp file: %v", err)
 			}
-			plain, _ := encodeForCache(payload, FormatWebP, tc.mangaID == "", s.coverMaxDim, false)
+			plain, _ := encodeForCache(payload, FormatWebP, tc.mangaID == "", s.coverMaxDim, false, nil)
 			if enhanced := !bytes.Equal(got, plain); enhanced != tc.wantEnhanced {
 				t.Errorf("enhanced = %v, want %v", enhanced, tc.wantEnhanced)
 			}

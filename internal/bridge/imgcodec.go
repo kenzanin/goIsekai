@@ -3,6 +3,7 @@ package bridge
 import (
 	"bytes"
 	"image"
+	"time"
 
 	"github.com/disintegration/imaging"
 	"github.com/gen2brain/avif"
@@ -48,15 +49,27 @@ func (f ImageFormat) extension() string {
 // outside the codec path.
 func (f ImageFormat) FormatExtension() string { return f.extension() }
 
+// encodeStats reports where a cache write spent its time, for the caller's
+// debug log. Both fields are zero when the work they time did not happen.
+type encodeStats struct {
+	// enhance is the cleanup pipeline alone (0 when it was skipped).
+	enhance time.Duration
+	// encode is everything else: decode, cover downscale, and the re-encode.
+	encode time.Duration
+}
+
 // encodeForCache converts data to the configured format, downscaling covers
 // (cover is non-empty) so neither side exceeds maxDim, and, when enhance is set,
 // rewriting greyscale pages through enhanceScan first. It returns the bytes to
 // store and whether they differ from the input.
 //
+// stats may be nil; when it is not, it is filled with the time each stage took.
+//
 // Fail-open by design: gif input, undecodable bytes, and encode errors all keep
 // the original bytes, because a cache that silently drops images is worse than
 // one that stores a few large files. A malformed maxDim is ignored the same way.
-func encodeForCache(data []byte, format ImageFormat, cover bool, maxDim int, enhance bool) ([]byte, bool) {
+func encodeForCache(data []byte, format ImageFormat, cover bool, maxDim int, enhance bool, stats *encodeStats) ([]byte, bool) {
+	started := time.Now()
 	if format == FormatOriginal || bytes.HasPrefix(data, []byte("GIF8")) {
 		return data, false
 	}
@@ -84,7 +97,11 @@ func encodeForCache(data []byte, format ImageFormat, cover bool, maxDim int, enh
 	// Colour pages are never enhanced. Deciding here, before the pipeline runs,
 	// means the bytes cannot be touched twice: the original is what gets encoded.
 	if enhance && !isColourPage(src) {
+		mark := time.Now()
 		src = enhanceScan(src)
+		if stats != nil {
+			stats.enhance = time.Since(mark)
+		}
 	}
 
 	var buf bytes.Buffer
@@ -103,6 +120,9 @@ func encodeForCache(data []byte, format ImageFormat, cover bool, maxDim int, enh
 	}
 	if err != nil {
 		return data, false
+	}
+	if stats != nil {
+		stats.encode = time.Since(started) - stats.enhance
 	}
 	return buf.Bytes(), true
 }

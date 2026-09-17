@@ -206,8 +206,8 @@ func TestEncodeForCacheSkipsColourPage(t *testing.T) {
 		t.Fatal(err)
 	}
 	src := buf.Bytes()
-	plain, _ := encodeForCache(src, FormatWebP, false, 720, false)
-	enhanced, _ := encodeForCache(src, FormatWebP, false, 720, true)
+	plain, _ := encodeForCache(src, FormatWebP, false, 720, false, nil)
+	enhanced, _ := encodeForCache(src, FormatWebP, false, 720, true, nil)
 	if !bytes.Equal(plain, enhanced) {
 		t.Error("a colour page must not be touched by enhancement")
 	}
@@ -219,8 +219,8 @@ func TestEncodeForCacheEnhancesGreyPage(t *testing.T) {
 		t.Fatal(err)
 	}
 	src := buf.Bytes()
-	plain, _ := encodeForCache(src, FormatWebP, false, 720, false)
-	enhanced, _ := encodeForCache(src, FormatWebP, false, 720, true)
+	plain, _ := encodeForCache(src, FormatWebP, false, 720, false, nil)
+	enhanced, _ := encodeForCache(src, FormatWebP, false, 720, true, nil)
 	if bytes.Equal(plain, enhanced) {
 		t.Fatal("a grey page was not enhanced")
 	}
@@ -231,5 +231,36 @@ func TestEncodeForCacheEnhancesGreyPage(t *testing.T) {
 	r, g, b, _ := img.At(10, 10).RGBA()
 	if r != g || g != b {
 		t.Errorf("enhanced page is not greyscale: %d,%d,%d", r, g, b)
+	}
+}
+
+// TestEncodeForCacheStats checks the timings the debug log reports: the two
+// stages have to be distinguishable, or the log line is worse than useless.
+// Reading enhance is how you tell "skipped" from "ran and cost nothing".
+func TestEncodeForCacheStats(t *testing.T) {
+	grey := jpegBytes(t, greyPage(400, 600))
+	colour := jpegBytes(t, solidPage(400, 600, color.RGBA{30, 200, 90, 255}))
+	for _, tc := range []struct {
+		name         string
+		src          []byte
+		enhance      bool
+		wantEnhanced bool
+	}{
+		{"grey page", grey, true, true},
+		{"colour page", colour, true, false},
+		{"enhancement off", grey, false, false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			var stats encodeStats
+			if _, converted := encodeForCache(tc.src, FormatWebP, false, 720, tc.enhance, &stats); !converted {
+				t.Fatal("expected a converted result")
+			}
+			if stats.encode <= 0 {
+				t.Error("encode stage was not timed")
+			}
+			if gotEnhanced := stats.enhance > 0; gotEnhanced != tc.wantEnhanced {
+				t.Errorf("enhance stage timed = %v (%v), want %v", gotEnhanced, stats.enhance, tc.wantEnhanced)
+			}
+		})
 	}
 }
