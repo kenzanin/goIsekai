@@ -38,7 +38,7 @@ UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like 
 
 -- Full manga id is "{slug}.{zid}"; several endpoints want the bare slug.
 function bare_slug(manga_id)
-    return (manga_id:match("^(.-)%."))
+    return (host.regex.find(manga_id, [[^(.*?)\.]]))
 end
 
 -- Info rows on the detail page carry their value as a link target, not a
@@ -46,10 +46,10 @@ end
 -- (site-specific shape; keep the anchor scan in this plugin's main)
 function label_value(html, label, href_prefix)
     -- no ">" anchor: the label is preceded by a newline+indent in real markup
-    local pos = string.match(html, label .. "%s*</h1>()")
-    if not pos then return "" end
-    local seg = string.sub(html, pos, pos + 400)
-    return string.match(seg, 'href="' .. host.text.lua_escape(href_prefix) .. '([^"]+)"') or ""
+    local _, finish = host.regex.find_index(html, label .. [[\s*</h1>]])
+    if not finish then return "" end
+    local seg = string.sub(html, finish + 1, finish + 401)
+    return host.regex.find(seg, 'href="' .. host.regex.quote(href_prefix) .. '([^"]+)"') or ""
 end
 
 -- ─── ABI: search_manga(arg) ────────────────────────────────────────────────
@@ -91,17 +91,17 @@ function get_manga_detail(arg)
         return host.json.encode({id = manga_id}) -- detail must stay an OBJECT
     end
 
-    local title = string.match(html, '<meta property="og:title" content="([^"]*)"') or ""
-    title = title:gsub("^Read%s+", "")
-    title = title:gsub("%s*|%s*MangaBuddy%s*$", "")
-    title = title:gsub("%s+Online$", "")
-    title = title:gsub("%s+(Manga|Manhwa|Comic)$", "")
+    local title = host.regex.find(html, [[<meta property="og:title" content="([^"]*)"]]) or ""
+    title = host.regex.replace(title, [[^Read\s+]], "")
+    title = host.regex.replace(title, [[\s*\|\s*MangaBuddy\s*$]], "")
+    title = host.regex.replace(title, [[\s+Online$]], "")
     title = host.text.html_decode(title)
 
-    local cover = string.match(html, '<meta property="og:image" content="([^"]*)"') or ""
+    local cover = host.regex.find(html, [[<meta property="og:image" content="([^"]*)"]]) or ""
 
-    local desc = string.match(html, '<meta name="description" content="([^"]*)"') or ""
-    desc = desc:gsub("^Read%s+[^.]+%.%s*", ""):gsub("%s*Read the latest chapters online for free at MangaBuddy%.?%s*$", "")
+    local desc = host.regex.find(html, [[<meta name="description" content="([^"]*)"]]) or ""
+    desc = host.regex.replace(desc, [[^Read\s+[^.]+\.\s*]], "")
+    desc = host.regex.replace(desc, [[\s*Read the latest chapters online for free at MangaBuddy\.?\s*$]], "")
     desc = host.text.html_decode(desc)
 
     local status = label_value(html, "Status", "/series?status=")
@@ -110,10 +110,12 @@ function get_manga_detail(arg)
 
     local genres = {}
     local seen_g = {}
-    for g in string.gmatch(html, 'href="/genre/([a-z0-9%-]+)"') do
+    for g in host.regex.gmatch(html, [[href="/genre/([a-z0-9-]+)"]]) do
         if not seen_g[g] then
             seen_g[g] = true
-            genres[#genres + 1] = g:gsub("%-", " "):gsub("(%a)([%w']*)", function(a, b)
+            -- A per-match replacement function is the one thing the host engine
+            -- cannot take, so the word capitalisation stays a Lua gsub.
+            genres[#genres + 1] = host.regex.replace(g, "-", " "):gsub("(%a)([%w']*)", function(a, b)
                 return a:upper() .. b
             end)
         end
@@ -184,7 +186,7 @@ end
 -- arg: '"slug.ZID:N"' (chapter id from get_chapter_list)  ->  array of {url}
 function get_page_list(arg)
     local chapter_id = host.json.decode(arg) -- "slug.ZID:chapter_slug"
-    local manga_id, chslug = string.match(chapter_id, "^(.-):(.+)$")
+    local manga_id, chslug = host.regex.find(chapter_id, [[(?s)^(.*?):(.+)$]])
     if not manga_id or not chslug then
         return host.json.encode({})
     end
@@ -197,7 +199,7 @@ function get_page_list(arg)
     -- (chapter cover /thumb/ images and the discord gif don't match this shape).
     local pages = {}
     local seen = {}
-    for u in string.gmatch(html, 'data%-src="(https://cdn1%.love4awalk%.xyz/[^"]-/%d+/%d+%.webp)"') do
+    for u in host.regex.gmatch(html, [[data-src="(https://cdn1\.love4awalk\.xyz/[^"]*?/\d+/\d+\.webp)"]]) do
         if not seen[u] then
             seen[u] = true
             pages[#pages + 1] = {url = u}
