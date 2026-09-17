@@ -1,6 +1,7 @@
 -- partials/pagination.lua
 -- Numbered page navigation. Replaces partials/pagination.jet.
 -- Called as: pagination(data) -> string
+-- One order everywhere: [← Prev] 1 2 … 4 5 [Next →]
 -- data.Pagination mirrors the Go Pagination struct:
 --   { Base, Param, Current, Total, Extra, Inner, Compact }
 -- Inner (optional): raw (already-escaped) HTML rendered at the LEFT of the
@@ -12,7 +13,6 @@ local BTN_BASE = "border border-neutral-700 hover:bg-neutral-800 rounded-md px-3
 local BTN_NUM = "border border-neutral-700 hover:bg-neutral-800 text-neutral-300 rounded-md px-4 py-1.5 text-sm"
 local BTN_CURRENT = "bg-indigo-600 text-white rounded-md px-4 py-1.5 text-sm"
 local BTN_DISABLED = "border border-neutral-700 text-neutral-600 rounded-md px-3 py-1.5 text-sm opacity-50 cursor-not-allowed"
-local PAG_INFO = "text-sm text-neutral-400 px-2"
 local ELLIPSIS = "px-1.5 text-neutral-500"
 
 -- Tighter button classes for the compact (inline toolbar) variant.
@@ -74,16 +74,6 @@ return function(data)
 		emit('  <span class="' .. h(cls(BTN_DISABLED, C_DISABLED, compact)) .. '" aria-label="Previous page">← Prev</span>')
 	end
 
-	-- Page info
-	emit('  <span class="' .. h(PAG_INFO) .. '">Page ' .. tostring(p.Current) .. ' of ' .. tostring(p.Total) .. '</span>')
-
-	-- Next button with label
-	if p.Current < p.Total then
-		emit('  <a href="' .. h(pageURL(p, p.Current + 1)) .. '" class="' .. h(cls(BTN_BASE, C_BASE, compact)) .. '" aria-label="Next page">Next →</a>')
-	else
-		emit('  <span class="' .. h(cls(BTN_DISABLED, C_DISABLED, compact)) .. '" aria-label="Next page">Next →</span>')
-	end
-
 	-- Numbered pages with smart ellipsis
 	local innerStart, innerEnd = 1, p.Total
 	if p.Total > 7 then
@@ -116,6 +106,13 @@ return function(data)
 			emit('  <span class="' .. h(ELLIPSIS) .. '">…</span>')
 		end
 		emit('  <a href="' .. h(pageURL(p, p.Total)) .. '" class="' .. h(cls(BTN_NUM, C_NUM, compact)) .. '" title="Page ' .. tostring(p.Total) .. '">' .. tostring(p.Total) .. '</a>')
+	end
+
+	-- Next button with label, after the numbers: [← Prev] 1 2 … 4 5 [Next →]
+	if p.Current < p.Total then
+		emit('  <a href="' .. h(pageURL(p, p.Current + 1)) .. '" class="' .. h(cls(BTN_BASE, C_BASE, compact)) .. '" aria-label="Next page">Next →</a>')
+	else
+		emit('  <span class="' .. h(cls(BTN_DISABLED, C_DISABLED, compact)) .. '" aria-label="Next page">Next →</span>')
 	end
 
 	if compact then

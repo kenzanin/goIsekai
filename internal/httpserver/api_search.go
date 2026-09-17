@@ -16,7 +16,7 @@ type apiSearchResponse struct {
 	Page    int           `json:"page"`
 }
 
-// apiSearch mirrors viewSearch: host-side pagination with search_page_size.
+// apiSearch mirrors viewSearch: host-side pagination with searchPageSize.
 func (s *Server) apiSearch(w http.ResponseWriter, r *http.Request) {
 	q := r.URL.Query().Get("q")
 	pluginID := r.URL.Query().Get("pluginID")
@@ -39,10 +39,7 @@ func (s *Server) apiSearch(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s.service.SyncPluginMeta(pluginID)
-	pageSize := s.service.PluginMeta(pluginID).SearchPageSize
-	if pageSize <= 0 {
-		pageSize = 24
-	}
+	pageSize := searchPageSize
 	total := len(results)
 	start := min((page-1)*pageSize, total)
 	end := min(start+pageSize, total)

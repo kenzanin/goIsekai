@@ -44,6 +44,10 @@ func (s *Server) viewHistory(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+// searchPageSize is the number of results per search page. 30 fills the
+// 6-column results grid with 5 rows.
+const searchPageSize = 30
+
 // viewSearch renders the search form and, when q+pluginID are present, results.
 func (s *Server) viewSearch(w http.ResponseWriter, r *http.Request) {
 	plugins, err := s.service.ListPlugins()
@@ -70,13 +74,9 @@ func (s *Server) viewSearch(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 	}
-	pageSize := s.service.PluginMeta(pluginID).SearchPageSize
-	if pageSize <= 0 {
-		pageSize = 24
-	}
-	// Host-side pagination: plugins return ALL matching results (the search
-	// contract per plugin metadata search_page_size); slice out the requested
-	// page here so the template never renders more than one page.
+	pageSize := searchPageSize
+	// Host-side pagination: plugins return ALL matching results; slice out the
+	// requested page here so the template never renders more than one page.
 	total := len(results)
 	start := min((page-1)*pageSize, total)
 	end := min(start+pageSize, total)

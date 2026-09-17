@@ -90,21 +90,23 @@ return function(data)
 		)
 	end
 
-	local listHTML = string.format(
-		[[
-<h1 class="text-xl font-semibold mb-6">History</h1>
-<div class="divide-y divide-neutral-800">
-%s
-</div>]],
-		table.concat(rows, "\n")
-	)
-
 	local pag = ""
 	if totalPages > 1 then
 		pag = pagination({
 			Pagination = { Base = "/view/history", Param = "page", Current = page, Total = totalPages },
 		})
 	end
+
+	local listHTML = string.format(
+		[[
+<h1 class="text-xl font-semibold mb-6">History</h1>
+%s
+<div class="divide-y divide-neutral-800">
+%s
+</div>]],
+		pag,
+		table.concat(rows, "\n")
+	)
 
 	return listHTML .. pag
 end

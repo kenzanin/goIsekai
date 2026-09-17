@@ -136,8 +136,8 @@ return function(data)
 		.. '" placeholder="Manga title..." class="w-full bg-neutral-900 border border-neutral-700 rounded-md px-3 py-2 text-sm">'
 		.. '</div>'
 		.. '<button type="submit" class="bg-indigo-600 hover:bg-indigo-500 text-white rounded-md px-4 py-2 text-sm font-medium">Search</button>'
-		.. '</form>'
 		.. (topPagination ~= "" and topPagination or "")
+		.. '</form>'
 		.. resultsHTML
 		.. "\n"
 		.. noResults
