@@ -157,6 +157,81 @@ func TestRegexReplace(t *testing.T) {
 	}
 }
 
+// TestRegexFindIndex pins the string.find contract the cursor scans rely on:
+// 1-based byte offsets, inclusive end, and no match reported without an error.
+func TestRegexFindIndex(t *testing.T) {
+	const subject = `<a href="/x/">x</a><a href="/y/">y</a>`
+	const link = `href="([^"]+)"`
+
+	start, end, ok, err := RegexFindIndex(subject, link, 1)
+	if err != nil || !ok {
+		t.Fatalf("first call: ok=%v err=%v", ok, err)
+	}
+	if start != 4 || end != 13 {
+		t.Fatalf("first call = %d..%d, want 4..13", start, end)
+	}
+	if got := subject[start-1 : end]; got != `href="/x/"` {
+		t.Fatalf("first match sliced %q", got)
+	}
+
+	// Starting one past the match's first byte finds the next link, so a cursor
+	// scan advances even though the match is longer than one byte.
+	start, end, ok, err = RegexFindIndex(subject, link, start+1)
+	if err != nil || !ok {
+		t.Fatalf("second call: ok=%v err=%v", ok, err)
+	}
+	if start != 23 || end != 32 {
+		t.Fatalf("second call = %d..%d, want 23..32", start, end)
+	}
+	if got := subject[start-1 : end]; got != `href="/y/"` {
+		t.Fatalf("second match sliced %q", got)
+	}
+
+	if _, _, ok, err = RegexFindIndex(subject, link, 40); ok || err != nil {
+		t.Fatalf("past-the-end init: ok=%v err=%v", ok, err)
+	}
+	if _, _, ok, err = RegexFindIndex(subject, `nope`, 1); ok || err != nil {
+		t.Fatalf("no match should be ok=false and no error, got ok=%v err=%v", ok, err)
+	}
+	if _, _, _, err = RegexFindIndex(subject, `(`, 1); err == nil {
+		t.Fatal("want error for bad pattern")
+	}
+
+	// Byte offsets, not rune offsets: the scan position stays usable as a
+	// string.sub bound on a page holding non-ASCII text.
+	start, end, ok, err = RegexFindIndex("é<img>", `<img>`, 1)
+	if err != nil || !ok {
+		t.Fatalf("utf-8: ok=%v err=%v", ok, err)
+	}
+	if start != 3 || end != 7 {
+		t.Fatalf("utf-8 = %d..%d, want 3..7", start, end)
+	}
+}
+
+// TestRegexQuote checks a needle full of metacharacters matches itself once
+// quoted, which is what a literal search over a scraped slug needs.
+func TestRegexQuote(t *testing.T) {
+	const needle = `a+b(c)[d].jpg?x=1|2`
+	const subject = "prefix " + needle + " suffix"
+
+	quoted := RegexQuote(needle)
+	start, end, ok, err := RegexFindIndex(subject, quoted, 1)
+	if err != nil || !ok {
+		t.Fatalf("quoted needle did not match: ok=%v err=%v", ok, err)
+	}
+	if got := subject[start-1 : end]; got != needle {
+		t.Fatalf("matched %q, want %q", got, needle)
+	}
+
+	// The unquoted needle is either a compile error or matches the wrong text,
+	// never itself. If that stops holding this test has stopped proving
+	// anything and the assertion above is no longer meaningful.
+	s, e, matched, err := RegexFindIndex(subject, needle, 1)
+	if err == nil && matched && subject[s-1:e] == needle {
+		t.Fatal("unquoted needle matched itself; quote is no longer load-bearing here")
+	}
+}
+
 // TestRegexCompileIsCached checks the cache returns the identical compiled
 // pattern, so repeated plugin calls do not pay for a compile each time.
 func TestRegexCompileIsCached(t *testing.T) {

@@ -8,6 +8,7 @@ function regexPayload() {
     '<a href="/m/a/" title="A"><a href="/m/b/" title="B">',
     'href="([^"]+)" title="([^"]+)"'
   ).forEach(function (row) { rows.push(row.join(",")); });
+  var span = host.regex.find_index('<a href="/x/">', 'href="([^"]+)"');
   return [
     String(host.regex.find('chapterId = 42', 'chapterId\\s*=\\s*(\\d+)')),
     String(host.regex.find('<h1>Solo Leveling</h1>', '<h1>([^<]+)</h1>')),
@@ -15,6 +16,9 @@ function regexPayload() {
     String(host.regex.match('https://x/1.webp', '\\.(?:jpg|png)$')),
     host.regex.replace('a  b', '\\s+', ' '),
     rows.join(';'),
+    String(span[0]),
+    String(span[1]),
+    host.regex.quote('a+b'),
   ].join(',');
 }
 

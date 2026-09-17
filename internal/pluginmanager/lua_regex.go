@@ -15,6 +15,8 @@ func regexGroup(state *lua.State) *lua.Table {
 	_ = group.RawSetString("find", luaRegexFind(state))
 	_ = group.RawSetString("match", luaRegexMatch(state))
 	_ = group.RawSetString("find_all", luaRegexFindAll(state))
+	_ = group.RawSetString("find_index", luaRegexFindIndex(state))
+	_ = group.RawSetString("quote", luaRegexQuote(state))
 	_ = group.RawSetString("replace", luaRegexReplace(state))
 	return group
 }
@@ -93,6 +95,34 @@ func regexRow(state *lua.State, row []string) lua.Value {
 		_ = cells.RawSetInt(i+1, lua.String(cell))
 	}
 	return cells.Value()
+}
+
+// luaRegexFindIndex wraps host.regex.find_index(subject, pattern, init): the
+// 1-based start and end byte offsets of the first match at or after init, or nil
+// when nothing matched. It is the positional half of string.find, for the
+// cursor scans that walk markup tag by tag.
+func luaRegexFindIndex(state *lua.State) lua.Value {
+	v, _ := state.NewNativeFunction(func(frame lua.Frame) lua.Outcome {
+		subject, pattern := luaRegexArgs(frame)
+		init := 1
+		if n, ok := frame.Number(2); ok {
+			init = int(n)
+		}
+		start, end, found, err := pluginutil.RegexFindIndex(subject, pattern, init)
+		if err != nil {
+			return frame.ReturnValues(lua.Nil(), lua.String(err.Error()))
+		}
+		if !found {
+			return frame.ReturnValue(lua.Nil())
+		}
+		return frame.ReturnValues(lua.Number(float64(start)), lua.Number(float64(end)))
+	})
+	return v.Value()
+}
+
+// luaRegexQuote wraps host.regex.quote(s) -> string.
+func luaRegexQuote(state *lua.State) lua.Value {
+	return luaStr1(state, pluginutil.RegexQuote)
 }
 
 // luaRegexReplace wraps host.regex.replace(subject, pattern, repl) -> string.

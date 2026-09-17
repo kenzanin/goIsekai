@@ -105,3 +105,39 @@ func RegexReplace(subject, pattern, repl string) (string, error) {
 	}
 	return re.ReplaceAllString(subject, repl), nil
 }
+
+// RegexFindIndex mirrors Lua's string.find for a regular expression: the 1-based
+// byte offset of the first match at or after init, together with the offset of
+// the match's last byte, so a plugin can slice the match out with string.sub.
+// It reports false when nothing matches, and init below 1 starts at the first
+// byte, both matching string.find. Byte offsets (not runes) keep the indices
+// interchangeable with string.sub and string.find positions.
+//
+// ponytail: the search runs on subject[init-1:], so a leading ^ anchors to init
+// rather than to the subject. Add an absolute-anchor branch when a caller needs
+// an anchored search from a non-first position.
+func RegexFindIndex(subject, pattern string, init int) (start, end int, ok bool, err error) {
+	re, err := regexCompile(pattern)
+	if err != nil {
+		return 0, 0, false, err
+	}
+	if init < 1 {
+		init = 1
+	}
+	if init > len(subject)+1 {
+		return 0, 0, false, nil
+	}
+	m := re.FindStringIndex(subject[init-1:])
+	if m == nil {
+		return 0, 0, false, nil
+	}
+	return m[0] + init, m[1] + init - 1, true, nil
+}
+
+// RegexQuote escapes every regex metacharacter in s so it matches itself. A
+// plugin that searches for a literal needle — a user query, a scraped slug —
+// needs this; without it a query holding a bracket or a plus sign is a
+// pattern-compile error instead of a miss.
+func RegexQuote(s string) string {
+	return coregex.QuoteMeta(s)
+}

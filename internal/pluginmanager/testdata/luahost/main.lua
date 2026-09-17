@@ -11,6 +11,7 @@ local function regex_payload()
     )) do
     rows[#rows + 1] = table.concat(row, ",")
   end
+  local start, finish = host.regex.find_index('<a href="/x/">', [[href="([^"]+)"]])
   return table.concat({
     table.concat({host.regex.find("chapterId = 42", [[chapterId\s*=\s*(\d+)]])}),
     table.concat({host.regex.find("<h1>Solo Leveling</h1>", [[<h1>([^<]+)</h1>]])}),
@@ -18,6 +19,9 @@ local function regex_payload()
     tostring(host.regex.match("https://x/1.webp", [[\.(?:jpg|png)$]])),
     host.regex.replace("a  b", [[\s+]], " "),
     table.concat(rows, ";"),
+    tostring(start),
+    tostring(finish),
+    host.regex.quote("a+b"),
   }, ",")
 end
 

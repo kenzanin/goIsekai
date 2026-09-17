@@ -12,10 +12,12 @@ import (
 func regexGroupJS(vm *goja.Runtime) (*goja.Object, error) {
 	obj := vm.NewObject()
 	fns := map[string]any{
-		"find":     jsRegexFind(vm),
-		"match":    jsRegexMatch(vm),
-		"find_all": jsRegexFindAll(vm),
-		"replace":  jsRegexReplace(vm),
+		"find":       jsRegexFind(vm),
+		"match":      jsRegexMatch(vm),
+		"find_all":   jsRegexFindAll(vm),
+		"find_index": jsRegexFindIndex(vm),
+		"quote":      jsRegexQuote(vm),
+		"replace":    jsRegexReplace(vm),
 	}
 	for name, fn := range fns {
 		if err := obj.Set(name, fn); err != nil {
@@ -77,6 +79,34 @@ func jsRegexFindAll(vm *goja.Runtime) func(goja.FunctionCall) goja.Value {
 			out = append(out, row)
 		}
 		return vm.ToValue(out)
+	}
+}
+
+// jsRegexFindIndex wraps host.regex.find_index(subject, pattern, init): a
+// [start, end] pair of 1-based byte offsets, or null when nothing matched. JS
+// has no multiple return values, so the two positions arrive as one array.
+func jsRegexFindIndex(vm *goja.Runtime) func(goja.FunctionCall) goja.Value {
+	return func(call goja.FunctionCall) goja.Value {
+		subject, pattern := jsRegexArgs(call)
+		init := 1
+		if arg := call.Argument(2); !goja.IsUndefined(arg) {
+			init = int(arg.ToInteger())
+		}
+		start, end, found, err := pluginutil.RegexFindIndex(subject, pattern, init)
+		if err != nil {
+			panic(vm.NewGoError(err))
+		}
+		if !found {
+			return goja.Null()
+		}
+		return vm.ToValue([]int{start, end})
+	}
+}
+
+// jsRegexQuote wraps host.regex.quote(s) -> string.
+func jsRegexQuote(vm *goja.Runtime) func(goja.FunctionCall) goja.Value {
+	return func(call goja.FunctionCall) goja.Value {
+		return vm.ToValue(pluginutil.RegexQuote(call.Argument(0).String()))
 	}
 }
 
