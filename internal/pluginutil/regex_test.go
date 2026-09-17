@@ -232,6 +232,55 @@ func TestRegexQuote(t *testing.T) {
 	}
 }
 
+// TestRegexDotFlagControlsNewlines pins the (?s) prefix the HTML scrapers need:
+// Lua's .- stopped at a newline for free, Go's . does not, so a pattern that has
+// to span markup only works with the flag spelled out.
+func TestRegexDotFlagControlsNewlines(t *testing.T) {
+	const subject = "<div class=\"box\">\n<a href=\"/one\">One</a>\n</div>"
+
+	got, err := RegexFind(subject, `(?s)class="box">(.*?)<a href="([^"]+)">([^<]+)</a>`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := []string{"\n", "/one", "One"}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("flagged rows = %#v, want %#v", got, want)
+	}
+
+	// Without the flag the walk cannot reach past the newline, so the block
+	// silently yields nothing — the failure mode the flag exists to prevent.
+	if matched, err := RegexMatch(subject, `class="box">(.*?)<a href=`); err != nil {
+		t.Fatal(err)
+	} else if matched {
+		t.Fatal("dot crossed a newline without the (?s) flag")
+	}
+}
+
+// TestRegexEscapedBracesMatchLiterals pins the pattern shape the MangaKatana
+// scraper writes as a level-1 long string ([=[ ... ]=]): a Lua long string
+// cannot hold a backslash before ], so the pattern only survives because the
+// engine reads \[ and \] as literal braces rather than repeat syntax.
+func TestRegexEscapedBracesMatchLiterals(t *testing.T) {
+	const subject = `data[12345678] tail[9]`
+
+	tight, err := RegexFindAll(subject, `(?s)\[(.*?)\]`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := [][]string{{"12345678"}, {"9"}}
+	if !reflect.DeepEqual(tight, want) {
+		t.Fatalf("escaped braces = %#v, want %#v", tight, want)
+	}
+
+	// Unescaped, the same text is a character class followed by a stray ')',
+	// which matches nothing here. If that stops holding, the escapes above are
+	// no longer load-bearing and this test has stopped proving anything.
+	if matched, err := RegexMatch(subject, `[(.*?)]`); err != nil {
+		t.Fatal(err)
+	} else if matched {
+		t.Fatal("unescaped braces matched, so the escapes prove nothing")
+	}
+}
+
 // TestRegexCompileIsCached checks the cache returns the identical compiled
 // pattern, so repeated plugin calls do not pay for a compile each time.
 func TestRegexCompileIsCached(t *testing.T) {
