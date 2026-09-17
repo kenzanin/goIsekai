@@ -2,6 +2,7 @@ package database
 
 import (
 	"fmt"
+	"path/filepath"
 	"testing"
 )
 
@@ -231,5 +232,59 @@ func TestRebuildLibraryFTS(t *testing.T) {
 	}
 	if alt != "Alt One Alt Two" {
 		t.Fatalf("expected rebuilt alt 'Alt One Alt Two', got %q", alt)
+	}
+}
+
+// TestLibraryFTSRebuildMigration covers the repair for an index left holding
+// the old "plugin|sourceID" row keys: those can never be joined back to their
+// manga, so every library search came back empty until the index was rebuilt.
+func TestLibraryFTSRebuildMigration(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "test.db")
+
+	db, err := Open(path)
+	if err != nil {
+		t.Fatalf("Open: %v", err)
+	}
+	mangaID, err := db.UpsertManga(Manga{PluginID: "p1", SourceMangaID: "s1", Title: "Stale Index Sample", InLibrary: true})
+	if err != nil {
+		t.Fatalf("upsert manga: %v", err)
+	}
+	if _, err := db.db.Exec(`DELETE FROM library_fts`); err != nil {
+		t.Fatalf("clear fts: %v", err)
+	}
+	if _, err := db.db.Exec(`INSERT INTO library_fts (title, alt, plugin_id, manga_row_id)
+		VALUES ('Stale Index Sample', '', 'p1', 'p1|s1')`); err != nil {
+		t.Fatalf("seed stale fts: %v", err)
+	}
+	if hits, err := db.SearchLibraryFTS("stale"); err != nil || len(hits) != 0 {
+		t.Fatalf("old-format keys should match nothing, got %v (%v)", hits, err)
+	}
+	// Rewind so the rebuild migration is the next one to run.
+	if _, err := db.db.Exec(fmt.Sprintf("PRAGMA user_version = %d", libraryFTSMigration)); err != nil {
+		t.Fatalf("pin version: %v", err)
+	}
+	if err := db.Close(); err != nil {
+		t.Fatalf("close: %v", err)
+	}
+
+	db, err = Open(path)
+	if err != nil {
+		t.Fatalf("reopen: %v", err)
+	}
+	defer func() { _ = db.Close() }()
+
+	var key string
+	if err := db.db.QueryRow(`SELECT manga_row_id FROM library_fts`).Scan(&key); err != nil {
+		t.Fatalf("scan row key: %v", err)
+	}
+	if key != fmt.Sprint(mangaID) {
+		t.Fatalf("row key = %q, want %d", key, mangaID)
+	}
+	hits, err := db.SearchLibraryFTS("stale")
+	if err != nil {
+		t.Fatalf("search: %v", err)
+	}
+	if len(hits) != 1 || hits[0].SourceMangaID != "s1" {
+		t.Fatalf("search hits = %v, want the rebuilt row", hits)
 	}
 }

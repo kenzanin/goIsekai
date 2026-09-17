@@ -20,6 +20,11 @@ const authorMigration = 21
 // that switches chapters to integer surrogate keys and implements purge policies.
 const dbStorageMigration = 22
 
+// libraryFTSMigration is the index for the library_fts rebuild. The index was
+// written when a library row was keyed "plugin|sourceID", so it has to be
+// regenerated from the integer-keyed table the storage migration introduced.
+const libraryFTSMigration = 23
+
 // migrations is an ordered list of DDL statements applied in sequence.
 // Version is tracked via PRAGMA user_version; migrations[i] is applied when
 // user_version < len(migrations) so partial upgrades resume correctly.
@@ -150,4 +155,8 @@ var migrations = []string{
 	// integer surrogate keys, purge non-library chapters, dedupe read_history,
 	// prune chapter_pages for fully-read chapters, then VACUUM.
 	`/* db-storage-optimization: see migrateDbStorage */`,
+	// Index 23: library_fts still holds the "plugin|sourceID" row keys from
+	// before manga had integer primary keys, so the join that resolves a search
+	// hit back to its manga matches nothing and every search comes back empty.
+	`/* library-fts-rebuild: see migrateLibraryFTSRebuild */`,
 }

@@ -1,6 +1,7 @@
 package database
 
 import (
+	"database/sql"
 	"fmt"
 	"strings"
 )
@@ -88,16 +89,36 @@ func (d *DB) SwapMainTitle(pluginID, sourceMangaID, newTitle string) error {
 	return tx.Commit()
 }
 
+// libraryFTSIndex inserts in-library manga into library_fts: the active title,
+// the alternative titles joined into one field, and the keys search joins back
+// on. An empty mangaRowID indexes the whole library.
+const libraryFTSIndex = `INSERT INTO library_fts (title, alt, plugin_id, manga_row_id)
+	SELECT m.title, COALESCE((SELECT group_concat(title, ' ') FROM alt_titles WHERE manga_row_id = m.id), ''), m.plugin_id, m.id
+	FROM mangas m WHERE m.in_library = 1`
+
+// ftsExecer is satisfied by *sql.DB and *sql.Tx, so the same statement serves
+// the single-row re-index, the full rebuild and the migration.
+type ftsExecer interface {
+	Exec(query string, args ...any) (sql.Result, error)
+}
+
+// indexLibraryFTS indexes every in-library manga, or just mangaRowID.
+func indexLibraryFTS(x ftsExecer, mangaRowID string) error {
+	if mangaRowID == "" {
+		_, err := x.Exec(libraryFTSIndex)
+		return err
+	}
+	_, err := x.Exec(libraryFTSIndex+` AND m.id = ?`, mangaRowID)
+	return err
+}
+
 // SyncFTS (re)indexes a single manga row in library_fts: the row is removed
 // first, then re-inserted with its alt titles when it is still in the library.
 func (d *DB) SyncFTS(mangaRowID string) error {
 	if _, err := d.db.Exec(`DELETE FROM library_fts WHERE manga_row_id = ?`, mangaRowID); err != nil {
 		return err
 	}
-	_, err := d.db.Exec(`INSERT INTO library_fts (title, alt, plugin_id, manga_row_id)
-		SELECT m.title, COALESCE((SELECT group_concat(title, ' ') FROM alt_titles WHERE manga_row_id = m.id), ''), m.plugin_id, m.id
-		FROM mangas m WHERE m.id = ? AND m.in_library = 1`, mangaRowID)
-	return err
+	return indexLibraryFTS(d.db, mangaRowID)
 }
 
 // RebuildLibraryFTS wipes and fully re-indexes library_fts from the mangas and
@@ -106,10 +127,7 @@ func (d *DB) RebuildLibraryFTS() error {
 	if _, err := d.db.Exec(`DELETE FROM library_fts`); err != nil {
 		return err
 	}
-	_, err := d.db.Exec(`INSERT INTO library_fts (title, alt, plugin_id, manga_row_id)
-		SELECT m.title, COALESCE((SELECT group_concat(title, ' ') FROM alt_titles WHERE manga_row_id = m.id), ''), m.plugin_id, m.id
-		FROM mangas m WHERE m.in_library = 1`)
-	return err
+	return indexLibraryFTS(d.db, "")
 }
 
 // CandidateRow is a library search hit resolved back to its manga.

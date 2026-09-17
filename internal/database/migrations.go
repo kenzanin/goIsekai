@@ -126,6 +126,12 @@ func (d *DB) runMigrations() error {
 			}
 			continue
 		}
+		if i == libraryFTSMigration {
+			if err := migrateLibraryFTSRebuild(tx); err != nil {
+				return fmt.Errorf("applying migration %d: %w", i, err)
+			}
+			continue
+		}
 		if _, err := tx.Exec(migrations[i]); err != nil {
 			return fmt.Errorf("applying migration %d: %w", i, err)
 		}
@@ -147,4 +153,23 @@ func (d *DB) runMigrations() error {
 		}
 	}
 	return nil
+}
+
+// migrateLibraryFTSRebuild regenerates library_fts. Rows were keyed
+// "plugin|sourceID" before manga gained an integer primary key, so the index
+// has to be rebuilt from the current tables before search can resolve a hit.
+func migrateLibraryFTSRebuild(tx *sql.Tx) error {
+	// Databases assembled without the alternative-titles migration never got
+	// the index. There is nothing stale to clear there.
+	var cnt int
+	if err := tx.QueryRow(`SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name = 'library_fts'`).Scan(&cnt); err != nil {
+		return fmt.Errorf("look up library_fts: %w", err)
+	}
+	if cnt == 0 {
+		return nil
+	}
+	if _, err := tx.Exec(`DELETE FROM library_fts`); err != nil {
+		return fmt.Errorf("clear library_fts: %w", err)
+	}
+	return indexLibraryFTS(tx, "")
 }
