@@ -32,7 +32,13 @@ var _gqlError = null;
 // Fetch a fresh mhub_access cookie by visiting a chapter URL (not homepage).
 // The Kotlin source (MangaHub.kt line 112) refreshes via chapter URL with Referer.
 function _fetchAccessKey() {
-    var refreshUrl = SITE_URL + "/chapter/martial-peak/chapter-" + (1000 + Math.floor(Math.random() * 2000));
+    // A bare GET only hands back the key this session/IP already exhausted, so
+    // every chapter comes back rate limited. Presenting a cookie value the
+    // server has never issued makes it mint a genuinely new key, and
+    // ?reloadKey=1 is what triggers the re-issue. Measured: each key so obtained
+    // carries four chapters of quota, and an explicit Cookie header overrides
+    // whatever the host cookie jar holds.
+    var refreshUrl = SITE_URL + "/chapter/martial-peak/chapter-" + (1000 + Math.floor(Math.random() * 2000)) + "?reloadKey=1";
     var r = host.http.get(refreshUrl, {
         "Referer": SITE_URL + "/manga/martial-peak",
         "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
@@ -40,6 +46,7 @@ function _fetchAccessKey() {
         "Sec-Fetch-Mode": "navigate",
         "Sec-Fetch-Site": "same-origin",
         "Upgrade-Insecure-Requests": "1",
+        "Cookie": "mhub_access=0000000000000000000000000000cafe",
     });
     if (!r || !r.headers) return null;
 
