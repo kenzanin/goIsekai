@@ -60,6 +60,34 @@ func TestYaegiBasic(t *testing.T) {
 	}
 }
 
+// TestYaegiBato1 loads the shipped Bato1 plugin (examples/plugins/yaegi/bato1)
+// so its source keeps compiling under the interpreter, then exercises the paths
+// that reject bad input before any request leaves the host.
+func TestYaegiBato1(t *testing.T) {
+	m := NewManager(hostnet.NewProxy(), "../../examples/plugins/yaegi")
+	p, err := m.loadYaegi("bato1", "../../examples/plugins/yaegi/bato1")
+	if err != nil {
+		t.Fatalf("loadYaegi(bato1): %v", err)
+	}
+	if p.meta.Name != "Bato1" || p.meta.SiteURL != "https://bato1.com" {
+		t.Errorf("Init meta = %+v, want Bato1 on https://bato1.com", p.meta)
+	}
+
+	badIDs := map[string]string{ // chapter id -> why it must be refused
+		`"no-separator"`: "no slug separator",
+		`"slug:84"`:      "chapter path is not chapter-<n>",
+	}
+	for id, why := range badIDs {
+		if _, err := callYaegi(m, p, "GetPageList", id); err == nil {
+			t.Errorf("GetPageList accepted %s (%s)", id, why)
+		}
+	}
+
+	if _, err := callYaegi(m, p, "GetMangaDetail", `""`); err == nil {
+		t.Error("GetMangaDetail accepted an empty manga id")
+	}
+}
+
 func TestYaegiHTTP(t *testing.T) {
 	// Start a local HTTP server for the plugin to call via hostnet.
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
