@@ -27,7 +27,7 @@ local HEADERS = {
 -- slash: a manga id is the slug and a chapter id is "<manga slug>:<cXXX>".
 -- Absolute URLs still work here so a test can point the plugin at a stub host.
 local function url_for(kind, id)
-    if string.match(id, "^https?://") then
+    if host.regex.match(id, "^https?://") then
         return id
     end
     return BASE .. "/" .. kind .. "/" .. id
@@ -36,15 +36,15 @@ end
 -- "https://mangakatana.com/manga/naruto.1205" and "/manga/naruto.1205" both
 -- reduce to "naruto.1205".
 local function slug_of(id)
-    return string.match(id, "/manga/([^/?#]+)") or id
+    return host.regex.find(id, [[/manga/([^/?#]+)]]) or id
 end
 
 -- "naruto.1205:c700" -> the chapter's absolute URL.
 local function chapter_url(id)
-    if string.match(id, "^https?://") then
+    if host.regex.match(id, "^https?://") then
         return id
     end
-    local slug, tail = string.match(id, "^([^:]+):(.+)$")
+    local slug, tail = host.regex.find(id, [[(?s)^([^:]+):(.+)$]])
     if not slug then
         return id
     end
@@ -71,9 +71,9 @@ end
 -- obfuscated variable from breaking us.
 local function page_urls(html)
     local best = {}
-    for array in string.gmatch(html, "%[(.-)%]") do
+    for array in host.regex.gmatch(html, [=[(?s)\[(.*?)\]]=]) do
         local urls = {}
-        for url in string.gmatch(array, "'(https?://[^']+)'") do
+        for url in host.regex.gmatch(array, [['(https?://[^']+)']]) do
             urls[#urls + 1] = url
         end
         if #urls > #best then
@@ -171,10 +171,10 @@ function get_chapter_list(arg)
     for i, url in ipairs(urls) do
         out[#out + 1] = {
             -- .../c247, .../c230.5 and .../c0-v2 all end in the segment to keep.
-            id = manga_id .. ":" .. (string.match(url, "/([^/]+)$") or url),
+            id = manga_id .. ":" .. (host.regex.find(url, [[/([^/]+)$]]) or url),
             manga_id = manga_id,
             -- The number is the tail of the href: .../c247, .../c230.5, .../c0-v2
-            chapter_num = tonumber(string.match(url, "/c([%d%.]+)")) or 0,
+            chapter_num = tonumber(host.regex.find(url, [[/c([\d.]+)]])) or 0,
             title = titles[i] or "",
             url = url,
         }
