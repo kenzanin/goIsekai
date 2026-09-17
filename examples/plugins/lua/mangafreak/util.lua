@@ -30,7 +30,7 @@ function util.parse_search(html)
                 local cover = block:match('data%-src="([^"]+)"') or block:match('<img[^>]*src="([^"]+)"') or ""
                 results[#results + 1] = {
                     id = slug,
-                    title = title:gsub("^%s+", ""):gsub("%s+$", ""),
+                    title = host.text.trim(title),
                     cover_url = cover
                 }
             end
@@ -41,11 +41,11 @@ function util.parse_search(html)
     if #results == 0 then
         for href, title in string.gmatch(html, '<a[^>]*href="([^"]*[Mm]anga/[^"]+)"[^>]*>([^<]+)</a>') do
             local slug = href:match('/[Mm]anga/([^/"?]+)')
-            if slug and not seen[slug] and title:gsub("^%s+",""):gsub("%s+$","") ~= "" then
+            if slug and not seen[slug] and host.text.trim(title) ~= "" then
                 seen[slug] = true
                 results[#results + 1] = {
                     id = slug,
-                    title = title:gsub("^%s+", ""):gsub("%s+$", ""),
+                    title = host.text.trim(title),
                     cover_url = ""
                 }
             end
@@ -81,10 +81,10 @@ function util.parse_manga_detail(html, manga_id)
 	end
 	local function rowValue(label)
 		for _, v in ipairs(divs) do
-			local trimmed = v:gsub("^%s+", ""):gsub("%s+$", "")
+			local trimmed = host.text.trim(v)
 			if trimmed:sub(1, #label):lower() == label:lower() then
 				local val = trimmed:sub(#label + 1)
-				return val:gsub("^%s*:?%s*", ""):gsub("%s+$", ""), true
+				return host.text.trim(val:gsub("^%s*:?%s*", "")), true
 			end
 		end
 		return nil, false
@@ -102,7 +102,7 @@ function util.parse_manga_detail(html, manga_id)
     local genres = {}
     local genre_block = html:match('class="series_sub_genre_list">(.-)</div>') or ""
     for g in genre_block:gmatch('<a[^>]*>([^<]+)</a>') do
-        local name = (g:gsub("^%s+", ""):gsub("%s+$", ""))
+        local name = host.text.trim(g)
         if name ~= "" then genres[#genres + 1] = name end
     end
     detail.genres = genres
@@ -131,7 +131,7 @@ function util.parse_chapter_list(html, manga_id)
         or html
 
     for href, name in block:gmatch('<a[^>]*href="([^"]*Read1_[^"]+)"[^>]*>([^<]+)</a>') do
-        local ch_name = name:gsub("^%s+", ""):gsub("%s+$", "")
+        local ch_name = host.text.trim(name)
         if ch_name ~= "" then
             local ch_path = href:match("/Read1_(.+)")
             local chapter_id = manga_id .. ":" .. (ch_path or ch_name)
