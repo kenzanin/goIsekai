@@ -90,16 +90,12 @@ func (d *DB) FindPotentialDuplicates() ([]DuplicateGroup, error) {
 		addDesc(normalizeTitle(m.Description), i)
 	}
 	for _, a := range titleAlts {
-		// Look up integer ID from rowID
-		mangaIntID, _ := d.getMangaIntIDFromRowID(a.MangaRowID)
-		if idx, ok := idIndex[mangaIntID]; ok {
+		if idx, ok := idIndex[mangaIDFromRowID(a.MangaRowID)]; ok {
 			addTitle(normalizeTitle(a.Value), idx)
 		}
 	}
 	for _, a := range descAlts {
-		// Look up integer ID from rowID
-		mangaIntID, _ := d.getMangaIntIDFromRowID(a.MangaRowID)
-		if idx, ok := idIndex[mangaIntID]; ok {
+		if idx, ok := idIndex[mangaIDFromRowID(a.MangaRowID)]; ok {
 			addDesc(normalizeTitle(a.Value), idx)
 		}
 	}

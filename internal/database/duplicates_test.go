@@ -1,6 +1,9 @@
 package database
 
-import "testing"
+import (
+	"strconv"
+	"testing"
+)
 
 // longDesc returns a description long enough to clear minDescKeyLen.
 func longDesc(s string) string {
@@ -101,5 +104,44 @@ func TestFindPotentialDuplicatesTitleAndDesc(t *testing.T) {
 				t.Errorf("out-of-library manga must not appear in groups")
 			}
 		}
+	}
+}
+
+// TestFindPotentialDuplicatesAltTitle covers the alternative-title path: two
+// manga published under unrelated main titles group when they share one
+// alternative title, which is how the same story is listed across sources.
+func TestFindPotentialDuplicatesAltTitle(t *testing.T) {
+	db := openTestDB(t)
+
+	insert := func(plugin, src, title, desc string) string {
+		id, err := db.UpsertManga(Manga{
+			PluginID: plugin, SourceMangaID: src,
+			Title: title, Description: desc, InLibrary: true,
+		})
+		if err != nil {
+			t.Fatalf("upsert %s: %v", title, err)
+		}
+		return strconv.FormatInt(id, 10)
+	}
+	rowA := insert("p1", "a", "Gachi Boshi", longDesc("a healer wanders off alone"))
+	rowB := insert("p2", "b", "Kyokuburi Hitei", longDesc("a party breaks up and its healer leaves"))
+
+	// The shared alternative title is the only thing these two have in common.
+	const shared = "極振り拒否して手探りスタート 特化しないヒーラー 仲間と別れて旅に出る"
+	for _, row := range []string{rowA, rowB} {
+		if _, err := db.AddAltTitles(row, []string{shared}, "test"); err != nil {
+			t.Fatalf("add alt title: %v", err)
+		}
+	}
+
+	groups, err := db.FindPotentialDuplicates()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(groups) != 1 {
+		t.Fatalf("got %d groups, want 1 sharing an alt title", len(groups))
+	}
+	if len(groups[0].Members) != 2 {
+		t.Fatalf("group has %d members, want 2", len(groups[0].Members))
 	}
 }
