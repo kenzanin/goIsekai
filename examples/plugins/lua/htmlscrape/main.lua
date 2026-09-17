@@ -40,7 +40,7 @@ BASE = "https://example.invalid"
 -- Ids may be full URLs, so this example can be pointed at any host (the test
 -- serves a stub on 127.0.0.1) without editing the file.
 local function url_for(kind, id)
-    if string.match(id, "^https?://") then
+    if host.regex.match(id, "^https?://") then
         return id
     end
     return BASE .. "/" .. kind .. "/" .. id

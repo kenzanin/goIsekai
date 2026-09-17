@@ -31,10 +31,6 @@ local normalizeStatus = host.text.normalize_status
 
 -- ─── helpers ───────────────────────────────────────────────────────────────
 
--- Escape Lua pattern magic chars (slugs are [a-z0-9-], but '-' is the
--- lazy quantifier — raw slugs in gmatch/find patterns silently fail).
-local lua_escape = host.text.lua_escape
-
 -- Thin alias for host.http.get, which logs transport failures and non-2xx.
 local http_get = host.http.get_body
 
@@ -43,7 +39,7 @@ local http_get = host.http.get_body
 function jsonld_book(html)
     local i = 1
     while true do
-        local s = string.find(html, '<script type="application/ld%+json">', i)
+        local s = host.regex.find_index(html, [[<script type="application/ld\+json">]], i)
         if not s then return nil end
         -- The page carries several ld+json blocks; host.text.json_blob returns
         -- one balanced object without tripping over braces inside strings.
@@ -64,9 +60,9 @@ end
 function flight_status(html, cover_path)
     if not cover_path or cover_path == "" then return "" end
     local needle = '\\"coverImage\\":\\"' .. cover_path .. '\\"'
-    local i = string.find(html, needle, 1, true)
+    local i = host.regex.find_index(html, host.regex.quote(needle), 1)
     if not i then return "" end
-    local status = string.match(html:sub(i, i + 600), '\\"status\\":\\"([A-Z_]+)\\"')
+    local status = host.regex.find(html:sub(i, i + 600), [[\\"status\\":\\"([A-Z_]+)\\"]])
     return status or ""
 end
 
@@ -87,7 +83,7 @@ function search_manga(arg)
     local out = {}
     for _, r in ipairs(data.series) do
         local cover = r.coverImage or ""
-        if cover ~= "" and not string.find(cover, "^https?://") then
+        if cover ~= "" and not host.regex.match(cover, "^https?://") then
             cover = BASE .. cover
         end
         out[#out + 1] = {
@@ -123,7 +119,7 @@ function get_manga_detail(arg)
         local img = book.image or ""
         if img ~= "" then
             detail.cover_url = img
-            if not string.find(img, "^https?://") then
+            if not host.regex.match(img, "^https?://") then
                 detail.cover_url = BASE .. img
             end
         end
@@ -141,16 +137,16 @@ function get_manga_detail(arg)
 
     -- Fallbacks for anything JSON-LD missed (or if the block was absent)
     if detail.title == "" then
-        detail.title = string.match(html, '<meta property="og:title" content="([^"]*)"') or ""
+        detail.title = host.regex.find(html, [[<meta property="og:title" content="([^"]*)"]]) or ""
     end
     if detail.cover_url == "" then
-        local c = string.match(html,
-            '<meta property="og:image" content="([^"]*)"') or ""
+        local c = host.regex.find(html, [[<meta property="og:image" content="([^"]*)"]]) or ""
         if c ~= "" then detail.cover_url = c end
     end
     if detail.status == "" then
-        local st = flight_status(html, string.match(detail.cover_url,
-            '(https?://[^/]+)?(/uploads/series/[^"]+)') or detail.cover_url)
+        local origin = host.regex.find(detail.cover_url, [[(https?://[^/]+)?(/uploads/series/[^"]+)]])
+        if origin == nil or origin == "" then origin = detail.cover_url end
+        local st = flight_status(html, origin)
         if st ~= "" then detail.status = normalizeStatus(st) end
     end
 
@@ -172,8 +168,8 @@ function get_chapter_list(arg)
     -- same URL repeats for the "latest chapter" card, so dedupe by number.
     local nums = {}
     local seen = {}
-    local pat = '/series/comic/' .. lua_escape(manga_id) .. '/chapter/(%d+)'
-    for n in string.gmatch(html, pat) do
+    local pat = '/series/comic/' .. host.regex.quote(manga_id) .. '/chapter/(\\d+)'
+    for _, n in ipairs(host.regex.find_all(html, pat)) do
         if not seen[n] then
             seen[n] = true
             nums[#nums + 1] = tonumber(n)
@@ -200,7 +196,7 @@ end
 -- arg: '"urlSlug:N"' (chapter id from get_chapter_list)  ->  array of {url}
 function get_page_list(arg)
     local chapter_id = host.json.decode(arg) -- e.g. "urlSlug:37"
-    local manga_id, num = string.match(chapter_id, "^(.-):(%d+)$")
+    local manga_id, num = host.regex.find(chapter_id, [[^(.*?):(\d+)$]])
     if not manga_id or not num then
         return host.json.encode({})
     end
@@ -213,8 +209,10 @@ function get_page_list(arg)
     -- order; dedupe keeps order (chapter cover can repeat via srcset).
     local pages = {}
     local seen = {}
-    local pat = '(https://media%.valirscans%.org/series/' .. lua_escape(manga_id) .. '/%d+/p%-[^"\\]+%.webp)'
-    for u in string.gmatch(html, pat) do
+    local pat = [[(https://media\.valirscans\.org/series/]]
+        .. host.regex.quote(manga_id)
+        .. [[/\d+/p-[^"\\]+\.webp)]]
+    for _, u in ipairs(host.regex.find_all(html, pat)) do
         if not seen[u] then
             seen[u] = true
             pages[#pages + 1] = { url = u }
