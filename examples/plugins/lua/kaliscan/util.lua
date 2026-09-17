@@ -19,8 +19,8 @@ function util.parse_search(html)
 
     -- Total pages from the paginator <select> — last <option value="/search?page=N&q=...">
     local max_page = 1
-    local last_page_num = string.match(html,
-        '<option%s+value="/search%?page=(%d+)[^"]*">(%d+)</option>%s*</select>')
+    local last_page_num = host.regex.find(html,
+        [[<option\s+value="/search\?page=(\d+)[^"]*">(\d+)</option>\s*</select>]])
     if last_page_num then
         max_page = tonumber(last_page_num) or 1
     end
@@ -32,10 +32,10 @@ function util.parse_search(html)
     -- Site emits TWO anchors per manga (cover anchor + title anchor). Only
     -- the cover anchor has <img ... data-src> directly inside it, so we match
     -- title/href/cover in ONE anchor (img must follow the opening tag) — the
-    -- old lazy `.-data%-src` crossed `</a>` into the NEXT manga's cover and
+    -- old lazy `(?s).*?data-src` crossed `</a>` into the NEXT manga's cover and
     -- shifted every thumbnail by one card.
-    for title, slug, cover in string.gmatch(html,
-        '<a%s+title="([^"]-)"[^>]*href="/manga/([^"]-)"[^>]*>%s*<img[^>]-data%-src="([^"]-)"')
+    for title, slug, cover in host.regex.gmatch(html,
+        [[(?s)<a\s+title="([^"]*?)"[^>]*href="/manga/([^"]*?)"[^>]*>\s*<img[^>]*?data-src="([^"]*?)"]])
     do
         if not seen[slug] then
             seen[slug] = true
@@ -67,28 +67,28 @@ function util.parse_manga_detail(html, manga_id)
     local detail = { id = manga_id }
 
     -- Title: <h1>TITLE</h1>
-    detail.title = string.match(html, '<h1>([^<]+)</h1>') or ""
+    detail.title = host.regex.find(html, [[<h1>([^<]+)</h1>]]) or ""
 
     -- Author: Authors :</strong> <a ...><span>AUTHOR</span>
-    detail.author = string.match(html,
-        'Authors[^<]*</strong>%s*\n?%s*<a[^>]*>%s*<span>([^<]+)</span>') or ""
+    detail.author = host.regex.find(html,
+        [[Authors[^<]*</strong>\s*\n?\s*<a[^>]*>\s*<span>([^<]+)</span>]]) or ""
 
     -- Status
-    detail.status = host.text.normalize_status(string.match(html,
-        'Status[^<]*</strong>%s*\n?%s*<a[^>]*>%s*<span>([^<]+)</span>') or "")
+    detail.status = host.text.normalize_status(host.regex.find(html,
+        [[Status[^<]*</strong>\s*\n?\s*<a[^>]*>\s*<span>([^<]+)</span>]]) or "")
 
     -- Cover: data-src inside the cover div
-    detail.cover_url = string.match(html,
-        'class="cover[^"]*"[^>]*>.-<img[^>]*data%-src="([^"]-)"') or ""
+    detail.cover_url = host.regex.find(html,
+        [[(?s)class="cover[^"]*"[^>]*>.*?<img[^>]*data-src="([^"]*?)"]]) or ""
 
     -- Description: <p class="content" ...>TEXT</p>
-    local desc = host.text.strip_html(string.match(html, '<p class="content"[^>]*>(.-)</p>') or "")
+    local desc = host.text.strip_html(host.regex.find(html, [[(?s)<p class="content"[^>]*>(.*?)</p>]]) or "")
     detail.description = desc
 
     -- Genres
     local genres = {}
-    for _, g in string.gmatch(html, 'href="/genres/([^/"]+)/"[^>]*>%s*([^<]+)%s*') do
-        genres[#genres + 1] = (g:gsub("[%s,]+$", ""))
+    for _, g in host.regex.gmatch(html, [[href="/genres/([^/"]+)/"[^>]*>\s*([^<]+)\s*]]) do
+        genres[#genres + 1] = host.regex.replace(g, [[[\s,]+$]], "")
     end
     detail.genres = genres
 
@@ -108,16 +108,16 @@ end
 function util.parse_chapter_list(html, manga_id)
     local chapters = {}
 
-    for number, href, title, upload_time in string.gmatch(html,
-        'id="c%-([^"]-)"[^>]*>%s*' ..
-        '<a[^>]*href="([^"]-)"[^>]*title="([^"]-)"[^>]*>%s*' ..
-        '<div>%s*<strong class="chapter%-title">([^<]-)</strong>%s*' ..
+    for number, href, title, upload_time in host.regex.gmatch(html,
+        'id="c-([^"]*?)"[^>]*>\\s*' ..
+        '<a[^>]*href="([^"]*?)"[^>]*title="([^"]*?)"[^>]*>\\s*' ..
+        '<div>\\s*<strong class="chapter-title">([^<]*?)</strong>\\s*' ..
         '<time[^>]*>([^<]*)</time>')
     do
         -- chapter_id: path after /manga/ with "/" swapped for ":" (e.g.
         -- "SLUG:chapter-98") — host routing treats the ID as one opaque
         -- segment, so a raw slash would 404 the reader URL.
-        local chapter_id = string.match(href, '/manga/(.+)')
+        local chapter_id = host.regex.find(href, [[(?s)/manga/(.+)]])
         if not chapter_id then
             chapter_id = manga_id .. "/chapter-" .. number
         end
@@ -154,9 +154,9 @@ end
 function util.parse_page_list(html, referer)
     local pages = {}
     local n = 0
-    for url in string.gmatch(html, 'data%-src="([^"]-)"') do
+    for url in host.regex.gmatch(html, [[data-src="([^"]*?)"]]) do
         -- Skip static assets / loading placeholders
-        if not string.match(url, '%.svg$') and not string.match(url, '/static/') then
+        if not host.regex.match(url, [[\.svg$]]) and not host.regex.match(url, [[/static/]]) then
             n = n + 1
             pages[n] = {
                 index = n - 1,

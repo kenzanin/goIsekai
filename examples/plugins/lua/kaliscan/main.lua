@@ -91,7 +91,7 @@ function get_page_list(arg)
     if not body then
         return host.json.encode({})
     end
-    local chapter_id = string.match(body, "chapterId%s*=%s*(%d+)")
+    local chapter_id = host.regex.find(body, [[chapterId\s*=\s*(\d+)]])
     if not chapter_id then
         return host.json.encode({})
     end
