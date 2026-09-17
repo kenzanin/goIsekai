@@ -17,6 +17,13 @@ BASE = "https://kaliscan.io"
 
 local util = require("util")
 
+-- MAX_RESULT_PAGES bounds how much of the result set one search pulls down.
+-- Every page is a separate request costing roughly a second, and the host gives
+-- a plugin invocation 15s in total: a broad query like "one" spans 27 pages, so
+-- walking to the end never finishes and the search fails outright. The host
+-- paginates whatever comes back, so a fixed window still fills several pages.
+local MAX_RESULT_PAGES = 5
+
 -- search_manga(arg) — arg is a JSON object: {"query":"...","page":1}
 -- Returns: array of {id, title, cover_url} + "total" field
 function search_manga(arg)
@@ -24,7 +31,7 @@ function search_manga(arg)
     local query = args.query or ""
     log.debug("search q=" .. query)
 
-    -- Fetch page 1 to discover total pages, then loop all pages.
+    -- Fetch page 1 to discover the page count, then walk up to the cap.
     local body = host.http.get_body(BASE .. "/search?q=" .. host.text.url_encode(query) .. "&page=1")
     if not body then
         return host.json.encode({})
@@ -32,8 +39,9 @@ function search_manga(arg)
     local first = util.parse_search(body)
     local all = first.results
     local max_page = first.total or 1
+    local last_page = math.min(max_page, MAX_RESULT_PAGES)
 
-    for p = 2, max_page do
+    for p = 2, last_page do
         local page_body = host.http.get_body(BASE .. "/search?q=" .. host.text.url_encode(query) .. "&page=" .. tostring(p))
         if not page_body then
             break
@@ -47,7 +55,7 @@ function search_manga(arg)
         end
     end
 
-    log.debug("search: found " .. #all .. " results for q=" .. query .. " (pages=" .. max_page .. ")")
+    log.debug("search: found " .. #all .. " results for q=" .. query .. " (pages=fetched " .. last_page .. "/" .. max_page .. ")")
     return host.json.encode(all)
 end
 

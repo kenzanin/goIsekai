@@ -107,9 +107,12 @@ function util.parse_manga_detail(html, manga_id)
     end
     detail.genres = genres
 
-    -- Description
-    local desc_block = html:match('class="manga_series_description">(.-)</div>') or ""
-    detail.description = host.text.strip_html(desc_block:match('<p>(.-)</p>') or desc_block)
+    -- Description. The block leads with a "Synopsis" label div before the real
+    -- text in a <p>. Matching to the first </div> stops at that label, and the
+    -- fallback then strips the label down to itself, so anchor on the closing
+    -- tag pair instead to reach the <p>.
+    local desc_section = html:match('class="manga_series_description">(.-)</div>%s*</div>') or ""
+    detail.description = host.text.strip_html(desc_section:match('<p>(.-)</p>') or desc_section)
 
     return detail
 end
