@@ -12,7 +12,6 @@ PLUGIN = {
     verify_url = "https://1manga.co",
     needs_human_verify = false,
     thumb_ratio = 0.703,
-    search_page_size = 30,
 }
 
 local GRAPHQL_URL = "https://api.mghcdn.com/graphql"

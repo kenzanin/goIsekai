@@ -33,7 +33,6 @@ PLUGIN = {
     verify_url = "https://example.invalid",
     needs_human_verify = false,
     thumb_ratio = 0.667,
-    search_page_size = 24,
 }
 
 BASE = "https://example.invalid"

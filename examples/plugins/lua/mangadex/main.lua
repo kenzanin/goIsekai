@@ -10,7 +10,6 @@ PLUGIN = {
     verify_url = "https://mangadex.org",
     needs_human_verify = false,
     thumb_ratio = 0.703,
-    search_page_size = 24,
 }
 
 local util = require("util")
@@ -18,7 +17,7 @@ local util = require("util")
 -- ─── ABI: search_manga ─────────────────────────────────────────────────────
 -- arg: {"query":"...","page":1}. MangaDex relevance ordering is not stable
 -- across offset windows, so every result is fetched in one go and the host
--- slices it by search_page_size.
+-- slices it into pages.
 function search_manga(arg)
     local args = host.json.decode(arg) or {}
     local title = host.text.trim(args.query or "")

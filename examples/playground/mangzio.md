@@ -10,7 +10,7 @@ Chapter ID mengandung `:` — percent-encode (`%3A`) di URL curl.
 curl -s http://127.0.0.1:8080/api/sandbox/plugins/
 ```
 
-## Search (return-all; host slices per search_page_size)
+## Search (return-all; host slices into pages)
 
 ```bash
 curl -s 'http://127.0.0.1:8080/api/sandbox/plugins/mangzio/search?q=isekai'

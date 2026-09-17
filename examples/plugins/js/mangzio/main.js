@@ -10,7 +10,6 @@ var PLUGIN = {
     verify_url: "https://www.mangzio.com",
     needs_human_verify: false,
     thumb_ratio: 0.703,
-    search_page_size: 24,
 };
 
 var BASE = "https://www.mangzio.com";
@@ -121,7 +120,7 @@ function searchManga(arg) {
         }
         results = filtered;
     }
-    // Return ALL filtered results — the host handles pagination via search_page_size.
+    // Return ALL filtered results — the host handles pagination.
     log.info("mangzio search: found " + results.length + " results for query=" + query);
     return JSON.stringify(results);
 }

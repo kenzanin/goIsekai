@@ -10,7 +10,6 @@ PLUGIN = {
     verify_url = "https://www.mangafreak.me",
     needs_human_verify = false,
     thumb_ratio = 0.703,
-    search_page_size = 20,
 }
 
 local BASE = "https://www.mangafreak.me"

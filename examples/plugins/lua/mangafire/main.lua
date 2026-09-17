@@ -14,7 +14,6 @@ PLUGIN = {
     site_url = "https://mangafire.to",
     logo = "logo.png",
     thumb_ratio = 0.677,
-    search_page_size = 50,
 }
 
 API_URL = "https://mangafire.to/api"

@@ -14,7 +14,7 @@ curl -s http://127.0.0.1:8080/api/sandbox/plugins/
 
 ```bash
 curl -s 'http://127.0.0.1:8080/api/sandbox/plugins/mangadex/search?q=isekai'
-# dengan halaman (host-side slicing, default search_page_size=24):
+# dengan halaman (host-side slicing, host-side slicing):
 curl -s 'http://127.0.0.1:8080/api/sandbox/plugins/mangadex/search?q=isekai&page=2'
 ```
 

@@ -128,7 +128,6 @@ type LoadedPlugin struct {
 	NeedsHumanVerify bool
 	ThumbRatio       float64
 	NeedsJS          bool
-	SearchPageSize   int
 	Name             string
 	SiteURL          string
 	Logo             string
@@ -156,7 +155,6 @@ func (m *Manager) LoadedPlugins() []LoadedPlugin {
 			NeedsHumanVerify: p.meta.NeedsHumanVerify,
 			ThumbRatio:       p.meta.ThumbRatio,
 			NeedsJS:          p.meta.NeedsJS,
-			SearchPageSize:   p.meta.SearchPageSize,
 			Name:             p.meta.Name,
 			SiteURL:          p.meta.SiteURL,
 			Logo:             p.meta.Logo,

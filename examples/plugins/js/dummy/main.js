@@ -15,7 +15,6 @@ var PLUGIN = {
     verify_url: "https://example.com",
     needs_human_verify: false,
     thumb_ratio: 0.703,
-    search_page_size: 24,
 };
 
 // search_manga(arg) — arg is a JSON object: {"query":"...","page":1}

@@ -92,7 +92,6 @@ name: "My Source"         -- display name
 verify_url: "https://..." -- site URL for human verification
 needs_human_verify: false
 thumb_ratio: 0.70         -- cover aspect ratio (width/height)
-search_page_size: 24      -- results per page (default 24)
 ```
 
 Add `needs_js: true` if the source requires a browser for anti-bot challenges
@@ -221,8 +220,8 @@ curl -s -X POST localhost:3333/api/sandbox/plugins/load \
   field of each page URL — the host forwards it automatically.
 - **Rate limiting**: the host paces HTTP requests per-host (~1 req/s). Don't
   add your own delays.
-- **Search pagination**: declare `search_page_size` in your plugin metadata if
-  it differs from the default 24. The host uses this to render Next/Prev links.
+- **Search pagination**: return every match and let the host slice the
+  results into pages of 30. Don't paginate inside the plugin.
 - **Anti-bot sites**: set `needs_js: true` in metadata. The host will attempt
   CDP fallback (lightpanda/chrome/obscura) when tls-client gets blocked.
 - **Chapter ID format**: use `:` as separator (`manga-slug:chapter-42`), not

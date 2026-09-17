@@ -13,7 +13,6 @@ PLUGIN = {
     verify_url = "https://mangakatana.com",
     needs_human_verify = false,
     thumb_ratio = 0.703,
-    search_page_size = 20,
 }
 
 BASE = "https://mangakatana.com"

@@ -19,7 +19,6 @@ PLUGIN = {
     verify_url = "https://valirscans.org",
     needs_human_verify = false,
     thumb_ratio = 0.703,
-    search_page_size = 24,
 }
 
 BASE = "https://valirscans.org"
