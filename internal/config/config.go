@@ -1,15 +1,23 @@
-// Package config loads and saves the reader's INI configuration file. It is
-// deliberately dependency-free: the format is small enough that a hand-rolled
-// parser is shorter and safer than pulling in an INI library.
+// Package config loads and saves the reader's INI configuration file. The
+// file format is delegated to gopkg.in/ini.v1; per-key validation stays in
+// this package so unknown or invalid values leave the defaults in place.
 package config
 
 import (
-	"fmt"
-	"os"
-	"path/filepath"
 	"sort"
+	"strconv"
 	"strings"
+
+	"gopkg.in/ini.v1"
 )
+
+// go-ini's write format is process-global. Match the reader's existing
+// "key = value" layout (spaces, no column alignment) so a save does not
+// reflow goisekai.ini.
+func init() {
+	ini.PrettyFormat = false
+	ini.PrettyEqual = true
+}
 
 // Config holds the reader's persisted settings.
 type Config struct {
@@ -104,116 +112,85 @@ type Config struct {
 	aliasTouched map[string]bool
 }
 
-// Default returns the built-in defaults.
-func Default() *Config {
-	c := &Config{
-		DataDir:         "app_data",
-		Title:           "goIsekai",
-		LogLevel:        "info",
-		Width:           1200,
-		Height:          800,
-		Host:            "127.0.0.1",
-		Port:            8080,
-		UserAgent:       "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36",
-		AcceptLanguage:  "en-US,en;q=0.9",
-		Referer:         "",
-		CDPEngine:       "off",
-		CDPPath:         "",
-		CDPSolveTimeout: 30,
-		APIKey:          "",
-
-		BackupIntervalHours: 24,
-		BackupKeep:          5,
-		PruneOrphans:        true,
-		CacheTTLHours:       24,
-		PreconnectEnabled:   false,
-
-		GenreAlias:  DefaultGenreAlias(),
-		StatusAlias: DefaultStatusAlias(),
-
-		ImageFormat: "webp",
-		CoverMaxDim: 720,
-
-		EnhanceDefault: "auto",
-		EnhancePlugins: map[string]string{},
-	}
-	c.CacheDir = filepath.Join(c.DataDir, "cache")
-	c.InfoDir = filepath.Join(c.DataDir, "info")
-	// Source-tree locations (relative to the working dir) so template and
-	// frontend edits take effect without a rebuild.
-	c.FrontendDir = "cmd/goisekai/frontend"
-	c.TemplatesDir = "internal/templates"
-	return c
-}
-
 // Save writes the config to path as INI. It does not create parent
 // directories; the caller is expected to point it at an existing directory.
 func (c *Config) Save(path string) error {
-	var b strings.Builder
-	fmt.Fprintf(&b, "[app]\n")
-	fmt.Fprintf(&b, "data_dir = %s\n", c.DataDir)
-	fmt.Fprintf(&b, "title = %s\n", c.Title)
-	fmt.Fprintf(&b, "log_level = %s\n", c.LogLevel)
-	fmt.Fprintf(&b, "width = %d\n", c.Width)
-	fmt.Fprintf(&b, "height = %d\n", c.Height)
-	fmt.Fprintf(&b, "cache_dir = %s\n", c.CacheDir)
-	fmt.Fprintf(&b, "frontend_dir = %s\n", c.FrontendDir)
-	fmt.Fprintf(&b, "templates_dir = %s\n", c.TemplatesDir)
-	fmt.Fprintf(&b, "info_dir = %s\n", c.InfoDir)
-	fmt.Fprintf(&b, "host = %s\n", c.Host)
-	fmt.Fprintf(&b, "port = %d\n", c.Port)
-	fmt.Fprintf(&b, "api_key = %s\n", c.APIKey)
-	fmt.Fprintf(&b, "image_format = %s\n", c.ImageFormat)
-	fmt.Fprintf(&b, "cover_max_dim = %d\n", c.CoverMaxDim)
-	writeEnhanceSection(&b, c.EnhanceDefault, c.EnhancePlugins)
-	fmt.Fprintf(&b, "\n[network]\n")
-	fmt.Fprintf(&b, "user_agent = %s\n", c.UserAgent)
-	fmt.Fprintf(&b, "accept_language = %s\n", c.AcceptLanguage)
-	fmt.Fprintf(&b, "referer = %s\n", c.Referer)
-	fmt.Fprintf(&b, "cdp_engine = %s\n", c.CDPEngine)
-	fmt.Fprintf(&b, "cdp_path = %s\n", c.CDPPath)
-	fmt.Fprintf(&b, "cdp_solve_timeout = %d\n", c.CDPSolveTimeout)
-	fmt.Fprintf(&b, "cache_ttl_hours = %d\n", c.CacheTTLHours)
-	fmt.Fprintf(&b, "preconnect_enabled = %t\n", c.PreconnectEnabled)
-	fmt.Fprintf(&b, "\n[maintenance]\n")
-	fmt.Fprintf(&b, "backup_interval_hours = %d\n", c.BackupIntervalHours)
-	fmt.Fprintf(&b, "backup_keep = %d\n", c.BackupKeep)
-	fmt.Fprintf(&b, "prune_orphans = %t\n", c.PruneOrphans)
-	writeAliasSection(&b, "genre", c.GenreAlias)
-	writeAliasSection(&b, "status", c.StatusAlias)
-	return os.WriteFile(path, []byte(b.String()), 0o644)
-}
-
-func writeAliasSection(b *strings.Builder, section string, aliases map[string][]string) {
-	if len(aliases) == 0 {
-		return
+	f, err := ini.LoadSources(ini.LoadOptions{IgnoreInlineComment: true}, []byte{})
+	if err != nil {
+		return err
 	}
-	names := make([]string, 0, len(aliases))
-	for name := range aliases {
-		names = append(names, name)
-	}
-	sort.Strings(names)
-	fmt.Fprintf(b, "\n[%s]\n", section)
-	for _, name := range names {
-		fmt.Fprintf(b, "%s = %s\n", name, strings.Join(aliases[name], ", "))
-	}
-}
-
-// writeEnhanceSection emits the `[enhance]` block: the global default first,
-// then every per-plugin override sorted, so a rewrite of the file (the settings
-// page does one) preserves hand-written overrides instead of dropping them.
-func writeEnhanceSection(b *strings.Builder, def string, plugins map[string]string) {
+	put(f, "app",
+		"data_dir", c.DataDir,
+		"title", c.Title,
+		"log_level", c.LogLevel,
+		"width", strconv.Itoa(c.Width),
+		"height", strconv.Itoa(c.Height),
+		"cache_dir", c.CacheDir,
+		"frontend_dir", c.FrontendDir,
+		"templates_dir", c.TemplatesDir,
+		"info_dir", c.InfoDir,
+		"host", c.Host,
+		"port", strconv.Itoa(c.Port),
+		"api_key", c.APIKey,
+		"image_format", c.ImageFormat,
+		"cover_max_dim", strconv.Itoa(c.CoverMaxDim))
+	// The [enhance] section is always written, default first, so a rewrite of
+	// the file (the settings page does one) keeps the global mode in place.
+	def := c.EnhanceDefault
 	if def == "" {
 		def = "auto"
 	}
-	fmt.Fprintf(b, "\n[enhance]\n")
-	fmt.Fprintf(b, "default = %s\n", def)
-	names := make([]string, 0, len(plugins))
-	for name := range plugins {
+	enhance := put(f, "enhance", "default", def)
+	for _, name := range sortedKeys(c.EnhancePlugins) {
+		_, _ = enhance.NewKey(name, c.EnhancePlugins[name])
+	}
+	put(f, "network",
+		"user_agent", c.UserAgent,
+		"accept_language", c.AcceptLanguage,
+		"referer", c.Referer,
+		"cdp_engine", c.CDPEngine,
+		"cdp_path", c.CDPPath,
+		"cdp_solve_timeout", strconv.Itoa(c.CDPSolveTimeout),
+		"cache_ttl_hours", strconv.Itoa(c.CacheTTLHours),
+		"preconnect_enabled", strconv.FormatBool(c.PreconnectEnabled))
+	put(f, "maintenance",
+		"backup_interval_hours", strconv.Itoa(c.BackupIntervalHours),
+		"backup_keep", strconv.Itoa(c.BackupKeep),
+		"prune_orphans", strconv.FormatBool(c.PruneOrphans))
+	putAlias(f, "genre", c.GenreAlias)
+	putAlias(f, "status", c.StatusAlias)
+	return f.SaveTo(path)
+}
+
+// put appends a section with the given flat key/value pairs in order.
+// NewSection and NewKey only fail on empty names, and every name here is a
+// fixed non-empty constant, so the errors cannot occur.
+func put(f *ini.File, section string, kv ...string) *ini.Section {
+	s, _ := f.NewSection(section)
+	for i := 0; i+1 < len(kv); i += 2 {
+		_, _ = s.NewKey(kv[i], kv[i+1])
+	}
+	return s
+}
+
+// putAlias appends a [genre]/[status] section with the alias names sorted;
+// an empty map yields no section at all.
+func putAlias(f *ini.File, section string, aliases map[string][]string) {
+	if len(aliases) == 0 {
+		return
+	}
+	s, _ := f.NewSection(section)
+	for _, name := range sortedKeys(aliases) {
+		_, _ = s.NewKey(name, strings.Join(aliases[name], ", "))
+	}
+}
+
+// sortedKeys returns the map's keys sorted, for stable file output.
+func sortedKeys[V any](m map[string]V) []string {
+	names := make([]string, 0, len(m))
+	for name := range m {
 		names = append(names, name)
 	}
 	sort.Strings(names)
-	for _, name := range names {
-		fmt.Fprintf(b, "%s = %s\n", name, plugins[name])
-	}
+	return names
 }

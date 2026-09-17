@@ -1,51 +1,32 @@
 package config
 
 import (
-	"bufio"
 	"os"
 	"strconv"
 	"strings"
 	"time"
 
 	"goisekai/internal/logger"
+	"gopkg.in/ini.v1"
 )
 
 // Load reads the INI file at path, applying defaults for any missing or
 // invalid keys. A missing file is not an error: it yields the default config.
 func Load(path string) (*Config, error) {
 	c := Default()
-	f, err := os.Open(path)
+	f, err := ini.LoadSources(ini.LoadOptions{IgnoreInlineComment: true}, path)
 	if err != nil {
 		if os.IsNotExist(err) {
 			return c, nil
 		}
 		return nil, err
 	}
-	defer func() {
-		_ = f.Close()
-	}()
-
-	section := ""
-	sc := bufio.NewScanner(f)
-	for sc.Scan() {
-		line := strings.TrimSpace(sc.Text())
-		if line == "" || strings.HasPrefix(line, "#") || strings.HasPrefix(line, ";") {
-			continue
+	// Iterate rather than look up by key so that set() keeps applying the
+	// per-key validation and the alias/enhance sections verbatim.
+	for _, s := range f.Sections() {
+		for _, k := range s.Keys() {
+			c.set(s.Name(), k.Name(), k.String())
 		}
-		if strings.HasPrefix(line, "[") && strings.HasSuffix(line, "]") {
-			section = strings.TrimSpace(line[1 : len(line)-1])
-			continue
-		}
-		before, after, ok := strings.Cut(line, "=")
-		if !ok {
-			continue // not a key=value line; skip silently
-		}
-		key := strings.TrimSpace(before)
-		val := strings.TrimSpace(after)
-		c.set(section, key, val)
-	}
-	if err := sc.Err(); err != nil {
-		return nil, err
 	}
 	return c, nil
 }
