@@ -62,12 +62,25 @@ local function detail(title)
         ["Accept"] = "application/json",
     }))
     local results = search and search.results
-    if type(results) ~= "table" or #results == 0 or not results[1].record then
+    if type(results) ~= "table" or #results == 0 then
         log.debug("mangaupdates info: no match for " .. title)
         return nil
     end
 
-    local record = results[1].record
+    -- A light novel tops the results for the title of the manga adapted from
+    -- it, and its metadata carries a "(Novel)" suffix that makes the alternative
+    -- titles differ from every other source's. Take the first manga instead.
+    local record
+    for _, hit in ipairs(results) do
+        if hit.record and hit.record.type ~= "Novel" then
+            record = hit.record
+            break
+        end
+    end
+    if not record then
+        log.debug("mangaupdates info: no match for " .. title)
+        return nil
+    end
     local full = decode(host.http.get(API .. "/series/" .. ("%d"):format(record.series_id), {
         ["Accept"] = "application/json",
     }))
