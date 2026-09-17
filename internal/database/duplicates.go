@@ -2,12 +2,13 @@ package database
 
 import "strconv"
 
-// DuplicateGroup is a set of ≥2 in-library manga that share a normalised
-// title or alternative title (or, when from different plugins, a normalised
-// description or alternative description).  The UI consumes these to flag
-// likely dupes.
+// DuplicateGroup is a set of ≥2 in-library manga that look like the same
+// story: they share a normalised title or alternative title, or — when from
+// different plugins — a normalised description or alternative description, or
+// a distinctive word that no more than two library entries use.  The UI
+// consumes these to flag likely dupes.
 type DuplicateGroup struct {
-	Key     string  // normalised key that was matched
+	Key     string  // evidence that matched: a normalised key, or a shared distinctive word
 	Title   string  // most readable original title (main title preferred)
 	Members []Manga // the manga in this group (≥2)
 }

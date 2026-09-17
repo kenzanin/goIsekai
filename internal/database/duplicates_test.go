@@ -145,3 +145,87 @@ func TestFindPotentialDuplicatesAltTitle(t *testing.T) {
 		t.Fatalf("group has %d members, want 2", len(groups[0].Members))
 	}
 }
+
+// TestFindPotentialDuplicatesSimilarSynopsis covers the wording pass: two
+// sources describing the same story in their own words still group when no
+// title or description matches exactly.  A blurb repeated by many sources, and
+// one source listing the same text twice, must not.
+func TestFindPotentialDuplicatesSimilarSynopsis(t *testing.T) {
+	db := openTestDB(t)
+
+	insert := func(plugin, src, title, desc string) int64 {
+		id, err := db.UpsertManga(Manga{
+			PluginID: plugin, SourceMangaID: src,
+			Title: title, Description: desc, InLibrary: true,
+		})
+		if err != nil {
+			t.Fatalf("upsert %q: %v", title, err)
+		}
+		return id
+	}
+
+	// The same story told two ways: no matching title, no matching blurb, but
+	// the names from the story appear in both.
+	left := insert("p1", "s1", "Zork Begins the Conquest",
+		"Zork Malabar crossed the salt flats of Qintarra for nine years before the warlord Hemlock burned his village.")
+	right := insert("p2", "s2", "Zork: Conquest Commences",
+		"After the warlord Hemlock razed Qintarra, Zork Malabar walked the salt flats and swore to rebuild.")
+
+	// Three sources repeating one short site-wide blurb.  Every word of it is
+	// in three rows, so it is too common to be evidence.
+	blurb := "Read the newest chapters for free on ExampleScans today."
+	var blurbRows []int64
+	for i, title := range []string{"Alpha", "Beta", "Omega"} {
+		blurbRows = append(blurbRows, insert("p"+strconv.Itoa(i+3), "t"+strconv.Itoa(i), title, blurb))
+	}
+
+	// One source listing the same story twice, described identically.  The
+	// wording is as distinctive as it gets, but a single source repeating
+	// itself is not a second sighting of the story.
+	twin := "Vashti Krellum sailed the obsidian Meridian to reach the drowned citadel of Yarrow, where the tide keeps every secret it swallows."
+	twinA := insert("p9", "u1", "Vashti and the Obsidian Meridian", twin)
+	twinB := insert("p9", "u2", "The Drowned Citadel of Yarrow", twin)
+
+	groups, err := db.FindPotentialDuplicates()
+	if err != nil {
+		t.Fatalf("FindPotentialDuplicates: %v", err)
+	}
+
+	groupedTogether := func(a, b int64) bool {
+		for _, g := range groups {
+			hasA, hasB := false, false
+			for _, m := range g.Members {
+				hasA = hasA || m.ID == a
+				hasB = hasB || m.ID == b
+			}
+			if hasA && hasB {
+				return true
+			}
+		}
+		return false
+	}
+
+	if !groupedTogether(left, right) {
+		t.Errorf("re-worded synopsis of the same story must group")
+	}
+	// The blurb rows share no story, only the site's own text.
+	if groupedTogether(blurbRows[0], blurbRows[1]) || groupedTogether(blurbRows[1], blurbRows[2]) {
+		t.Errorf("a blurb carried by three sources must not group")
+	}
+	// One source repeating itself is not a second sighting.
+	if groupedTogether(twinA, twinB) {
+		t.Errorf("two rows of one plugin must not group")
+	}
+	for _, g := range groups {
+		if len(g.Members) < 2 {
+			t.Errorf("group %q has %d member(s)", g.Key, len(g.Members))
+		}
+	}
+	if len(groups) != 1 || len(groups[0].Members) != 2 {
+		names := make([]string, 0, len(groups))
+		for _, g := range groups {
+			names = append(names, g.Title)
+		}
+		t.Errorf("got %d groups %v, want only the two-source pair", len(groups), names)
+	}
+}
