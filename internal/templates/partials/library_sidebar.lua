@@ -116,7 +116,7 @@ return function(data)
 
     <details class="bg-neutral-900 border border-neutral-800 rounded-lg overflow-hidden]] .. (duplicateCount == 0 and " open" or "") .. [[">
         <summary class="px-4 py-3 cursor-pointer select-none text-xs font-medium text-neutral-200 hover:bg-neutral-800/60 transition list-none flex items-center justify-between gap-2">
-                <span>Duplicate <span class="text-indigo-400 font-semibold">]] .. h(tostring(duplicateCount)) .. [['</span></span>
+                <span>Duplicate <span class="text-indigo-400 font-semibold">]] .. h(tostring(duplicateCount)) .. [[</span></span>
                 <svg class="w-4 h-4 text-neutral-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
         </summary>
         <div class="border-t border-neutral-800 px-3 py-3 flex flex-col gap-4">
