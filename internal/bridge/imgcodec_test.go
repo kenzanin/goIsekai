@@ -5,9 +5,12 @@ import (
 	"image"
 	"image/color"
 	"image/jpeg"
+	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/gen2brain/avif"
+	"github.com/gen2brain/jxl"
 	"github.com/gen2brain/webp"
 )
 
@@ -86,6 +89,40 @@ func TestEncodeForCacheAvif(t *testing.T) {
 	}
 }
 
+func TestEncodeForCacheJXL(t *testing.T) {
+	got, converted := encodeForCache(validJPEG(t, 900, 1400), FormatJXL, true, 720)
+	if !converted {
+		t.Fatal("expected conversion to jxl")
+	}
+	if !isJXL(got) {
+		t.Fatalf("output lacks a jxl signature: %q", got[:min(16, len(got))])
+	}
+	cfg, err := jxl.DecodeConfig(bytes.NewReader(got))
+	if err != nil {
+		t.Fatalf("decode jxl config: %v", err)
+	}
+	if cfg.Width != 462 || cfg.Height != 720 {
+		t.Errorf("dimensions = %dx%d, want 462x720", cfg.Width, cfg.Height)
+	}
+	// The L2 read path validates cached bytes through image.DecodeConfig, which
+	// only recognises JXL because the codec registers itself on import. Losing
+	// that would make every cached file look corrupt and get deleted.
+	if _, _, err := decodeImage(got); err != nil {
+		t.Fatalf("cached jxl does not decode: %v", err)
+	}
+}
+
+func TestEncodeForCacheDoesNotReEncodeJXL(t *testing.T) {
+	once, _ := encodeForCache(validJPEG(t, 400, 600), FormatJXL, true, 0)
+	twice, converted := encodeForCache(once, FormatJXL, true, 0)
+	if converted {
+		t.Error("jxl input under jxl format should not be re-encoded")
+	}
+	if !bytes.Equal(once, twice) {
+		t.Error("re-encoding changed bytes")
+	}
+}
+
 func TestEncodeForCacheOriginalFormatUntouched(t *testing.T) {
 	src := validJPEG(t, 900, 1400)
 	got, converted := encodeForCache(src, FormatOriginal, true, 720)
@@ -142,6 +179,7 @@ func TestFormatExtension(t *testing.T) {
 	for format, want := range map[ImageFormat]string{
 		FormatWebP:     ".webp",
 		FormatAVIF:     ".avif",
+		FormatJXL:      ".jxl",
 		FormatOriginal: ".img",
 	} {
 		if got := format.extension(); got != want {
@@ -151,6 +189,36 @@ func TestFormatExtension(t *testing.T) {
 	// An unknown format falls back to the legacy extension.
 	if got := ImageFormat("garbage").extension(); got != ".webp" {
 		t.Errorf("unknown extension() = %q, want .webp", got)
+	}
+}
+
+// TestLoadImageFormat guards the .ini handshake: a format the switch does not
+// name is silently ignored and the cache falls back to webp, so a new value has
+// to be registered here as well as in the codec.
+func TestLoadImageFormat(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		ini  string
+		want ImageFormat
+	}{
+		{"jxl", "image_format = jxl\n", FormatJXL},
+		{"avif", "image_format = avif\n", FormatAVIF},
+		{"webp", "image_format = webp\n", FormatWebP},
+		{"original", "image_format = original\n", FormatOriginal},
+		{"unknown falls back to webp", "image_format = heif\n", FormatWebP},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			path := filepath.Join(t.TempDir(), "goisekai.ini")
+			if err := os.WriteFile(path, []byte("[app]\n"+tc.ini), 0o600); err != nil {
+				t.Fatal(err)
+			}
+			if got := loadImageFormat(path); got != tc.want {
+				t.Errorf("loadImageFormat = %q, want %q", got, tc.want)
+			}
+		})
+	}
+	if got := loadImageFormat(filepath.Join(t.TempDir(), "missing.ini")); got != FormatWebP {
+		t.Errorf("missing config = %q, want webp", got)
 	}
 }
 

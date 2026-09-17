@@ -138,7 +138,7 @@ func (c *Config) set(section, key, val string) {
 			c.APIKey = val
 		case "image_format":
 			switch val {
-			case "webp", "avif", "original":
+			case "webp", "avif", "jxl", "original":
 				c.ImageFormat = val
 			}
 		case "cover_max_dim":

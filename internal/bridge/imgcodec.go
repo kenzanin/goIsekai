@@ -6,6 +6,7 @@ import (
 
 	"github.com/disintegration/imaging"
 	"github.com/gen2brain/avif"
+	"github.com/gen2brain/jxl"
 	"github.com/gen2brain/webp"
 )
 
@@ -17,6 +18,11 @@ type ImageFormat string
 const (
 	FormatWebP ImageFormat = "webp"
 	FormatAVIF ImageFormat = "avif"
+	// FormatJXL buys fidelity per byte rather than raw size: on real manga
+	// pages it encodes larger than AVIF at this quality. The cache is served
+	// straight to the reader's <img>, and JPEG XL is still behind a flag in
+	// Chrome and Firefox, so this stays a deliberate opt-in, not the default.
+	FormatJXL ImageFormat = "jxl"
 	// FormatOriginal keeps whatever the source sent (gifs, already-small
 	// jpegs, undecodable bytes) with no conversion at all.
 	FormatOriginal ImageFormat = "original"
@@ -29,6 +35,8 @@ func (f ImageFormat) extension() string {
 	switch f {
 	case FormatAVIF:
 		return ".avif"
+	case FormatJXL:
+		return ".jxl"
 	case FormatOriginal:
 		return ".img"
 	default:
@@ -51,11 +59,11 @@ func encodeForCache(data []byte, format ImageFormat, cover bool, maxDim int) ([]
 	if format == FormatOriginal || bytes.HasPrefix(data, []byte("GIF8")) {
 		return data, false
 	}
-	// Already in the target format headroom check: re-encoding AVIF/WebP loses
-	// quality for no size win, so bytes that need no downscale pass straight
-	// through. That covers every page image and every cover already under the
-	// cap, which is the common case.
-	if isAVIF(data) {
+	// Already in the target format headroom check: re-encoding AVIF/WebP/JXL
+	// loses quality for no size win, so bytes that need no downscale pass
+	// straight through. That covers every page image and every cover already
+	// under the cap, which is the common case.
+	if isAVIF(data) || isJXL(data) {
 		return data, false
 	}
 	if isWebP(data) {
@@ -79,6 +87,11 @@ func encodeForCache(data []byte, format ImageFormat, cover bool, maxDim int) ([]
 		// Speed 6 is libavif's balanced preset; covers are small enough that
 		// the encode stays well under the fetch it is replacing.
 		err = avif.Encode(&buf, src, avif.Options{Quality: 60, Speed: 6})
+	case FormatJXL:
+		// Effort 4 of 7: the top of the range spends several times the CPU on
+		// a wider block search for a few percent, which a cache write cannot
+		// afford on a page-sized image.
+		err = jxl.Encode(&buf, src, jxl.EncodeOptions{Quality: 85, Effort: 4})
 	default:
 		err = webp.Encode(&buf, src, webp.Options{Quality: 85})
 	}
@@ -93,9 +106,9 @@ func needsDownscale(w, h, maxDim int) bool {
 	return maxDim > 0 && (w > maxDim || h > maxDim)
 }
 
-// decodeImage decodes any format the process registered a decoder for. The
-// webp package registers itself with image.RegisterFormat, so a webp source
-// reaches imaging.Fit like any other format.
+// decodeImage decodes any format the process registered a decoder for. The webp
+// and jxl packages register themselves with image.RegisterFormat, so a source
+// in either reaches imaging.Fit like any other format.
 func decodeImage(data []byte) (image.Image, string, error) {
 	return image.Decode(bytes.NewReader(data))
 }
@@ -111,4 +124,12 @@ func isAVIF(data []byte) bool {
 	}
 	brand := data[8:12]
 	return bytes.Equal(brand, []byte("avif")) || bytes.Equal(brand, []byte("avis"))
+}
+
+// isJXL matches both JPEG XL signatures: the bare codestream and the container.
+func isJXL(data []byte) bool {
+	if len(data) >= 2 && data[0] == 0xff && data[1] == 0x0a {
+		return true
+	}
+	return bytes.HasPrefix(data, []byte("\x00\x00\x00\x0cJXL \x0d\x0a\x87\x0a"))
 }

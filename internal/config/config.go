@@ -81,7 +81,8 @@ type Config struct {
 	StatusAlias map[string][]string
 
 	// ImageFormat is the on-disk encoding for cached images: "webp" (default),
-	// "avif" (smaller, slower to encode), or "original" (no conversion).
+	// "avif" (smaller, slower to encode), "jxl" (smallest on paper, but only
+	// Safari renders JPEG XL without a flag), or "original" (no conversion).
 	ImageFormat string
 	// CoverMaxDim caps the longer side of a cover in pixels when it is cached.
 	// 0 disables downscaling. Page images are never resized.

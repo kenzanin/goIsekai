@@ -13,6 +13,7 @@ require (
 	github.com/disintegration/imaging v1.6.2
 	github.com/dop251/goja v0.0.0-20260901132549-43234fa61381
 	github.com/gen2brain/avif v0.6.0
+	github.com/gen2brain/jxl v0.2.0
 	github.com/gen2brain/webp v0.6.4
 	github.com/go-chi/chi/v5 v5.3.2
 	github.com/go-jet/jet/v2 v2.15.0

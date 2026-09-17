@@ -30,10 +30,12 @@ func (s *AppService) GetImage(pluginID, url string, headers map[string]string, m
 	// L2: disk cache. Converted images are stored as <key>.<format>, anything
 	// that kept its original bytes (gif passthrough, undecodable, "original"
 	// mode) as <key>.img. Older builds used ".webp"/".img" only, so every
-	// format we can write is tried before declaring a miss.
+	// format we can write is tried before declaring a miss. JXL comes last:
+	// when a format switch left several copies behind, the renderable one wins.
 	if base := s.diskCachePath(pluginID, mangaID, chapterID, url); base != "" {
 		for _, ext := range []string{
 			"." + string(FormatAVIF), "." + string(FormatWebP), ".img",
+			"." + string(FormatJXL),
 		} {
 			if data, err := os.ReadFile(base + ext); err == nil {
 				if validateImageFast(data) {

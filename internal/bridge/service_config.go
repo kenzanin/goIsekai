@@ -12,7 +12,7 @@ func loadImageFormat(cfgPath string) ImageFormat {
 		return FormatWebP
 	}
 	switch ImageFormat(cfg.ImageFormat) {
-	case FormatAVIF, FormatOriginal, FormatWebP:
+	case FormatAVIF, FormatJXL, FormatOriginal, FormatWebP:
 		return ImageFormat(cfg.ImageFormat)
 	default:
 		return FormatWebP
