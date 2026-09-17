@@ -22,6 +22,9 @@ var THUMB_CDN = "https://thumb.mghcdn.com/";
 // Module-level cached access key (refreshed on first call or after error).
 var _cachedKey = null;
 
+// Last refusal message reported by the GraphQL API (rate limit, expired key).
+var _gqlError = null;
+
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
@@ -50,48 +53,59 @@ function _fetchAccessKey() {
     return sc.substring(start, end);
 }
 
-// Execute a GraphQL query with retry on auth failure.
+// Execute a GraphQL query, dropping the cached key and retrying once when the
+// API refuses. MangaHub reports both expired keys and its "API rate limit
+// excessed" refusal as HTTP 200 with an errors array and a null payload, so the
+// status code alone cannot tell a good answer from a refused one. The message is
+// kept in _gqlError so callers can surface it instead of a silent empty list.
 function _graphqlQuery(query) {
-    var key = _cachedKey;
-    if (!key) {
-        key = _fetchAccessKey();
-        if (key) _cachedKey = key;
-    }
-    if (!key) {
-        log.error("1manga: no mhub_access key available");
-        return null;
-    }
+    _gqlError = null;
+    for (var attempt = 0; attempt < 2; attempt++) {
+        var key = _cachedKey;
+        if (!key) {
+            key = _fetchAccessKey();
+            if (key) _cachedKey = key;
+        }
+        if (!key) {
+            log.error("1manga: no mhub_access key available");
+            return null;
+        }
 
-    var r = host.http.post(GRAPHQL_URL, JSON.stringify({ query: query }), {
-        "Content-Type": "application/json",
-        "Origin": SITE_URL,
-        "Referer": SITE_URL + "/",
-        "x-mhub-access": key,
-    });
-
-    if (!r || r.status < 200 || r.status >= 300) {
-        // Token expired — refresh and retry once.
-        log.info("1manga: GraphQL status " + (r ? r.status : "null") + ", refreshing key");
-        _cachedKey = null;
-        key = _fetchAccessKey();
-        if (key) _cachedKey = key;
-        if (!key) return null;
-
-        r = host.http.post(GRAPHQL_URL, JSON.stringify({ query: query }), {
+        var r = host.http.post(GRAPHQL_URL, JSON.stringify({ query: query }), {
             "Content-Type": "application/json",
             "Origin": SITE_URL,
             "Referer": SITE_URL + "/",
             "x-mhub-access": key,
         });
-        if (!r || r.status < 200 || r.status >= 300) return null;
-    }
 
-    try {
-        return JSON.parse(r.body);
-    } catch (e) {
-        log.error("1manga: JSON parse error: " + e);
-        return null;
+        if (!r || r.status < 200 || r.status >= 300) {
+            log.info("1manga: GraphQL status " + (r ? r.status : "null") + ", refreshing key");
+            _cachedKey = null;
+            continue;
+        }
+
+        var parsed;
+        try {
+            parsed = JSON.parse(r.body);
+        } catch (e) {
+            log.error("1manga: JSON parse error: " + e);
+            return null;
+        }
+        if (!parsed) {
+            log.error("1manga: empty GraphQL response");
+            return null;
+        }
+        if (parsed.errors && parsed.errors.length) {
+            _gqlError = parsed.errors[0].message || "GraphQL error";
+        } else if (!parsed.data) {
+            _gqlError = "GraphQL response carried no data";
+        } else {
+            return parsed;
+        }
+        log.warn("1manga: GraphQL refused (" + _gqlError + "), retrying with a fresh key");
+        _cachedKey = null;
     }
+    return null;
 }
 
 // Escape a string for embedding in a GraphQL string literal.
@@ -239,6 +253,9 @@ function getPageList(arg) {
 
     var data = _graphqlQuery(gql);
     if (!data || !data.data || !data.data.chapter) {
+        // A refused query (rate limit, expired key) must fail loudly: returning
+        // an empty list renders a blank chapter with no explanation.
+        if (_gqlError) throw new Error("1manga: " + _gqlError);
         return JSON.stringify([]);
     }
 
