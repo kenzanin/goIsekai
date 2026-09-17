@@ -8,6 +8,11 @@ function regexPayload() {
     '<a href="/m/a/" title="A"><a href="/m/b/" title="B">',
     'href="([^"]+)" title="([^"]+)"'
   ).forEach(function (row) { rows.push(row.join(",")); });
+  var matches = [];
+  host.regex.find_all(
+    '<a href="/m/a/" title="A"><a href="/m/b/" title="B">',
+    'href="([^"]+)" title="([^"]+)"'
+  ).forEach(function (row) { matches.push(row[0] + "=" + row[1]); });
   var span = host.regex.find_index('<a href="/x/">', 'href="([^"]+)"');
   return [
     String(host.regex.find('chapterId = 42', 'chapterId\\s*=\\s*(\\d+)')),
@@ -19,6 +24,7 @@ function regexPayload() {
     String(span[0]),
     String(span[1]),
     host.regex.quote('a+b'),
+    matches.join(';'),
   ].join(',');
 }
 

@@ -11,6 +11,13 @@ local function regex_payload()
     )) do
     rows[#rows + 1] = table.concat(row, ",")
   end
+  local matches = {}
+  for href, title in host.regex.gmatch(
+      '<a href="/m/a/" title="A"><a href="/m/b/" title="B">',
+      [[href="([^"]+)" title="([^"]+)"]]
+    ) do
+    matches[#matches + 1] = href .. "=" .. title
+  end
   local start, finish = host.regex.find_index('<a href="/x/">', [[href="([^"]+)"]])
   return table.concat({
     table.concat({host.regex.find("chapterId = 42", [[chapterId\s*=\s*(\d+)]])}),
@@ -22,6 +29,7 @@ local function regex_payload()
     tostring(start),
     tostring(finish),
     host.regex.quote("a+b"),
+    table.concat(matches, ";"),
   }, ",")
 end
 

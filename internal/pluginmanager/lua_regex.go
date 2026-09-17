@@ -15,6 +15,7 @@ func regexGroup(state *lua.State) *lua.Table {
 	_ = group.RawSetString("find", luaRegexFind(state))
 	_ = group.RawSetString("match", luaRegexMatch(state))
 	_ = group.RawSetString("find_all", luaRegexFindAll(state))
+	_ = group.RawSetString("gmatch", luaRegexGmatch(state))
 	_ = group.RawSetString("find_index", luaRegexFindIndex(state))
 	_ = group.RawSetString("quote", luaRegexQuote(state))
 	_ = group.RawSetString("replace", luaRegexReplace(state))
@@ -95,6 +96,34 @@ func regexRow(state *lua.State, row []string) lua.Value {
 		_ = cells.RawSetInt(i+1, lua.String(cell))
 	}
 	return cells.Value()
+}
+
+// luaRegexGmatch wraps host.regex.gmatch(subject, pattern): the iterator triple
+// a Lua generic for consumes, so a plugin keeps the `for a, b in ... do` shape
+// it already had and the captures arrive as separate loop variables. JS has no
+// generic for, so its runtimes use find_all instead.
+func luaRegexGmatch(state *lua.State) lua.Value {
+	v, _ := state.NewNativeFunction(func(frame lua.Frame) lua.Outcome {
+		rows, err := pluginutil.RegexFindAll(luaRegexArgs(frame))
+		if err != nil {
+			return frame.ReturnValues(lua.Nil(), lua.String(err.Error()))
+		}
+		next := 0
+		iter, _ := state.NewNativeFunction(func(f lua.Frame) lua.Outcome {
+			if next >= len(rows) {
+				return f.ReturnValue(lua.Nil())
+			}
+			row := rows[next]
+			next++
+			values := make([]lua.Value, len(row))
+			for i, capture := range row {
+				values[i] = lua.String(capture)
+			}
+			return f.ReturnValues(values...)
+		})
+		return frame.ReturnValues(iter.Value(), lua.Nil(), lua.Nil())
+	})
+	return v.Value()
 }
 
 // luaRegexFindIndex wraps host.regex.find_index(subject, pattern, init): the
