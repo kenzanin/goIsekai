@@ -17,7 +17,8 @@ const wantHostPayload = "a%20b|a b|&|hi|bold x|Abc|aGk=|hi|YT9i|6869|hi|" +
 	"f7bc83f430538424b13298e6aa6fb143ef4d59a14946175997479dbc2d1a3cd8|" +
 	"0206|6869|6869|aGk|6869|HjB2RwY5YAtJKGYJESc|" +
 	`12.5|7.5|{"a":[1,2]}|2026-01-02T00:00:00Z|` +
-	`{"a":1,"b":"x"}|[1,2,3]|{"a":1,"b":"x"}|true`
+	`{"a":1,"b":"x"}|[1,2,3]|{"a":1,"b":"x"}|` +
+	`42,Solo Leveling,true,false,a b,/m/a/,A;/m/b/,B|true`
 
 // hostFixtureDetail copies a host-native fixture into a temp dir and returns the
 // manga detail it produces. The fixture reports the JSON natives' failure texts

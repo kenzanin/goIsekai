@@ -1,5 +1,23 @@
 var PLUGIN = { contract_version: 1, name: "JS host natives" };
 
+// regexPayload reports host.regex's output in a fixed string so the
+// cross-runtime test compares JS and Lua literally.
+function regexPayload() {
+  var rows = [];
+  host.regex.find_all(
+    '<a href="/m/a/" title="A"><a href="/m/b/" title="B">',
+    'href="([^"]+)" title="([^"]+)"'
+  ).forEach(function (row) { rows.push(row.join(",")); });
+  return [
+    String(host.regex.find('chapterId = 42', 'chapterId\\s*=\\s*(\\d+)')),
+    String(host.regex.find('<h1>Solo Leveling</h1>', '<h1>([^<]+)</h1>')),
+    String(host.regex.match('https://x/1.jpg', '\\.(?:jpg|png)$')),
+    String(host.regex.match('https://x/1.webp', '\\.(?:jpg|png)$')),
+    host.regex.replace('a  b', '\\s+', ' '),
+    rows.join(';'),
+  ].join(',');
+}
+
 function payload() {
   return [
     host.text.url_encode("a b"),
@@ -33,6 +51,7 @@ function payload() {
     host.json.encode(host.json.decode('{"b":"x","a":1}')),
     host.json.encode(host.json.decode("[1,2,3]")),
     host.json.encode({a: 1, b: "x"}),
+    regexPayload(),
     // get_body reports every failure mode as null, transport errors included.
     String(host.http.get_body("http://127.0.0.1:1/") === null),
   ].join("|");

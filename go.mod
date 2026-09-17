@@ -1,6 +1,6 @@
 module goisekai
 
-go 1.27.0
+go 1.27.1
 
 require (
 	github.com/PuerkitoBio/goquery v1.8.1
@@ -11,6 +11,7 @@ require (
 	github.com/bogdanfinn/tls-client v1.15.1
 	github.com/chromedp/cdproto v0.0.0-20260714215040-dc233986426f
 	github.com/chromedp/chromedp v0.16.0
+	github.com/coregx/coregex v0.12.25
 	github.com/disintegration/imaging v1.6.2
 	github.com/dop251/goja v0.0.0-20260901132549-43234fa61381
 	github.com/gen2brain/avif v0.6.0
@@ -34,6 +35,7 @@ require (
 	github.com/bogdanfinn/utls v1.7.7-barnius // indirect
 	github.com/bogdanfinn/websocket v1.5.5-barnius // indirect
 	github.com/chromedp/sysutil v1.1.0 // indirect
+	github.com/coregx/ahocorasick v0.3.1 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/dlclark/regexp2/v2 v2.5.2 // indirect
 	github.com/dustin/go-humanize v1.0.1 // indirect

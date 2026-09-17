@@ -59,12 +59,15 @@ func registerHostNatives(state *lua.State, m *Manager, id string) {
 		panic(err)
 	}
 
+	regexTbl := regexGroup(state)
+
 	host, _ := state.NewTable()
 	_ = host.RawSetString("text", text.Value())
 	_ = host.RawSetString("codecs", codecs.Value())
 	_ = host.RawSetString("crypto", crypto.Value())
 	_ = host.RawSetString("json", jsonTbl.Value())
 	_ = host.RawSetString("html", htmlTbl.Value())
+	_ = host.RawSetString("regex", regexTbl.Value())
 
 	// host.http — thin wrappers over http_request proxy.
 	http, _ := state.NewTable()

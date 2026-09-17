@@ -1,5 +1,26 @@
 PLUGIN = { contract_version = 1, name = "Lua host natives" }
 
+-- regex_payload reports host.regex's output in a fixed string so the
+-- cross-runtime test compares Lua and JS literally. Patterns are written as
+-- long strings, so a backslash reaches the engine unescaped.
+local function regex_payload()
+  local rows = {}
+  for _, row in ipairs(host.regex.find_all(
+      '<a href="/m/a/" title="A"><a href="/m/b/" title="B">',
+      [[href="([^"]+)" title="([^"]+)"]]
+    )) do
+    rows[#rows + 1] = table.concat(row, ",")
+  end
+  return table.concat({
+    table.concat({host.regex.find("chapterId = 42", [[chapterId\s*=\s*(\d+)]])}),
+    table.concat({host.regex.find("<h1>Solo Leveling</h1>", [[<h1>([^<]+)</h1>]])}),
+    tostring(host.regex.match("https://x/1.jpg", [[\.(?:jpg|png)$]])),
+    tostring(host.regex.match("https://x/1.webp", [[\.(?:jpg|png)$]])),
+    host.regex.replace("a  b", [[\s+]], " "),
+    table.concat(rows, ";"),
+  }, ",")
+end
+
 local function payload()
   return table.concat({
     host.text.url_encode("a b"),
@@ -33,6 +54,7 @@ local function payload()
     host.json.encode(host.json.decode('{"b":"x","a":1}')),
     host.json.encode(host.json.decode("[1,2,3]")),
     host.json.encode({a = 1, b = "x"}),
+    regex_payload(),
     -- get_body reports every failure mode as nil, transport errors included, so
     -- a plugin can drop the per-call status guard.
     tostring(host.http.get_body("http://127.0.0.1:1/") == nil),
