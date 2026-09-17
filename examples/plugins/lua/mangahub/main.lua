@@ -48,7 +48,7 @@ local function fetch_access_key()
     if not resp or not resp.headers then return nil end
 
     local cookie = resp.headers["Set-Cookie"] or ""
-    local key = cookie:match("mhub_access=([^;]+)")
+    local key = host.regex.find(cookie, [[mhub_access=([^;]+)]])
     if not key or key == "" then return nil end
     return key
 end
@@ -175,7 +175,7 @@ function get_manga_detail(arg)
     -- genres arrives as one comma-separated string; the ABI wants a list.
     local genres = {}
     if type(m.genres) == "string" then
-        for part in m.genres:gmatch("[^,]+") do
+        for part in host.regex.gmatch(m.genres, [[[^,]+]]) do
             local name = host.text.trim(part)
             if name ~= "" then genres[#genres + 1] = name end
         end
@@ -246,9 +246,8 @@ function get_page_list(arg)
     local chapterID = host.json.decode(arg)
     if not chapterID then return host.json.encode({}) end
 
-    -- The trailing dash must be escaped: "r-" in a Lua pattern means "zero or
-    -- more r, lazily", so a bare ":chapter-" would match ":chapte".
-    local slug, number = chapterID:match("^(.-):chapter%-(.+)$")
+    -- Split on the first ":" — the slug cannot contain one, the tail can.
+    local slug, number = host.regex.find(chapterID, [[(?s)^(.*?):chapter-(.+)$]])
     if not slug then return host.json.encode({}) end
     log.info("mangahub pages: slug=" .. slug .. " ch=" .. number)
 
