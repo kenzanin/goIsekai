@@ -39,19 +39,19 @@ function search_manga(arg)
 
     -- Parse .post-title > h3 > a for title + href
     -- Structure: <div class="post-title"><h3 class="h4"><a href="URL">TITLE</a></h3></div>
-    for href, title in body:gmatch('post%-title[^>]*>.-<a[^>]*href="([^"]+)"[^>]*>([^<]+)</a>') do
-        local slug = href:match('/manga/([^/]+)/') or href:match('/manga/([^/]+)$')
+    for href, title in host.regex.gmatch(body, [[(?s)post-title[^>]*>.*?<a[^>]*href="([^"]+)"[^>]*>([^<]+)</a>]]) do
+        local slug = host.regex.find(href, [[/manga/([^/]+)/]]) or host.regex.find(href, [[/manga/([^/]+)$]])
         if slug and not seen[slug] then
             seen[slug] = true
             -- Find cover: search nearby for data-src or src with image URL
             local cover = ""
-            local pos = body:find(slug, 1, true)
+            local pos = host.regex.find_index(body, host.regex.quote(slug), 1)
             if pos then
                 local area = body:sub(math.max(1, pos - 3000), math.min(#body, pos + 3000))
                 -- Madara lazy images: data-src with possible tabs/newlines before URL
-                cover = area:match('data%-src="[\t\n%s]*(https?://[^"]+)"')
-                    or area:match('data%-src="(https?://[^"]+)"')
-                    or area:match('src="(https?://[^"]+)"')
+                cover = host.regex.find(area, [[data-src="[\t\n\s]*(https?://[^"]+)"]])
+                    or host.regex.find(area, [[data-src="(https?://[^"]+)"]])
+                    or host.regex.find(area, [[src="(https?://[^"]+)"]])
                 if cover then cover = trim(cover) end
             end
             results[#results + 1] = {
@@ -77,37 +77,37 @@ function get_manga_detail(arg)
         cover_url = "", genres = {}, status = "" }
 
     -- cover
-    local cover_block = body:match('class="summary_image".-</a>') or ""
-    detail.cover_url = trim(cover_block:match('data%-src="([^"]+)"') or cover_block:match('src="([^"]+)"') or "")
+    local cover_block = host.regex.find(body, [[(?s)class="summary_image".*?</a>]]) or ""
+    detail.cover_url = trim(host.regex.find(cover_block, [[data-src="([^"]+)"]]) or host.regex.find(cover_block, [[src="([^"]+)"]]) or "")
 
     -- title
-    local tblock = body:match('class="post%-title[^"]*">(.-)</div>') or ""
-    detail.title = unescape(trim(tblock:match("<h[1-6][^>]*>(.-)</h[1-6]>") or ""))
+    local tblock = host.regex.find(body, [[(?s)class="post-title[^"]*">(.*?)</div>]]) or ""
+    detail.title = unescape(trim(host.regex.find(tblock, [[(?s)<h[1-6][^>]*>(.*?)</h[1-6]>]]) or ""))
 
     -- author
-    local ablock = body:match('class="author%-content">(.-)</div>') or ""
+    local ablock = host.regex.find(body, [[(?s)class="author-content">(.*?)</div>]]) or ""
     detail.author = host.text.strip_html(ablock):gsub(",", ", ")
 
     -- genres
-    local gblock = body:match('class="genres%-content">(.-)</div>') or ""
-    for g in gblock:gmatch("<a[^>]*>([^<]+)</a>") do
+    local gblock = host.regex.find(body, [[(?s)class="genres-content">(.*?)</div>]]) or ""
+    for g in host.regex.gmatch(gblock, [[<a[^>]*>([^<]+)</a>]]) do
         local name = unescape(trim(g))
         if name ~= "" then detail.genres[#detail.genres + 1] = name end
     end
 
     -- status
-    local sblock = body:match('class="post%-status">(.-)$') or ""
+    local sblock = host.regex.find(body, [[(?s)class="post-status">(.*?)$]]) or ""
     if sblock ~= "" then
-        local after = sblock:match("Status%s*</h5>.-class=\"summary%-content\">%s*([^<]+)")
+        local after = host.regex.find(sblock, [[(?s)Status\s*</h5>.*?class="summary-content">\s*([^<]+)]])
         if after then
             detail.status = host.text.normalize_status(trim(after))
         end
     end
 
     -- description
-    local dblock = body:match('class="summary__content[^"]*">(.-)<span%s+class="[^"]*content%-readmore"') or ""
-    if dblock == "" then dblock = body:match('class="summary__content[^"]*">(.-)</div>') or "" end
-    detail.description = host.text.strip_html(dblock):gsub("%s+", " ")
+    local dblock = host.regex.find(body, [[(?s)class="summary__content[^"]*">(.*?)<span\s+class="[^"]*content-readmore"]]) or ""
+    if dblock == "" then dblock = host.regex.find(body, [[(?s)class="summary__content[^"]*">(.*?)</div>]]) or "" end
+    detail.description = host.regex.replace(host.text.strip_html(dblock), [[\s+]], " ")
 
     return host.json.encode(detail)
 end
@@ -127,12 +127,12 @@ function get_chapter_list(arg)
     local seen = {}
 
     -- Madara chapter list: <li class="wp-manga-chapter"><a href="URL">LABEL</a>...<i>DATE</i></li>
-    for li in body:gmatch('<li[^>]*class="wp%-manga%-chapter[^"]*"[^>]*>(.-)</li>') do
-        local href = li:match('href="([^"]+)"')
-        local label = trim(li:match('>([^<]*[Cc]hapter[^<]*)<') or "")
-        local date = trim(li:match('chapter%-release%-date[^>]*>.-<i>([^<]+)</i>') or "")
+    for li in host.regex.gmatch(body, [[(?s)<li[^>]*class="wp-manga-chapter[^"]*"[^>]*>(.*?)</li>]]) do
+        local href = host.regex.find(li, [[href="([^"]+)"]])
+        local label = trim(host.regex.find(li, [[>([^<]*[Cc]hapter[^<]*)<]]) or "")
+        local date = trim(host.regex.find(li, [[(?s)chapter-release-date[^>]*>.*?<i>([^<]+)</i>]]) or "")
         if href and label ~= "" then
-            local cid = href:match('/manga/[^/]+/([^/]+)/?$') or href:match('/([^/]+)/?$')
+            local cid = host.regex.find(href, [[/manga/[^/]+/([^/]+)/?$]]) or host.regex.find(href, [[/([^/]+)/?$]])
             if cid and not seen[cid] then
                 seen[cid] = true
                 -- Released dates normalize through host.text; "" means the site
@@ -152,8 +152,8 @@ function get_chapter_list(arg)
 
     -- Fallback: extract chapter links from <a href> containing /chapter-
     if #chapters == 0 then
-        for href, label in body:gmatch('<a[^>]*href="([^"]*chapter-[^"]+)"[^>]*>%s*([^<]+)%s*</a>') do
-            local cid = href:match('/([^/]+)/?$')
+        for href, label in host.regex.gmatch(body, [[<a[^>]*href="([^"]*chapter-[^"]+)"[^>]*>\s*([^<]+)\s*</a>]]) do
+            local cid = host.regex.find(href, [[/([^/]+)/?$]])
             if cid and not seen[cid] then
                 seen[cid] = true
                 chapters[#chapters + 1] = {
@@ -181,17 +181,17 @@ function get_page_list(arg)
     local pages = {}
     local pos = 1
     while true do
-        local s = body:find("<img", pos, true)
+        local s = host.regex.find_index(body, "<img", pos)
         if not s then break end
-        local e = body:find(">", s, true)
+        local e = host.regex.find_index(body, ">", s)
         if not e then break end
         local tag = body:sub(s, e)
-        if tag:find("wp%-manga%-chapter%-img") then
+        if host.regex.match(tag, "wp-manga-chapter-img") then
             -- data-src may have tabs/newlines between the attribute and URL value
-            local src = tag:match('data%-src="[\t\n%s]*(https?://[^"]+)"')
-                or tag:match('data%-src="(https?://[^"]+)"')
-                or tag:match('src="[\t\n%s]*(https?://[^"]+)"')
-                or tag:match('src="(https?://[^"]+)"')
+            local src = host.regex.find(tag, [[data-src="[\t\n\s]*(https?://[^"]+)"]])
+                or host.regex.find(tag, [[data-src="(https?://[^"]+)"]])
+                or host.regex.find(tag, [[src="[\t\n\s]*(https?://[^"]+)"]])
+                or host.regex.find(tag, [[src="(https?://[^"]+)"]])
             if src then pages[#pages + 1] = { index = #pages, url = trim(src) } end
         end
         pos = e + 1
