@@ -7,7 +7,7 @@ local util = {}
 -- The site appends " series" ("COMPLETED series"), so drop that suffix before
 -- delegating to the host map.
 local function normalizeStatus(s)
-    local raw = (s or ""):gsub("%s+series%s*$", "")
+    local raw = host.regex.replace(s or "", [[\s+series\s*$]], "")
     return host.text.normalize_status(raw)
 end
 
@@ -18,16 +18,16 @@ function util.parse_search(html)
     local results = {}
     local seen = {}
 
-    for block in string.gmatch(html, '<div%s+class="mangak?a?_search_item">(.-)</div>') do
-        local href, title = block:match('<h%a+%s*>%s*<a[^>]*href="([^"]+)"[^>]*>([^<]+)</a>')
+    for block in host.regex.gmatch(html, [[(?s)<div\s+class="mangak?a?_search_item">(.*?)</div>]]) do
+        local href, title = host.regex.find(block, [[<h[a-zA-Z]+\s*>\s*<a[^>]*href="([^"]+)"[^>]*>([^<]+)</a>]])
         if not href then
-            href, title = block:match('<a[^>]*href="([^"]+)"[^>]*>([^<]+)</a>')
+            href, title = host.regex.find(block, [[<a[^>]*href="([^"]+)"[^>]*>([^<]+)</a>]])
         end
         if href then
-            local slug = href:match('/[Mm]anga/([^/"?]+)')
+            local slug = host.regex.find(href, [[/[Mm]anga/([^/"?]+)]])
             if slug and not seen[slug] then
                 seen[slug] = true
-                local cover = block:match('data%-src="([^"]+)"') or block:match('<img[^>]*src="([^"]+)"') or ""
+                local cover = host.regex.find(block, [[data-src="([^"]+)"]]) or host.regex.find(block, [[<img[^>]*src="([^"]+)"]]) or ""
                 results[#results + 1] = {
                     id = slug,
                     title = host.text.trim(title),
@@ -39,8 +39,8 @@ function util.parse_search(html)
 
     -- Broader fallback
     if #results == 0 then
-        for href, title in string.gmatch(html, '<a[^>]*href="([^"]*[Mm]anga/[^"]+)"[^>]*>([^<]+)</a>') do
-            local slug = href:match('/[Mm]anga/([^/"?]+)')
+        for href, title in host.regex.gmatch(html, [[<a[^>]*href="([^"]*[Mm]anga/[^"]+)"[^>]*>([^<]+)</a>]]) do
+            local slug = host.regex.find(href, [[/[Mm]anga/([^/"?]+)]])
             if slug and not seen[slug] and host.text.trim(title) ~= "" then
                 seen[slug] = true
                 results[#results + 1] = {
@@ -61,22 +61,22 @@ function util.parse_manga_detail(html, manga_id)
     local detail = { id = manga_id }
 
     -- Title: <h1>TITLE</h1>
-    detail.title = host.text.strip_html(html:match('<h1>(.-)</h1>') or "")
+    detail.title = host.text.strip_html(host.regex.find(html, [[(?s)<h1>(.*?)</h1>]]) or "")
     if detail.title == "" then
-        local data_block = html:match('class="manga_series_data">(.-)%s*</div>%s*</div>') or ""
-        detail.title = host.text.strip_html(data_block:match('<h5>(.-)</h5>')) or ""
+        local data_block = host.regex.find(html, [[(?s)class="manga_series_data">(.*?)\s*</div>\s*</div>]]) or ""
+        detail.title = host.text.strip_html(host.regex.find(data_block, [[(?s)<h5>(.*?)</h5>]])) or ""
     end
 
     -- Cover
-    local img_block = html:match('class="manga_series_image">(.-)</div>') or ""
-    detail.cover_url = img_block:match('<img[^>]*src="([^"]*)"') or ""
+    local img_block = host.regex.find(html, [[(?s)class="manga_series_image">(.*?)</div>]]) or ""
+    detail.cover_url = host.regex.find(img_block, [[<img[^>]*src="([^"]*)"]]) or ""
 
 	-- Status, Author, Artist — matched by row label, not fixed index, because
 	-- the info div set varies per page (some rows absent), which shifts indexes.
-	local data_block = html:match('class="manga_series_data">(.-)%s*</div>%s*</div>')
-		or html:match('class="manga_series_data">(.-)</div>') or ""
+	local data_block = host.regex.find(html, [[(?s)class="manga_series_data">(.*?)\s*</div>\s*</div>]])
+		or host.regex.find(html, [[(?s)class="manga_series_data">(.*?)</div>]]) or ""
 	local divs = {}
-	for d in data_block:gmatch('<div[^>]*>(.-)</div>') do
+	for d in host.regex.gmatch(data_block, [[(?s)<div[^>]*>(.*?)</div>]]) do
 		divs[#divs + 1] = host.text.strip_html(d)
 	end
 	local function rowValue(label)
@@ -84,7 +84,7 @@ function util.parse_manga_detail(html, manga_id)
 			local trimmed = host.text.trim(v)
 			if trimmed:sub(1, #label):lower() == label:lower() then
 				local val = trimmed:sub(#label + 1)
-				return host.text.trim(val:gsub("^%s*:?%s*", "")), true
+				return host.text.trim(host.regex.replace(val, [[^\s*:?\s*]], "")), true
 			end
 		end
 		return nil, false
@@ -100,8 +100,8 @@ function util.parse_manga_detail(html, manga_id)
 
     -- Genres
     local genres = {}
-    local genre_block = html:match('class="series_sub_genre_list">(.-)</div>') or ""
-    for g in genre_block:gmatch('<a[^>]*>([^<]+)</a>') do
+    local genre_block = host.regex.find(html, [[(?s)class="series_sub_genre_list">(.*?)</div>]]) or ""
+    for g in host.regex.gmatch(genre_block, [[<a[^>]*>([^<]+)</a>]]) do
         local name = host.text.trim(g)
         if name ~= "" then genres[#genres + 1] = name end
     end
@@ -111,8 +111,8 @@ function util.parse_manga_detail(html, manga_id)
     -- text in a <p>. Matching to the first </div> stops at that label, and the
     -- fallback then strips the label down to itself, so anchor on the closing
     -- tag pair instead to reach the <p>.
-    local desc_section = html:match('class="manga_series_description">(.-)</div>%s*</div>') or ""
-    detail.description = host.text.strip_html(desc_section:match('<p>(.-)</p>') or desc_section)
+    local desc_section = host.regex.find(html, [[(?s)class="manga_series_description">(.*?)</div>\s*</div>]]) or ""
+    detail.description = host.text.strip_html(host.regex.find(desc_section, [[(?s)<p>(.*?)</p>]]) or desc_section)
 
     return detail
 end
@@ -130,13 +130,13 @@ function util.parse_chapter_list(html, manga_id)
     -- (oldest-first: Chapter 1..N). The series_sub_chapter_list block above it
     -- holds only the latest ~4 chapters (newest-first), so scanning the whole
     -- page mixes both blocks and scrambles the order.
-    local block = html:match('class="manga_series_list">(.-)</table>')
+    local block = host.regex.find(html, [[(?s)class="manga_series_list">(.*?)</table>]])
         or html
 
-    for href, name in block:gmatch('<a[^>]*href="([^"]*Read1_[^"]+)"[^>]*>([^<]+)</a>') do
+    for href, name in host.regex.gmatch(block, [[<a[^>]*href="([^"]*Read1_[^"]+)"[^>]*>([^<]+)</a>]]) do
         local ch_name = host.text.trim(name)
         if ch_name ~= "" then
-            local ch_path = href:match("/Read1_(.+)")
+            local ch_path = host.regex.find(href, [[/Read1_(.+)]])
             local chapter_id = manga_id .. ":" .. (ch_path or ch_name)
             if not seen[chapter_id] then
                 seen[chapter_id] = true
@@ -163,13 +163,13 @@ end
 function util.parse_page_list(html)
     local pages = {}
     local n = 0
-    for src in string.gmatch(html, '<img[^>]*id="gohere"[^>]*src="([^"]*)"') do
+    for src in host.regex.gmatch(html, [[<img[^>]*id="gohere"[^>]*src="([^"]*)"]]) do
         n = n + 1
         pages[n] = { url = src }
     end
     if #pages == 0 then
-        for src in string.gmatch(html, '<img[^>]*src="(https?://[^"]+)"') do
-            if not src:match('%.svg$') and not src:match('logo') and not src:match('icon') then
+        for src in host.regex.gmatch(html, [[<img[^>]*src="(https?://[^"]+)"]]) do
+            if not host.regex.match(src, [[\.svg$]]) and not host.regex.match(src, "logo") and not host.regex.match(src, "icon") then
                 n = n + 1
                 pages[n] = { url = src }
             end

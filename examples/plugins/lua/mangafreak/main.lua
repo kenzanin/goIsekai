@@ -80,7 +80,7 @@ end
 function get_page_list(arg)
     local chapter_id = host.json.decode(arg) -- "SLUG:chapter-PATH"
     -- Extract Read1_ path from "SLUG:Read1_SLUG_CHNUM"
-    local _, _, ch_path = chapter_id:find(":(.+)$")
+    local ch_path = host.regex.find(chapter_id, [[:(.+)$]])
     local url = BASE .. "/Read1_" .. ch_path
     local body = host.http.get_body(url)
     if not body then
