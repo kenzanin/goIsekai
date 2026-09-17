@@ -7,7 +7,7 @@ var PLUGIN = {
     contract_version: 1,
     name: "1Manga",
     site_url: "https://1manga.co",
-    logo: "",
+    logo: "logo.png",
     verify_url: "https://1manga.co",
     needs_human_verify: false,
     thumb_ratio: 0.703,
@@ -234,7 +234,7 @@ function getChapterList(arg) {
             // host normalizes all three. An unparseable date leaves the key
             // out, so Go keeps time.Time zero instead of failing the decode.
             released_at: host.text.date_to_iso(ch.date) || undefined,
-            url: "https://1manga.co/" + slug + "/" + ch.number,
+            url: SITE_URL + "/chapter/" + slug + "/chapter-" + ch.number,
         });
     }
 
