@@ -1,13 +1,19 @@
 package bridge
 
 import (
+	"errors"
 	"fmt"
 	"time"
 
+	"goisekai/internal/config"
 	"goisekai/internal/database"
 	"goisekai/internal/logger"
 	"goisekai/pkg/types"
 )
+
+// ErrSyncTooFresh reports a manual sync refused because the manga's updated_at
+// is younger than the auto-update threshold.
+var ErrSyncTooFresh = errors.New("bridge: sync skipped, updated more recently than the threshold")
 
 // SyncLibrary re-fetches chapter lists from source plugins for every manga in the library.
 func (s *AppService) SyncLibrary() error {
@@ -16,6 +22,64 @@ func (s *AppService) SyncLibrary() error {
 		return fmt.Errorf("bridge: sync library: %w", err)
 	}
 	return s.syncMangas(library)
+}
+
+// LibrarySyncState reports when a library manga was last synced (updated_at)
+// and whether it is past the auto-update threshold. Non-library or unknown
+// manga report zero time and not stale (the button only shows in-library).
+func (s *AppService) LibrarySyncState(pluginID, mangaID string, now time.Time) (time.Time, bool) {
+	cached, err := s.db.GetMangaCached(pluginID, mangaID)
+	if err != nil || !cached.InLibrary {
+		return time.Time{}, false
+	}
+	return cached.UpdatedAt, now.Sub(cached.UpdatedAt) >= time.Duration(s.updateStaleDays())*24*time.Hour
+}
+
+// SyncManga re-fetches one manga's detail + chapters, stamping updated_at so
+// the hourly scheduler skips it until it goes stale again. Refuses when the
+// manga is not in the library (non-library rows are detail-view cache) or when
+// updated_at is younger than the update_stale_days threshold; staleOK forces
+// the sync past the threshold check.
+func (s *AppService) SyncManga(pluginID, mangaID string, staleOK bool) error {
+	cached, err := s.db.GetMangaCached(pluginID, mangaID)
+	if err != nil {
+		return fmt.Errorf("bridge: sync manga: %w", err)
+	}
+	if !cached.InLibrary {
+		return fmt.Errorf("bridge: sync manga: %s/%s is not in the library", pluginID, mangaID)
+	}
+	if !staleOK && time.Since(cached.UpdatedAt) < time.Duration(s.updateStaleDays())*24*time.Hour {
+		return ErrSyncTooFresh
+	}
+	detail, err := s.mgr.GetMangaDetail(pluginID, mangaID)
+	if err != nil {
+		return fmt.Errorf("bridge: sync manga detail: %w", err)
+	}
+	chapters, err := s.mgr.GetChapterList(pluginID, mangaID)
+	if err != nil {
+		return fmt.Errorf("bridge: sync manga chapters: %w", err)
+	}
+	prevCount, _ := s.db.CountChaptersForManga(cached.ID)
+	if err := s.persistMangaDetails(pluginID, detail, chapters); err != nil {
+		return fmt.Errorf("bridge: sync manga persist: %w", err)
+	}
+	if n, cerr := s.db.CountChaptersForManga(cached.ID); cerr == nil && n > prevCount {
+		if nerr := s.db.MarkMangaNew(cached.ID); nerr != nil {
+			logger.Warn("mark manga new", "id", cached.ID, "error", nerr)
+		}
+	}
+	return nil
+}
+
+// updateStaleDays reads update_stale_days from the INI, falling back to the
+// 3-day default when unreadable. The scheduler re-checks this every pass so
+// edits apply without a restart.
+func (s *AppService) updateStaleDays() int {
+	cfg, err := config.Load(s.cfgPath)
+	if err != nil || cfg == nil || cfg.UpdateStaleDays < 1 {
+		return 3
+	}
+	return cfg.UpdateStaleDays
 }
 
 // SyncStaleLibrary re-syncs only the in-library manga whose updated_at is

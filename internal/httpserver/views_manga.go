@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 )
 
 // buildMangaDetailData assembles the data map for a manga detail view.
@@ -43,6 +44,7 @@ func (s *Server) buildMangaDetailData(r *http.Request, pluginID, mangaID string)
 		continueTo = lastCont
 	}
 	inLibrary := s.service.IsInLibrary(pluginID, mangaID)
+	lastSynced, stale := s.service.LibrarySyncState(pluginID, mangaID, time.Now())
 
 	pluginName := pluginID
 	pluginIcon := ""
@@ -94,6 +96,8 @@ func (s *Server) buildMangaDetailData(r *http.Request, pluginID, mangaID string)
 		"OverrideGenres": overrideGenres,
 		"Genres":         manga.Genres,
 		"CoverDim":       manga.CoverDim,
+		"LastSynced":     lastSynced,
+		"Stale":          stale,
 	}
 }
 

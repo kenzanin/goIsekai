@@ -19,6 +19,7 @@ func (s *Server) registerActionRoutes() {
 	s.Router.Post("/action/toggle-plugin/{pluginID}", s.handleTogglePlugin)
 	s.Router.Post("/action/toggle-library/{pluginID}/{mangaID}", s.handleToggleLibrary)
 	s.Router.Post("/action/sync", s.handleSync)
+	s.Router.Post("/action/sync-manga/{pluginID}/{mangaID}", s.handleSyncManga)
 	s.Router.Post("/action/set-title/{pluginID}/{mangaID}", s.handleSetTitle)
 	s.Router.Post("/action/remove-alt-title/{pluginID}/{mangaID}", s.handleRemoveAltTitle)
 	s.Router.Post("/action/remove-alt-summary/{pluginID}/{mangaID}", s.handleRemoveAltSummary)

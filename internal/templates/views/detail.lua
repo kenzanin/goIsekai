@@ -162,6 +162,27 @@ return function(data)
 		.. '">'
 		.. (inLibrary and '<button type="submit" class="border border-emerald-600/50 text-emerald-400 bg-emerald-500/10 hover:bg-emerald-500/20 rounded-md px-4 py-2 text-sm">✓ In Library</button>' or '<button type="submit" class="bg-indigo-600 hover:bg-indigo-500 text-white rounded-md px-4 py-2 text-sm font-medium">+ Add to Library</button>')
 		.. "</form>"
+	if inLibrary then
+		local stale = data.Stale
+		local synced = data.LastSynced
+		local syncedHTML = ""
+		if synced and synced.Year and synced.Year > 1970 then
+			syncedHTML = '<span class="text-xs text-neutral-500 self-center" title="Last refresh check">synced '
+				.. os.date("%Y-%m-%d %H:%M", os.time{year=synced.Year, month=synced.Month, day=synced.Day, hour=synced.Hour, min=synced.Minute})
+				.. '</span>'
+		end
+		actionsHTML = actionsHTML
+			.. '<form method="post" action="/action/sync-manga/'
+			.. h(pluginID)
+			.. "/"
+			.. h(mangaID)
+			.. '">'
+			.. (stale
+				and '<button type="submit" title="Refresh this manga now" class="border border-neutral-700 text-neutral-300 hover:bg-neutral-800 rounded-md px-4 py-2 text-sm cursor-pointer">⟳ Refresh</button>'
+				or '<button type="button" disabled title="Updated recently — auto-refresh kicks in after the threshold (settings)" class="border border-neutral-800 text-neutral-600 rounded-md px-4 py-2 text-sm cursor-not-allowed">⟳ Refresh</button>')
+			.. '</form>'
+			.. syncedHTML
+	end
 
 	if continuePoint then
 		local cp = continuePoint

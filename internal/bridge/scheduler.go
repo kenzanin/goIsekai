@@ -3,7 +3,6 @@ package bridge
 import (
 	"time"
 
-	"goisekai/internal/config"
 	"goisekai/internal/logger"
 )
 
@@ -20,19 +19,11 @@ func StartLibraryScheduler(s *AppService, stop <-chan struct{}) {
 			case <-stop:
 				return
 			case <-t.C:
-				days := updateStaleDays(s.cfgPath)
+				days := s.updateStaleDays()
 				if err := s.SyncStaleLibrary(time.Now().AddDate(0, 0, -days)); err != nil {
 					logger.Error("scheduled library sync", "error", err)
 				}
 			}
 		}
 	}()
-}
-
-func updateStaleDays(cfgPath string) int {
-	cfg, err := config.Load(cfgPath)
-	if err != nil || cfg == nil || cfg.UpdateStaleDays < 1 {
-		return 3
-	}
-	return cfg.UpdateStaleDays
 }
