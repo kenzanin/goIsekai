@@ -334,6 +334,9 @@
     im.loading = 'lazy';
     im.className = 'block select-none mx-auto';
     im.dataset.idx = idx;
+    im.addEventListener('load', () => {
+      if (stripMode && viewMode !== 'fitWidth') applyStripSizing();
+    });
     stripView.appendChild(im);
     return im;
   }
@@ -370,6 +373,7 @@
         d.pages.forEach((p) => {
           stripImgs.push(appendStripPage(p, stripImgs.length, nextChID));
         });
+        applyStripSizing();
         // Seam keeps flowing: adopt the appended chapter as current so
         // progress tracking and the next append chain onward.
         adoptNeighbor(nextChID, d);
