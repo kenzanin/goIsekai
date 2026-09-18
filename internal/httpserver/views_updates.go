@@ -76,7 +76,7 @@ func (s *Server) viewUpdates(w http.ResponseWriter, r *http.Request) {
 		}
 		for _, m := range mangas {
 			if strconv.FormatInt(m.ID, 10) == st.MangaID {
-				items = append(items, buildRow(m, "update", st.NewSince.UTC().Format(time.RFC3339)))
+				items = append(items, buildRow(m, "update", st.NewSince.Local().Format(time.RFC3339)))
 				break
 			}
 		}
@@ -84,7 +84,7 @@ func (s *Server) viewUpdates(w http.ResponseWriter, r *http.Request) {
 	cutoff := time.Now().AddDate(0, 0, -7)
 	for _, m := range mangas {
 		if m.CreatedAt.After(cutoff) {
-			items = append(items, buildRow(m, "recent", m.CreatedAt.UTC().Format(time.RFC3339)))
+			items = append(items, buildRow(m, "recent", m.CreatedAt.Local().Format(time.RFC3339)))
 		}
 	}
 	sort.SliceStable(items, func(i, j int) bool {

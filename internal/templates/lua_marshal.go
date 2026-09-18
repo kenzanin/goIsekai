@@ -47,7 +47,9 @@ func marshalGoToLua(S *lua.State, v any) lua.Value {
 		if val.IsZero() {
 			return lua.String("")
 		}
-		return lua.String(val.UTC().Format(time.RFC3339))
+		// Stored values are UTC (CURRENT_TIMESTAMP); render in server local
+		// time so stamps match the user's wall clock.
+		return lua.String(val.Local().Format(time.RFC3339))
 	case []any:
 		return marshalSliceToLua(S, val)
 	case map[string]any:
