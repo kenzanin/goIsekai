@@ -59,13 +59,9 @@ return function(data)
 
 			local kind = KIND_BADGE[p.Kind]
 			local kindBadge = kind
-					and ('<span class="text-[10px] px-1.5 py-0.5 rounded-full font-medium '
-						.. kind.class
-						.. '" title="'
-						.. h(kind.title)
-						.. '">'
-						.. kind.label
-						.. "</span>")
+					and ('<span class="text-[10px] px-1.5 py-0.5 rounded-full font-medium ' .. kind.class .. '" title="' .. h(
+						kind.title
+					) .. '">' .. kind.label .. "</span>")
 				or ""
 
 			cardHTML = cardHTML

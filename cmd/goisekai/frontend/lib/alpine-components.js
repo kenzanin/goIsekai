@@ -17,9 +17,10 @@
   // redirect target (fetch follows redirects, so only the target survives).
   window.showToast = (resp, type) => {
     if (!resp) return;
-    var msg = resp.headers && resp.headers.get('X-Toast');
+    var msg = resp.headers?.get('X-Toast');
+    var m;
     if (!msg && resp.url) {
-      var m = resp.url.match(/[?&]toast=([^&]+)/);
+      m = resp.url.match(/[?&]toast=([^&]+)/);
       if (m) msg = decodeURIComponent(m[1]);
     }
     if (!msg) return;
@@ -615,6 +616,19 @@ window.setLoading = (btn, loading) => {
 // Relative timestamps: any element carrying data-ts shows "3h ago"
 // =====================================================================
 document.addEventListener('DOMContentLoaded', () => {
+  // Mermaid diagrams (About page): convert code.language-mermaid blocks to
+  // divs mermaid renders as SVG, dark-themed to match the UI. No-op elsewhere.
+  var mmd = document.querySelectorAll('code.language-mermaid');
+  if (mmd.length && window.mermaid) {
+    mmd.forEach((code) => {
+      var div = document.createElement('pre');
+      div.className = 'mermaid';
+      div.textContent = code.textContent;
+      code.closest('pre').replaceWith(div);
+    });
+    window.mermaid.initialize({ startOnLoad: false, theme: 'dark' });
+    window.mermaid.run({ querySelector: '.mermaid' });
+  }
   var m = window.location.search.match(/[?&]toast=([^&]+)/);
   if (m && typeof showToast === 'function') {
     showToast({ headers: null, url: window.location.href }, 'success');
@@ -624,9 +638,9 @@ document.addEventListener('DOMContentLoaded', () => {
   const refresh = () => {
     document.querySelectorAll('[data-ts]').forEach((el) => {
       const mins = Math.floor((Date.now() - new Date(el.dataset.ts).getTime()) / 60000);
-      if (mins < 60) el.textContent = mins + 'm ago';
-      else if (mins < 1440) el.textContent = Math.floor(mins / 60) + 'h ago';
-      else el.textContent = Math.floor(mins / 1440) + 'd ago';
+      if (mins < 60) el.textContent = `${mins}m ago`;
+      else if (mins < 1440) el.textContent = `${Math.floor(mins / 60)}h ago`;
+      else el.textContent = `${Math.floor(mins / 1440)}d ago`;
     });
   };
   refresh();

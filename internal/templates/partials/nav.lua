@@ -6,10 +6,13 @@
 local ACTIVE_CLASS = "border-b-2 border-indigo-400 bg-indigo-500/15 text-indigo-300"
 local BASE_CLASS = "rounded-md px-3 py-2 text-sm font-medium hover:bg-neutral-800"
 
-local function navLink(href, token, label, active)
+local function navLink(href, token, label, active, extra)
 	local cls = BASE_CLASS
 	if active == token then
 		cls = cls .. " " .. ACTIVE_CLASS
+	end
+	if extra then
+		cls = cls .. " " .. extra
 	end
 	return '<a href="' .. h(href) .. '" class="' .. h(cls) .. '" data-nav="' .. h(token) .. '">' .. h(label) .. "</a>"
 end
@@ -37,7 +40,7 @@ return function(data)
 		navLink("/view/plugins", "plugins", "Plugins", active),
 		navLink("/view/settings", "settings", "Settings", active),
 		navLink("/view/logs", "logs", "Logs", active),
-		navLink("/view/about", "about", "About", active),
+		navLink("/view/about", "about", "About", active, "ml-auto"),
 		"</nav>",
 	}, "\n")
 end

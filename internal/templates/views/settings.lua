@@ -76,7 +76,9 @@ return function(data)
         <div class="space-y-4">
             <div>
                 <label for="update_stale_days" class="block text-sm font-medium mb-1">Auto-refresh manga older than (days)</label>
-                <input id="update_stale_days" name="update_stale_days" type="number" min="1" value="]] .. h(tostring(cfg.UpdateStaleDays or 3)) .. [[" class="w-full bg-neutral-900 border border-neutral-700 rounded-md px-3 py-2 text-sm">
+                <input id="update_stale_days" name="update_stale_days" type="number" min="1" value="]] .. h(
+		tostring(cfg.UpdateStaleDays or 3)
+	) .. [[" class="w-full bg-neutral-900 border border-neutral-700 rounded-md px-3 py-2 text-sm">
                 <span class="text-xs text-neutral-500">Checked hourly; minimum 1.</span>
             </div>
         </div>

@@ -38,9 +38,13 @@ return function(data)
 	end
 	local pluginBadge = ""
 	if pluginName ~= "" then
-		pluginBadge = '<span class="inline-flex items-center gap-1.5 text-[10px] px-2 py-0.5 rounded-full bg-neutral-800 text-neutral-500">'
+		pluginBadge =
+			'<span class="inline-flex items-center gap-1.5 text-[10px] px-2 py-0.5 rounded-full bg-neutral-800 text-neutral-500">'
 		if pluginIcon ~= "" then
-			pluginBadge = pluginBadge .. '<img src="' .. h(pluginIcon) .. '" alt="" class="h-3.5 w-3.5 rounded-sm object-cover">'
+			pluginBadge = pluginBadge
+				.. '<img src="'
+				.. h(pluginIcon)
+				.. '" alt="" class="h-3.5 w-3.5 rounded-sm object-cover">'
 		end
 		pluginBadge = pluginBadge .. h(pluginName) .. "</span>"
 	end
@@ -54,17 +58,36 @@ return function(data)
 
 		local coverHTML
 		if coverURL ~= "" then
-			coverHTML = '<img src="/image?pluginID=' .. h(pluginID) .. '&amp;url=' .. h(coverURL) .. '" alt="' .. h(title) .. '" class="w-full aspect-[2/3] object-cover" loading="lazy">'
+			coverHTML = '<img src="/image?pluginID='
+				.. h(pluginID)
+				.. "&amp;url="
+				.. h(coverURL)
+				.. '" alt="'
+				.. h(title)
+				.. '" class="w-full aspect-[2/3] object-cover" loading="lazy">'
 		else
 			coverHTML = '<div class="w-full aspect-[2/3] bg-neutral-800 flex items-center justify-center text-neutral-500 text-2xl font-semibold">'
-				.. h(getInitials(title)) .. "</div>"
+				.. h(getInitials(title))
+				.. "</div>"
 		end
 
-		rows[#rows + 1] = '<a href="/view/manga/' .. h(pluginID) .. "/" .. h(mangaID) .. '" class="flex flex-col bg-neutral-900 rounded-lg overflow-hidden hover:-translate-y-0.5 hover:shadow-lg hover:shadow-black/40 hover:ring-1 hover:ring-indigo-500 transition">'
-			.. '<div class="relative overflow-hidden">' .. coverHTML .. "</div>"
+		rows[#rows + 1] = '<a href="/view/manga/'
+			.. h(pluginID)
+			.. "/"
+			.. h(mangaID)
+			.. '" class="flex flex-col bg-neutral-900 rounded-lg overflow-hidden hover:-translate-y-0.5 hover:shadow-lg hover:shadow-black/40 hover:ring-1 hover:ring-indigo-500 transition">'
+			.. '<div class="relative overflow-hidden">'
+			.. coverHTML
+			.. "</div>"
 			.. '<div class="p-3 flex-1 flex flex-col justify-between">'
-			.. '<div class="font-medium text-sm mb-1 truncate" title="' .. h(title) .. '">' .. h(title) .. "</div>"
-			.. '<div class="flex items-center gap-1">' .. (pluginBadge ~= "" and '<span class="text-[10px] text-neutral-500">' .. pluginBadge .. "</span>" or "") .. "</div>"
+			.. '<div class="font-medium text-sm mb-1 truncate" title="'
+			.. h(title)
+			.. '">'
+			.. h(title)
+			.. "</div>"
+			.. '<div class="flex items-center gap-1">'
+			.. (pluginBadge ~= "" and '<span class="text-[10px] text-neutral-500">' .. pluginBadge .. "</span>" or "")
+			.. "</div>"
 			.. "</div></a>"
 	end
 
@@ -123,21 +146,21 @@ return function(data)
 		.. pluginBadge
 		.. [[</h1>]]
 		.. '<form method="get" action="/view/search" class="flex gap-2 items-end mb-8">'
-		.. '<div>'
+		.. "<div>"
 		.. '<label for="pluginID" class="block text-xs text-neutral-400 mb-1">Plugin</label>'
 		.. '<select id="pluginID" name="pluginID" class="bg-neutral-900 border border-neutral-700 rounded-md px-3 py-2 text-sm">'
 		.. pluginOpts
-		.. '</select>'
-		.. '</div>'
+		.. "</select>"
+		.. "</div>"
 		.. '<div class="flex-1 max-w-md">'
 		.. '<label for="q" class="block text-xs text-neutral-400 mb-1">Query</label>'
 		.. '<input id="q" name="q" type="text" value="'
 		.. h(q)
 		.. '" placeholder="Manga title..." class="w-full bg-neutral-900 border border-neutral-700 rounded-md px-3 py-2 text-sm">'
-		.. '</div>'
+		.. "</div>"
 		.. '<button type="submit" class="bg-indigo-600 hover:bg-indigo-500 text-white rounded-md px-4 py-2 text-sm font-medium">Search</button>'
 		.. (topPagination ~= "" and topPagination or "")
-		.. '</form>'
+		.. "</form>"
 		.. resultsHTML
 		.. "\n"
 		.. noResults

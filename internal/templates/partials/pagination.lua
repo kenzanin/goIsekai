@@ -12,7 +12,8 @@
 local BTN_BASE = "border border-neutral-700 hover:bg-neutral-800 rounded-md px-3 py-1.5 text-sm"
 local BTN_NUM = "border border-neutral-700 hover:bg-neutral-800 text-neutral-300 rounded-md px-4 py-1.5 text-sm"
 local BTN_CURRENT = "bg-indigo-600 text-white rounded-md px-4 py-1.5 text-sm"
-local BTN_DISABLED = "border border-neutral-700 text-neutral-600 rounded-md px-3 py-1.5 text-sm opacity-50 cursor-not-allowed"
+local BTN_DISABLED =
+	"border border-neutral-700 text-neutral-600 rounded-md px-3 py-1.5 text-sm opacity-50 cursor-not-allowed"
 local ELLIPSIS = "px-1.5 text-neutral-500"
 
 -- Tighter button classes for the compact (inline toolbar) variant.
@@ -34,7 +35,7 @@ local function pageURL(p, n)
 	url = url .. sep .. p.Param .. "=" .. tostring(n)
 	if p.Extra and #p.Extra > 0 then
 		for i = 1, #p.Extra, 2 do
-			local k, v = p.Extra[i], p.Extra[i+1]
+			local k, v = p.Extra[i], p.Extra[i + 1]
 			if v ~= "" then
 				url = url .. "&" .. k .. "=" .. tostring(v)
 			end
@@ -69,9 +70,19 @@ return function(data)
 
 	-- Prev button with label
 	if p.Current > 1 then
-		emit('  <a href="' .. h(pageURL(p, p.Current - 1)) .. '" class="' .. h(cls(BTN_BASE, C_BASE, compact)) .. '" aria-label="Previous page">← Prev</a>')
+		emit(
+			'  <a href="'
+				.. h(pageURL(p, p.Current - 1))
+				.. '" class="'
+				.. h(cls(BTN_BASE, C_BASE, compact))
+				.. '" aria-label="Previous page">← Prev</a>'
+		)
 	else
-		emit('  <span class="' .. h(cls(BTN_DISABLED, C_DISABLED, compact)) .. '" aria-label="Previous page">← Prev</span>')
+		emit(
+			'  <span class="'
+				.. h(cls(BTN_DISABLED, C_DISABLED, compact))
+				.. '" aria-label="Previous page">← Prev</span>'
+		)
 	end
 
 	-- Numbered pages with smart ellipsis
@@ -87,7 +98,13 @@ return function(data)
 	end
 
 	if innerStart > 1 then
-		emit('  <a href="' .. h(pageURL(p, 1)) .. '" class="' .. h(cls(BTN_NUM, C_NUM, compact)) .. '" title="Page 1">1</a>')
+		emit(
+			'  <a href="'
+				.. h(pageURL(p, 1))
+				.. '" class="'
+				.. h(cls(BTN_NUM, C_NUM, compact))
+				.. '" title="Page 1">1</a>'
+		)
 		if innerStart > 2 then
 			emit('  <span class="' .. h(ELLIPSIS) .. '">…</span>')
 		end
@@ -95,9 +112,25 @@ return function(data)
 
 	for n = innerStart, innerEnd do
 		if n == p.Current then
-			emit('  <span class="' .. h(cls(BTN_CURRENT, C_CURRENT, compact)) .. '" aria-current="page">' .. tostring(n) .. '</span>')
+			emit(
+				'  <span class="'
+					.. h(cls(BTN_CURRENT, C_CURRENT, compact))
+					.. '" aria-current="page">'
+					.. tostring(n)
+					.. "</span>"
+			)
 		else
-			emit('  <a href="' .. h(pageURL(p, n)) .. '" class="' .. h(cls(BTN_NUM, C_NUM, compact)) .. '" title="Page ' .. tostring(n) .. '">' .. tostring(n) .. '</a>')
+			emit(
+				'  <a href="'
+					.. h(pageURL(p, n))
+					.. '" class="'
+					.. h(cls(BTN_NUM, C_NUM, compact))
+					.. '" title="Page '
+					.. tostring(n)
+					.. '">'
+					.. tostring(n)
+					.. "</a>"
+			)
 		end
 	end
 
@@ -105,14 +138,32 @@ return function(data)
 		if innerEnd < p.Total - 1 then
 			emit('  <span class="' .. h(ELLIPSIS) .. '">…</span>')
 		end
-		emit('  <a href="' .. h(pageURL(p, p.Total)) .. '" class="' .. h(cls(BTN_NUM, C_NUM, compact)) .. '" title="Page ' .. tostring(p.Total) .. '">' .. tostring(p.Total) .. '</a>')
+		emit(
+			'  <a href="'
+				.. h(pageURL(p, p.Total))
+				.. '" class="'
+				.. h(cls(BTN_NUM, C_NUM, compact))
+				.. '" title="Page '
+				.. tostring(p.Total)
+				.. '">'
+				.. tostring(p.Total)
+				.. "</a>"
+		)
 	end
 
 	-- Next button with label, after the numbers: [← Prev] 1 2 … 4 5 [Next →]
 	if p.Current < p.Total then
-		emit('  <a href="' .. h(pageURL(p, p.Current + 1)) .. '" class="' .. h(cls(BTN_BASE, C_BASE, compact)) .. '" aria-label="Next page">Next →</a>')
+		emit(
+			'  <a href="'
+				.. h(pageURL(p, p.Current + 1))
+				.. '" class="'
+				.. h(cls(BTN_BASE, C_BASE, compact))
+				.. '" aria-label="Next page">Next →</a>'
+		)
 	else
-		emit('  <span class="' .. h(cls(BTN_DISABLED, C_DISABLED, compact)) .. '" aria-label="Next page">Next →</span>')
+		emit(
+			'  <span class="' .. h(cls(BTN_DISABLED, C_DISABLED, compact)) .. '" aria-label="Next page">Next →</span>'
+		)
 	end
 
 	if compact then

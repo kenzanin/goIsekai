@@ -72,6 +72,7 @@ return function(data, content)
 		content,
 		"    </main>",
 		'    <script src="/static/lib/alpine-components.js"></script>',
+		'    <script src="/static/lib/mermaid.min.js" defer></script>',
 		'    <script defer src="/static/lib/alpine.min.js"></script>',
 		toast(data),
 		"</body>",

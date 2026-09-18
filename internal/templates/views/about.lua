@@ -5,7 +5,8 @@
 return function(data)
 	local body = [[<div class="max-w-3xl mx-auto about-doc">]]
 	body = body .. (data.Content or "")
-	body = body .. [[<hr style="margin:2rem 0;border-color:#262626;">
+	body = body
+		.. [[<hr style="margin:2rem 0;border-color:#262626;">
 <p style="color:#a3a3a3;font-size:0.875rem;">Man in the loop: <a href="mailto:kenzanin@gmail.com" style="color:#818cf8;text-decoration:underline;">Kenzanin at Gmail dot com</a></p>
 </div>
 <style>
