@@ -11,7 +11,7 @@ import (
 // UpsertManga inserts a manga or, on a duplicate (plugin_id, source_manga_id),
 // refreshes the mutable columns and updated_at. Returns the manga ID.
 func (d *DB) UpsertManga(m Manga) (int64, error) {
-	res, err := Mangas.INSERT(
+	_, err := Mangas.INSERT(
 		Mangas.PluginID,
 		Mangas.SourceMangaID,
 		Mangas.Title,
@@ -43,7 +43,13 @@ func (d *DB) UpsertManga(m Manga) (int64, error) {
 	if err != nil {
 		return 0, err
 	}
-	id, err := res.LastInsertId()
+	// last_insert_rowid is stale when the ON CONFLICT DO UPDATE path fires,
+	// so resolve the id from the unique key instead.
+	var id int64
+	err = d.db.QueryRow(
+		`SELECT id FROM mangas WHERE plugin_id = ? AND source_manga_id = ?`,
+		m.PluginID, m.SourceMangaID,
+	).Scan(&id)
 	return id, err
 }
 

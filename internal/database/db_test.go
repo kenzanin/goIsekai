@@ -96,6 +96,31 @@ func TestUpsertMangaUniqueConstraint(t *testing.T) {
 	}
 }
 
+// Upserting an existing (plugin_id, source_manga_id) takes the DO UPDATE path,
+// which does not touch last_insert_rowid; the returned id must still be the
+// existing row's id. Inserting B in between makes a stale rowid detectable.
+func TestUpsertMangaReturnsExistingIDOnConflict(t *testing.T) {
+	db := openTestDB(t)
+
+	a := Manga{PluginID: "p1", SourceMangaID: "s1", Title: "A", InLibrary: true}
+	idA, err := db.UpsertManga(a)
+	if err != nil {
+		t.Fatalf("upsert A: %v", err)
+	}
+	b := Manga{PluginID: "p1", SourceMangaID: "s2", Title: "B"}
+	if _, err := db.UpsertManga(b); err != nil {
+		t.Fatalf("upsert B: %v", err)
+	}
+	a.Title = "A2"
+	idA2, err := db.UpsertManga(a)
+	if err != nil {
+		t.Fatalf("upsert A again: %v", err)
+	}
+	if idA2 != idA {
+		t.Fatalf("conflict upsert returned id %d, want existing id %d", idA2, idA)
+	}
+}
+
 func TestToggleLibrary(t *testing.T) {
 	db := openTestDB(t)
 
