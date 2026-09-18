@@ -18,7 +18,8 @@ return function(data)
 	end
 
 	local rows = {}
-	local lastDay = nil
+	local seenNew = false
+	local seenRest = false
 	for _, entry in ipairs(allItems) do
 		local title = entry.Title or ""
 		local pluginID = entry.PluginID or ""
@@ -43,12 +44,16 @@ return function(data)
 			formattedDate = h(formatDate(tostring(entry.Date or "")))
 		end
 
-		if formattedDate ~= "—" and formattedDate ~= lastDay then
-			rows[#rows + 1] = string.format(
-				'<div class="sticky top-0 z-10 -mx-2 py-2 px-2 bg-neutral-950/95 backdrop-blur text-sm font-semibold text-neutral-300 border-b border-neutral-800">%s</div>',
-				formattedDate
-			)
-			lastDay = formattedDate
+		-- Two fixed sections: New-badge rows first, everything else after.
+		-- Headers emit once per section (repeating per page boundary).
+		local isNew = entry.HasNew and entry.Type == "update"
+		if isNew and not seenNew then
+			rows[#rows + 1] = [[<div class="sticky top-0 z-10 -mx-2 py-2 px-2 bg-neutral-950/95 backdrop-blur text-sm font-semibold text-red-400 border-b border-neutral-800 flex items-center gap-2">
+    <span class="w-2 h-2 rounded-full bg-red-500 animate-pulse"></span>New chapters</div>]]
+			seenNew = true
+		elseif not isNew and not seenRest then
+			rows[#rows + 1] = [[<div class="sticky top-0 z-10 -mx-2 py-2 px-2 bg-neutral-950/95 backdrop-blur text-sm font-semibold text-neutral-300 border-b border-neutral-800">Library updates</div>]]
+			seenRest = true
 		end
 
 		local coverHtml
