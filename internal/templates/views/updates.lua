@@ -27,9 +27,9 @@ return function(data)
 		local pluginIcon = entry.PluginIcon or ""
 		local readChapters = entry.ReadChapters or 0
 		local totalChapters = entry.TotalChapters or 0
-		local badge = ""
-		local tsAttr = ""
-		local formattedDate = ""
+		local badge
+		local tsAttr
+		local formattedDate
 
 		if entry.Type == "update" then
 			badge =
