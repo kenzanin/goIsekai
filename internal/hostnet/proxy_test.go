@@ -336,3 +336,27 @@ func TestPreconnectFailureGraceful(t *testing.T) {
 		t.Errorf("got status %d, want 200", resp.StatusCode)
 	}
 }
+
+func TestSecCHUAFollowsUA(t *testing.T) {
+	p := NewProxy()
+	h := p.buildHeaders(nil)
+	if got := h.Get("Sec-CH-UA"); !strings.Contains(got, `v="126"`) {
+		t.Fatalf("default UA should yield Chrome 126 hint, got %q", got)
+	}
+	// Per-request UA override must re-derive the hint.
+	h = p.buildHeaders(map[string]string{"User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/99.0.4844.84 Safari/537.36"})
+	if got := h.Get("Sec-CH-UA"); !strings.Contains(got, `v="99"`) {
+		t.Fatalf("override UA should yield Chrome 99 hint, got %q", got)
+	}
+	// Non-Chromium UA must drop the hint.
+	h = p.buildHeaders(map[string]string{"User-Agent": "Mozilla/5.0 (X11; Linux; rv:109.0) Gecko/20100101 Firefox/117.0"})
+	if got := h.Get("Sec-CH-UA"); got != "" {
+		t.Fatalf("Firefox UA should drop hint, got %q", got)
+	}
+	// Explicit config pin wins over derivation.
+	p.SetSecCHUA(`"Google Chrome";v="153"`)
+	h = p.buildHeaders(nil)
+	if got := h.Get("Sec-CH-UA"); got != `"Google Chrome";v="153"` {
+		t.Fatalf("explicit pin should win, got %q", got)
+	}
+}

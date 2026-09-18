@@ -21,6 +21,7 @@ func startConfigWatch(cfgPath string, proxy *hostnet.Proxy) {
 		}
 		proxy.SetDefaultHeader("User-Agent", updated.UserAgent)
 		proxy.SetDefaultHeader("Referer", updated.Referer)
+		proxy.SetSecCHUA(updated.SecCHUA)
 	})
 }
 

@@ -108,6 +108,7 @@ func (p *Proxy) doRequestProfile(pluginID, profileName string, req types.HTTPReq
 	// travels with the browser identity it was issued to.
 	if ua := p.uaOverride(pluginID); ua != "" {
 		httpReq.Header.Set("User-Agent", ua)
+		p.reapplySecCHUA(httpReq.Header)
 	}
 
 	client, err := p.clientFor(pluginID, profileName)

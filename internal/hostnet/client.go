@@ -5,6 +5,8 @@ import (
 	"sort"
 	"strings"
 
+	nethttp "net/http"
+
 	http "github.com/bogdanfinn/fhttp"
 	tls_client "github.com/bogdanfinn/tls-client"
 )
@@ -46,6 +48,25 @@ func (p *Proxy) uaOverride(pluginID string) string {
 	return p.uaOverrides[pluginID]
 }
 
+// secCHUAFor derives the Sec-CH-UA client hint for a Chromium-family
+// User-Agent, returning "" for non-Chromium browsers (Firefox, Safari) which
+// must not send the header. Kept tolerant: a UA without a recognizable Chrome
+// version yields "".
+func secCHUAFor(ua string) string {
+	_, after, ok := strings.Cut(ua, "Chrome/")
+	if !ok {
+		return ""
+	}
+	ver := after
+	if j := strings.IndexAny(ver, " ."); j >= 0 {
+		ver = ver[:j]
+	}
+	if ver == "" {
+		return ""
+	}
+	return `"Chromium";v="` + ver + `", "Google Chrome";v="` + ver + `", "Not-A.Brand";v="99"`
+}
+
 // buildHeaders assembles the complete header set for a request. tls-client
 // applies its client defaults only when req.Header is empty, so a populated
 // header fully replaces them; we must therefore supply the full set here.
@@ -76,7 +97,18 @@ func (p *Proxy) buildHeaders(overrides map[string]string) http.Header {
 		header.Set(k, overrides[k])
 		order = append(order, strings.ToLower(k))
 	}
-
+	// Keep the client hint in lockstep with the User-Agent actually being
+	// sent (per-request or per-plugin overrides included) unless the config
+	// supplies one explicitly; drop it for non-Chromium UAs, whose browsers
+	// never send the hint.
+	if hint := p.secCHUAHint(header.Get("User-Agent")); hint != "" {
+		if header.Get("Sec-CH-UA") == "" {
+			order = append(order, "sec-ch-ua")
+		}
+		header.Set("Sec-CH-UA", hint)
+	} else if p.secCHUAExplicit == "" {
+		header.Del("Sec-CH-UA")
+	}
 	header[http.HeaderOrderKey] = order
 	return header
 }
@@ -89,4 +121,35 @@ func flattenHeaders(h http.Header) map[string]string {
 		out[k] = strings.Join(vals, ", ")
 	}
 	return out
+}
+
+// reapplySecCHUA refreshes the Sec-CH-UA hint after a late User-Agent change
+// on a tls-client request header. Explicit config pins always win.
+func (p *Proxy) reapplySecCHUA(h http.Header) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	ua := h.Get("User-Agent")
+	switch {
+	case p.secCHUAExplicit != "":
+		h.Set("Sec-CH-UA", p.secCHUAExplicit)
+	case ua != "" && secCHUAFor(ua) != "":
+		h.Set("Sec-CH-UA", secCHUAFor(ua))
+	default:
+		h.Del("Sec-CH-UA")
+	}
+}
+
+// reapplySecCHUAStd is reapplySecCHUA for stdlib request headers.
+func (p *Proxy) reapplySecCHUAStd(h nethttp.Header) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	ua := h.Get("User-Agent")
+	switch {
+	case p.secCHUAExplicit != "":
+		h.Set("Sec-CH-UA", p.secCHUAExplicit)
+	case ua != "" && secCHUAFor(ua) != "":
+		h.Set("Sec-CH-UA", secCHUAFor(ua))
+	default:
+		h.Del("Sec-CH-UA")
+	}
 }

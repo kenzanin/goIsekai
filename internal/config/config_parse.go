@@ -176,6 +176,8 @@ func (c *Config) set(section, key, val string) {
 			c.AcceptLanguage = val
 		case "referer":
 			c.Referer = val
+		case "sec_ch_ua":
+			c.SecCHUA = val
 		case "cdp_engine":
 			if val == "off" || val == "lightpanda" || val == "obscura" || val == "chrome" {
 				c.CDPEngine = val

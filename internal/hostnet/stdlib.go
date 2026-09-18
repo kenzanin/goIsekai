@@ -45,6 +45,7 @@ func (p *Proxy) doRequestStd(pluginID string, req types.HTTPRequest) (types.HTTP
 	}
 	if ua := p.uaOverride(pluginID); ua != "" {
 		sreq.Header.Set("User-Agent", ua)
+		p.reapplySecCHUAStd(sreq.Header)
 	}
 
 	client := &nethttp.Client{Transport: stdTransport, Timeout: 30 * time.Second}

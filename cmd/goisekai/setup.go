@@ -61,6 +61,7 @@ func setupProxy(cfg *config.Config, db *database.DB) *hostnet.Proxy {
 	proxy.SetDefaultHeader("User-Agent", cfg.UserAgent)
 	proxy.SetDefaultHeader("Accept-Language", cfg.AcceptLanguage)
 	proxy.SetDefaultHeader("Referer", cfg.Referer)
+	proxy.SetSecCHUA(cfg.SecCHUA)
 	proxy.ConfigureCDP(hostnet.CDPConfig{
 		Engine:  cfg.CDPEngine,
 		Path:    cfg.CDPPath,

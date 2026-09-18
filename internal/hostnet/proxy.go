@@ -32,16 +32,17 @@ func (c CDPConfig) enabled() bool {
 // per-plugin cookie persistence. Plugins must not open sockets directly; all
 // network access flows through here.
 type Proxy struct {
-	mu             sync.Mutex
-	defaultHeaders map[string]string
-	clients        map[string]tls_client.HttpClient // keyed by pluginID+"\x00"+profile
-	uaOverrides    map[string]string                // per-plugin User-Agent override
-	pendingVerify  map[string]verifySeed            // cookie jar seeds awaiting client creation
-	needsJS        map[string]bool                  // per-plugin needs_js hint
-	pins           map[string]string                // pluginID -> pinned profile ("stdlib" = use doRequestStd)
-	hints          map[string][]string              // pluginID -> ordered profile ladder from metadata
-	persistPin     func(pluginID, profile string)   // persists pin to DB; nil-safe
-	cdp            CDPConfig
+	mu              sync.Mutex
+	defaultHeaders  map[string]string
+	clients         map[string]tls_client.HttpClient // keyed by pluginID+"\x00"+profile
+	uaOverrides     map[string]string                // per-plugin User-Agent override
+	secCHUAExplicit string                           // config-set Sec-CH-UA hint ("" = derive from UA)
+	pendingVerify   map[string]verifySeed            // cookie jar seeds awaiting client creation
+	needsJS         map[string]bool                  // per-plugin needs_js hint
+	pins            map[string]string                // pluginID -> pinned profile ("stdlib" = use doRequestStd)
+	hints           map[string][]string              // pluginID -> ordered profile ladder from metadata
+	persistPin      func(pluginID, profile string)   // persists pin to DB; nil-safe
+	cdp             CDPConfig
 
 	// solveChallenge is swappable for tests; nil means the real chromedp solver.
 	solveChallenge func(cfg CDPConfig, url string) ([]*http.Cookie, string, error)
@@ -74,13 +75,14 @@ func NewProxy() *Proxy {
 			// Empty Referer by default; only injected when a plugin sets one.
 			"Referer": "",
 		},
-		clients:        make(map[string]tls_client.HttpClient),
-		uaOverrides:    make(map[string]string),
-		pendingVerify:  make(map[string]verifySeed),
-		needsJS:        make(map[string]bool),
-		pins:           make(map[string]string),
-		hints:          make(map[string][]string),
-		solveChallenge: solveChallenge,
+		clients:         make(map[string]tls_client.HttpClient),
+		uaOverrides:     make(map[string]string),
+		secCHUAExplicit: "",
+		pendingVerify:   make(map[string]verifySeed),
+		needsJS:         make(map[string]bool),
+		pins:            make(map[string]string),
+		hints:           make(map[string][]string),
+		solveChallenge:  solveChallenge,
 		stdlibTransport: &nethttp.Transport{
 			MaxIdleConnsPerHost: 6,
 			IdleConnTimeout:     90 * time.Second,
@@ -94,6 +96,26 @@ func (p *Proxy) SetDefaultHeader(key, value string) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	p.defaultHeaders[key] = value
+}
+
+// SetSecCHUA configures the Sec-CH-UA client hint. An empty value switches
+// back to deriving the hint from the effective User-Agent (and dropping it
+// for non-Chromium UAs); a non-empty value pins it for every request.
+func (p *Proxy) SetSecCHUA(hint string) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.secCHUAExplicit = hint
+}
+
+// secCHUAHint resolves the Sec-CH-UA to send: the configured value when one
+// is pinned, otherwise the Chromium brand/version of ua ("" when ua is not
+// Chromium-family, in which case the header must be omitted).
+// Callers must hold p.mu.
+func (p *Proxy) secCHUAHint(ua string) string {
+	if p.secCHUAExplicit != "" {
+		return p.secCHUAExplicit
+	}
+	return secCHUAFor(ua)
 }
 
 // ConfigureCDP sets the browser-engine settings used to solve anti-bot

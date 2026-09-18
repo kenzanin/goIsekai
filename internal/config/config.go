@@ -63,6 +63,11 @@ type Config struct {
 	UserAgent      string
 	AcceptLanguage string
 	Referer        string
+	// SecCHUA pins the Sec-CH-UA client hint sent with every request. Empty
+	// (the default) derives the hint from User-Agent automatically and omits
+	// it for non-Chromium UAs. Set it when a site expects a specific hint
+	// regardless of the configured User-Agent.
+	SecCHUA string
 
 	// [network] — CDP browser engine for solving anti-bot challenges.
 	// CDPEngine is "off" (disabled), "lightpanda", "obscura", or "chrome".
@@ -148,6 +153,7 @@ func (c *Config) Save(path string) error {
 		"user_agent", c.UserAgent,
 		"accept_language", c.AcceptLanguage,
 		"referer", c.Referer,
+		"sec_ch_ua", c.SecCHUA,
 		"cdp_engine", c.CDPEngine,
 		"cdp_path", c.CDPPath,
 		"cdp_solve_timeout", strconv.Itoa(c.CDPSolveTimeout),
