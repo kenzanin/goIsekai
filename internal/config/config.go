@@ -58,6 +58,10 @@ type Config struct {
 	BackupKeep int
 	// PruneOrphans enables the automatic orphaned-row janitor.
 	PruneOrphans bool
+	// UpdateStaleDays is the scheduler's staleness threshold: library manga
+	// whose row was last updated more than this many days ago get re-synced
+	// hourly. Minimum 1; the hourly tick is the finest granularity.
+	UpdateStaleDays int
 
 	// [network] — default headers injected into plugin HTTP requests.
 	UserAgent      string
@@ -162,7 +166,8 @@ func (c *Config) Save(path string) error {
 	put(f, "maintenance",
 		"backup_interval_hours", strconv.Itoa(c.BackupIntervalHours),
 		"backup_keep", strconv.Itoa(c.BackupKeep),
-		"prune_orphans", strconv.FormatBool(c.PruneOrphans))
+		"prune_orphans", strconv.FormatBool(c.PruneOrphans),
+		"update_stale_days", strconv.Itoa(c.UpdateStaleDays))
 	putAlias(f, "genre", c.GenreAlias)
 	putAlias(f, "status", c.StatusAlias)
 	return f.SaveTo(path)

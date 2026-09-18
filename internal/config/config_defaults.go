@@ -23,6 +23,7 @@ func Default() *Config {
 		BackupIntervalHours: 24,
 		BackupKeep:          5,
 		PruneOrphans:        true,
+		UpdateStaleDays:     3,
 		CacheTTLHours:       24,
 		PreconnectEnabled:   false,
 

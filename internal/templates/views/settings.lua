@@ -71,6 +71,17 @@ return function(data)
         </div>
     </div>
 
+    <div class="border border-neutral-800 rounded-lg p-4">
+        <h2 class="text-sm font-medium text-neutral-300 mb-3">Library Updates</h2>
+        <div class="space-y-4">
+            <div>
+                <label for="update_stale_days" class="block text-sm font-medium mb-1">Auto-refresh manga older than (days)</label>
+                <input id="update_stale_days" name="update_stale_days" type="number" min="1" value="]] .. h(tostring(cfg.UpdateStaleDays or 3)) .. [[" class="w-full bg-neutral-900 border border-neutral-700 rounded-md px-3 py-2 text-sm">
+                <span class="text-xs text-neutral-500">Checked hourly; minimum 1.</span>
+            </div>
+        </div>
+    </div>
+
     <button type="submit" class="bg-indigo-600 hover:bg-indigo-500 text-white rounded-md px-4 py-2 text-sm font-medium">Save</button>
 </form>
 

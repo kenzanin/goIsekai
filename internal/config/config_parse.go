@@ -167,6 +167,10 @@ func (c *Config) set(section, key, val string) {
 			}
 		case "prune_orphans":
 			c.PruneOrphans = val == "true" || val == "1" || val == "yes"
+		case "update_stale_days":
+			if n, err := strconv.Atoi(val); err == nil && n >= 1 {
+				c.UpdateStaleDays = n
+			}
 		}
 	case "network":
 		switch key {

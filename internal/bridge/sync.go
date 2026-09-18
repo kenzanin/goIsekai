@@ -2,6 +2,7 @@ package bridge
 
 import (
 	"fmt"
+	"time"
 
 	"goisekai/internal/database"
 	"goisekai/internal/logger"
@@ -14,6 +15,24 @@ func (s *AppService) SyncLibrary() error {
 	if err != nil {
 		return fmt.Errorf("bridge: sync library: %w", err)
 	}
+	return s.syncMangas(library)
+}
+
+// SyncStaleLibrary re-syncs only the in-library manga whose updated_at is
+// older than cutoff — the hourly scheduler's pass.
+func (s *AppService) SyncStaleLibrary(cutoff time.Time) error {
+	stale, err := s.db.ListLibraryStale(cutoff)
+	if err != nil {
+		return fmt.Errorf("bridge: sync stale library: %w", err)
+	}
+	if len(stale) == 0 {
+		return nil
+	}
+	logger.Info("scheduled library refresh", "stale", len(stale))
+	return s.syncMangas(stale)
+}
+
+func (s *AppService) syncMangas(library []database.Manga) error {
 	for _, manga := range library {
 		m, detailErr := s.mgr.GetMangaDetail(manga.PluginID, manga.SourceMangaID)
 		if detailErr != nil {

@@ -98,6 +98,11 @@ func (s *Server) handleSaveSettings(w http.ResponseWriter, r *http.Request) {
 	if _, ok := r.Form["referer"]; ok {
 		cfg.Referer = r.FormValue("referer")
 	}
+	if _, ok := r.Form["update_stale_days"]; ok {
+		if n, err := strconv.Atoi(r.FormValue("update_stale_days")); err == nil && n >= 1 {
+			cfg.UpdateStaleDays = n
+		}
+	}
 	if err := cfg.Save(cfgPath); err != nil {
 		s.logger.Error("save settings: write config", "error", err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)

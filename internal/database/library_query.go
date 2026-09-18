@@ -51,6 +51,24 @@ func (d *DB) ListLibrary() ([]Manga, error) {
 	return result, nil
 }
 
+// ListLibraryStale returns in-library manga whose updated_at predates cutoff.
+// The scheduler uses it to decide which titles need a refresh from their plugin.
+func (d *DB) ListLibraryStale(cutoff time.Time) ([]Manga, error) {
+	var models []model.Mangas
+	err := Mangas.SELECT(Mangas.AllColumns).
+		WHERE(Mangas.InLibrary.EQ(Int(1)).
+			AND(Mangas.UpdatedAt.LT(RawTimestamp("'"+cutoff.UTC().Format(time.DateTime)+"'")))).
+		Query(d.db, &models)
+	if err != nil {
+		return nil, err
+	}
+	result := make([]Manga, len(models))
+	for i, m := range models {
+		result[i] = mangaFromModel(m)
+	}
+	return result, nil
+}
+
 // LibraryMangaStats holds per-manga aggregation for the library grid.
 //
 // qrm matches result columns to named-struct fields via two-part alias tags

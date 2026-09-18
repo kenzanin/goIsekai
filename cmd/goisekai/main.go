@@ -137,6 +137,11 @@ func main() {
 	mgr.SetOnLoad(svc.SyncPluginMeta)
 	mgr.SetEnrichRegistry(enrichReg)
 
+	// Hourly background refresh of stale library manga (update_stale_days).
+	schedulerStop := make(chan struct{})
+	bridge.StartLibraryScheduler(svc, schedulerStop)
+	defer close(schedulerStop)
+
 	// devMode=true: re-read + recompile Lua templates per render, so a .lua
 	// edit takes effect on refresh with no rebuild or restart.
 	eng, err := templates.New(os.DirFS(cfg.TemplatesDir), true)
