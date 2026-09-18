@@ -30,7 +30,8 @@ type AppService struct {
 	cacheDir    string
 	imageMu     sync.RWMutex
 	imageCache  map[string][]byte
-	imgSem      chan struct{} // caps concurrent image fetches per host process
+	imgSemMu    sync.Mutex
+	imgSem      map[string]chan struct{} // host -> fetch semaphore; hosts never block each other
 	imgPaceMu   sync.Mutex
 	imgPace     map[string]time.Time // host -> earliest allowed next request (MD@Home pacing)
 	enrich      *enrich.Registry

@@ -54,17 +54,18 @@ func (s *AppService) GetImage(pluginID, url string, headers map[string]string, m
 	logger.Debug("fetching image", "url", url, "plugin", pluginID)
 	// At-home image nodes 404 bursts: a browser's draw+prefetch fires several
 	// fetches at once. Serialize per host and pace requests ~1s apart (the
-	// upstream convention for MD@Home), retrying with backoff before giving up.
-	if s.imgSem == nil {
-		s.imgSem = make(chan struct{}, 1)
-	}
-	s.imgSem <- struct{}{}
+	// upstream convention for MD@Home), retrying with backoff before giving
+	// up. The semaphore is per host, so covers from site A never queue behind
+	// pages from site B.
 	host := func() string {
 		if u, err := neturl.Parse(url); err == nil && u.Host != "" {
 			return u.Host
 		}
 		return url
 	}()
+	sem := s.hostSem(host)
+	sem <- struct{}{}
+	defer func() { <-sem }()
 	var resp types.HTTPResponse
 	var err error
 	var body []byte
@@ -93,7 +94,6 @@ func (s *AppService) GetImage(pluginID, url string, headers map[string]string, m
 		err = nil
 		break
 	}
-	<-s.imgSem
 	if err != nil {
 		logger.Error("image fetch failed", "url", url, "error", err)
 		return nil, fmt.Errorf("bridge: get image %s: %w", url, err)
