@@ -2,6 +2,7 @@ package httpserver
 
 import (
 	"net/http"
+	neturl "net/url"
 	"strconv"
 )
 
@@ -66,6 +67,25 @@ func (s *Server) handleToggleChapterSkip(w http.ResponseWriter, r *http.Request)
 		return
 	}
 	s.hxRedirect(w, "/view/manga/"+pluginID+"/"+mangaID)
+}
+
+// handleRefetchCover re-downloads a manga's cover, busting the caches.
+func (s *Server) handleRefetchCover(w http.ResponseWriter, r *http.Request) {
+	pluginID := param(r, "pluginID")
+	mangaID := param(r, "mangaID")
+	if err := s.service.RefetchCover(pluginID, mangaID); err != nil {
+		s.logger.Error("refetch cover", "pluginID", pluginID, "mangaID", mangaID, "error", err)
+		http.Error(w, err.Error(), http.StatusBadGateway)
+		return
+	}
+	s.toastRedirect(w, r, "/view/manga/"+pluginID+"/"+mangaID, "Cover re-fetched")
+}
+
+// toastRedirect behaves like hxRedirect but carries a success toast message
+// in X-Toast; the SPA fetch layer shows it after swapping the page in.
+func (s *Server) toastRedirect(w http.ResponseWriter, r *http.Request, location, msg string) {
+	w.Header().Set("Location", location+"?toast="+neturl.QueryEscape(msg))
+	w.WriteHeader(http.StatusSeeOther)
 }
 
 // handleToggleCoverDim toggles the cover dim overlay on a manga.

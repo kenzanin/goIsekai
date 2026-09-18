@@ -62,17 +62,26 @@ return function(data)
 			.. '" class="w-full aspect-[2/3] rounded-xl object-cover">'
 			.. '<div id="cover-dim" class="lib-dim" style="display:'
 				.. (data.CoverDim == 1 and "block" or "none")
-				.. ';position:absolute;top:0;left:0;right:0;bottom:0;border-radius:0.75rem;background:rgba(0,0,0,0.82);"></div>'
+				.. ';position:absolute;top:0;left:0;right:0;bottom:0;border-radius:0.75rem;background:rgba(0,0,0,0.82);backdrop-filter:blur(3px);"></div>'
 			.. '</div>'
-			.. '<form action="/action/toggle-cover-dim/'
+			.. '<div class="mt-2 flex items-center gap-3 text-xs">'
+				.. '<form action="/action/toggle-cover-dim/'
 				.. h(pluginID)
 				.. '/'
 				.. h(data.MangaID)
 				.. '" method="POST" style="display:inline">'
-				.. '<button type="submit" id="cover-dim-btn" title="Dim the cover image" class="mt-2 inline-flex items-center text-xs text-neutral-400 hover:text-neutral-200 transition cursor-pointer">'
+				.. '<button type="submit" id="cover-dim-btn" title="Dim the cover image" class="inline-flex items-center text-neutral-400 hover:text-neutral-200 transition cursor-pointer">'
 					.. (data.CoverDim == 1 and "Show cover" or "Hide cover")
 					.. '</button>'
 				.. '</form>'
+				.. '<form action="/action/refetch-cover/'
+				.. h(pluginID)
+				.. '/'
+				.. h(data.MangaID)
+				.. '" method="POST" style="display:inline">'
+				.. '<button type="submit" title="Re-download the cover from the source" class="inline-flex items-center text-neutral-400 hover:text-neutral-200 transition cursor-pointer">Get cover</button>'
+				.. '</form>'
+			.. '</div>'
 	else
 		coverHTML = '<div class="w-full aspect-[2/3] bg-neutral-800 rounded-xl flex items-center justify-center text-neutral-500 text-4xl font-semibold">'
 			.. h(getInitials(manga.Title or ""))
@@ -153,7 +162,8 @@ return function(data)
 			<button type="button" id="synopsis-toggle" onclick="var t=document.getElementById('synopsis-text');var f=document.getElementById('synopsis-fade');var b=document.getElementById('synopsis-toggle');t.classList.toggle('max-h-[4.5rem]');t.classList.toggle('max-h-none');f.style.display=t.classList.contains('max-h-none')?'none':'block';b.textContent=t.classList.contains('max-h-none')?'Show less':'Read more';" class="text-xs text-indigo-400 hover:text-indigo-300 transition mt-1 cursor-pointer">Read more</button></div>]]
 	end
 
-	-- Action buttons
+	-- Action buttons; syncedHTML carries the far-right Update button
+	local syncedHTML = ""
 	local actionsHTML = '<div class="flex flex-wrap items-center gap-2 mt-4">'
 		.. '<form method="post" action="/action/toggle-library/'
 		.. h(pluginID)
@@ -163,23 +173,28 @@ return function(data)
 		.. (inLibrary and '<button type="submit" class="border border-emerald-600/50 text-emerald-400 bg-emerald-500/10 hover:bg-emerald-500/20 rounded-md px-4 py-2 text-sm">✓ In Library</button>' or '<button type="submit" class="bg-indigo-600 hover:bg-indigo-500 text-white rounded-md px-4 py-2 text-sm font-medium">+ Add to Library</button>')
 		.. "</form>"
 	if inLibrary then
-		local stale = data.Stale
 		local synced = data.LastSynced
-		local syncedHTML = ""
+		syncedHTML = ""
 		if type(synced) == "string" and #synced >= 16 then
-			syncedHTML = '<span class="text-xs text-neutral-500 self-center" title="Last refresh check">synced '
+			syncedHTML = '<form method="post" action="/action/sync-manga/'
+				.. h(pluginID)
+				.. "/"
+				.. h(mangaID)
+				.. '" class="ml-auto inline-flex items-center gap-2">'
+				.. '<span class="text-xs text-neutral-500 cursor-default" title="Last refresh check - click Update to refresh now">updated '
 				.. synced:sub(1, 10) .. " " .. synced:sub(12, 16)
 				.. '</span>'
+				.. '<button type="submit" title="Refresh this manga now" class="border border-neutral-700 text-neutral-300 hover:bg-neutral-800 rounded-md px-4 py-2 text-sm cursor-pointer">⟳ Update</button>'
+				.. '</form>'
+		else
+			syncedHTML = '<form method="post" action="/action/sync-manga/'
+				.. h(pluginID)
+				.. "/"
+				.. h(mangaID)
+				.. '" class="ml-auto">'
+				.. '<button type="submit" title="Refresh this manga now" class="border border-neutral-700 text-neutral-300 hover:bg-neutral-800 rounded-md px-4 py-2 text-sm cursor-pointer">⟳ Update</button>'
+				.. '</form>'
 		end
-		actionsHTML = actionsHTML
-			.. '<form method="post" action="/action/sync-manga/'
-			.. h(pluginID)
-			.. "/"
-			.. h(mangaID)
-			.. '">'
-			.. '<button type="submit" title="Refresh this manga now" class="border border-neutral-700 text-neutral-300 hover:bg-neutral-800 rounded-md px-4 py-2 text-sm cursor-pointer">⟳ Refresh</button>'
-			.. '</form>'
-			.. syncedHTML
 	end
 
 	if continuePoint then
@@ -210,7 +225,7 @@ return function(data)
 			.. h(label)
 			.. "</a>"
 	end
-	actionsHTML = actionsHTML .. "</div>"
+	actionsHTML = actionsHTML .. (syncedHTML or "") .. "</div>"
 
 	-- Main 2-column layout
 	body = body

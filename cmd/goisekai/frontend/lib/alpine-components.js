@@ -12,6 +12,21 @@
     '.toast-leave{transform:translateX(100%);opacity:0}';
   (document.head || document.documentElement).appendChild(_style);
 
+  // Global helper: surface a server-sent toast. Handlers pass the fetch
+  // response; the message may ride the 303 as X-Toast or as ?toast= on the
+  // redirect target (fetch follows redirects, so only the target survives).
+  window.showToast = (resp, type) => {
+    if (!resp) return;
+    var msg = resp.headers && resp.headers.get('X-Toast');
+    if (!msg && resp.url) {
+      var m = resp.url.match(/[?&]toast=([^&]+)/);
+      if (m) msg = decodeURIComponent(m[1]);
+    }
+    if (!msg) return;
+    if (typeof Alpine !== 'undefined' && Alpine.store('toast')) {
+      Alpine.store('toast').show(msg, type || 'success');
+    }
+  };
   // Global helper: submit a form via SPA fetch (same as submit event handler).
   // Called as: @click="submitForm($el.closest('form'))"
   window.submitForm = (form) => {
@@ -54,6 +69,7 @@
           if (u.indexOf(window.location.origin) === 0 && u.indexOf('/action/') === -1) {
             history.replaceState(history.state, '', u);
           }
+          showToast(resp, 'success');
         });
       })
       .catch(() => {
@@ -454,6 +470,7 @@
               if (u.indexOf(window.location.origin) === 0 && u.indexOf('/action/') === -1) {
                 history.replaceState(history.state, '', u);
               }
+              showToast(resp, 'success');
             });
           })
           .catch(() => {
@@ -598,6 +615,11 @@ window.setLoading = (btn, loading) => {
 // Relative timestamps: any element carrying data-ts shows "3h ago"
 // =====================================================================
 document.addEventListener('DOMContentLoaded', () => {
+  var m = window.location.search.match(/[?&]toast=([^&]+)/);
+  if (m && typeof showToast === 'function') {
+    showToast({ headers: null, url: window.location.href }, 'success');
+    history.replaceState(history.state, '', window.location.pathname + window.location.hash);
+  }
   if (!document.querySelector('[data-ts]')) return;
   const refresh = () => {
     document.querySelectorAll('[data-ts]').forEach((el) => {

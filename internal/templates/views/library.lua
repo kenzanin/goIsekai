@@ -71,7 +71,7 @@ return function(data)
 		.. '<svg class="w-4 h-4 text-neutral-400" fill="currentColor" viewBox="0 0 16 16"><rect x="1" y="1" width="6" height="6" rx="1"/><rect x="9" y="1" width="6" height="6" rx="1"/><rect x="1" y="9" width="6" height="6" rx="1"/><rect x="9" y="9" width="6" height="6" rx="1"/></svg></button>'
 		.. '<button type="button" id="view-list-btn" aria-pressed="false" class="p-1.5 rounded-md hover:bg-neutral-800 transition" title="List view">'
 		.. '<svg class="w-4 h-4 text-neutral-400" fill="currentColor" viewBox="0 0 16 16"><rect x="1" y="1" width="14" height="3" rx="1"/><rect x="1" y="6.5" width="14" height="3" rx="1"/><rect x="1" y="12" width="14" height="3" rx="1"/></svg></button></div>'
-		.. '<form method="post" action="/action/sync" class="ml-auto">'
+		.. '<form method="post" action="/action/sync" class="ml-auto" data-sync-form>'
 		.. '<button type="submit" class="bg-indigo-600 hover:bg-indigo-500 text-white rounded-md px-4 py-2 text-sm font-medium inline-flex items-center gap-1.5">'
 		.. '<svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 0 0 4.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 0 1-15.357-2m15.357 2H15"/></svg>Update</button>'
 		.. "</form></div>"
@@ -80,6 +80,17 @@ return function(data)
 		.. (sidebarHTML ~= "" and "</div></div>" or "")
 		.. bottomPagination
 		.. [[
+<script>
+(function () {
+  var f = document.querySelector('[data-sync-form]');
+  if (!f) return;
+  f.addEventListener('submit', function () {
+    var b = f.querySelector('button');
+    b.disabled = true;
+    b.innerHTML = '⟳ Syncing…';
+  });
+})();
+</script>
 <style>
   .view-container[data-view-mode="list"] {
     display: flex;

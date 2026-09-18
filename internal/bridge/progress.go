@@ -100,6 +100,54 @@ func (s *AppService) GetChapterProgresses(pluginID, mangaID string) (map[string]
 	return out, nil
 }
 
+// RefetchCover forces a fresh download of a manga's cover: L1/L2 cache
+// entries for the current cover URL are dropped, the plugin is asked for the
+// detail again (signed CDNs rotate cover URLs), and the cover is re-fetched
+// and validated. A new URL overwrites the stored one so the next page render
+// uses it. The re-downloaded bytes are cached as usual.
+func (s *AppService) RefetchCover(pluginID, mangaID string) error {
+	cached, err := s.db.GetMangaCached(pluginID, mangaID)
+	if err != nil {
+		return fmt.Errorf("bridge: refetch cover: %w", err)
+	}
+	if cached.CoverURL == "" {
+		return fmt.Errorf("bridge: refetch cover: %s/%s has no cover URL", pluginID, mangaID)
+	}
+	// Evict caches for the current URL so the /image proxy refetches.
+	s.imageMu.Lock()
+	delete(s.imageCache, cached.CoverURL)
+	s.imageMu.Unlock()
+	if base := s.diskCachePath(pluginID, "", "", cached.CoverURL); base != "" {
+		for _, ext := range []string{
+			"." + string(FormatAVIF), "." + string(FormatWebP), ".img",
+			"." + string(FormatJXL),
+		} {
+			_ = os.Remove(base + ext)
+		}
+	}
+	// A signed CDN may have rotated the URL; refresh it from the plugin.
+	if s.mgr != nil {
+		if detail, err := s.mgr.GetMangaDetail(pluginID, mangaID); err == nil && detail.CoverURL != "" && detail.CoverURL != cached.CoverURL {
+			if _, err := s.db.UpsertManga(database.Manga{
+				PluginID:      pluginID,
+				SourceMangaID: mangaID,
+				Title:         cached.Title,
+				CoverURL:      detail.CoverURL,
+				Description:   cached.Description,
+				Status:        cached.Status,
+				InLibrary:     cached.InLibrary,
+			}); err != nil {
+				return fmt.Errorf("bridge: refetch cover update url: %w", err)
+			}
+			cached.CoverURL = detail.CoverURL
+		}
+	}
+	if _, err := s.GetImage(pluginID, cached.CoverURL, nil, "", ""); err != nil {
+		return fmt.Errorf("bridge: refetch cover download: %w", err)
+	}
+	return nil
+}
+
 // ToggleCoverDim toggles the cover dim overlay flag on the manga.
 func (s *AppService) ToggleCoverDim(pluginID, mangaID string) error {
 	mangaIntID, err := s.db.ResolveMangaIntID(pluginID, mangaID)

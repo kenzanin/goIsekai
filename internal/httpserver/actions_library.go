@@ -27,7 +27,7 @@ func (s *Server) handleSyncManga(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	s.hxRedirect(w, "/view/manga/"+pluginID+"/"+mangaID)
+	s.toastRedirect(w, r, "/view/manga/"+pluginID+"/"+mangaID, "Manga refreshed")
 }
 
 // handleSync re-fetches chapter lists for every library manga.
@@ -37,5 +37,5 @@ func (s *Server) handleSync(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	s.hxRedirect(w, "/view/library")
+	s.toastRedirect(w, r, "/view/library", "Library sync finished")
 }
