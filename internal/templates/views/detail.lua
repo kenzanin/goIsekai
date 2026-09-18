@@ -177,9 +177,7 @@ return function(data)
 			.. "/"
 			.. h(mangaID)
 			.. '">'
-			.. (stale
-				and '<button type="submit" title="Refresh this manga now" class="border border-neutral-700 text-neutral-300 hover:bg-neutral-800 rounded-md px-4 py-2 text-sm cursor-pointer">⟳ Refresh</button>'
-				or '<button type="button" disabled title="Updated recently — auto-refresh kicks in after the threshold (settings)" class="border border-neutral-800 text-neutral-600 rounded-md px-4 py-2 text-sm cursor-not-allowed">⟳ Refresh</button>')
+			.. '<button type="submit" title="Refresh this manga now" class="border border-neutral-700 text-neutral-300 hover:bg-neutral-800 rounded-md px-4 py-2 text-sm cursor-pointer">⟳ Refresh</button>'
 			.. '</form>'
 			.. syncedHTML
 	end

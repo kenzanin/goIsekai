@@ -16,14 +16,15 @@ func (s *Server) handleToggleLibrary(w http.ResponseWriter, r *http.Request) {
 	s.hxRedirect(w, "/view/manga/"+pluginID+"/"+mangaID)
 }
 
-// handleSyncManga re-fetches one library manga now. A refresh inside the
-// auto-update threshold is refused; the button already says why.
+// handleSyncManga re-fetches one library manga on demand. Always allowed; the
+// sync stamps updated_at, so the auto-updater then leaves it alone until it
+// goes stale again.
 func (s *Server) handleSyncManga(w http.ResponseWriter, r *http.Request) {
 	pluginID := param(r, "pluginID")
 	mangaID := param(r, "mangaID")
-	if err := s.service.SyncManga(pluginID, mangaID, false); err != nil {
+	if err := s.service.SyncManga(pluginID, mangaID); err != nil {
 		s.logger.Warn("sync manga", "plugin", pluginID, "manga", mangaID, "error", err)
-		http.Error(w, err.Error(), http.StatusConflict)
+		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 	s.hxRedirect(w, "/view/manga/"+pluginID+"/"+mangaID)

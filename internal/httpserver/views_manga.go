@@ -44,7 +44,7 @@ func (s *Server) buildMangaDetailData(r *http.Request, pluginID, mangaID string)
 		continueTo = lastCont
 	}
 	inLibrary := s.service.IsInLibrary(pluginID, mangaID)
-	lastSynced, stale := s.service.LibrarySyncState(pluginID, mangaID, time.Now())
+	lastSynced, _ := s.service.LibrarySyncState(pluginID, mangaID, time.Now())
 
 	pluginName := pluginID
 	pluginIcon := ""
@@ -97,7 +97,6 @@ func (s *Server) buildMangaDetailData(r *http.Request, pluginID, mangaID string)
 		"Genres":         manga.Genres,
 		"CoverDim":       manga.CoverDim,
 		"LastSynced":     lastSynced,
-		"Stale":          stale,
 	}
 }
 

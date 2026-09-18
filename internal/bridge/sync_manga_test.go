@@ -1,7 +1,6 @@
 package bridge
 
 import (
-	"errors"
 	"testing"
 	"time"
 
@@ -18,46 +17,38 @@ func upsertTestManga(t *testing.T, db *database.DB, sourceID string, _ time.Dura
 	}
 }
 
-func TestSyncMangaTooFresh(t *testing.T) {
+func TestSyncMangaRefusals(t *testing.T) {
 	s := newTestService(t)
-	upsertTestManga(t, s.db, "fresh", time.Hour)
+	upsertTestManga(t, s.db, "m", time.Hour)
 
-	err := s.SyncManga("p", "fresh", false)
-	if !errors.Is(err, ErrSyncTooFresh) {
-		t.Fatalf("want ErrSyncTooFresh, got %v", err)
+	// Unknown manga: refused before any plugin call.
+	if err := s.SyncManga("p", "missing"); err == nil {
+		t.Fatal("missing: want error")
 	}
-	// The not-in-library and unknown-manga refusals come before the gate.
-	if err := s.SyncManga("p", "missing", false); err == nil || errors.Is(err, ErrSyncTooFresh) {
-		t.Fatalf("want unknown-manga error, got %v", err)
-	}
-}
-
-func TestSyncMangaNotInLibrary(t *testing.T) {
-	s := newTestService(t)
+	// Not in library: refused (rows are detail-view cache only).
 	if _, err := s.db.UpsertManga(database.Manga{PluginID: "p", SourceMangaID: "ghost", InLibrary: false}); err != nil {
 		t.Fatalf("upsert: %v", err)
 	}
-	err := s.SyncManga("p", "ghost", false)
-	if err == nil || errors.Is(err, ErrSyncTooFresh) {
-		t.Fatalf("want not-in-library error, got %v", err)
+	if err := s.SyncManga("p", "ghost"); err == nil {
+		t.Fatal("ghost: want not-in-library error")
 	}
 }
 
-func TestSyncMangaStateFreshRow(t *testing.T) {
+func TestLibrarySyncState(t *testing.T) {
 	s := newTestService(t)
 	upsertTestManga(t, s.db, "m", time.Hour)
 
 	now := time.Now()
 	// updated_at is stamped "now" at insert, so a 3-day threshold says fresh.
-	if _, stale := s.LibrarySyncState("p", "m", now); stale {
-		t.Fatal("fresh row: want not stale")
-	}
-	err := s.SyncManga("p", "m", false)
-	if !errors.Is(err, ErrSyncTooFresh) {
-		t.Fatalf("want ErrSyncTooFresh, got %v", err)
+	ts, _ := s.LibrarySyncState("p", "m", now)
+	if ts.IsZero() {
+		t.Fatal("want the stamp from the fresh row")
 	}
 	// The same row goes stale when "now" moves past the threshold.
 	if _, stale := s.LibrarySyncState("p", "m", now.AddDate(0, 0, 5)); !stale {
 		t.Fatal("row older than threshold: want stale")
+	}
+	if _, stale := s.LibrarySyncState("p", "missing", now); stale {
+		t.Fatal("missing: want not stale for unknown manga")
 	}
 }
