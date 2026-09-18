@@ -53,9 +53,13 @@ type Proxy struct {
 // blocked by anti-bot measures.
 const defaultUA = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36"
 
+// secCHUA is the Sec-CH-UA client hint matching defaultUA's Chrome brand.
+// Kept in sync manually when defaultUA changes.
+const secCHUA = `"Chromium";v="126", "Google Chrome";v="126", "Not-A.Brand";v="99"`
+
 // defaultHeaderOrder fixes the order in which default headers are applied so
 // the derived HeaderOrderKey is deterministic regardless of map iteration.
-var defaultHeaderOrder = []string{"User-Agent", "Accept-Language", "Referer"}
+var defaultHeaderOrder = []string{"User-Agent", "Accept-Language", "Referer", "Sec-CH-UA"}
 
 // NewProxy initializes a Proxy with browser-like default headers and an empty
 // per-plugin client map. Each client is created lazily on first use.
@@ -64,6 +68,9 @@ func NewProxy() *Proxy {
 		defaultHeaders: map[string]string{
 			"User-Agent":      defaultUA,
 			"Accept-Language": "en-US,en;q=0.9",
+			// Client hint matching the UA brand; some WAFs (bato1.com) reject
+			// requests whose Sec-CH-UA is missing or disagrees with it.
+			"Sec-CH-UA": secCHUA,
 			// Empty Referer by default; only injected when a plugin sets one.
 			"Referer": "",
 		},
