@@ -218,6 +218,7 @@
         preloaded[idx] = im;
       }
     }
+    var spill = readAhead - budget;
     if (spill > 0 && nextChID) {
       if (nextPages) prefetchNext(spill);
       else warmNeighbor(nextChID, 'next');
