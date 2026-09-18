@@ -56,6 +56,12 @@ type encodeStats struct {
 	enhance time.Duration
 	// encode is everything else: decode, cover downscale, and the re-encode.
 	encode time.Duration
+	// resized reports that a cover was fitted under maxDim. Covers only;
+	// page images are never resized.
+	resized bool
+	// resizeFrom/resizeTo are the pixel dimensions before and after the fit.
+	resizeFrom [2]int
+	resizeTo   [2]int
 }
 
 // encodeForCache converts data to the configured format, downscaling covers
@@ -93,6 +99,11 @@ func encodeForCache(data []byte, format ImageFormat, cover bool, maxDim int, enh
 	}
 	if b := src.Bounds(); cover && needsDownscale(b.Dx(), b.Dy(), maxDim) {
 		src = imaging.Fit(src, maxDim, maxDim, imaging.Lanczos)
+		if stats != nil {
+			stats.resized = true
+			stats.resizeFrom = [2]int{b.Dx(), b.Dy()}
+			stats.resizeTo = [2]int{src.Bounds().Dx(), src.Bounds().Dy()}
+		}
 	}
 	// Colour pages are never enhanced. Deciding here, before the pipeline runs,
 	// means the bytes cannot be touched twice: the original is what gets encoded.

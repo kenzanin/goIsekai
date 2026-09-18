@@ -127,6 +127,11 @@ func (s *AppService) GetImage(pluginID, url string, headers map[string]string, m
 				"enhance_ms", stats.enhance.Milliseconds(),
 				"convert_ms", stats.encode.Milliseconds(),
 				"in_bytes", len(body), "out_bytes", len(data), "ext", ext)
+			if stats.resized {
+				logger.Debug("cover resized",
+					"url", url, "from", stats.resizeFrom, "to", stats.resizeTo,
+					"max_dim", s.coverMaxDim)
+			}
 			_ = os.WriteFile(base+ext, data, 0o644)
 		}
 	}
