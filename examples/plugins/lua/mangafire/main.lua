@@ -94,7 +94,7 @@ function search_manga(arg)
             }
         end
         local meta = body.meta or {}
-        if not meta.has_next or page >= meta.last_page then break end
+        if not meta.has_next or page >= (tonumber(meta.last_page) or 1) then break end
         page = page + 1
         if #all >= 2000 then break end
     end
@@ -171,7 +171,7 @@ function get_chapter_list(arg)
             chapters[#chapters + 1] = entry
         end
         local meta = body.meta or {}
-        if page >= meta.last_page or not meta.has_next or page >= 3 then break end
+        if page >= (tonumber(meta.last_page) or 1) or not meta.has_next or page >= 3 then break end
         page = page + 1
     end
 
