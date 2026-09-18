@@ -87,7 +87,13 @@ func (s *Server) viewUpdates(w http.ResponseWriter, r *http.Request) {
 			items = append(items, buildRow(m, "recent", m.CreatedAt.Local().Format(time.RFC3339)))
 		}
 	}
+	// Newest first; rows carrying a New badge surface above same-date rows
+	// so the feed leads with what actually changed.
 	sort.SliceStable(items, func(i, j int) bool {
+		ni, nj := items[i]["HasNew"].(bool), items[j]["HasNew"].(bool)
+		if ni != nj {
+			return ni
+		}
 		return items[i]["Date"].(string) > items[j]["Date"].(string)
 	})
 

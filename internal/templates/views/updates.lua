@@ -18,6 +18,7 @@ return function(data)
 	end
 
 	local rows = {}
+	local lastDay = nil
 	for _, entry in ipairs(allItems) do
 		local title = entry.Title or ""
 		local pluginID = entry.PluginID or ""
@@ -40,6 +41,14 @@ return function(data)
 				'<span class="shrink-0 text-xs px-2 py-0.5 rounded-full bg-indigo-500/15 text-indigo-400">New title</span>'
 			tsAttr = h(tostring(entry.Date or ""))
 			formattedDate = h(formatDate(tostring(entry.Date or "")))
+		end
+
+		if formattedDate ~= "—" and formattedDate ~= lastDay then
+			rows[#rows + 1] = string.format(
+				'<div class="sticky top-0 z-10 -mx-2 py-2 px-2 bg-neutral-950/95 backdrop-blur text-sm font-semibold text-neutral-300 border-b border-neutral-800">%s</div>',
+				formattedDate
+			)
+			lastDay = formattedDate
 		end
 
 		local coverHtml
