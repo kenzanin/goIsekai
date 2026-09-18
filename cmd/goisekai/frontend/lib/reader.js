@@ -332,7 +332,7 @@
     var im = document.createElement('img');
     im.src = imageUrl(p, chID);
     im.loading = 'lazy';
-    im.className = 'w-full block select-none';
+    im.className = 'block select-none mx-auto';
     im.dataset.idx = idx;
     stripView.appendChild(im);
     return im;
@@ -340,7 +340,7 @@
 
   function appendStripDivider(num) {
     var d = document.createElement('div');
-    d.className = 'flex items-center gap-3 py-6 text-xs text-neutral-500';
+    d.className = 'flex items-center justify-center gap-3 py-6 text-xs text-neutral-500';
     d.textContent = `\u2014 Ch. ${num} \u2014`;
     stripView.appendChild(d);
   }
