@@ -37,6 +37,7 @@ return function(data)
 		navLink("/view/plugins", "plugins", "Plugins", active),
 		navLink("/view/settings", "settings", "Settings", active),
 		navLink("/view/logs", "logs", "Logs", active),
+		navLink("/view/about", "about", "About", active),
 		"</nav>",
 	}, "\n")
 end

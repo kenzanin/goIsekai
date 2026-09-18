@@ -104,6 +104,14 @@ func (s *Server) viewSearch(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+// viewAbout renders the project README as the About page. The markdown is
+// converted server-side on every request; the file is tiny and local.
+func (s *Server) viewAbout(w http.ResponseWriter, r *http.Request) {
+	s.renderPage(w, r, "views/about", "about", map[string]any{
+		"Content": renderMarkdown(loadReadme()),
+	})
+}
+
 // viewLogs renders the in-memory log buffer with a 2s HTMX poll.
 func (s *Server) viewLogs(w http.ResponseWriter, r *http.Request) {
 	limit := 500
