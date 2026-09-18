@@ -300,13 +300,20 @@
     stripBtn();
     canvas.style.display = 'none';
     stripView.classList.remove('hidden');
-    for (const im of stripImgs) im.remove();
-    stripImgs = [];
-    stripChapters = [];
+    populateStrip();
+    applyStripSizing();
+    stripView.scrollTop = (current / Math.max(pages.length, 1)) * stripView.scrollHeight;
+  }
+
+  // (Re)build the strip column from the current chapter's pages. No-op when
+  // already populated — chapter commits and seam appends manage it directly.
+  function populateStrip() {
+    if (stripImgs.length) return;
+    stripChapters = [cid];
     pages.forEach((p, i) => {
       stripImgs.push(appendStripPage(p, i, cid));
     });
-    stripView.scrollTop = Math.max(0, (current / pages.length) * stripView.scrollHeight);
+    applyStripSizing();
   }
 
   function exitStrip() {
@@ -420,6 +427,8 @@
     updateProgressLine();
     reportProgress();
     prefetch();
+    if (stripMode && !stripImgs.length) populateStrip();
+    if (stripMode) stripView.scrollTop = (i / Math.max(pages.length, 1)) * stripView.scrollHeight;
     var url = imageUrl(pages[i]);
     var cached = preloaded[i];
     if (cached?.complete && cached.naturalWidth > 0) {
@@ -491,8 +500,31 @@
     panX = 0;
     panY = 0;
     calcBaseScale();
-    render();
+    if (stripMode) applyStripSizing();
+    else render();
   }
+
+  // Strip pages size off viewMode + zoom: fit-width fills the column, 1:1
+  // uses natural width capped to the viewport (no horizontal scroll),
+  // fit-height scales per page to the visible height. zoom multiplies on top.
+  function applyStripSizing() {
+    var vw = canvas.clientWidth || window.innerWidth;
+    var vh = canvas.clientHeight || window.innerHeight;
+    for (let k = 0; k < stripImgs.length; k++) {
+      const im = stripImgs[k];
+      if (viewMode === 'fitHeight' && im.naturalHeight > 0) {
+        const s = (vh / im.naturalHeight) * zoom;
+        im.style.width = `${im.naturalWidth * s}px`;
+      } else if (viewMode === 'original') {
+        im.style.width = `${Math.min(im.naturalWidth || vw, vw) * zoom}px`;
+      } else {
+        im.style.width = `${vw * zoom}px`;
+      }
+    }
+  }
+  window.addEventListener('resize', () => {
+    if (stripMode) applyStripSizing();
+  });
 
   function goToPage(i) {
     if (i < 0 || i >= pages.length) return;
@@ -593,10 +625,8 @@
     if (stripMode) {
       for (const im of stripImgs) im.remove();
       stripImgs = [];
-      stripChapters = [targetCID];
-      pages.forEach((p, i) => {
-        stripImgs.push(appendStripPage(p, i, targetCID));
-      });
+      stripChapters = [];
+      populateStrip();
       stripView.scrollTop = targetPage === 'last' ? stripView.scrollHeight : 0;
     } else drawPage(initial);
   }
@@ -627,6 +657,12 @@
 
   // Zoom controls (cursor-anchored via wheel; buttons zoom about center).
   function zoomBy(factor, cx, cy) {
+    if (stripMode) {
+      zoom = Math.max(0.2, Math.min(5, zoom * factor));
+      localStorage.setItem(`gi_zoom_${viewMode}`, String(zoom));
+      applyStripSizing();
+      return;
+    }
     var rect = canvas.getBoundingClientRect();
     var mx = cx === undefined ? rect.width / 2 : cx - rect.left;
     var my = cy === undefined ? rect.height / 2 : cy - rect.top;
@@ -757,7 +793,6 @@
       else enterStrip();
     });
   stripBtn();
-  if (stripMode) enterStrip();
 
   var fitBtn = document.getElementById('btn-fit');
   var fitLabels = { fitWidth: 'Fit W', fitHeight: 'Fit H', original: '1:1' };
@@ -869,6 +904,10 @@
           var sp = resume ? current + 1 : startPage;
           if (window.location.search.indexOf('page=last') >= 0) sp = pages.length;
           var initial = sp ? Math.max(1, Math.min(sp, pages.length)) - 1 : 0;
+          if (stripMode) {
+            canvas.style.display = 'none';
+            stripView.classList.remove('hidden');
+          }
           drawPage(initial);
         });
       })
