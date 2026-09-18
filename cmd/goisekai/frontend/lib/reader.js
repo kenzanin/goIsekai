@@ -37,6 +37,12 @@
   var startPage = parseInt(new URLSearchParams(window.location.search).get('page'), 10);
   var nextChID = root.dataset.nextChapterId || '';
   var prevChID = root.dataset.prevChapterId || '';
+  // Vertical strip mode: continuous downward scroll. When a chapter's pages run
+  // out, the next chapter's pages are appended seamlessly (sites that split one
+  // manga release across several chapter parts read as one flow).
+  var stripMode = localStorage.getItem('gi_stripMode') === '1';
+  var stripView = document.getElementById('strip-view');
+  var stripLoading = false; // strip is appending a neighbor chapter
 
   // Auto-hide bars state
   var barsVisible = true;
@@ -272,6 +278,141 @@
       });
   }
 
+  // ---- Vertical strip mode ------------------------------------------------
+  // One <img> per page stacked vertically; wheel/space/keys scroll. When the
+  // reader reaches the seam between chapter parts, the next chapter's page
+  // list is fetched and its pages appended to the same column with a thin
+  // divider, so split-up releases read continuously.
+  var stripImgs = []; // pages currently in the column
+  var stripChapters = []; // chapter ids already appended
+
+  function stripBtn() {
+    var b = document.getElementById('btn-strip');
+    if (b) {
+      b.classList.toggle('bg-indigo-600/20', stripMode);
+      b.classList.toggle('border-indigo-500/40', stripMode);
+    }
+  }
+
+  function enterStrip() {
+    stripMode = true;
+    localStorage.setItem('gi_stripMode', '1');
+    stripBtn();
+    canvas.style.display = 'none';
+    stripView.classList.remove('hidden');
+    for (const im of stripImgs) im.remove();
+    stripImgs = [];
+    stripChapters = [];
+    pages.forEach((p, i) => {
+      stripImgs.push(appendStripPage(p, i, cid));
+    });
+    stripView.scrollTop = Math.max(0, (current / pages.length) * stripView.scrollHeight);
+  }
+
+  function exitStrip() {
+    stripMode = false;
+    localStorage.setItem('gi_stripMode', '0');
+    stripBtn();
+    stripView.classList.add('hidden');
+    stripView.innerHTML = '';
+    stripImgs = [];
+    stripChapters = [];
+    canvas.style.display = '';
+    drawPage(current);
+  }
+
+  function appendStripPage(p, idx, chID) {
+    var im = document.createElement('img');
+    im.src = imageUrl(p, chID);
+    im.loading = 'lazy';
+    im.className = 'w-full block select-none';
+    im.dataset.idx = idx;
+    stripView.appendChild(im);
+    return im;
+  }
+
+  function appendStripDivider(num) {
+    var d = document.createElement('div');
+    d.className = 'flex items-center gap-3 py-6 text-xs text-neutral-500';
+    d.textContent = `\u2014 Ch. ${num} \u2014`;
+    stripView.appendChild(d);
+  }
+
+  // Append the next chapter's pages when the column bottom approaches.
+  function maybeExtendStrip() {
+    if (stripLoading) return;
+    if (!nextChID || nextChID === cid || stripChapters.indexOf(nextChID) >= 0) return;
+    var nearBottom = stripView.scrollTop + stripView.clientHeight > stripView.scrollHeight - 2500;
+    if (!nearBottom) return;
+    stripLoading = true;
+    var warm =
+      nextData && (nextData.pages || []).length
+        ? Promise.resolve(nextData)
+        : fetch(`/api/reader-data/${[pid, mid, nextChID].map(encodeURIComponent).join('/')}`).then(
+            (r) => r.json(),
+          );
+    warm
+      .then((d) => {
+        stripLoading = false;
+        if (!d || d.error || !(d.pages || []).length) return;
+        if (stripChapters.indexOf(nextChID) >= 0) return;
+        stripChapters.push(nextChID);
+        appendStripDivider(d.chapterNum || '');
+        // Rebase p{k}/n{k} image keys are per-chapter; column images carry
+        // their own chapter id via imageUrl, so plain appends are safe.
+        d.pages.forEach((p) => {
+          stripImgs.push(appendStripPage(p, stripImgs.length, nextChID));
+        });
+        // Seam keeps flowing: adopt the appended chapter as current so
+        // progress tracking and the next append chain onward.
+        adoptNeighbor(nextChID, d);
+      })
+      .catch(() => {
+        stripLoading = false;
+      });
+  }
+
+  // Point the reader's state at the chapter whose pages were appended, without
+  // touching the visible column — scroll continues across the seam.
+  function adoptNeighbor(chID, data) {
+    cid = chID;
+    nextChID = data.nextChapterID || '';
+    prevChID = data.prevChapterID || '';
+    nextData = null;
+    nextPages = null;
+    prevData = null;
+    prevPages = null;
+    syncChapterNav(data);
+    history.replaceState(
+      {},
+      '',
+      `/view/read/${[pid, mid, chID].map(encodeURIComponent).join('/')}`,
+    );
+  }
+
+  stripView.addEventListener('scroll', () => {
+    maybeExtendStrip();
+    trackStripProgress();
+  });
+
+  // Progress = the image crossing the viewport's vertical midpoint.
+  function trackStripProgress() {
+    var acc = 0;
+    for (let k = 0; k < stripImgs.length; k++) {
+      acc += stripImgs[k].clientHeight + 8;
+      if (acc >= stripView.scrollTop + stripView.clientHeight / 2) {
+        if (current !== k && k < pages.length) {
+          current = k % Math.max(pages.length, 1);
+          updateCounter();
+          updateProgressLine();
+          reportProgress();
+        }
+        break;
+      }
+    }
+  }
+  stripView.addEventListener('click', () => setBarsVisible(!barsVisible));
+
   function drawPage(i) {
     current = i;
     showError(false);
@@ -359,6 +500,7 @@
   }
 
   function next() {
+    if (stripMode) return; // scrolling is the navigation in strip mode
     if (current < pages.length - 1) {
       goToPage(current + 1);
       return;
@@ -372,6 +514,7 @@
     showEndOfSeries();
   }
   function prev() {
+    if (stripMode) return;
     if (current > 0) {
       goToPage(current - 1);
       return;
@@ -447,7 +590,15 @@
     history.pushState({}, '', url + (targetPage === 'last' ? '?page=last' : ''));
     var initial = targetPage === 'last' ? pages.length - 1 : 0;
     showSpinner(false);
-    drawPage(initial);
+    if (stripMode) {
+      for (const im of stripImgs) im.remove();
+      stripImgs = [];
+      stripChapters = [targetCID];
+      pages.forEach((p, i) => {
+        stripImgs.push(appendStripPage(p, i, targetCID));
+      });
+      stripView.scrollTop = targetPage === 'last' ? stripView.scrollHeight : 0;
+    } else drawPage(initial);
   }
 
   // Reflect chapter state in the top-bar title + prev/next chapter controls.
@@ -494,6 +645,10 @@
     'wheel',
     (e) => {
       e.preventDefault();
+      if (stripMode) {
+        stripView.scrollTop += e.deltaY;
+        return;
+      }
       if (e.ctrlKey) {
         zoomBy(e.deltaY > 0 ? 0.9 : 1.1, e.clientX, e.clientY);
         return;
@@ -595,6 +750,15 @@
     zoomBy(1 / 1.2);
   });
 
+  var stripToggle = document.getElementById('btn-strip');
+  if (stripToggle)
+    stripToggle.addEventListener('click', () => {
+      if (stripMode) exitStrip();
+      else enterStrip();
+    });
+  stripBtn();
+  if (stripMode) enterStrip();
+
   var fitBtn = document.getElementById('btn-fit');
   var fitLabels = { fitWidth: 'Fit W', fitHeight: 'Fit H', original: '1:1' };
   var fitOrder = ['fitWidth', 'fitHeight', 'original'];
@@ -634,7 +798,8 @@
       (direction === 'rtl' ? next : prev)();
     } else if (e.key === ' ') {
       e.preventDefault();
-      next();
+      if (stripMode) stripView.scrollTop += canvas.clientHeight * 0.9;
+      else next();
     } else if (e.key === 'Escape') {
       e.preventDefault();
       window.location.href = `/view/manga/${encodeURIComponent(pid)}/${encodeURIComponent(mid)}`;

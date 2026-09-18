@@ -50,6 +50,7 @@ return function(data)
       <button id="btn-fit" title="Fit mode" class="border border-neutral-700 hover:bg-neutral-800 active:scale-95 transition rounded-md px-3 py-1.5 text-xs">Fit W</button>
       <button id="btn-zoom-out" title="Zoom out" class="border border-neutral-700 hover:bg-neutral-800 active:scale-95 transition rounded-md px-3 py-1.5 text-xs">−</button>
       <button id="btn-zoom-in" title="Zoom in" class="border border-neutral-700 hover:bg-neutral-800 active:scale-95 transition rounded-md px-3 py-1.5 text-xs">＋</button>
+      <button id="btn-strip" title="Vertical strip (continuous scroll)" class="border border-neutral-700 hover:bg-neutral-800 active:scale-95 transition rounded-md px-3 py-1.5 text-xs">⇕</button>
       <button id="btn-dir" title="Direction (RTL/LTR)" class="border border-neutral-700 hover:bg-neutral-800 active:scale-95 transition rounded-md px-3 py-1.5 text-xs">LTR</button>
     </div>
   </div>
@@ -62,6 +63,9 @@ return function(data)
 
   <!-- Canvas -->
   <canvas id="page-canvas" class="absolute inset-0 h-full w-full"></canvas>
+
+  <!-- Vertical strip view (continuous scroll; next chapter parts append seamlessly) -->
+  <div id="strip-view" class="absolute inset-0 overflow-y-auto overscroll-contain hidden pt-12 pb-16 bg-neutral-950"></div>
 
   <!-- Center click zone -->
   <div id="zone-center" class="absolute top-12 bottom-14 left-[35%] right-[35%] z-10 cursor-pointer" title="Toggle bars"></div>
