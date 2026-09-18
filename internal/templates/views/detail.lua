@@ -166,9 +166,9 @@ return function(data)
 		local stale = data.Stale
 		local synced = data.LastSynced
 		local syncedHTML = ""
-		if synced and synced.Year and synced.Year > 1970 then
+		if type(synced) == "string" and #synced >= 16 then
 			syncedHTML = '<span class="text-xs text-neutral-500 self-center" title="Last refresh check">synced '
-				.. os.date("%Y-%m-%d %H:%M", os.time{year=synced.Year, month=synced.Month, day=synced.Day, hour=synced.Hour, min=synced.Minute})
+				.. synced:sub(1, 10) .. " " .. synced:sub(12, 16)
 				.. '</span>'
 		end
 		actionsHTML = actionsHTML
