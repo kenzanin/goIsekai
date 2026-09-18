@@ -18,6 +18,7 @@ return function(data)
 	end
 
 	local rows = {}
+	local lastDay = nil
 	for _, entry in ipairs(history) do
 		local title = entry.Title or ""
 		local pluginID = entry.PluginID or ""
@@ -30,11 +31,21 @@ return function(data)
 		local lastReadAt = entry.LastReadAt or ""
 		local tsAttr = ""
 		local formattedDate = ""
+		local dayKey = ""
 		if lastReadAt ~= "" then
 			tsAttr = h(tostring(lastReadAt))
 			formattedDate = h(formatDate(tostring(lastReadAt)))
+			dayKey = formatDate(tostring(lastReadAt))
 		else
 			formattedDate = "—"
+		end
+
+		if dayKey ~= "" and dayKey ~= lastDay then
+			rows[#rows + 1] = string.format(
+				'<div class="sticky top-0 z-10 -mx-2 py-2 px-2 bg-neutral-950/95 backdrop-blur text-sm font-semibold text-neutral-300 border-b border-neutral-800">%s</div>',
+				h(dayKey)
+			)
+			lastDay = dayKey
 		end
 
 		local coverHtml
