@@ -24,8 +24,11 @@
     panY = 0,
     baseScale = 1,
     dpr = 1;
-  var preloaded = {}; // page index -> Image
-  var nextPages = null; // next chapter page list — fetched lazily for read-ahead spill
+  var preloaded = {}; // page index -> Image; n{k}/p{k} = neighbor-chapter spill
+  var nextData = null,
+    nextPages = null, // neighbor reader-data, kept for instant chapter switch
+    prevData = null,
+    prevPages = null;
   var imgFails = 0; // consecutive image-load failures (at-home nodes flake transiently)
   var readAhead = Math.max(
     0,
@@ -215,23 +218,13 @@
         preloaded[idx] = im;
       }
     }
-    var spill = readAhead - budget;
     if (spill > 0 && nextChID) {
-      if (nextPages) {
-        prefetchNext(spill);
-        return;
-      }
-      // Lazily fetch the next chapter's page list once, then spill into it.
-      fetch(`/api/reader-data/${[pid, mid, nextChID].map(encodeURIComponent).join('/')}`)
-        .then((r) => r.json())
-        .then((d) => {
-          nextPages = d?.pages || [];
-          if (nextPages.length) prefetchNext(spill);
-        })
-        .catch(() => {
-          /* next-chapter warmup is best-effort */
-        });
+      if (nextPages) prefetchNext(spill);
+      else warmNeighbor(nextChID, 'next');
     }
+    // Warm the previous chapter from page 1 — same instant-switch path when
+    // the reader retreats backwards.
+    if (current === 0 && prevChID && !prevPages && !loading) warmNeighbor(prevChID, 'prev');
   }
 
   function prefetchNext(n) {
@@ -242,6 +235,40 @@
         preloaded[`n${k}`] = im;
       }
     }
+  }
+
+  function prefetchPrev(n) {
+    for (let k = 0; k < Math.min(n, prevPages.length); k++) {
+      if (!preloaded[`p${k}`]) {
+        const im = new Image();
+        im.src = imageUrl(prevPages[k], prevChID);
+        preloaded[`p${k}`] = im;
+      }
+    }
+  }
+
+  // Neighbor warmup: fetch the chapter's reader-data once so switchChapter can
+  // commit instantly (page list + neighbors already in memory, images already
+  // spilling into the browser cache).
+  function warmNeighbor(chID, dir) {
+    if (!chID || chID === cid) return;
+    fetch(`/api/reader-data/${[pid, mid, chID].map(encodeURIComponent).join('/')}`)
+      .then((r) => r.json())
+      .then((d) => {
+        if (!d || d.error) return;
+        var list = d.pages || [];
+        if (dir === 'next') {
+          nextData = d;
+          nextPages = list;
+        } else {
+          prevData = d;
+          prevPages = list;
+        }
+        if (list.length) (dir === 'next' ? prefetchNext : prefetchPrev)(readAhead);
+      })
+      .catch(() => {
+        /* neighbor warmup is best-effort */
+      });
   }
 
   function drawPage(i) {
@@ -357,8 +384,18 @@
   }
 
   // Fetch-swap navigation: load a chapter in place without a full page reload.
+  // A warmed neighbor commits instantly — no fetch, no spinner — so switching
+  // chapters feels like switching pages.
   function switchChapter(targetCID, targetPage) {
     if (loading) return;
+    if (targetCID === nextChID && nextData && (nextData.pages || []).length) {
+      commitChapter(nextData, targetCID, targetPage);
+      return;
+    }
+    if (targetCID === prevChID && prevData && (prevData.pages || []).length) {
+      commitChapter(prevData, targetCID, targetPage);
+      return;
+    }
     showSpinner(true);
     _lastFailedRetry = () => {
       switchChapter(targetCID, targetPage);
@@ -374,36 +411,42 @@
           showSpinner(false);
           return;
         }
-        var newPages = data.pages || [];
-        if (!newPages.length) {
+        if (!(data.pages || []).length) {
           showReaderError('Empty chapter (plugin failed to fetch pages) — try Retry');
           showSpinner(false);
           return;
         }
-        // Commit new chapter state.
-        cid = targetCID;
-        pages = newPages;
-        nextChID = data.nextChapterID || '';
-        prevChID = data.prevChapterID || '';
-        preloaded = {};
-        nextPages = null;
-        imgFails = 0;
-        img = null;
-        panX = 0;
-        panY = 0;
-        _lastFailedRetry = null;
-        syncChapterNav(data);
-        // Update the URL without a reload; back/forward still work.
-        var url = `/view/read/${[pid, mid, targetCID].map(encodeURIComponent).join('/')}`;
-        history.pushState({}, '', url + (targetPage === 'last' ? '?page=last' : ''));
-        var initial = targetPage === 'last' ? pages.length - 1 : 0;
-        showSpinner(false);
-        drawPage(initial);
+        commitChapter(data, targetCID, targetPage);
       })
       .catch((err) => {
         showReaderError(friendlyError(err));
         showSpinner(false);
       });
+  }
+
+  // Commit a chapter's fetched-or-warmed state and draw the target page.
+  function commitChapter(data, targetCID, targetPage) {
+    cid = targetCID;
+    pages = data.pages;
+    nextChID = data.nextChapterID || '';
+    prevChID = data.prevChapterID || '';
+    preloaded = {};
+    nextData = null;
+    nextPages = null;
+    prevData = null;
+    prevPages = null;
+    imgFails = 0;
+    img = null;
+    panX = 0;
+    panY = 0;
+    _lastFailedRetry = null;
+    syncChapterNav(data);
+    // Update the URL without a reload; back/forward still work.
+    var url = `/view/read/${[pid, mid, targetCID].map(encodeURIComponent).join('/')}`;
+    history.pushState({}, '', url + (targetPage === 'last' ? '?page=last' : ''));
+    var initial = targetPage === 'last' ? pages.length - 1 : 0;
+    showSpinner(false);
+    drawPage(initial);
   }
 
   // Reflect chapter state in the top-bar title + prev/next chapter controls.
