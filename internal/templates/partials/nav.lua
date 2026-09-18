@@ -33,7 +33,6 @@ return function(data)
 		"        </svg>",
 		"        <span style=\"font-family: 'Space Grotesk', system-ui, sans-serif; letter-spacing: -0.02em;\">goIsekai</span>",
 		"    </a>",
-		navLink("/", "library", "Library", active),
 		navLink("/view/search", "search", "Search", active),
 		navLink("/view/updates", "updates", "Updates", active),
 		navLink("/view/history", "history", "History", active),

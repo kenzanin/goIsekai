@@ -67,9 +67,9 @@ return function(data)
 			local pluginBadge = ""
 			if pluginName ~= "" then
 				local pIcon = pluginIcon ~= ""
-						and ('<img src="' .. h(pluginIcon) .. '" alt="" class="h-3 w-3 rounded-sm object-cover">')
+						and ('<img src="' .. h(pluginIcon) .. '" alt="" class="h-4 w-4 rounded-sm object-cover">')
 					or ""
-				pluginBadge = '<span class="absolute bottom-2 left-2 bg-black/60 backdrop-blur rounded-full px-2 py-0.5 text-[11px] text-neutral-200 flex items-center gap-1 max-w-[90%]">'
+				pluginBadge = '<span class="absolute bottom-2 left-2 bg-black/60 backdrop-blur rounded-full px-2 py-1 text-xs font-medium text-neutral-100 flex items-center gap-1.5 max-w-[90%]">'
 					.. pIcon
 					.. '<span class="truncate">'
 					.. h(pluginName)

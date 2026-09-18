@@ -45,12 +45,12 @@ func TestRenderPageNavToken(t *testing.T) {
 	// highlight nothing rather than leaving the previous page's tab lit.
 	req := httptest.NewRequest("GET", "/view/library", nil)
 	rec := httptest.NewRecorder()
-	s.renderPage(rec, req, "views/library", "library", nil)
+	s.renderPage(rec, req, "views/library", "search", nil)
 
-	if body := rec.Body.String(); !strings.Contains(body, `data-nav="library"`) {
+	if body := rec.Body.String(); !strings.Contains(body, `data-nav="search"`) {
 		t.Fatal("full page render has no nav bar")
 	} else if n := strings.Count(body, "border-indigo-400"); n != 1 {
-		t.Errorf("library page highlights %d nav link(s), want exactly 1", n)
+		t.Errorf("page highlights %d nav link(s), want exactly 1", n)
 	}
 
 	req2 := httptest.NewRequest("GET", "/view/library", nil)

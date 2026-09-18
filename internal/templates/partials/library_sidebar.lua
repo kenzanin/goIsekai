@@ -132,17 +132,17 @@ return function(data)
 				if p.Icon and p.Icon ~= "" then
 					iconHTML = '<img src="'
 						.. h(p.Icon)
-						.. '" alt="" class="h-2.5 w-2.5 rounded-sm object-cover shrink-0">'
+						.. '" alt="" class="h-3.5 w-3.5 rounded-sm object-cover shrink-0">'
 				end
 				pluginRows = pluginRows
-					.. '<div class="flex items-center justify-between gap-2 text-xs rounded-md px-1.5 py-1">'
+					.. '<div class="flex items-center justify-between gap-2 text-sm rounded-md px-1.5 py-1">'
 					.. '<span class="flex items-center gap-1.5 min-w-0">'
 					.. iconHTML
-					.. '<span class="text-neutral-300 truncate">'
+					.. '<span class="text-sm font-medium text-neutral-200 truncate">'
 					.. h(p.Name or "")
 					.. "</span>"
 					.. "</span>"
-					.. '<span class="font-semibold text-indigo-400 shrink-0">'
+					.. '<span class="text-sm font-bold text-indigo-400 shrink-0">'
 					.. h(tostring(p.Count or 0))
 					.. "</span></div>"
 			end
