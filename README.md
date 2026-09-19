@@ -118,12 +118,12 @@ graph TD
 
 ```mermaid
 graph TD
-    A[/] --> B[Static assets]
+    A["/"] --> B[Static assets]
     A --> C[HTML views]
-    A --> D[/api JSON endpoints]
-    A --> E[/action HTMX]
-    A --> F[/image proxy]
-    A --> G[/plugin-static]
+    A --> D["/api JSON endpoints"]
+    A --> E["/action HTMX"]
+    A --> F["/image proxy"]
+    A --> G["/plugin-static"]
 
     B --> B1["/static/*"]
     C --> C1["/view/library"]
