@@ -40,7 +40,8 @@
   // Vertical strip mode: continuous downward scroll. When a chapter's pages run
   // out, the next chapter's pages are appended seamlessly (sites that split one
   // manga release across several chapter parts read as one flow).
-  var stripMode = localStorage.getItem('gi_stripMode') === '1';
+  var stripKey = `gi_stripMode.${mid}`;
+  var stripMode = localStorage.getItem(stripKey) === '1';
   var stripView = document.getElementById('strip-view');
   var stripLoading = false; // strip is appending a neighbor chapter
 
@@ -298,7 +299,7 @@
 
   function enterStrip() {
     stripMode = true;
-    localStorage.setItem('gi_stripMode', '1');
+    localStorage.setItem(stripKey, '1');
     stripBtn();
     canvas.style.display = 'none';
     stripView.classList.remove('hidden');
@@ -320,7 +321,7 @@
 
   function exitStrip() {
     stripMode = false;
-    localStorage.setItem('gi_stripMode', '0');
+    localStorage.setItem(stripKey, '0');
     stripBtn();
     stripView.classList.add('hidden');
     stripView.innerHTML = '';
