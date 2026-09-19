@@ -55,7 +55,7 @@ func (s *AppService) ExportCBZ(pluginID, mangaID, chapterID, title string) (stri
 	images := make([][]byte, 0, len(pages))
 	failed := 0
 	for _, p := range pages {
-		data, imgErr := s.GetImage(pluginID, p.URL, p.Headers, mangaID, chapterID)
+		data, imgErr := s.GetImage(pluginID, p.URL, p.Headers, mangaID, chapterID, PrioLow)
 		if imgErr != nil {
 			logger.Warn("export cbz: skip page", "error", imgErr)
 			failed++

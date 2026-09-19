@@ -73,9 +73,10 @@
   // Start with bars hidden
   setBarsVisible(false);
 
-  function imageUrl(p, chapterID) {
+  function imageUrl(p, chapterID, prio) {
     var h = p.headers || {};
     var ref = h.Referer || h.referer || '';
+    var prioParam = prio === 'high' ? '&prio=high' : '';
     return (
       '/image?pluginID=' +
       encodeURIComponent(pid) +
@@ -85,6 +86,7 @@
       encodeURIComponent(mid) +
       '&chapterID=' +
       encodeURIComponent(chapterID || cid) +
+      prioParam +
       (ref ? `&referer=${encodeURIComponent(ref)}` : '')
     );
   }
@@ -220,7 +222,7 @@
       const idx = current + k;
       if (!preloaded[idx]) {
         const im = new Image();
-        im.src = imageUrl(pages[idx]);
+        im.src = imageUrl(pages[idx], undefined, 'low');
         preloaded[idx] = im;
       }
     }
@@ -238,7 +240,7 @@
     for (let k = 0; k < Math.min(n, nextPages.length); k++) {
       if (!preloaded[`n${k}`]) {
         const im = new Image();
-        im.src = imageUrl(nextPages[k], nextChID);
+        im.src = imageUrl(nextPages[k], nextChID, 'low');
         preloaded[`n${k}`] = im;
       }
     }
@@ -248,7 +250,7 @@
     for (let k = 0; k < Math.min(n, prevPages.length); k++) {
       if (!preloaded[`p${k}`]) {
         const im = new Image();
-        im.src = imageUrl(prevPages[k], prevChID);
+        im.src = imageUrl(prevPages[k], prevChID, 'low');
         preloaded[`p${k}`] = im;
       }
     }
@@ -330,7 +332,7 @@
 
   function appendStripPage(p, idx, chID) {
     var im = document.createElement('img');
-    im.src = imageUrl(p, chID);
+    im.src = imageUrl(p, chID, 'low');
     im.loading = 'lazy';
     im.className = 'block select-none mx-auto';
     im.dataset.idx = idx;
@@ -433,7 +435,7 @@
     prefetch();
     if (stripMode && !stripImgs.length) populateStrip();
     if (stripMode) stripView.scrollTop = (i / Math.max(pages.length, 1)) * stripView.scrollHeight;
-    var url = imageUrl(pages[i]);
+    var url = imageUrl(pages[i], undefined, 'high');
     var cached = preloaded[i];
     if (cached?.complete && cached.naturalWidth > 0) {
       img = cached;

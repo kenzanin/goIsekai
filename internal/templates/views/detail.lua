@@ -55,8 +55,9 @@ return function(data)
 		coverHTML = coverWrap
 			.. '<img src="/image?pluginID='
 			.. h(pluginID)
-			.. "&amp;url="
+			.. "&url="
 			.. h(manga.CoverURL)
+			.. "&prio=high"
 			.. '" alt="'
 			.. h(manga.Title or "")
 			.. '" class="w-full aspect-[2/3] rounded-xl object-cover">'

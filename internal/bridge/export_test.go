@@ -65,7 +65,7 @@ func TestZipImagesOrdering(t *testing.T) {
 func TestReadCachedImageDiskOnly(t *testing.T) {
 	s := newTestServiceWithCache(t)
 	url := serveImage(t, "image/png", validPNG(t))
-	if _, err := s.GetImage("p", url, nil, "m", "c"); err != nil {
+	if _, err := s.GetImage("p", url, nil, "m", "c", PrioLow); err != nil {
 		t.Fatalf("GetImage: %v", err)
 	}
 

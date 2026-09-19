@@ -4,6 +4,8 @@ import (
 	"github.com/goccy/go-json"
 	"net/http"
 	"net/url"
+
+	"goisekai/internal/bridge"
 )
 
 // apiHistoryEntry is the JSON shape for GET /history.
@@ -178,7 +180,7 @@ func (s *Server) apiImage(w http.ResponseWriter, r *http.Request) {
 	}
 
 	s.logger.Debug("api image", "pluginID", pluginID, "url", urlStr, "mangaID", mangaID, "chapterID", chapterID)
-	data, err := s.service.GetImage(pluginID, urlStr, headers, mangaID, chapterID)
+	data, err := s.service.GetImage(pluginID, urlStr, headers, mangaID, chapterID, bridge.PrioLow)
 	if err != nil {
 		s.logger.Error("api image fetch", "url", urlStr, "pluginID", pluginID, "error", err)
 		writeErr(w, http.StatusBadGateway, "image fetch failed")

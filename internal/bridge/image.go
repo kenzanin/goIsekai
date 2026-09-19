@@ -17,7 +17,7 @@ import (
 // disk (L2) so repeat lookups skip the network entirely. mangaID/chapterID scope
 // the L2 path: page images land under images/<pluginID>/<mangaID>/<chapterID>/,
 // and thumbnails (empty mangaID) under images/<pluginID>/library/.
-func (s *AppService) GetImage(pluginID, url string, headers map[string]string, mangaID, chapterID string) ([]byte, error) {
+func (s *AppService) GetImage(pluginID, url string, headers map[string]string, mangaID, chapterID string, prio Prio) ([]byte, error) {
 	// L1: in-memory cache.
 	s.imageMu.RLock()
 	if cached, ok := s.imageCache[url]; ok {
@@ -55,7 +55,7 @@ func (s *AppService) GetImage(pluginID, url string, headers map[string]string, m
 	// At-home image nodes 404 bursts: a browser's draw+prefetch fires several
 	// fetches at once. Serialize per host and pace requests ~1s apart (the
 	// upstream convention for MD@Home), retrying with backoff before giving
-	// up. The semaphore is per host, so covers from site A never queue behind
+	// up. The lanes are per host, so covers from site A never queue behind
 	// pages from site B.
 	host := func() string {
 		if u, err := neturl.Parse(url); err == nil && u.Host != "" {
@@ -63,9 +63,8 @@ func (s *AppService) GetImage(pluginID, url string, headers map[string]string, m
 		}
 		return url
 	}()
-	sem := s.hostSem(host)
-	sem <- struct{}{}
-	defer func() { <-sem }()
+	s.hostAcquire(host, prio)
+	defer s.hostRelease(host, prio)
 	var resp types.HTTPResponse
 	var err error
 	var body []byte

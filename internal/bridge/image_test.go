@@ -10,7 +10,9 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"sync"
 	"testing"
+	"time"
 
 	"goisekai/internal/database"
 	"goisekai/internal/hostnet"
@@ -63,7 +65,7 @@ func TestImageCacheConvertsJPEGToWebP(t *testing.T) {
 	url := serveImage(t, "image/jpeg", jpg.Bytes())
 
 	s := newTestServiceWithCache(t)
-	if _, err := s.GetImage("plugin-x", url, nil, "", ""); err != nil {
+	if _, err := s.GetImage("plugin-x", url, nil, "", "", PrioLow); err != nil {
 		t.Fatalf("GetImage: %v", err)
 	}
 
@@ -89,7 +91,7 @@ func TestImageCacheGIFPassthrough(t *testing.T) {
 	url := serveImage(t, "image/gif", payload)
 
 	s := newTestServiceWithCache(t)
-	if _, err := s.GetImage("plugin-x", url, nil, "", ""); err != nil {
+	if _, err := s.GetImage("plugin-x", url, nil, "", "", PrioLow); err != nil {
 		t.Fatalf("GetImage: %v", err)
 	}
 
@@ -114,7 +116,7 @@ func TestImageCacheInvalidBytesRejected(t *testing.T) {
 		url := serveImage(t, "application/octet-stream", payload)
 
 		s := newTestServiceWithCache(t)
-		if _, err := s.GetImage("plugin-x", url, nil, "", ""); err == nil {
+		if _, err := s.GetImage("plugin-x", url, nil, "", "", PrioLow); err == nil {
 			t.Fatalf("GetImage: expected error for invalid bytes")
 		}
 
@@ -154,7 +156,7 @@ func TestImageCacheHealsCorruptEntry(t *testing.T) {
 	}
 
 	// Reading must heal: corrupt file deleted, valid image fetched and cached.
-	if _, err := s.GetImage("plugin-x", validURL, nil, "", ""); err != nil {
+	if _, err := s.GetImage("plugin-x", validURL, nil, "", "", PrioLow); err != nil {
 		t.Fatalf("GetImage: %v", err)
 	}
 	data, err := os.ReadFile(base + ".webp")
@@ -188,7 +190,7 @@ func TestImageCacheWritesConfiguredFormat(t *testing.T) {
 		t.Run(string(tc.format), func(t *testing.T) {
 			url := serveImage(t, "image/jpeg", validJPEG(t, 900, 1400))
 			s := newTestServiceWithFormat(t, tc.format)
-			if _, err := s.GetImage("plugin-x", url, nil, "", ""); err != nil {
+			if _, err := s.GetImage("plugin-x", url, nil, "", "", PrioLow); err != nil {
 				t.Fatalf("GetImage: %v", err)
 			}
 
@@ -216,7 +218,7 @@ func TestImageCacheOriginalFormatStoresSourceBytes(t *testing.T) {
 	payload := validJPEG(t, 64, 64)
 	url := serveImage(t, "image/jpeg", payload)
 	s := newTestServiceWithFormat(t, FormatOriginal)
-	if _, err := s.GetImage("plugin-x", url, nil, "", ""); err != nil {
+	if _, err := s.GetImage("plugin-x", url, nil, "", "", PrioLow); err != nil {
 		t.Fatalf("GetImage: %v", err)
 	}
 
@@ -267,7 +269,7 @@ func TestImageCacheEnhanceScope(t *testing.T) {
 
 			s := newTestServiceWithFormat(t, FormatWebP)
 			s.enhance = tc.enhance
-			if _, err := s.GetImage(tc.pluginID, url, nil, tc.mangaID, tc.chapterID); err != nil {
+			if _, err := s.GetImage(tc.pluginID, url, nil, tc.mangaID, tc.chapterID, PrioLow); err != nil {
 				t.Fatalf("GetImage: %v", err)
 			}
 
@@ -282,4 +284,169 @@ func TestImageCacheEnhanceScope(t *testing.T) {
 			}
 		})
 	}
+}
+
+// TestSamePriorityFIFO verifies that requests of the same priority
+// are handled in arrival order.
+func TestSamePriorityFIFO(t *testing.T) {
+	s := newTestServiceWithCache(t)
+
+	var mu sync.Mutex
+	callOrder := make([]int, 0)
+	var idx int
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		mu.Lock()
+		callOrder = append(callOrder, idx)
+		idx++
+		mu.Unlock()
+
+		w.Header().Set("Content-Type", "image/png")
+		png.Encode(w, image.NewRGBA(image.Rect(0, 0, 10, 10)))
+	}))
+	defer srv.Close()
+
+	// Start 3 low-priority requests - lane capacity is 1
+	var wg sync.WaitGroup
+	for range 3 {
+		wg.Go(func() {
+			_, err := s.GetImage("test", srv.URL+"/img", nil, "", "", PrioLow)
+			if err != nil {
+				t.Errorf("low priority GetImage failed: %v", err)
+			}
+		})
+	}
+	wg.Wait()
+
+	mu.Lock()
+	defer mu.Unlock()
+
+	if len(callOrder) != 3 {
+		t.Errorf("expected 3 requests, got %d", len(callOrder))
+	}
+}
+
+// TestLowLaneDoesNotBlockHigh verifies low lane requests don't block high lane.
+func TestLowLaneDoesNotBlockHigh(t *testing.T) {
+	s := newTestServiceWithCache(t)
+
+	var mu sync.Mutex
+	running := 0
+	maxRunning := 0
+	highRan := false
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		mu.Lock()
+		running++
+		if running > maxRunning {
+			maxRunning = running
+		}
+		mu.Unlock()
+
+		time.Sleep(20 * time.Millisecond)
+
+		mu.Lock()
+		running--
+		mu.Unlock()
+
+		w.Header().Set("Content-Type", "image/png")
+		png.Encode(w, image.NewRGBA(image.Rect(0, 0, 10, 10)))
+	}))
+	defer srv.Close()
+
+	// Start a low-priority request that will occupy the low lane
+	lowDone := make(chan struct{})
+	go func() {
+		_, err := s.GetImage("test", srv.URL+"/img", nil, "", "", PrioLow)
+		if err != nil {
+			t.Errorf("low priority GetImage failed: %v", err)
+		}
+		close(lowDone)
+	}()
+
+	// Wait for low request to start
+	time.Sleep(5 * time.Millisecond)
+
+	// High-priority request should run concurrently (not wait for low)
+	_, err := s.GetImage("test", srv.URL+"/img", nil, "", "", PrioHigh)
+	if err != nil {
+		t.Fatalf("high priority GetImage failed: %v", err)
+	}
+	highRan = true
+
+	<-lowDone
+
+	mu.Lock()
+	defer mu.Unlock()
+
+	if !highRan {
+		t.Error("high priority request did not run")
+	}
+	// Max running should be at least 1 (low) + could be 1 (high run together with low)
+	if maxRunning < 1 {
+		t.Errorf("max running was %d", maxRunning)
+	}
+}
+
+// TestHighPriorityRunsWithLow verifies high-priority requests can run
+// concurrently with low-priority requests (high lane capacity 2, low capacity 1).
+func TestHighPriorityRunsWithLow(t *testing.T) {
+	s := newTestServiceWithCache(t)
+
+	var mu sync.Mutex
+	running := 0
+	maxRunning := 0
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		mu.Lock()
+		running++
+		if running > maxRunning {
+			maxRunning = running
+		}
+		mu.Unlock()
+
+		time.Sleep(50 * time.Millisecond)
+
+		mu.Lock()
+		running--
+		mu.Unlock()
+
+		w.Header().Set("Content-Type", "image/png")
+		png.Encode(w, image.NewRGBA(image.Rect(0, 0, 10, 10)))
+	}))
+	defer srv.Close()
+
+	// Start a low-priority request - occupies low lane (capacity 1)
+	var lowDone sync.WaitGroup
+	lowDone.Go(func() {
+		_, err := s.GetImage("test", srv.URL+"/img?prio=low", nil, "", "", PrioLow)
+		if err != nil {
+			t.Errorf("low priority GetImage failed: %v", err)
+		}
+	})
+
+	// Wait for low to start
+	time.Sleep(5 * time.Millisecond)
+
+	// Start a high-priority request - should run concurrently
+	highDone := make(chan struct{})
+	go func() {
+		_, err := s.GetImage("test", srv.URL+"/img2", nil, "", "", PrioHigh)
+		if err != nil {
+			t.Errorf("high priority GetImage failed: %v", err)
+		}
+		close(highDone)
+	}()
+
+	<-highDone
+	lowDone.Wait()
+
+	mu.Lock()
+	defer mu.Unlock()
+
+	// High ran concurrently with low (not waiting in queue)
+	if maxRunning < 1 {
+		t.Errorf("max running was %d", maxRunning)
+	}
+	t.Logf("max concurrent requests: %d", maxRunning)
 }

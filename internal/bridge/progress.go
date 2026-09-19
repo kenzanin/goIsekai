@@ -142,7 +142,7 @@ func (s *AppService) RefetchCover(pluginID, mangaID string) error {
 			cached.CoverURL = detail.CoverURL
 		}
 	}
-	if _, err := s.GetImage(pluginID, cached.CoverURL, nil, "", ""); err != nil {
+	if _, err := s.GetImage(pluginID, cached.CoverURL, nil, "", "", PrioHigh); err != nil {
 		return fmt.Errorf("bridge: refetch cover download: %w", err)
 	}
 	return nil
