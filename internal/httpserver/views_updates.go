@@ -17,6 +17,10 @@ func (s *Server) viewUpdates(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		s.logger.Error("updates list", "error", err)
 	}
+	ov, err := s.service.LibraryOverview()
+	if err != nil {
+		s.logger.Warn("updates overview", "error", err)
+	}
 	libStats, err := s.service.ListLibraryWithProgress()
 	if err != nil {
 		s.logger.Warn("updates stats", "error", err)
@@ -105,10 +109,21 @@ func (s *Server) viewUpdates(w http.ResponseWriter, r *http.Request) {
 	total := len(items)
 	start := min((page-1)*pageSize, total)
 	end := min(start+pageSize, total)
-
+	checked24h := 0
+	dayAgo := time.Now().Add(-24 * time.Hour)
+	for _, m := range mangas {
+		if m.UpdatedAt.After(dayAgo) {
+			checked24h++
+		}
+	}
 	s.renderPage(w, r, "views/updates", "updates", map[string]any{
 		"Items":      items[start:end],
 		"Page":       page,
 		"TotalPages": max((total+pageSize-1)/pageSize, 1),
+		"Stats": map[string]any{
+			"Total":      ov.TotalTitles,
+			"Checked24h": checked24h,
+			"Fresh":      ov.HasUpdates,
+		},
 	})
 }

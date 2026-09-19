@@ -117,13 +117,32 @@ return function(data)
 		})
 	end
 
+	local stats = data.Stats or {}
+	local chips = ""
+	if next(stats) then
+		local function chip(label, value)
+			return string.format(
+				'<span class="text-xs px-2.5 py-1 rounded-full bg-neutral-800/80 text-neutral-400">%s <span class="text-neutral-200 font-medium">%d</span></span>',
+				label,
+				value or 0
+			)
+		end
+		chips = table.concat({
+			chip("titles", stats.Total),
+			chip("checked &lt;24h", stats.Checked24h),
+			chip("new chapters", stats.Fresh),
+		})
+	end
+
 	local listHTML = string.format(
 		[[
-<h1 class="text-xl font-semibold mb-6">Updates</h1>
+<h1 class="text-xl font-semibold mb-3">Updates</h1>
+<div class="flex flex-wrap gap-2 mb-6">%s</div>
 %s
 <div class="divide-y divide-neutral-800">
 %s
 </div>]],
+		chips,
 		pag,
 		table.concat(rows, "\n")
 	)
