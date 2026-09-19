@@ -1561,6 +1561,10 @@ video {
   background-color: rgb(38 38 38 / 0.5);
 }
 
+.bg-neutral-800\/80 {
+  background-color: rgb(38 38 38 / 0.8);
+}
+
 .bg-neutral-900 {
   --tw-bg-opacity: 1;
   background-color: rgb(23 23 23 / var(--tw-bg-opacity, 1));
