@@ -32,21 +32,22 @@ return function(data)
 		local tsAttr
 		local formattedDate
 
-		if entry.Type == "update" then
+		tsAttr = h(tostring(entry.Date or ""))
+		formattedDate = h(formatDate(tostring(entry.Date or "")))
+		-- Badge follows the same flag that drives the [New] library badge.
+		-- "New title" is just a recently-added row with no fresh chapters.
+		if entry.HasNew == true then
 			badge =
 				'<span class="shrink-0 text-xs px-2 py-0.5 rounded-full bg-red-500 text-white font-medium">New</span>'
-			tsAttr = h(tostring(entry.Date or ""))
-			formattedDate = h(formatDate(tostring(entry.Date or "")))
 		else
 			badge =
 				'<span class="shrink-0 text-xs px-2 py-0.5 rounded-full bg-indigo-500/15 text-indigo-400">New title</span>'
-			tsAttr = h(tostring(entry.Date or ""))
-			formattedDate = h(formatDate(tostring(entry.Date or "")))
 		end
 
-		-- Two fixed sections: New-badge rows first, everything else after.
-		-- Headers emit once per section (repeating per page boundary).
-		local isNew = entry.HasNew and entry.Type == "update"
+		-- Two fixed sections matching the visible badge: rows that would show
+		-- the red New badge first, everything else after. Headers emit once
+		-- per section (repeating per page boundary).
+		local isNew = entry.HasNew == true
 		if isNew and not seenNew then
 			rows[#rows + 1] = [[<div class="sticky top-0 z-10 -mx-2 py-2 px-2 bg-neutral-950/95 backdrop-blur text-sm font-semibold text-red-400 border-b border-neutral-800 flex items-center gap-2">
     <span class="w-2 h-2 rounded-full bg-red-500 animate-pulse"></span>New chapters</div>]]
