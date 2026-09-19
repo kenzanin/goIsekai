@@ -5,6 +5,22 @@ import (
 	"slices"
 )
 
+// displayedGenres returns the genres the detail page currently shows: the
+// user override when one exists, otherwise the enrichment categories (the
+// persisted mirror of plugin genres shown in the panel). Genre toggles seed
+// from this list so adding one genre never discards the rest.
+func (s *AppService) displayedGenres(mangaIntID int64) []string {
+	if genres, has, err := s.db.GetMangaGenres(mangaIntID); err == nil && has {
+		return genres
+	}
+	cats, _ := s.db.ListCategories(fmt.Sprint(mangaIntID))
+	names := make([]string, 0, len(cats))
+	for _, c := range cats {
+		names = append(names, c.Category)
+	}
+	return names
+}
+
 // SetMangaGenres stores a user-defined genre override for a manga.
 func (s *AppService) SetMangaGenres(pluginID, mangaID string, genres []string) error {
 	mangaIntID, _ := s.db.ResolveMangaIntID(pluginID, mangaID)
@@ -32,7 +48,7 @@ func (s *AppService) AddGenre(pluginID, mangaID, genre string) error {
 		return fmt.Errorf("bridge: add genre: %w", err)
 	}
 	if !has {
-		genres = nil
+		genres = s.displayedGenres(mangaIntID)
 	}
 	if slices.Contains(genres, genre) {
 		return nil
@@ -52,7 +68,7 @@ func (s *AppService) ToggleGenre(pluginID, mangaID, genre string) error {
 		return fmt.Errorf("bridge: toggle genre: %w", err)
 	}
 	if !has {
-		genres = nil
+		genres = s.displayedGenres(mangaIntID)
 	}
 	for i, g := range genres {
 		if g == genre {
