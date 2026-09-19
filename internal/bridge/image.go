@@ -17,6 +17,14 @@ import (
 // disk (L2) so repeat lookups skip the network entirely. mangaID/chapterID scope
 // the L2 path: page images land under images/<pluginID>/<mangaID>/<chapterID>/,
 // and thumbnails (empty mangaID) under images/<pluginID>/library/.
+// imageCall lets concurrent GetImage callers for the same URL share one
+// network fetch instead of each queuing on the host lane separately.
+type imageCall struct {
+	done chan struct{}
+	data []byte
+	err  error
+}
+
 func (s *AppService) GetImage(pluginID, url string, headers map[string]string, mangaID, chapterID string, prio Prio) ([]byte, error) {
 	// L1: in-memory cache.
 	s.imageMu.RLock()
@@ -50,6 +58,23 @@ func (s *AppService) GetImage(pluginID, url string, headers map[string]string, m
 			}
 		}
 	}
+
+	// Singleflight: another caller may already be fetching this URL (draw +
+	// prefetch race). Join its call instead of queueing a duplicate fetch.
+	if existing, loaded := s.imageFlight.LoadOrStore(url, &imageCall{done: make(chan struct{})}); loaded {
+		call := existing.(*imageCall)
+		<-call.done
+		if call.err == nil {
+			return call.data, nil
+		}
+		// Leader failed; fall through and retry once ourselves.
+	}
+	call := &imageCall{done: make(chan struct{})}
+	s.imageFlight.Store(url, call)
+	defer func() {
+		s.imageFlight.Delete(url)
+		close(call.done)
+	}()
 
 	logger.Debug("fetching image", "url", url, "plugin", pluginID)
 	// At-home image nodes 404 bursts: a browser's draw+prefetch fires several
@@ -95,10 +120,12 @@ func (s *AppService) GetImage(pluginID, url string, headers map[string]string, m
 	}
 	if err != nil {
 		logger.Error("image fetch failed", "url", url, "error", err)
+		call.err = err
 		return nil, fmt.Errorf("bridge: get image %s: %w", url, err)
 	}
 	if resp.Status < 200 || resp.Status >= 300 {
 		logger.Error("image bad status", "url", url, "status", resp.Status)
+		call.err = fmt.Errorf("unexpected status %d", resp.Status)
 		return nil, fmt.Errorf("bridge: get image %s: unexpected status %d", url, resp.Status)
 	}
 	// body already set in loop after validation
@@ -106,6 +133,7 @@ func (s *AppService) GetImage(pluginID, url string, headers map[string]string, m
 	s.imageMu.Lock()
 	s.imageCache[url] = body
 	s.imageMu.Unlock()
+	call.data = body
 
 	// L2 cache: write to disk, converting to the configured format. Covers
 	// (mangaID empty) are also downscaled. Only a real page is ever enhanced:

@@ -30,6 +30,7 @@ type AppService struct {
 	cacheDir    string
 	imageMu     sync.RWMutex
 	imageCache  map[string][]byte
+	imageFlight sync.Map // url -> *imageCall; concurrent readers share one network fetch
 	hostLanesMu sync.Mutex
 	hostLanes   map[string]*hostLanes // host -> priority lanes
 	imgPaceMu   sync.Mutex

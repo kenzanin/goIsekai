@@ -2,6 +2,7 @@ package bridge
 
 import (
 	"bytes"
+	"fmt"
 	"image"
 	"image/color"
 	"image/jpeg"
@@ -11,6 +12,7 @@ import (
 	"os"
 	"path/filepath"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -306,11 +308,12 @@ func TestSamePriorityFIFO(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	// Start 3 low-priority requests - lane capacity is 1
+	// Start 3 low-priority requests for DISTINCT urls (same-url dedup is
+	// TestConcurrentGetImageSharesFetch) - lane capacity is 1
 	var wg sync.WaitGroup
-	for range 3 {
+	for k := range 3 {
 		wg.Go(func() {
-			_, err := s.GetImage("test", srv.URL+"/img", nil, "", "", PrioLow)
+			_, err := s.GetImage("test", fmt.Sprintf("%s/img?n=%d", srv.URL, k), nil, "", "", PrioLow)
 			if err != nil {
 				t.Errorf("low priority GetImage failed: %v", err)
 			}
@@ -449,4 +452,47 @@ func TestHighPriorityRunsWithLow(t *testing.T) {
 		t.Errorf("max running was %d", maxRunning)
 	}
 	t.Logf("max concurrent requests: %d", maxRunning)
+}
+
+// TestConcurrentGetImageSharesFetch proves the singleflight path: N goroutines
+// requesting the same image URL must produce exactly one upstream hit.
+func TestConcurrentGetImageSharesFetch(t *testing.T) {
+	var hits atomic.Int32
+	var buf bytes.Buffer
+	if err := png.Encode(&buf, image.NewRGBA(image.Rect(0, 0, 4, 4))); err != nil {
+		t.Fatalf("png.Encode: %v", err)
+	}
+	payload := buf.Bytes()
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		hits.Add(1)
+		time.Sleep(50 * time.Millisecond) // widen the race window
+		w.Header().Set("Content-Type", "image/png")
+		_, _ = w.Write(payload)
+	}))
+	t.Cleanup(srv.Close)
+
+	s := newTestServiceWithCache(t)
+	const n = 8
+	var wg sync.WaitGroup
+	results := make([][]byte, n)
+	for i := range n {
+		wg.Go(func() {
+			data, err := s.GetImage("p", srv.URL+"/img", nil, "m", "c", PrioLow)
+			if err != nil {
+				t.Errorf("get image: %v", err)
+				return
+			}
+			results[i] = data
+		})
+	}
+	wg.Wait()
+
+	if got := hits.Load(); got != 1 {
+		t.Errorf("upstream hits = %d, want 1", got)
+	}
+	for i, data := range results {
+		if string(data) != string(payload) {
+			t.Fatalf("goroutine %d got different bytes", i)
+		}
+	}
 }
