@@ -18,6 +18,7 @@ var luaFnNames = map[string]string{
 	types.GetChapterListFunc: "get_chapter_list",
 	types.GetPageListFunc:    "get_page_list",
 	types.GetEnrichmentFunc:  "getEnrichment",
+	types.GetGenresFunc:      "get_genres",
 }
 
 // callLua invokes a Lua ABI function with a JSON string argument under timeout,

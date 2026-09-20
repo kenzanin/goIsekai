@@ -31,6 +31,7 @@ var goFnNames = map[string]string{
 	types.GetMangaDetailFunc: "GetMangaDetail",
 	types.GetChapterListFunc: "GetChapterList",
 	types.GetPageListFunc:    "GetPageList",
+	types.GetGenresFunc:      "GetGenres",
 }
 
 // loadGo opens a compiled Go plugin (.so) and validates its ABI symbols.
@@ -68,6 +69,10 @@ func (m *Manager) loadGo(id, path string) (*loadedPlugin, error) {
 	// Verify every ABI symbol resolves to a func(string) (string, error).
 	fns := map[string]any{}
 	for hostName, symName := range goFnNames {
+		// GetGenres is optional; every other mapped export is required.
+		if hostName == types.GetGenresFunc {
+			continue
+		}
 		s, err := h.Lookup(symName)
 		if err != nil {
 			return nil, fmt.Errorf("go plugin %s: symbol %s missing: %w", id, symName, err)

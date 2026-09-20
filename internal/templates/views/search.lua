@@ -16,6 +16,8 @@ return function(data)
 	local page = data.Page or 1
 	local totalPages = data.TotalPages or 1
 	local challenge = data.Challenge or false
+	local genres = data.Genres or {}
+	local genre = data.Genre or ""
 
 	-- Build plugin options
 	local pluginOpts = ""
@@ -47,6 +49,23 @@ return function(data)
 				.. '" alt="" class="h-3.5 w-3.5 rounded-sm object-cover">'
 		end
 		pluginBadge = pluginBadge .. h(pluginName) .. "</span>"
+	end
+
+	-- Build genre options (only when the selected plugin advertises genres)
+	local genreOpts = ""
+	if pluginID ~= "" and #genres > 0 then
+		genreOpts = ' <option value="">All genres</option>\n'
+		for _, g in ipairs(genres) do
+			local selected = (genre == g.Slug) and " selected" or ""
+			genreOpts = genreOpts
+				.. ' <option value="'
+				.. h(g.Slug)
+				.. '"'
+				.. selected
+				.. ">"
+				.. h(g.Name)
+				.. "</option>\n"
+		end
 	end
 
 	-- Build result rows
@@ -92,8 +111,12 @@ return function(data)
 	end
 
 	local noResults = ""
-	if #results == 0 and q ~= "" then
-		noResults = '<div class="py-16 text-center text-neutral-500">No results for "' .. h(q) .. '"</div>'
+	if #results == 0 and (q ~= "" or genre ~= "") then
+		noResults = '<div class="py-16 text-center text-neutral-500">No results'
+		if q ~= "" then
+			noResults = noResults .. ' for "' .. h(q) .. '"'
+		end
+		noResults = noResults .. "</div>"
 	end
 
 	-- Challenge warning
@@ -121,7 +144,7 @@ return function(data)
 				Param = "page",
 				Current = page,
 				Total = totalPages,
-				Extra = { "q", q, "pluginID", pluginID },
+				Extra = { "q", q, "pluginID", pluginID, "genre", genre },
 				Compact = true,
 			},
 		})
@@ -136,7 +159,7 @@ return function(data)
 				Param = "page",
 				Current = page,
 				Total = totalPages,
-				Extra = { "q", q, "pluginID", pluginID },
+				Extra = { "q", q, "pluginID", pluginID, "genre", genre },
 				Compact = false,
 			},
 		})
@@ -158,6 +181,14 @@ return function(data)
 		.. h(q)
 		.. '" placeholder="Manga title..." class="w-full bg-neutral-900 border border-neutral-700 rounded-md px-3 py-2 text-sm">'
 		.. "</div>"
+		.. (genreOpts ~= "" and (
+			'<div>'
+			.. '<label for="genre" class="block text-xs text-neutral-400 mb-1">Genre</label>'
+			.. '<select id="genre" name="genre" class="bg-neutral-900 border border-neutral-700 rounded-md px-3 py-2 text-sm">'
+			.. genreOpts
+			.. "</select>"
+			.. "</div>"
+		) or "")
 		.. '<button type="submit" class="bg-indigo-600 hover:bg-indigo-500 text-white rounded-md px-4 py-2 text-sm font-medium">Search</button>'
 		.. (topPagination ~= "" and topPagination or "")
 		.. "</form>"

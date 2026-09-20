@@ -105,7 +105,11 @@ func (s *Sandbox) handleSearch(w http.ResponseWriter, r *http.Request) {
 		_ = json.Unmarshal([]byte(p), &page)
 	}
 
-	results, err := s.svc.SearchManga(pluginID, types.SearchFilter{Query: q, Page: page})
+	results, err := s.svc.SearchManga(pluginID, types.SearchFilter{
+		Query:  q,
+		Page:   page,
+		Genres: []string{r.URL.Query().Get("genre")},
+	})
 	if err != nil {
 		writeErr(w, http.StatusInternalServerError, err.Error())
 		return

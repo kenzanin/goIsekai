@@ -31,6 +31,10 @@ const (
 	// {"title":string,"kind":string,"source":string}.
 	// Output: JSON array of items [{value,url,cover_url,source}, ...].
 	GetEnrichmentFunc = "GetEnrichment"
+	// GetGenresFunc is an OPTIONAL export. When present, the host calls it
+	// with no arguments and expects a JSON array of
+	// [{name:string, slug:string}] describing the source's browsable genres.
+	GetGenresFunc = "GetGenres"
 )
 
 // HostHTTPRequestFunc is the host-imported function available to plugins for

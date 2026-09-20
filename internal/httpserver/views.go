@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"strconv"
 
+	"goisekai/internal/bridge"
 	"goisekai/internal/database"
 	"goisekai/internal/hostnet"
 	"goisekai/pkg/types"
@@ -56,14 +57,19 @@ func (s *Server) viewSearch(w http.ResponseWriter, r *http.Request) {
 	}
 	q := r.URL.Query().Get("q")
 	pluginID := r.URL.Query().Get("pluginID")
+	genre := r.URL.Query().Get("genre")
 	page, _ := strconv.Atoi(r.URL.Query().Get("page"))
 	if page < 1 {
 		page = 1
 	}
+	var genres []bridge.Genre
+	if pluginID != "" {
+		genres, _ = s.service.ListGenres(pluginID)
+	}
 	var results []types.Manga
 	challenge := false
-	if q != "" && pluginID != "" {
-		results, err = s.service.SearchManga(pluginID, types.SearchFilter{Query: q, Page: page})
+	if (q != "" || genre != "") && pluginID != "" {
+		results, err = s.service.SearchManga(pluginID, types.SearchFilter{Query: q, Page: page, Genres: []string{genre}})
 		if err != nil {
 			if _, ok := errors.AsType[*hostnet.ChallengeError](err); ok {
 				challenge = true
@@ -93,6 +99,8 @@ func (s *Server) viewSearch(w http.ResponseWriter, r *http.Request) {
 		"Plugins":    plugins,
 		"Q":          q,
 		"PluginID":   pluginID,
+		"Genres":     genres,
+		"Genre":      genre,
 		"PluginName": pluginName,
 		"PluginIcon": pluginIcon,
 		"Results":    results[start:end],

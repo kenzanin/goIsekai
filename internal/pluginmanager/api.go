@@ -62,6 +62,32 @@ func (m *Manager) Search(pluginID string, filter types.SearchFilter) ([]types.Ma
 	return result, nil
 }
 
+// Genre is one browsable genre advertised by a plugin's optional GetGenres
+// export. Slug is what a plugin expects in SearchFilter.Genres.
+type Genre struct {
+	Name string `json:"name"`
+	Slug string `json:"slug"`
+}
+
+// GetGenres runs a plugin's optional GetGenres export. Plugins without the
+// export return nil, nil so callers can treat genre browsing as unsupported.
+func (m *Manager) GetGenres(pluginID string) ([]Genre, error) {
+	p, err := m.get(pluginID)
+	if err != nil {
+		return nil, err
+	}
+	out, err := m.call(p, types.GetGenresFunc, "{}")
+	if err != nil {
+		// Optional export: absent function or unsupported kind means "none".
+		return nil, nil
+	}
+	var result []Genre
+	if err := json.Unmarshal([]byte(out), &result); err != nil {
+		return nil, fmt.Errorf("plugin %s: invalid GetGenres result: %w", pluginID, err)
+	}
+	return result, nil
+}
+
 // GetMangaDetail runs a plugin's GetMangaDetail function and decodes its result.
 // It uses a cached response if available and not expired.
 func (m *Manager) GetMangaDetail(pluginID, mangaID string) (types.Manga, error) {

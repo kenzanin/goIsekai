@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 
 	"goisekai/internal/database"
+	"goisekai/internal/pluginmanager"
 )
 
 // InstallPlugin copies a plugin folder into the managed plugins directory,
@@ -49,6 +50,14 @@ func (s *AppService) ReloadPlugin(id string) (string, error) {
 	return s.mgr.ReloadPlugin(id)
 }
 
+// Genre re-exports the plugin manager's genre descriptor for views.
+type Genre = pluginmanager.Genre
+
+// ListGenres returns the genre list a plugin advertises via its optional
+// GetGenres export, or nil when the plugin does not support genre browsing.
+func (s *AppService) ListGenres(pluginID string) ([]Genre, error) {
+	return s.mgr.GetGenres(pluginID)
+}
 // ListPlugins returns all registered plugins.
 func (s *AppService) ListPlugins() ([]database.Plugin, error) {
 	list, err := s.db.ListPlugins()

@@ -25,6 +25,7 @@ var yaegiABIFns = []string{
 	types.GetChapterListFunc,
 	types.GetPageListFunc,
 	types.InitFunc,
+	types.GetGenresFunc,
 }
 
 // yaegiPlugin wraps a Yaegi interpreter instance for a single plugin.

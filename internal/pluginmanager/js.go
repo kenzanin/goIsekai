@@ -21,6 +21,7 @@ var jsFnNames = map[string]string{
 	types.GetMangaDetailFunc: "getMangaDetail",
 	types.GetChapterListFunc: "getChapterList",
 	types.GetPageListFunc:    "getPageList",
+	types.GetGenresFunc:      "getGenres",
 }
 
 // loadJS creates a sandboxed JavaScript VM via goja, loads <dir>/main.js,
@@ -145,6 +146,10 @@ func (m *Manager) loadJS(id, dir string) (*loadedPlugin, error) {
 	// Verify that all required ABI functions exist. Enrichment is optional
 	// and reaches the host through GetEnrichment, which is not required.
 	for abi, jsName := range jsFnNames {
+		// GetGenres is optional; every other mapped export is required.
+		if abi == types.GetGenresFunc {
+			continue
+		}
 		val := vm.Get(jsName)
 		if val == nil || goja.IsUndefined(val) {
 			return nil, fmt.Errorf("js plugin %s: missing function %s (abi: %s)", id, jsName, abi)
