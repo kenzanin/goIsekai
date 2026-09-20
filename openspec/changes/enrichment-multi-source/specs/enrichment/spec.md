@@ -56,6 +56,26 @@ The system SHALL fetch enrichment items for a library manga from every enabled s
 - **WHEN** one enabled source errors or times out during a fetch
 - **THEN** the items returned by the remaining enabled sources are still stored
 
+### Requirement: Category enrichment
+
+The system SHALL store fetched categories (genres/tags) per manga with their source label, deduplicated per manga, and SHALL include the stored categories in the manga detail view data. A fetched category SHALL be resolved through the host's genre alias map before storage, so spellings the map treats as the same genre are stored once under the canonical name; a category the map does not know SHALL be kept exactly as the source sent it.
+
+#### Scenario: Categories rendered on detail view
+- **WHEN** the manga detail view is requested for a manga with stored categories
+- **THEN** the categories and their source labels are included in the response
+
+#### Scenario: Same genre from two sources is stored once
+- **WHEN** two sources report the same genre under spellings the alias map treats as one
+- **THEN** a single category is stored under the canonical name
+
+#### Scenario: Unknown category is kept as received
+- **WHEN** a source reports a category the alias map does not know
+- **THEN** it is stored with the spelling the source sent
+
+#### Scenario: Category toggle uses the stored spelling
+- **WHEN** the user toggles a stored category into the manga's genres
+- **THEN** the stored genre override uses the same spelling as the stored category
+
 ### Requirement: Author enrichment
 
 The system SHALL support `authors` as an enrichment kind, and SHALL store a fetched author on the manga rather than as a list of alternative rows. Because a manga holds a single author value, only the author reported by the highest-precedence source that returned a non-blank author SHALL be stored; authors reported by the other sources SHALL NOT be joined into that value. A fetched author SHALL replace the stored value, blank author names in a result SHALL be ignored, and the manga detail view SHALL use the stored author when the source plugin supplies none.

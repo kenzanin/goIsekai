@@ -65,6 +65,10 @@ Deleting the arbitrary-language fallback is the fix for the reported symptom; ke
 **Summary hygiene strips link blocks at the source.**
 Stripping at render time would leave the spam in the database and in any future export. The stored value should be the value the user wants.
 
+**Fetched categories are resolved through the genre alias map before storage.**
+The host already rewrites plugin genre spellings to canonical names through a config-driven alias map, and it is visible from the detail view, but fetched categories bypassed it and were stored exactly as each source wrote them. Two sources naming the same genre therefore produced two entries. Running the same alias index over fetched categories reuses a map the user already owns and lets the existing uniqueness constraint collapse the cross-source duplicate with no new query.
+Alternatives: normalizing when the category is rendered (leaves the duplicate rows in the database, and the stored genre override keys on the exact string, so the two spellings would still toggle independently) and normalizing inside each script (three copies of a map that lives in the user's config and cannot be reached from a script).
+
 **Kitsu resolves by the MangaDex cross-source id when one is available.**
 MangaDex returns an `attributes.links` map including a Kitsu id, verified to resolve to the same series, so the second provider can skip title search entirely when the MangaDex script has already looked the title up. Falling back to title search keeps Kitsu usable on its own.
 
@@ -76,6 +80,7 @@ MangaDex returns an `attributes.links` map including a Kitsu id, verified to res
 - Existing installations declare no precedence or enabled flag → defaults keep every current source working, but their mutual order falls back to the id tie-break, which may differ from today's winner for `authors`. Today's winner is a coin flip, so no reliable behavior is lost.
 - Two implementations can still drift if the scripts hand-roll the rule instead of calling the host helper → the spec states the rule and the scripts should call the helper; a drift here degrades verification rather than corrupting data.
 - Removing the language fallback can produce no summary where a wrong-language one used to appear → intended; this is the reported bug, and the alt-summary pool is allowed to shrink.
+- Normalizing a category replaces the source's own wording with the canonical name, so a recognized tag no longer reads the way the source wrote it → intended, and a wrong mapping is corrected in the user's alias config rather than in code. Unrecognized categories are still stored verbatim, so no information is lost.
 - The script fixes are not reachable from Go tests, since they run in a plugin VM → verification needs a live fetch against a known title, so the tasks include a manual check rather than only unit tests.
 - Removing the MangaUpdates runtime script reduces coverage until a replacement is installed → it is one reversible data step, and the example copy already exists.
 

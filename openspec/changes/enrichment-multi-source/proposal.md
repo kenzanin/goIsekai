@@ -9,6 +9,7 @@ Enrichment picks one source per kind from a precedence list the host builds by i
 - A fetch gathers every enabled source that supports the kind instead of stopping at the first one that answers. Alt titles, alt summaries, categories, and related manga accumulate from all of them and keep their per-source labels.
 - Authors stay single-valued: the highest-precedence source that returned a non-blank author wins, and only that source's value is stored.
 - Sources stop returning arbitrary-language summaries, stop accepting a search hit that does not match the requested title, and stop storing raw link and trailer spam inside a summary.
+- Fetched categories pass through the genre alias map the host already applies to plugin genres, so the same genre reported by two sources is stored once under one spelling instead of appearing twice.
 - A Kitsu enrichment source is added, resolving by the MangaDex cross-source id when one is available rather than by title search.
 - The MangaUpdates runtime script is demoted to example-only.
 - The per-kind and per-source fetch selectors are dropped from the requirements: with every enabled source fetching, the panel stays a single collapsed control.

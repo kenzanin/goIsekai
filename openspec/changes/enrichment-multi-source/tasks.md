@@ -27,18 +27,24 @@
 - [ ] 4.3 Change the author store path so only the highest-precedence non-blank author result is stored, rather than joining every source's authors into one string. Verify a bridge test in which two sources report different authors stores only the higher-precedence one.
 - [ ] 4.4 Keep the explicit single-source path working for callers that name one source. Verify a fetch limited to one source stores only that source's items and leaves the other source's data untouched.
 
-## 5. Fetch control
+## 5. Category normalization
 
-- [ ] 5.1 Confirm the detail view's enrichment control already matches the new requirement: a single collapsed action that posts only the manga title, with no kind or source selection, and per-row source labels on the stored items. Expected outcome is no template change; if any selector or missing label is found, add or align it. Verify by submitting the control from the manga detail view and observing items from more than one source, each labelled.
+- [ ] 5.1 Resolve fetched categories through the alias index the host already uses for plugin genres before storing them, reusing that index rather than building a second one, and keep a category the map does not know exactly as the source sent it. Verify a test in which two sources report spellings the map treats as one genre stores a single canonical row.
+- [ ] 5.2 Confirm the category toggle stores the spelling the stored category uses, so toggling a normalized category on and off is stable and does not create a second genre entry. Verify by toggling a category the alias map rewrote and confirming the stored genre override matches the stored category.
 
-## 6. Sources
+## 6. Fetch control
 
-- [ ] 6.1 Add `examples/info/kitsu/main.lua` declaring a `kitsu` source at a lower precedence than MangaDex, implementing titles, summaries, categories, authors, and related, resolving by the Kitsu identifier MangaDex reports when one is available and falling back to title search otherwise, and applying the same match-verification and language rules as the other scripts. Verify by fetching enrichment for a title MangaDex reports a Kitsu identifier for and confirming Kitsu data is stored under the `kitsu` label alongside MangaDex's.
-- [ ] 6.2 Confirm the new source is discovered without any host change or rebuild. Verify `just install-info kitsu` followed by a catalog read lists `kitsu` with its kinds, and that it never appears in the manga source list.
-- [ ] 6.3 Demote MangaUpdates from the runtime info directory, leaving the example copy as the shareable artifact. Verify a catalog read no longer lists `mangaupdates` and an enrichment fetch still succeeds. Record that this is reversible with `just install-info mangaupdates`.
+- [ ] 6.1 Confirm the detail view's enrichment control already matches the new requirement: a single collapsed action that posts only the manga title, with no kind or source selection, and per-row source labels on the stored items. Expected outcome is no template change; if any selector or missing label is found, add or align it. Verify by submitting the control from the manga detail view and observing items from more than one source, each labelled.
 
-## 7. Verification
+## 7. Sources
 
-- [ ] 7.1 Run `just test` and confirm the package suites pass, then run `just check` and confirm formatting, modernization, and linting are clean.
-- [ ] 7.2 Restart the host twice with debug logging and trigger the same enrichment fetch each time. Verify the fetch log lists the sources in the same, declared, precedence order on both runs, and that the stored items keep their per-source labels.
-- [ ] 7.3 Fetch enrichment for a title that previously produced a wrong-language synopsis and confirm the stored summary is now in a preferred language and free of link blocks, while a title no source matches stores nothing.
+- [ ] 7.1 Add `examples/info/kitsu/main.lua` declaring a `kitsu` source at a lower precedence than MangaDex, implementing titles, summaries, categories, authors, and related, resolving by the Kitsu identifier MangaDex reports when one is available and falling back to title search otherwise, and applying the same match-verification and language rules as the other scripts. Verify by fetching enrichment for a title MangaDex reports a Kitsu identifier for and confirming Kitsu data is stored under the `kitsu` label alongside MangaDex's.
+- [ ] 7.2 Confirm the new source is discovered without any host change or rebuild. Verify `just install-info kitsu` followed by a catalog read lists `kitsu` with its kinds, and that it never appears in the manga source list.
+- [ ] 7.3 Demote MangaUpdates from the runtime info directory, leaving the example copy as the shareable artifact. Verify a catalog read no longer lists `mangaupdates` and an enrichment fetch still succeeds. Record that this is reversible with `just install-info mangaupdates`.
+
+## 8. Verification
+
+- [ ] 8.1 Run `just test` and confirm the package suites pass, then run `just check` and confirm formatting, modernization, and linting are clean.
+- [ ] 8.2 Restart the host twice with debug logging and trigger the same enrichment fetch each time. Verify the fetch log lists the sources in the same, declared, precedence order on both runs, and that the stored items keep their per-source labels.
+- [ ] 8.3 Fetch enrichment for a title that previously produced a wrong-language synopsis and confirm the stored summary is now in a preferred language and free of link blocks, while a title no source matches stores nothing.
+- [ ] 8.4 Fetch a title both sources know and confirm the category list shows one entry per genre rather than one per source spelling, and that an alt title, alt summary, and related item from each source is individually removable.
