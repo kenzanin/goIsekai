@@ -81,25 +81,36 @@ function search_manga(arg)
 end
 
 -- ─── get_genres (optional export) ──────────────────────────────────────────
--- MangaDex tag UUIDs are stable; slugs here are those UUIDs.
-local GENRES = {
-    { name = "Action",      slug = "391b0423-d847-456f-aff0-8b0cfc03066b" },
-    { name = "Adventure",   slug = "87cc87cd-a395-47af-b27a-93258283bbc6" },
-    { name = "Comedy",      slug = "4d32cc48-9f00-4cca-9b5a-a839f0764984" },
-    { name = "Drama",       slug = "b9af3a63-f058-46de-a9a0-e0c13906197a" },
-    { name = "Fantasy",     slug = "cdc58593-87dd-415e-bbc0-2ec27bf404cc" },
-    { name = "Horror",      slug = "cdad7e68-1419-41dd-bdce-27753074a640" },
-    { name = "Isekai",      slug = "ace04997-f6bd-436e-b261-779182193d3d" },
-    { name = "Romance",     slug = "423e2eae-a7a2-4a8b-ac03-a8351462d71d" },
-    { name = "Sci-Fi",      slug = "256c8bd9-4904-4360-bf4f-508a76d67183" },
-    { name = "Mystery",     slug = "ee968100-4191-4968-93d3-f82d72be7e46" },
-    { name = "Supernatural", slug = "eabc5b4c-6aff-42f3-b657-3e90cbd00b75" },
-    { name = "Sports",      slug = "69964a64-2f90-4d33-beeb-f3ed2875eb4c" },
-    { name = "Thriller",    slug = "07251805-a27e-4d59-b488-f0bfbec15168" },
-}
+-- Tag ids are read from the API instead of being hardcoded, because MangaDex
+-- reissues tag UUIDs and a stale list silently matches nothing. Slugs are the
+-- tag UUIDs. The "genre" and "theme" groups are the ones users browse by.
+local genres_cache
 
 function get_genres()
-    return host.json.encode(GENRES)
+    if not genres_cache then
+        local resp = util.http_get(util.API_URL .. "/manga/tag")
+        if not resp or resp.status < 200 or resp.status >= 300 then
+            log.error("mangadex genres: HTTP " .. tostring(resp and resp.status or 0))
+            return host.json.encode({})
+        end
+
+        local body = host.json.decode(resp.body)
+        local list = {}
+        for _, tag in ipairs(body and body.data or {}) do
+            local a = tag.attributes or {}
+            local group = a.group
+            local name = (a.name or {}).en
+            if tag.id and name and (group == "genre" or group == "theme") then
+                list[#list + 1] = { name = name, slug = tag.id }
+            end
+        end
+
+        table.sort(list, function(x, y) return x.name < y.name end)
+        genres_cache = list
+        log.info("mangadex genres: loaded " .. tostring(#list) .. " tags")
+    end
+
+    return host.json.encode(genres_cache)
 end
 
 -- ─── ABI: get_manga_detail ─────────────────────────────────────────────────
