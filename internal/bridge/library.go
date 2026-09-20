@@ -2,6 +2,7 @@ package bridge
 
 import (
 	"fmt"
+	"slices"
 
 	"goisekai/internal/database"
 	"goisekai/internal/logger"
@@ -10,8 +11,12 @@ import (
 	"github.com/goccy/go-json"
 )
 
-// SearchManga delegates to the plugin's Search function.
+// SearchManga delegates to the plugin's Search function. Blank genre entries
+// are dropped first: plugins read a non-empty genre list as "browse by genre",
+// so the empty string a form submits for "all genres" would send them down
+// that path with nothing to match.
 func (s *AppService) SearchManga(pluginID string, filter types.SearchFilter) ([]types.Manga, error) {
+	filter.Genres = slices.DeleteFunc(filter.Genres, func(g string) bool { return g == "" })
 	result, err := s.mgr.Search(pluginID, filter)
 	if err != nil {
 		return nil, fmt.Errorf("bridge: search manga: %w", err)
