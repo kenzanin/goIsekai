@@ -35,25 +35,41 @@ local VRF_STAGES = {
 }
 
 -- Build a VRF-signed API URL. Parameters are sorted by key (Go net/url Encode).
+-- An array value is sent as repeated raw "key[]" query parameters while the
+-- signature covers the indexed form the site signs, so
+-- genres_in[]=13&genres_in[]=79 is signed as genres_in[0]=13&genres_in[1]=79.
 local function vrf_url(path, params)
-    if not params or next(params) == nil then
-        params = {}
+    local sign, send = {}, {}
+    for k, v in pairs(params or {}) do
+        if type(v) == "table" then
+            -- Array parameters are passed under a "name[]" key; the site signs
+            -- the indexed form instead.
+            local base = k:sub(1, -3)
+            for i, item in ipairs(v) do
+                local indexed = base .. "[" .. (i - 1) .. "]"
+                sign[indexed] = item
+                send[indexed] = k
+            end
+        else
+            sign[k] = v
+            send[k] = host.text.url_encode(k)
+        end
     end
-    local sig = host.crypto.vrf_sign(path, params, VRF_STAGES)
+
+    local keys = {}
+    for k in pairs(sign) do keys[#keys + 1] = k end
+    table.sort(keys)
+
     local parts = {}
-    for k in pairs(params) do parts[#parts + 1] = k end
-    table.sort(parts)
-    local query = ""
-    for i = 1, #parts do
-        local k = parts[i]
-        query = query .. host.text.url_encode(k) .. "=" .. host.text.url_encode(params[k])
-        if i < #parts then query = query .. "&" end
+    for _, k in ipairs(keys) do
+        parts[#parts + 1] = send[k] .. "=" .. host.text.url_encode(sign[k])
     end
+
     local u = API_URL .. path
-    if query ~= "" then
-        return u .. "?" .. query .. "&vrf=" .. sig
+    if #parts > 0 then
+        return u .. "?" .. table.concat(parts, "&") .. "&vrf=" .. host.crypto.vrf_sign(path, sign, VRF_STAGES)
     end
-    return u .. "?vrf=" .. sig
+    return u .. "?vrf=" .. host.crypto.vrf_sign(path, sign, VRF_STAGES)
 end
 
 -- ---------------------------------------------------------------------------
@@ -72,12 +88,32 @@ end
 function search_manga(arg)
     local f = host.json.decode(arg)
     local query = f and f.query or ""
-    log.debug("mangafire search: q=" .. query)
+    local genres = f and f.genres or {}
+    log.debug("mangafire search: q=" .. query .. " genres=" .. tostring(#genres))
+
+    local params = {limit = "50"}
+    -- keyword has to be left out entirely when nothing was typed: an empty
+    -- value changes the parameter set the VRF signature is checked against and
+    -- the API answers 403.
+    if query ~= "" then params.keyword = query end
+    if #genres > 0 then
+        params["genres_in[]"] = genres
+        params.genres_mode = "and"
+    end
 
     local all = {}
     local page = 1
+    -- Host invoke budget is 15s: a bare genre browse matches thousands of
+    -- titles, so stop sweeping in time and return partial results rather than
+    -- failing the whole search.
+    local deadline = os.clock() + 8
     while true do
-        local raw = http_get(vrf_url("/titles", {keyword = query, limit = "50", page = "" .. page}))
+        if os.clock() > deadline then
+            log.warn("mangafire search: budget reached page=" .. tostring(page))
+            break
+        end
+        params.page = "" .. page
+        local raw = http_get(vrf_url("/titles", params))
         if not raw then
             log.error("mangafire search: request failed page=" .. page)
             break
@@ -205,4 +241,68 @@ function get_page_list(arg)
 
     log.debug("mangafire pages: found " .. #pages .. " pages for " .. chapter_id)
     return host.json.encode(pages)
+end
+
+-- ─── get_genres (optional export) ──────────────────────────────────────────
+-- The genre ids the site's own filter panel uses. They are seeded server-side
+-- and stable, and the API exposes no endpoint that lists them, so the table is
+-- carried here and only needs revisiting if the site adds a genre.
+local GENRES = {
+    { name = "Action",         slug = "1" },
+    { name = "Adult",          slug = "268929" },
+    { name = "Adventure",      slug = "78" },
+    { name = "Avant Garde",    slug = "3" },
+    { name = "Boys Love",      slug = "4" },
+    { name = "Comedy",         slug = "5" },
+    { name = "Crime",          slug = "268921" },
+    { name = "Demons",         slug = "77" },
+    { name = "Drama",          slug = "6" },
+    { name = "Ecchi",          slug = "7" },
+    { name = "Fantasy",        slug = "79" },
+    { name = "Girls Love",     slug = "9" },
+    { name = "Gourmet",        slug = "10" },
+    { name = "Harem",          slug = "11" },
+    { name = "Hentai",         slug = "268930" },
+    { name = "Historical",     slug = "268922" },
+    { name = "Horror",         slug = "530" },
+    { name = "Isekai",         slug = "13" },
+    { name = "Iyashikei",      slug = "531" },
+    { name = "Josei",          slug = "15" },
+    { name = "Kids",           slug = "532" },
+    { name = "Magic",          slug = "539" },
+    { name = "Magical Girls",  slug = "268923" },
+    { name = "Mahou Shoujo",   slug = "533" },
+    { name = "Martial Arts",   slug = "534" },
+    { name = "Mature",         slug = "268931" },
+    { name = "Mecha",          slug = "19" },
+    { name = "Medical",        slug = "268924" },
+    { name = "Military",       slug = "535" },
+    { name = "Music",          slug = "21" },
+    { name = "Mystery",        slug = "22" },
+    { name = "Parody",         slug = "23" },
+    { name = "Philosophical",  slug = "268925" },
+    { name = "Psychological",  slug = "536" },
+    { name = "Reverse Harem",  slug = "25" },
+    { name = "Romance",        slug = "26" },
+    { name = "School",         slug = "73" },
+    { name = "Sci-Fi",         slug = "28" },
+    { name = "Seinen",         slug = "537" },
+    { name = "Shoujo",         slug = "30" },
+    { name = "Shounen",        slug = "31" },
+    { name = "Slice of Life",  slug = "538" },
+    { name = "Smut",           slug = "268932" },
+    { name = "Space",          slug = "33" },
+    { name = "Sports",         slug = "34" },
+    { name = "Super Power",    slug = "75" },
+    { name = "Superhero",      slug = "268926" },
+    { name = "Supernatural",   slug = "76" },
+    { name = "Suspense",       slug = "37" },
+    { name = "Thriller",       slug = "38" },
+    { name = "Tragedy",        slug = "268927" },
+    { name = "Vampire",        slug = "39" },
+    { name = "Wuxia",          slug = "268928" },
+}
+
+function get_genres()
+    return host.json.encode(GENRES)
 end

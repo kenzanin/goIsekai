@@ -75,6 +75,31 @@ func jsonValue(s, key string) string {
 	return b.String()
 }
 
+// jsonArray returns the elements of key's JSON array value. Genre slugs are
+// [a-z-] only, so the elements never carry a comma or an escape and splitting
+// the literal text is enough.
+func jsonArray(s, key string) []string {
+	i := strings.Index(s, `"`+key+`":`)
+	if i < 0 {
+		return nil
+	}
+	v := strings.TrimSpace(s[i+len(`"`+key+`":`):])
+	if !strings.HasPrefix(v, "[") {
+		return nil
+	}
+	end := strings.Index(v, "]")
+	if end < 0 {
+		return nil
+	}
+	var out []string
+	for _, part := range strings.Split(v[1:end], ",") {
+		if part = strings.Trim(strings.TrimSpace(part), `"`); part != "" {
+			out = append(out, part)
+		}
+	}
+	return out
+}
+
 // jsonList renders a []string as a JSON array.
 func jsonList(vals []string) string {
 	var b strings.Builder
@@ -127,9 +152,13 @@ func collectPages(pages map[int]string, nums, srcs []string) {
 // Search(arg) takes a JSON SearchFilter like {"query":"solo"} and returns a
 // JSON array of Manga. The host slices search results into its own pages, so
 // only the site's first result page is read and the filter's page is ignored,
-// the same way the other source plugins behave.
+// the same way the other source plugins behave. Selected genres are sent as
+// repeated genre[] parameters, which the filter form ANDs together.
 func Search(arg string) (string, error) {
 	requestURL := base + "/filter?keyword=" + url.QueryEscape(jsonValue(arg, "query"))
+	for _, genre := range jsonArray(arg, "genres") {
+		requestURL += "&genre[]=" + url.QueryEscape(genre)
+	}
 	body, err := hostnet.Get(requestURL)
 	if err != nil {
 		return "", err
@@ -310,6 +339,68 @@ func GetPageList(arg string) (string, error) {
 			out.WriteByte(',')
 		}
 		fmt.Fprintf(&out, `{"index":%d,"url":%s}`, i, strconv.Quote(pages[idx]))
+	}
+	out.WriteByte(']')
+	return out.String(), nil
+}
+
+// batoGenres is the genre list the site's /filter form offers. The site keeps
+// it server-side with no endpoint to read it from, so it is carried here and
+// only needs revisiting if bato1 adds or renames a genre.
+var batoGenres = [][2]string{
+	{"Action", "action"},
+	{"Adventure", "adventure"},
+	{"Avant Garde", "avant-garde"},
+	{"Boys Love", "boys-love"},
+	{"Comedy", "comedy"},
+	{"Demons", "demons"},
+	{"Drama", "drama"},
+	{"Ecchi", "ecchi"},
+	{"Fantasy", "fantasy"},
+	{"Girls Love", "girls-love"},
+	{"Gourmet", "gourmet"},
+	{"Harem", "harem"},
+	{"Horror", "horror"},
+	{"Isekai", "isekai"},
+	{"Iyashikei", "iyashikei"},
+	{"Josei", "josei"},
+	{"Kids", "kids"},
+	{"Magic", "magic"},
+	{"Mahou Shoujo", "mahou-shoujo"},
+	{"Martial Arts", "martial-arts"},
+	{"Mecha", "mecha"},
+	{"Military", "military"},
+	{"Music", "music"},
+	{"Mystery", "mystery"},
+	{"Parody", "parody"},
+	{"Psychological", "psychological"},
+	{"Reverse Harem", "reverse-harem"},
+	{"Romance", "romance"},
+	{"School", "school"},
+	{"Sci-Fi", "sci-fi"},
+	{"Seinen", "seinen"},
+	{"Shoujo", "shoujo"},
+	{"Shounen", "shounen"},
+	{"Slice of Life", "slice-of-life"},
+	{"Space", "space"},
+	{"Sports", "sports"},
+	{"Super Power", "super-power"},
+	{"Supernatural", "supernatural"},
+	{"Suspense", "suspense"},
+	{"Thriller", "thriller"},
+	{"Vampire", "vampire"},
+}
+
+// GetGenres returns the optional ABI export the host calls to build its genre
+// picker. The argument is unused; the host passes an empty JSON object.
+func GetGenres(arg string) (string, error) {
+	var out strings.Builder
+	out.WriteByte('[')
+	for i, g := range batoGenres {
+		if i > 0 {
+			out.WriteByte(',')
+		}
+		fmt.Fprintf(&out, `{"name":%s,"slug":%s}`, strconv.Quote(g[0]), strconv.Quote(g[1]))
 	}
 	out.WriteByte(']')
 	return out.String(), nil

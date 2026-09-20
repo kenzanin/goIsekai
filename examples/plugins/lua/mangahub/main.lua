@@ -118,10 +118,14 @@ function search_manga(arg)
     local query = args.query or ""
     local page = args.page or 1
     local offset = (page - 1) * 30
-    log.info("mangahub search: q=" .. query .. " page=" .. tostring(page))
+    -- The API takes every selected genre as one comma-separated list of slugs,
+    -- ANDed together, and expects the literal "all" when none is selected.
+    local genres = args.genres or {}
+    local genre = #genres > 0 and table.concat(genres, ",") or "all"
+    log.info("mangahub search: q=" .. query .. " genre=" .. genre .. " page=" .. tostring(page))
 
     local gql = '{search(x: ' .. SOURCE_ID .. ', q: "' .. escape_gql(query)
-        .. '", genre: "all", mod: POPULAR, offset: ' .. tostring(offset) .. ') {rows {title, slug, image}}}'
+        .. '", genre: "' .. escape_gql(genre) .. '", mod: POPULAR, offset: ' .. tostring(offset) .. ') {rows {title, slug, image}}}'
 
     local data = graphql_query(gql)
     local rows = {}
@@ -282,4 +286,40 @@ function get_page_list(arg)
 
     log.info("mangahub pages: found " .. tostring(#pages) .. " pages for " .. chapterID)
     return host.json.encode(pages)
+end
+
+-- ─── ABI: get_genres (optional) ────────────────────────────────────────────
+-- The GraphQL API has no genre query, so the slugs come from the /genre/<slug>
+-- links the site renders. The list is cached for the life of the VM: it only
+-- changes when the site adds a genre.
+local genres_cache = nil
+
+function get_genres()
+    if genres_cache then return host.json.encode(genres_cache) end
+
+    local resp = host.http.get(SITE_URL .. "/search")
+    local html = resp and resp.body or ""
+    if html == "" then
+        log.error("mangahub: /search carried no body, genre browsing unavailable")
+        return "[]"
+    end
+
+    local seen, out = {}, {}
+    for tag, name in host.regex.gmatch(html, [[(<a [^>]*genre-label[^>]*)>([^<]+)</a>]]) do
+        local slug = host.regex.find(tag, [[/genre/([a-z0-9-]+)]])
+        if slug and slug ~= "" and not seen[slug] then
+            seen[slug] = true
+            out[#out + 1] = { name = host.text.trim(name), slug = slug }
+        end
+    end
+    table.sort(out, function(a, b) return a.name < b.name end)
+
+    if #out == 0 then
+        log.error("mangahub: /search listed no genre labels, genre browsing unavailable")
+        return "[]"
+    end
+
+    log.info("mangahub: " .. #out .. " genres")
+    genres_cache = out
+    return host.json.encode(out)
 end
