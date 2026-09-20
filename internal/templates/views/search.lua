@@ -171,7 +171,7 @@ return function(data)
 		.. '<form method="get" action="/view/search" class="flex gap-2 items-end mb-8">'
 		.. "<div>"
 		.. '<label for="pluginID" class="block text-xs text-neutral-400 mb-1">Plugin</label>'
-		.. '<select id="pluginID" name="pluginID" class="bg-neutral-900 border border-neutral-700 rounded-md px-3 py-2 text-sm">'
+		.. '<select id="pluginID" name="pluginID" onchange="this.form.submit()" class="bg-neutral-900 border border-neutral-700 rounded-md px-3 py-2 text-sm">'
 		.. pluginOpts
 		.. "</select>"
 		.. "</div>"

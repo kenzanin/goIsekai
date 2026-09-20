@@ -57,6 +57,16 @@ func (s *Server) viewSearch(w http.ResponseWriter, r *http.Request) {
 	}
 	q := r.URL.Query().Get("q")
 	pluginID := r.URL.Query().Get("pluginID")
+	if pluginID == "" {
+		// Default to the first active plugin so the genre picker renders on a
+		// fresh page load, not only once a plugin has been submitted.
+		for _, p := range plugins {
+			if p.IsActive {
+				pluginID = p.ID
+				break
+			}
+		}
+	}
 	genre := r.URL.Query().Get("genre")
 	page, _ := strconv.Atoi(r.URL.Query().Get("page"))
 	if page < 1 {
