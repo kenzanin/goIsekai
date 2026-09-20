@@ -29,6 +29,15 @@ func (s *AppService) liveChaptersFallback(mangaIntID int64, liveChapters []types
 	return out
 }
 
+// CachedMangaAndChapters returns the persisted copy of a manga and its chapter
+// list (newest first). The reader prefers this over a live plugin fetch: the
+// live chapter list can come back partial, which leaves chapter navigation with
+// no next chapter even though the detail page lists one.
+func (s *AppService) CachedMangaAndChapters(pluginID, mangaID string) (types.Manga, []types.Chapter, error) {
+	mangaIntID, _ := s.db.ResolveMangaIntID(pluginID, mangaID)
+	return s.cachedMangaFallback(pluginID, mangaID, mangaIntID)
+}
+
 // cachedMangaFallback returns cached data when plugin is unreachable.
 func (s *AppService) cachedMangaFallback(pluginID, mangaID string, mangaIntID int64) (types.Manga, []types.Chapter, error) {
 	cachedManga, err := s.db.GetMangaCached(pluginID, mangaID)

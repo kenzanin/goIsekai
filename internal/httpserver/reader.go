@@ -47,6 +47,32 @@ func chapterNeighbors(chapters []types.Chapter, progress map[string]database.Cha
 	return "", ""
 }
 
+// readerChapters resolves the manga and its chapter list for the reader. The
+// persisted copy is preferred: it is the same list the detail page shows, and a
+// live plugin fetch can come back partial, which would leave navigation with no
+// next chapter even though the chapter exists. A manga that was never synced
+// falls back to the plugin.
+func (s *Server) readerChapters(pluginID, mangaID string) (types.Manga, []types.Chapter, error) {
+	manga, chapters, err := s.service.CachedMangaAndChapters(pluginID, mangaID)
+	if err == nil && len(chapters) > 0 {
+		return manga, chapters, nil
+	}
+
+	manga, chapters, err = s.service.GetMangaDetails(pluginID, mangaID)
+	if err != nil {
+		return manga, chapters, err
+	}
+	if len(chapters) == 0 {
+		live, liveErr := s.service.GetChapterList(pluginID, mangaID)
+		if liveErr != nil {
+			s.logger.Error("reader chapter list fallback", "error", liveErr, "plugin", pluginID, "manga", mangaID)
+			return manga, chapters, nil
+		}
+		chapters = live
+	}
+	return manga, chapters, nil
+}
+
 // viewReader renders the reader shell; page data is fetched as JSON by the
 // inline script from /api/reader-data.
 func (s *Server) viewReader(w http.ResponseWriter, r *http.Request) {
@@ -57,17 +83,11 @@ func (s *Server) viewReader(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "missing route params", http.StatusBadRequest)
 		return
 	}
-	manga, chapters, err := s.service.GetMangaDetails(pluginID, mangaID)
+	manga, chapters, err := s.readerChapters(pluginID, mangaID)
 	if err != nil {
 		s.logger.Error("reader detail", "error", err, "plugin", pluginID, "manga", mangaID)
 		http.Error(w, "failed to load manga: "+err.Error(), http.StatusBadGateway)
 		return
-	}
-	if len(chapters) == 0 {
-		chapters, err = s.service.GetChapterList(pluginID, mangaID)
-		if err != nil {
-			s.logger.Error("reader chapter list fallback", "error", err, "plugin", pluginID, "manga", mangaID)
-		}
 	}
 	progress, err := s.service.GetChapterProgresses(pluginID, mangaID)
 	if err != nil {
@@ -119,17 +139,9 @@ func (s *Server) readerData(w http.ResponseWriter, r *http.Request) {
 			s.logger.Warn("record total pages", "error", err, "chapter", chapterID)
 		}
 	}
-	_, chapters, err := s.service.GetMangaDetails(pluginID, mangaID)
+	_, chapters, err := s.readerChapters(pluginID, mangaID)
 	if err != nil {
 		s.logger.Error("reader neighbors", "error", err, "plugin", pluginID, "manga", mangaID)
-	}
-	// If detail response didn't include chapters (e.g. mangzio),
-	// fetch the chapter list separately for neighbor resolution.
-	if len(chapters) == 0 {
-		chapters, err = s.service.GetChapterList(pluginID, mangaID)
-		if err != nil {
-			s.logger.Error("reader chapter list fallback", "error", err, "plugin", pluginID, "manga", mangaID)
-		}
 	}
 	progress, err := s.service.GetChapterProgresses(pluginID, mangaID)
 	if err != nil {
