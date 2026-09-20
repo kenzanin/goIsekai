@@ -1,7 +1,7 @@
 ## 1. Shared title normalization
 
-- [ ] 1.1 Move the title normalization rule out of `internal/database/duplicates_match.go` into `internal/pluginutil` as an exported function, and make the duplicate detector call it instead of keeping a private copy. Verify `CGO_ENABLED=0 go build ./...` succeeds and the duplicate-detection tests still pass (`go test ./internal/database/ -run Duplicate -count=1`).
-- [ ] 1.2 Register the function as a `host.text.*` helper next to the existing text helpers for both the Lua and JS runtimes, so a plugin can normalize a title without reimplementing the rule. Verify with a case added to `internal/pluginmanager/host_helpers_test.go` that asserts case, punctuation, and repeated spacing all collapse to the same string.
+- [x] 1.1 Move the title normalization rule out of `internal/database/duplicates_match.go` into `internal/pluginutil` as an exported function, and make the duplicate detector call it instead of keeping a private copy. Verify `CGO_ENABLED=0 go build ./...` succeeds and the duplicate-detection tests still pass (`go test ./internal/database/ -run Duplicate -count=1`).
+- [x] 1.2 Register the function as a `host.text.*` helper next to the existing text helpers for both the Lua and JS runtimes, so a plugin can normalize a title without reimplementing the rule. Verify with a case added to `internal/pluginmanager/host_helpers_test.go` that asserts case, punctuation, and repeated spacing all collapse to the same string.
 
 ## 2. Source script fixes
 
