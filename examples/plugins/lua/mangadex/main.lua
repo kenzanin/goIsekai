@@ -27,8 +27,16 @@ function search_manga(arg)
     local results = {}
     local offset = 0
     local total = 999999
+    -- Host invoke budget is 15s: stop sweeping in time and return partial
+    -- results rather than failing the whole search.
+    local deadline = os.clock() + 8
 
     while offset < total do
+        if os.clock() > deadline then
+            log.warn("mangadex search: budget reached offset=" .. tostring(offset))
+            break
+        end
+
         local qs = "limit=100&offset=" .. tostring(offset)
         qs = qs .. "&includes[]=cover_art&includes[]=author"
         qs = qs .. "&availableTranslatedLanguage[]=" .. util.LANG
@@ -81,6 +89,7 @@ local GENRES = {
     { name = "Drama",       slug = "b9af3a63-f058-46de-a9a0-e0c13906197a" },
     { name = "Fantasy",     slug = "cdc58593-87dd-415e-bbc0-2ec27bf404cc" },
     { name = "Horror",      slug = "cdad7e68-1419-41dd-bdce-27753074a640" },
+    { name = "Isekai",      slug = "ace04997-f6bd-436e-b261-779182193d3d" },
     { name = "Romance",     slug = "423e2eae-a7a2-4a8b-ac03-a8351462d71d" },
     { name = "Sci-Fi",      slug = "256c8bd9-4904-4360-bf4f-508a76d67183" },
     { name = "Mystery",     slug = "ee968100-4191-4968-93d3-f82d72be7e46" },
