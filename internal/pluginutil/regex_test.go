@@ -1,7 +1,9 @@
 package pluginutil
 
 import (
+	"errors"
 	"reflect"
+	"strings"
 	"testing"
 )
 
@@ -153,6 +155,52 @@ func TestRegexReplace(t *testing.T) {
 	}
 
 	if _, err := RegexReplace("x", `(`, ""); err == nil {
+		t.Fatal("want error for bad pattern")
+	}
+}
+
+// TestRegexReplaceFunc pins the string.gsub replacement-function contract: one
+// call per match with the captures, the whole match when the pattern has none,
+// and a callback error surfaced instead of a half-replaced string.
+func TestRegexReplaceFunc(t *testing.T) {
+	// The mangabuddy genre label: every word capitalised.
+	got, err := RegexReplaceFunc("slice-of-life", `([A-Za-z])([\w']*)`, func(captures []string) (string, error) {
+		return strings.ToUpper(captures[0]) + captures[1], nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got != "Slice-Of-Life" {
+		t.Fatalf("captures = %q", got)
+	}
+
+	// Without captures the callback receives the whole match.
+	got, err = RegexReplaceFunc("a1b2", `\d`, func(captures []string) (string, error) {
+		return "[" + captures[0] + "]", nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got != "a[1]b[2]" {
+		t.Fatalf("whole match = %q", got)
+	}
+
+	got, err = RegexReplaceFunc("abc", `\d`, func([]string) (string, error) {
+		t.Fatal("callback ran without a match")
+		return "", nil
+	})
+	if err != nil || got != "abc" {
+		t.Fatalf("no match = %q, err=%v", got, err)
+	}
+
+	failed := errors.New("callback failed")
+	if _, err := RegexReplaceFunc("a1b2", `\d`, func([]string) (string, error) {
+		return "", failed
+	}); err != failed {
+		t.Fatalf("callback error = %v, want %v", err, failed)
+	}
+
+	if _, err := RegexReplaceFunc("x", `(`, func([]string) (string, error) { return "", nil }); err == nil {
 		t.Fatal("want error for bad pattern")
 	}
 }

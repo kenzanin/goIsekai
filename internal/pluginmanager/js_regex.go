@@ -110,10 +110,30 @@ func jsRegexQuote(vm *goja.Runtime) func(goja.FunctionCall) goja.Value {
 	}
 }
 
-// jsRegexReplace wraps host.regex.replace(subject, pattern, repl) -> string.
+// jsRegexReplace wraps host.regex.replace(subject, pattern, repl) -> string
+// with the two forms the Lua runtime takes: a string repl, where capture
+// references use Go's $1 syntax, or a function called once per match with the
+// match's captures (the whole match when the pattern has none).
 func jsRegexReplace(vm *goja.Runtime) func(goja.FunctionCall) goja.Value {
 	return func(call goja.FunctionCall) goja.Value {
 		subject, pattern := jsRegexArgs(call)
+		if fn, isFunction := goja.AssertFunction(call.Argument(2)); isFunction {
+			out, err := pluginutil.RegexReplaceFunc(subject, pattern, func(captures []string) (string, error) {
+				args := make([]goja.Value, len(captures))
+				for i, capture := range captures {
+					args[i] = vm.ToValue(capture)
+				}
+				result, err := fn(goja.Undefined(), args...)
+				if err != nil {
+					return "", err
+				}
+				return result.String(), nil
+			})
+			if err != nil {
+				panic(vm.NewGoError(err))
+			}
+			return vm.ToValue(out)
+		}
 		out, err := pluginutil.RegexReplace(subject, pattern, call.Arguments[2].String())
 		if err != nil {
 			panic(vm.NewGoError(err))

@@ -113,9 +113,8 @@ function get_manga_detail(arg)
     for g in host.regex.gmatch(html, [[href="/genre/([a-z0-9-]+)"]]) do
         if not seen_g[g] then
             seen_g[g] = true
-            -- A per-match replacement function is the one thing the host engine
-            -- cannot take, so the word capitalisation stays a Lua gsub.
-            genres[#genres + 1] = host.regex.replace(g, "-", " "):gsub("(%a)([%w']*)", function(a, b)
+            local label = host.regex.replace(g, "-", " ")
+            genres[#genres + 1] = host.regex.replace(label, "([A-Za-z])([\\w']*)", function(a, b)
                 return a:upper() .. b
             end)
         end

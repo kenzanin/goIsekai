@@ -155,16 +155,42 @@ func luaRegexQuote(state *lua.State) lua.Value {
 }
 
 // luaRegexReplace wraps host.regex.replace(subject, pattern, repl) -> string.
-// Capture references in repl use Go's $1 syntax.
+// Capture references in a string repl use Go's $1 syntax. A function repl is
+// called once per match with the match's captures, or with the whole match when
+// the pattern has none, and whatever it returns (by tostring) replaces the
+// match. That is the shape string.gsub gives a replacement function, so a
+// computed replacement no longer forces the plugin back onto Lua patterns.
 func luaRegexReplace(state *lua.State) lua.Value {
 	v, _ := state.NewNativeFunction(func(frame lua.Frame) lua.Outcome {
 		subject, pattern := luaRegexArgs(frame)
-		repl, _ := frame.CoerceString(2)
-		out, err := pluginutil.RegexReplace(subject, pattern, repl)
+		out, err := luaRegexReplaceRun(frame, subject, pattern)
 		if err != nil {
 			return frame.ReturnValues(lua.Nil(), lua.String(err.Error()))
 		}
 		return frame.ReturnValue(lua.String(out))
 	})
 	return v.Value()
+}
+
+// luaRegexReplaceRun picks the replacement form from the third argument: a
+// function is called per match, and anything else is read as the replacement
+// string the same way the other host helpers coerce an argument.
+func luaRegexReplaceRun(frame lua.Frame, subject, pattern string) (string, error) {
+	replacement, _ := frame.Argument(2)
+	function, isFunction := replacement.AsFunction()
+	if !isFunction {
+		repl, _ := frame.CoerceString(2)
+		return pluginutil.RegexReplace(subject, pattern, repl)
+	}
+	return pluginutil.RegexReplaceFunc(subject, pattern, func(captures []string) (string, error) {
+		args := make([]lua.Value, len(captures))
+		for i, capture := range captures {
+			args[i] = lua.String(capture)
+		}
+		result, err := frame.CallOne(function.Value(), args...)
+		if err != nil {
+			return "", err
+		}
+		return frame.ToString(result)
+	})
 }

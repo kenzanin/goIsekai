@@ -7,6 +7,7 @@
 package pluginutil
 
 import (
+	"strings"
 	"sync"
 
 	"github.com/coregx/coregex"
@@ -104,6 +105,48 @@ func RegexReplace(subject, pattern, repl string) (string, error) {
 		return "", err
 	}
 	return re.ReplaceAllString(subject, repl), nil
+}
+
+// RegexReplaceFunc replaces every match with the result of fn, called with the
+// match's captures, or with the whole match when the pattern has none. That is
+// the argument shape Lua's string.gsub hands a replacement function, so a
+// plugin that needs a computed replacement — recasing a word, escaping a byte —
+// gets it from the shared engine instead of falling back to Lua patterns. A
+// pattern that does not compile, or an error from fn, aborts with no partial
+// result.
+func RegexReplaceFunc(subject, pattern string, fn func(captures []string) (string, error)) (string, error) {
+	re, err := regexCompile(pattern)
+	if err != nil {
+		return "", err
+	}
+	matches := re.FindAllStringSubmatchIndex(subject, -1)
+	if len(matches) == 0 {
+		return subject, nil
+	}
+	groups := re.NumSubexp()
+	var out strings.Builder
+	out.Grow(len(subject))
+	last := 0
+	for _, match := range matches {
+		out.WriteString(subject[last:match[0]])
+		captures := make([]string, groups)
+		if groups == 0 {
+			captures = append(captures, subject[match[0]:match[1]])
+		}
+		for i := range groups {
+			if start, end := match[2*i+2], match[2*i+3]; start >= 0 {
+				captures[i] = subject[start:end]
+			}
+		}
+		replacement, err := fn(captures)
+		if err != nil {
+			return "", err
+		}
+		out.WriteString(replacement)
+		last = match[1]
+	}
+	out.WriteString(subject[last:])
+	return out.String(), nil
 }
 
 // RegexFindIndex mirrors Lua's string.find for a regular expression: the 1-based

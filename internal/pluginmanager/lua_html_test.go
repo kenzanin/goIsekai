@@ -9,10 +9,11 @@ import (
 )
 
 // newLuaState builds a Lua state with the host table installed, the way a
-// plugin gets one at load time.
+// plugin gets one at load time. It goes through createLuaState so a test runs
+// against the same sandbox, standard libraries included, that a plugin does.
 func newLuaState(t *testing.T) *lua.State {
 	t.Helper()
-	state, err := lua.New(lua.Options{})
+	state, err := createLuaState("test")
 	if err != nil {
 		t.Fatalf("new state: %v", err)
 	}
