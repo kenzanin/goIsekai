@@ -178,4 +178,27 @@ function util.parse_page_list(html)
     return pages
 end
 
+-- ─── Genre archive parsing ─────────────────────────────────────────────────
+-- GET /Genre/<slug> pages list div.ranking_item blocks:
+--   <a href="/Manga/SLUG"><h3 class="title">TITLE</h3></a>
+--   <img src="https://images.mangafreak.me/manga_images/x.jpg"/>
+function util.parse_ranking(html)
+    local results = {}
+    local seen = {}
+    for href, title in host.regex.gmatch(html,
+        [[<a href="(/[Mm]anga/[^"]+)"><h3 class="title">([^<]+)</h3></a>]]) do
+        local slug = host.regex.find(href, [[/[Mm]anga/([^/"?]+)]])
+        if slug and not seen[slug] then
+            seen[slug] = true
+            results[#results + 1] = {
+                id = slug,
+                title = host.text.trim(title),
+                cover_url = string.format("https://images.mangafreak.me/manga_images/%s.jpg",
+                    string.lower(slug)),
+            }
+        end
+    end
+    return results
+end
+
 return util

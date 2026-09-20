@@ -25,10 +25,20 @@ function search_manga(arg)
     local args = host.json.decode(arg)
     local query = args.query or ""
     local page = args.page or 1
+    local genres = args.genres or {}
 
-    -- Madara GET search: admin-ajax.php returns 0 bytes, use server-rendered GET instead
-    local url = BASE .. "/?s=" .. host.text.url_encode(query) .. "&post_type=wp-manga"
-    local body = host.http.get_body(url)
+    local body
+    -- Genre browsing: GET /manga-genre/<slug>/ (page N: /manga-genre/<slug>/page/N/).
+    if #genres > 0 then
+        local url = BASE .. "/manga-genre/" .. host.text.url_encode(genres[1]) .. "/"
+        if page > 1 then
+            url = url .. "page/" .. tostring(page) .. "/"
+        end
+        body = host.http.get_body(url)
+    else
+        -- Madara GET search: admin-ajax.php returns 0 bytes, use server-rendered GET instead
+        body = host.http.get_body(BASE .. "/?s=" .. host.text.url_encode(query) .. "&post_type=wp-manga")
+    end
     if not body or body == "" then
         log.error("mangasushi search empty response")
         return host.json.encode({})
@@ -201,3 +211,33 @@ function get_page_list(arg)
     return host.json.encode(pages)
 end
 
+
+-- ─── get_genres (optional export) ──────────────────────────────────────────
+-- Mangasushi is a smaller Madara mirror; a slim common set.
+local GENRES = {
+    { name = "Action",        slug = "action" },
+    { name = "Adventure",     slug = "adventure" },
+    { name = "Comedy",        slug = "comedy" },
+    { name = "Drama",         slug = "drama" },
+    { name = "Fantasy",       slug = "fantasy" },
+    { name = "Harem",         slug = "harem" },
+    { name = "Historical",    slug = "historical" },
+    { name = "Horror",        slug = "horror" },
+    { name = "Isekai",        slug = "isekai" },
+    { name = "Martial Arts",  slug = "martial-arts" },
+    { name = "Mystery",       slug = "mystery" },
+    { name = "Psychological", slug = "psychological" },
+    { name = "Romance",       slug = "romance" },
+    { name = "School Life",   slug = "school-life" },
+    { name = "Sci-fi",        slug = "sci-fi" },
+    { name = "Seinen",        slug = "seinen" },
+    { name = "Shoujo",        slug = "shoujo" },
+    { name = "Shounen",       slug = "shounen" },
+    { name = "Slice of Life", slug = "slice-of-life" },
+    { name = "Supernatural",  slug = "supernatural" },
+    { name = "Tragedy",       slug = "tragedy" },
+}
+
+function get_genres()
+    return host.json.encode(GENRES)
+end

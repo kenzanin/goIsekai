@@ -25,10 +25,21 @@ function search_manga(arg)
     local args = host.json.decode(arg)
     local query = args.query or ""
     local page = args.page or 1
+    local genres = args.genres or {}
 
-    -- Madara GET search: admin-ajax.php returns 0 bytes, use server-rendered GET instead
-    local url = BASE .. "/?s=" .. host.text.url_encode(query) .. "&post_type=wp-manga"
-    local body = host.http.get_body(url)
+    local body
+    -- Genre browsing: GET /genres/<slug>/ (page N: /genres/<slug>/?page=N is
+    -- not supported by Madara; /genres/<slug>/page/N/ is).
+    if #genres > 0 then
+        local url = BASE .. "/genres/" .. host.text.url_encode(genres[1]) .. "/"
+        if page > 1 then
+            url = url .. "page/" .. tostring(page) .. "/"
+        end
+        body = host.http.get_body(url)
+    else
+        -- Madara GET search: admin-ajax.php returns 0 bytes, use server-rendered GET instead
+        body = host.http.get_body(BASE .. "/?s=" .. host.text.url_encode(query) .. "&post_type=wp-manga")
+    end
     if not body or body == "" then
         log.error("mangaread search empty response")
         return host.json.encode({})
@@ -201,3 +212,49 @@ function get_page_list(arg)
     return host.json.encode(pages)
 end
 
+
+-- ─── get_genres (optional export) ──────────────────────────────────────────
+-- Slugs from /genres/<slug> (site navigation).
+local GENRES = {
+    { name = "Action",        slug = "action" },
+    { name = "Adventure",     slug = "adventure" },
+    { name = "Comedy",        slug = "comedy" },
+    { name = "Comic",         slug = "comic" },
+    { name = "Cooking",       slug = "cooking" },
+    { name = "Doujinshi",     slug = "doujinshi" },
+    { name = "Drama",         slug = "drama" },
+    { name = "Ecchi",         slug = "ecchi" },
+    { name = "Fantasy",       slug = "fantasy" },
+    { name = "Gender Bender", slug = "gender-bender" },
+    { name = "Harem",         slug = "harem" },
+    { name = "Historical",    slug = "historical" },
+    { name = "Horror",        slug = "horror" },
+    { name = "Isekai",        slug = "isekai" },
+    { name = "Josei",         slug = "josei" },
+    { name = "Manhua",        slug = "manhua" },
+    { name = "Manhwa",        slug = "manhwa" },
+    { name = "Manga",         slug = "manga" },
+    { name = "Martial Arts",  slug = "martial-arts" },
+    { name = "Mecha",         slug = "mecha" },
+    { name = "Mystery",       slug = "mystery" },
+    { name = "One shot",      slug = "one-shot" },
+    { name = "Psychological", slug = "psychological" },
+    { name = "Romance",       slug = "romance" },
+    { name = "School Life",   slug = "school-life" },
+    { name = "Sci-fi",        slug = "sci-fi" },
+    { name = "Seinen",        slug = "seinen" },
+    { name = "Shoujo",        slug = "shoujo" },
+    { name = "Shoujo Ai",     slug = "shoujo-ai" },
+    { name = "Shounen",       slug = "shounen" },
+    { name = "Shounen Ai",    slug = "shounen-ai" },
+    { name = "Slice of Life", slug = "slice-of-life" },
+    { name = "Smut",          slug = "smut" },
+    { name = "Sports",        slug = "sports" },
+    { name = "Supernatural",  slug = "supernatural" },
+    { name = "Tragedy",       slug = "tragedy" },
+    { name = "Webtoon",       slug = "webtoon" },
+}
+
+function get_genres()
+    return host.json.encode(GENRES)
+end
