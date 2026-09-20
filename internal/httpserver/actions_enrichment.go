@@ -76,13 +76,16 @@ func (s *Server) handleRemoveCategory(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	category := r.FormValue("category")
+	// Toggle the genre BEFORE the category row changes: ToggleGenre seeds
+	// from displayed genres (override or categories). Mutating the category
+	// first makes the toggle invert (removing what it should add).
+	if err := s.service.ToggleGenre(pluginID, mangaID, category); err != nil {
+		s.logger.Error("toggle genre from category", "pluginID", pluginID, "mangaID", mangaID, "category", category, "error", err)
+	}
 	if err := s.service.RemoveCategory(pluginID, mangaID, category); err != nil {
 		s.logger.Error("remove category", "pluginID", pluginID, "mangaID", mangaID, "category", category, "error", err)
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
-	}
-	if err := s.service.ToggleGenre(pluginID, mangaID, category); err != nil {
-		s.logger.Error("toggle genre from category", "pluginID", pluginID, "mangaID", mangaID, "category", category, "error", err)
 	}
 	s.viewMangaDetail(w, r)
 }
@@ -97,13 +100,16 @@ func (s *Server) handleAddCategory(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	category := r.FormValue("category")
+	// Toggle the genre BEFORE the category row changes: ToggleGenre seeds
+	// from displayed genres (override or categories). Mutating the category
+	// first makes the toggle invert (removing what it should add).
+	if err := s.service.ToggleGenre(pluginID, mangaID, category); err != nil {
+		s.logger.Error("toggle genre from category", "pluginID", pluginID, "mangaID", mangaID, "category", category, "error", err)
+	}
 	if err := s.service.AddCategory(pluginID, mangaID, category); err != nil {
 		s.logger.Error("add category", "pluginID", pluginID, "mangaID", mangaID, "category", category, "error", err)
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
-	}
-	if err := s.service.ToggleGenre(pluginID, mangaID, category); err != nil {
-		s.logger.Error("toggle genre from category", "pluginID", pluginID, "mangaID", mangaID, "category", category, "error", err)
 	}
 	s.viewMangaDetail(w, r)
 }
