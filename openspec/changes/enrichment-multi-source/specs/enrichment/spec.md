@@ -30,7 +30,7 @@ The system SHALL expose a catalog of available enrichment sources aggregated fro
 
 ### Requirement: On-demand enrichment fetch
 
-The system SHALL fetch enrichment items for a library manga from every enabled source that supports the requested kind, resolve the manga's current title, and merge the returned items into persistent storage tagged with the source label of the provider that returned them. Items SHALL be stored per source, so one kind MAY hold items from several sources at once, and an item already stored for that manga and kind SHALL be skipped (no duplicates). When two sources report the same item, the higher-precedence source SHALL be the one recorded. An empty provider result SHALL NOT delete existing rows, and a source that fails or times out SHALL NOT prevent the remaining sources from being stored.
+The system SHALL fetch enrichment items for a library manga from every enabled source that supports the requested kind, resolve the manga's current title, and merge the returned items into persistent storage tagged with the source label of the provider that returned them. Items SHALL be stored per source, so one kind MAY hold items from several sources at once, and an item already stored for that manga and kind SHALL be skipped (no duplicates). Storing SHALL NOT wait for the user to accept an item: everything a source returns is stored, and the user decides what to keep afterwards by promoting or removing individual stored items. When two sources report the same item, the higher-precedence source SHALL be the one recorded. An empty provider result SHALL NOT delete existing rows, and a source that fails or times out SHALL NOT prevent the remaining sources from being stored.
 
 #### Scenario: Fetch categories from a built-in source
 - **WHEN** an enrichment fetch for kind `categories` is requested for a library manga and the `mangadex` source declares `categories`
@@ -51,6 +51,10 @@ The system SHALL fetch enrichment items for a library manga from every enabled s
 #### Scenario: Fetch gathers every enabled source
 - **WHEN** an enrichment fetch for kind `categories` is requested for a library manga and both `mangadex` and `kitsu` declare `categories` and are enabled
 - **THEN** the categories from both sources are persisted, each carrying its own source label
+
+#### Scenario: Storing does not wait for a selection
+- **WHEN** a source returns several alt titles or alt summaries for a manga
+- **THEN** all of them are stored without the user accepting any individually, and each can be promoted or removed afterwards
 
 #### Scenario: Failing source does not block the rest
 - **WHEN** one enabled source errors or times out during a fetch

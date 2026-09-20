@@ -62,6 +62,10 @@ The host only receives the final items; it never sees the candidate set the sour
 **A missing preferred-language summary yields no summary.**
 Deleting the arbitrary-language fallback is the fix for the reported symptom; keeping it and labelling the language in the UI would leave the wrong synopsis on screen. The cost is that the alt-summary pool shrinks for records whose only description is in an unrequested language.
 
+**Every fetched item is stored, and the user prunes afterwards. There is no selection step.**
+A fetch writes every returned item into the matching alternative table and stops there; choosing what fits is done per row afterwards through the promote and remove actions the detail view already has. This is the whole reason the change needs no new storage: the alternative tables already carry a source label and already ignore a duplicate value, and the panel already renders each row with a promote and a remove control.
+Alternatives: staging fetched items until the user confirms each one, which needs a new persisted pending state, a new action per kind, and a way to expire an unconfirmed batch, in exchange for saving the user some deletions. Rejected because the per-row pruning it replaces already exists, so the staging step would add a lifecycle to save clicks that the removal control already covers.
+
 **Summary hygiene strips link blocks at the source.**
 Stripping at render time would leave the spam in the database and in any future export. The stored value should be the value the user wants.
 
@@ -76,6 +80,7 @@ MangaDex returns an `attributes.links` map including a Kitsu id, verified to res
 
 - One plugin invocation per source per kind instead of stopping at the winner → acceptable because the fetch is manual and there are about three sources; the existing per-source error tolerance must be preserved so a slow source cannot fail the whole fetch.
 - Merging all sources surfaces noise from a weak source → the match-verification and language rules must land first, otherwise this change just displays more wrong data. A user who dislikes a source disables it in that source's declaration.
+- Storing everything without a selection step means more rows to prune, and more again once several sources answer → the rows already carry the source that produced them and each is removable on its own, so the work is bounded and the user can see where an entry came from. If the panel becomes noisy, the next step is grouping or ordering the rows by source, not adding a confirmation step; that would reintroduce the pending state this design avoids.
 - The stored `via <source>` label of a value two sources share is the first writer's, so precedence now decides labels, not just order → intended, and the reason precedence must be declared rather than accidental.
 - Existing installations declare no precedence or enabled flag → defaults keep every current source working, but their mutual order falls back to the id tie-break, which may differ from today's winner for `authors`. Today's winner is a coin flip, so no reliable behavior is lost.
 - Two implementations can still drift if the scripts hand-roll the rule instead of calling the host helper → the spec states the rule and the scripts should call the helper; a drift here degrades verification rather than corrupting data.
