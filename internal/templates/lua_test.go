@@ -92,3 +92,37 @@ func TestLuaEngineDevMode(t *testing.T) {
 		t.Errorf("first render = %q, want v1", got)
 	}
 }
+
+// TestGetInitialsKeepsWholeRunes pins the avatar initial to a whole letter. The
+// first byte of a CJK rune is not a letter, so taking it drew a replacement
+// glyph on every Japanese, Chinese and Korean title.
+func TestGetInitialsKeepsWholeRunes(t *testing.T) {
+	tmplFS := fstest.MapFS{
+		"views/initials.lua": &fstest.MapFile{
+			Data: []byte(`return function(data) return getInitials(data.Title) end`),
+		},
+	}
+	engine, err := NewLuaEngine(tmplFS, false)
+	if err != nil {
+		t.Fatalf("NewLuaEngine: %v", err)
+	}
+
+	for _, tt := range []struct{ title, want string }{
+		{"Solo Leveling", "SL"},
+		{"One Piece", "OP"},
+		{"進撃の巨人", "進"},
+		{"進撃 Attack", "進A"},
+		{"日本語 タイトル", "日タ"},
+		{"", ""},
+	} {
+		t.Run(tt.title, func(t *testing.T) {
+			var buf bytes.Buffer
+			if err := engine.Render(&buf, "views/initials", map[string]any{"Title": tt.title}); err != nil {
+				t.Fatalf("Render: %v", err)
+			}
+			if got := buf.String(); got != tt.want {
+				t.Fatalf("getInitials(%q) = %q, want %q", tt.title, got, tt.want)
+			}
+		})
+	}
+}

@@ -4,6 +4,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	lua "github.com/mmcdole/lunar"
 
@@ -66,21 +67,16 @@ func getInitialsHelper(S *lua.State) lua.NativeFunc {
 		}
 		s, _ := frame.ToString(arg)
 		parts := strings.Fields(s)
-		initials := make([]byte, 0, 2)
-		for i := range 2 {
-			if i >= len(parts) {
-				break
-			}
-			r := []rune(parts[i])
-			if len(r) == 0 {
-				continue
-			}
-			u := strings.ToUpper(string(r[0]))
-			if len(u) > 0 {
-				initials = append(initials, u[0])
+		var initials strings.Builder
+		// A letter is a rune, not a byte: a CJK title's first rune is three
+		// bytes, so slicing its first byte draws a replacement glyph instead of
+		// the letter. Decode the rune and uppercase it whole.
+		for _, part := range parts[:min(2, len(parts))] {
+			if r, _ := utf8.DecodeRuneInString(part); r != utf8.RuneError {
+				initials.WriteString(pluginutil.Titlecase(string(r)))
 			}
 		}
-		return frame.ReturnString(string(initials))
+		return frame.ReturnString(initials.String())
 	}
 }
 
