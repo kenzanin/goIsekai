@@ -120,8 +120,16 @@ function search_manga(arg)
     local offset = (page - 1) * 30
     log.info("1manga search: q=" .. query .. " page=" .. tostring(page))
 
+    -- GraphQL takes one genre name per call; multi-genre means intersecting
+    -- result sets, which one query cannot express. First genre wins; the rest
+    -- narrow client-side by slug membership from detail fetches would be too
+    -- costly, so we pass the first genre to the API and keep it simple.
+    local genres = args.genres or {}
+    local genre = "all"
+    if #genres > 0 then genre = genres[1] end
+
     local gql = '{search(x: ' .. SOURCE_ID .. ', q: "' .. escape_gql(query)
-        .. '", genre: "all", mod: POPULAR, offset: ' .. tostring(offset) .. ') {rows {title, slug, image}}}'
+        .. '", genre: "' .. escape_gql(genre) .. '", mod: POPULAR, offset: ' .. tostring(offset) .. ') {rows {title, slug, image}}}'
 
     local data = graphql_query(gql)
     local rows = {}
@@ -282,4 +290,43 @@ function get_page_list(arg)
 
     log.info("1manga pages: found " .. tostring(#pages) .. " pages for " .. chapterID)
     return host.json.encode(pages)
+end
+
+-- ─── get_genres (optional export) ──────────────────────────────────────────
+-- MangaHub GraphQL takes genre names directly (genre: "Action"); the list
+-- below mirrors the site's genre facet.
+local GENRES = {
+    { name = "Action",      slug = "Action" },
+    { name = "Adventure",   slug = "Adventure" },
+    { name = "Comedy",      slug = "Comedy" },
+    { name = "Cooking",     slug = "Cooking" },
+    { name = "Doujinshi",   slug = "Doujinshi" },
+    { name = "Drama",       slug = "Drama" },
+    { name = "Fantasy",     slug = "Fantasy" },
+    { name = "Gender bender", slug = "Gender Bender" },
+    { name = "Harem",       slug = "Harem" },
+    { name = "Historical",  slug = "Historical" },
+    { name = "Horror",      slug = "Horror" },
+    { name = "Isekai",      slug = "Isekai" },
+    { name = "Josei",       slug = "Josei" },
+    { name = "Martial arts", slug = "Martial Arts" },
+    { name = "Mecha",       slug = "Mecha" },
+    { name = "Mystery",     slug = "Mystery" },
+    { name = "One shot",    slug = "One Shot" },
+    { name = "Psychological", slug = "Psychological" },
+    { name = "Romance",     slug = "Romance" },
+    { name = "School life", slug = "School Life" },
+    { name = "Sci-fi",      slug = "Sci Fi" },
+    { name = "Seinen",      slug = "Seinen" },
+    { name = "Shoujo",      slug = "Shoujo" },
+    { name = "Shounen",     slug = "Shounen" },
+    { name = "Slice of life", slug = "Slice of Life" },
+    { name = "Sports",      slug = "Sports" },
+    { name = "Supernatural", slug = "Supernatural" },
+    { name = "Tragedy",     slug = "Tragedy" },
+    { name = "Webtoons",    slug = "Webtoons" },
+}
+
+function get_genres()
+    return host.json.encode(GENRES)
 end

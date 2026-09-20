@@ -21,7 +21,8 @@ local util = require("util")
 function search_manga(arg)
     local args = host.json.decode(arg) or {}
     local title = host.text.trim(args.query or "")
-    log.info("mangadex search: q=" .. title)
+    local genres = args.genres or {}
+    log.info("mangadex search: q=" .. title .. " genres=" .. tostring(#genres))
 
     local results = {}
     local offset = 0
@@ -35,6 +36,9 @@ function search_manga(arg)
             qs = qs .. "&order[followedCount]=desc"
         else
             qs = qs .. "&order[relevance]=desc&title=" .. host.text.url_encode(title)
+        end
+        for _, g in ipairs(genres) do
+            qs = qs .. "&includedTags[]=" .. host.text.url_encode(g)
         end
         qs = qs .. "&" .. util.content_rating_params()
 
@@ -66,6 +70,28 @@ function search_manga(arg)
 
     log.info("mangadex search: found " .. tostring(#results) .. " results for q=" .. title)
     return host.json.encode(results)
+end
+
+-- ─── get_genres (optional export) ──────────────────────────────────────────
+-- MangaDex tag UUIDs are stable; slugs here are those UUIDs.
+local GENRES = {
+    { name = "Action",      slug = "391b0423-d847-456f-aff0-8b0cfc03038b" },
+    { name = "Adventure",   slug = "87cc87be-a65e-4bd4-b88b-0e4def2d1e02" },
+    { name = "Comedy",      slug = "4d32cc48-9f00-4cca-9b5a-a839f0764984" },
+    { name = "Drama",       slug = "b9af3a63-f058-46de-a9a0-e0c13906197a" },
+    { name = "Fantasy",     slug = "cdc58593-87dd-415e-bbc0-2ec27bf404cc" },
+    { name = "Horror",      slug = "cdad7e68-1419-41dd-bdce-27753074a640" },
+    { name = "Mystery",     slug = "ee968100-4191-4968-93d3-f82d72be7e46" },
+    { name = "Romance",     slug = "423e2eae-a7a2-4a8b-ac03-aec3532a4b17" },
+    { name = "Sci-Fi",      slug = "256c8bd9-4904-4360-bf4f-508a76d67183" },
+    { name = "Slice of Life", slug = "e5301a23-ebd9-49dd-a0cb-2add944c7fe9" },
+    { name = "Sports",      slug = "69964a64-2f90-4d33-beeb-f3ed2875eb4c" },
+    { name = "Supernatural", slug = "eabc5b4c-6aff-42f3-b657-3e90cbd00b75" },
+    { name = "Thriller",    slug = "292e862b-2d17-4062-90a2-0356aa4cdb4e" },
+}
+
+function get_genres()
+    return host.json.encode(GENRES)
 end
 
 -- ─── ABI: get_manga_detail ─────────────────────────────────────────────────

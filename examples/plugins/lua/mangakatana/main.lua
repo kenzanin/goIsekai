@@ -86,10 +86,39 @@ end
 -- ─── ABI: search_manga(arg) ────────────────────────────────────────────────
 -- arg: {"query":"...","page":1}  ->  array of {id, title, cover_url}
 -- Page 1 is the bare query string; later pages move the path to /page/N.
+-- Genre slugs on mangakatana are lowercase-with-dashes ("school-life",
+-- "overpowered-mc"); the archive page reuses the search card layout, so the
+-- same selectors apply.
+local function genre_url(slug, page)
+    local path = BASE .. "/genre/" .. host.text.url_encode(slug)
+    if page > 1 then
+        return path .. "/page/" .. page
+    end
+    return path
+end
+
 function search_manga(arg)
     local args = host.json.decode(arg)
     local q = host.text.url_encode(args.query or "")
     local page = tonumber(args.page) or 1
+    local genres = args.genres or {}
+
+    -- Genre browsing: /genre/<slug> (single genre per request).
+    if #genres > 0 then
+        local doc = doc_for(genre_url(genres[1], page))
+        if not doc then
+            return host.json.encode({})
+        end
+        local hrefs = host.html.find_list_attr(doc, "#book_list .item h3.title a", "href")
+        local titles = host.html.find_list_text(doc, "#book_list .item h3.title a")
+        local covers = host.html.find_list_attr(doc, "#book_list .item .media img", "src")
+        local out = {}
+        for i, href in ipairs(hrefs) do
+            out[#out + 1] = { id = slug_of(href), title = titles[i] or "", cover_url = covers[i] or "" }
+        end
+        log.debug("mangakatana: " .. #out .. " results for genre=" .. genres[1])
+        return host.json.encode(out)
+    end
 
     local url = BASE .. "/?search=" .. q .. "&search_by=book_name"
     if page > 1 then
@@ -198,4 +227,39 @@ function get_page_list(arg)
     end
     log.debug("mangakatana: " .. #out .. " pages for " .. tostring(chapter_id))
     return host.json.encode(out)
+end
+
+-- ─── get_genres (optional export) ──────────────────────────────────────────
+-- Slugs as they appear in /genre/<slug>; scraped from the site nav.
+local GENRES = {
+    { name = "Action",        slug = "action" },
+    { name = "Adventure",     slug = "adventure" },
+    { name = "Comedy",        slug = "comedy" },
+    { name = "Drama",         slug = "drama" },
+    { name = "Fantasy",       slug = "fantasy" },
+    { name = "Harem",         slug = "harem" },
+    { name = "Historical",    slug = "historical" },
+    { name = "Horror",        slug = "horror" },
+    { name = "Isekai",        slug = "isekai" },
+    { name = "Josei",         slug = "josei" },
+    { name = "Martial Arts",  slug = "martial-arts" },
+    { name = "Mecha",         slug = "mecha" },
+    { name = "Mystery",       slug = "mystery" },
+    { name = "Psychological", slug = "psychological" },
+    { name = "Reincarnation", slug = "reincarnation" },
+    { name = "Romance",       slug = "romance" },
+    { name = "School Life",   slug = "school-life" },
+    { name = "Sci-Fi",        slug = "sci-fi" },
+    { name = "Seinen",        slug = "seinen" },
+    { name = "Shoujo",        slug = "shoujo" },
+    { name = "Shounen",       slug = "shounen" },
+    { name = "Slice of Life", slug = "slice-of-life" },
+    { name = "Sports",        slug = "sports" },
+    { name = "Super Power",   slug = "super-power" },
+    { name = "Supernatural",  slug = "supernatural" },
+    { name = "Tragedy",       slug = "tragedy" },
+}
+
+function get_genres()
+    return host.json.encode(GENRES)
 end
