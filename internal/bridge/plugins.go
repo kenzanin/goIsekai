@@ -58,6 +58,7 @@ type Genre = pluginmanager.Genre
 func (s *AppService) ListGenres(pluginID string) ([]Genre, error) {
 	return s.mgr.GetGenres(pluginID)
 }
+
 // ListPlugins returns all registered plugins.
 func (s *AppService) ListPlugins() ([]database.Plugin, error) {
 	list, err := s.db.ListPlugins()
