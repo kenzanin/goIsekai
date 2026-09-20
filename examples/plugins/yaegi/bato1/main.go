@@ -1,3 +1,5 @@
+//go:build ignore
+
 // Bato1 (formerly Bato.to) plugin for goIsekai, running under the Yaegi
 // interpreter. Only the Go standard library and the synthetic hostnet package
 // are importable; all network access and HTML parsing goes through hostnet.

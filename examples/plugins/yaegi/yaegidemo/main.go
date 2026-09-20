@@ -1,3 +1,5 @@
+//go:build ignore
+
 // Demo Yaegi plugin for goIsekai.
 //
 // Yaegi plugins are sandboxed Go source programs. The host interprets this
