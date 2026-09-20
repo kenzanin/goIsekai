@@ -30,6 +30,9 @@ func (m *enrichMockProvider) Kinds() []enrich.Kind {
 	copy(out, m.kinds)
 	return out
 }
+func (m *enrichMockProvider) Precedence() int { return 0 }
+func (m *enrichMockProvider) Enabled() bool   { return true }
+
 func (m *enrichMockProvider) Fetch(_ context.Context, _ *http.Client, title string, k enrich.Kind) ([]enrich.Item, error) {
 	m.titles = append(m.titles, title)
 	return m.items[k], nil

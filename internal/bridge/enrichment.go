@@ -17,9 +17,11 @@ type EnrichmentResult struct {
 
 // EnrichmentCatalogEntry describes one enrichment source for the UI.
 type EnrichmentCatalogEntry struct {
-	ID    string   `json:"id"`
-	Name  string   `json:"name"`
-	Kinds []string `json:"kinds"`
+	ID         string   `json:"id"`
+	Name       string   `json:"name"`
+	Kinds      []string `json:"kinds"`
+	Precedence int      `json:"precedence,omitempty"`
+	Enabled    bool     `json:"enabled"`
 }
 
 // loadInfoProviders instantiates the enrichment scripts so the providers they
@@ -62,9 +64,11 @@ func (s *AppService) EnrichmentCatalog(kind string) []EnrichmentCatalogEntry {
 			kinds[i] = string(k)
 		}
 		out = append(out, EnrichmentCatalogEntry{
-			ID:    e.ID,
-			Name:  e.Name,
-			Kinds: kinds,
+			ID:         e.ID,
+			Name:       e.Name,
+			Kinds:      kinds,
+			Precedence: int(e.Precedence),
+			Enabled:    e.Enabled,
 		})
 	}
 	return out

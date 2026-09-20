@@ -26,6 +26,8 @@ func (m *mockProvider) Kinds() []Kind {
 func (m *mockProvider) Fetch(_ context.Context, _ *http.Client, _ string, _ Kind) ([]Item, error) {
 	return m.items, m.err
 }
+func (m *mockProvider) Precedence() int { return 0 }
+func (m *mockProvider) Enabled() bool   { return true }
 
 func TestRegister_DeduplicatesByID(t *testing.T) {
 	r := NewRegistry()
@@ -142,9 +144,11 @@ func (m *kindMock) Fetch(_ context.Context, _ *http.Client, _ string, k Kind) ([
 	m.calls = append(m.calls, k)
 	return m.byKind[k], nil
 }
+func (m *kindMock) Precedence() int { return 0 }
+func (m *kindMock) Enabled() bool   { return true }
 
-// TestCatalog_KeepsRegistrationOrder: the catalog is the caller's source
-// precedence, so walking it must not shuffle the sources (a map walk did).
+// TestCatalog_KeepsRegistrationOrder: the catalog is sorted by precedence, so providers with the same precedence are sorted by ID
+// for determinism.
 func TestCatalog_KeepsRegistrationOrder(t *testing.T) {
 	r := NewRegistry()
 	for _, id := range []string{"mangadex", "mangaupdates", "anilist"} {
@@ -155,7 +159,7 @@ func TestCatalog_KeepsRegistrationOrder(t *testing.T) {
 	for _, e := range r.Catalog("") {
 		got = append(got, e.ID)
 	}
-	want := []string{"mangadex", "mangaupdates", "anilist"}
+	want := []string{"anilist", "mangadex", "mangaupdates"}
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("catalog order = %v, want %v", got, want)
 	}
@@ -193,4 +197,109 @@ func TestFetchFirst_FirstSourceOwnsAKind(t *testing.T) {
 	if len(second.calls) != 1 || second.calls[0] != KindRelated {
 		t.Errorf("second source was asked for %v, want only related", second.calls)
 	}
+}
+
+// precMock is like kindMock but with customizable precedence.
+type precMock struct {
+	id         string
+	kinds      []Kind
+	byKind     map[Kind][]Item
+	precedence int
+}
+
+func (m *precMock) ID() string      { return m.id }
+func (m *precMock) Name() string    { return m.id }
+func (m *precMock) Kinds() []Kind   { return m.kinds }
+func (m *precMock) Precedence() int { return m.precedence }
+func (m *precMock) Enabled() bool   { return true }
+func (m *precMock) Fetch(_ context.Context, _ *http.Client, _ string, k Kind) ([]Item, error) {
+	return m.byKind[k], nil
+}
+
+// TestCatalog_PrecedenceOrder: providers are sorted by precedence,
+// then by ID for determinism, regardless of registration order.
+func TestCatalog_PrecedenceOrder(t *testing.T) {
+	// Register in shuffled order, but catalog should be sorted by precedence.
+	orders := [][]string{
+		{"c", "b", "a"}, // different registration orders
+		{"b", "a", "c"},
+		{"a", "c", "b"},
+	}
+
+	for _, order := range orders {
+		r := NewRegistry()
+		for _, id := range order {
+			var prec int
+			switch id {
+			case "a":
+				prec = 1
+			case "b":
+				prec = 2
+			case "c":
+				prec = 3
+			}
+			p := &precMock{
+				id:         id,
+				kinds:      []Kind{KindTitles},
+				byKind:     map[Kind][]Item{KindTitles: {{Value: id}}},
+				precedence: prec,
+			}
+			r.Register(p)
+		}
+
+		var got []string
+		for _, e := range r.Catalog("") {
+			got = append(got, e.ID)
+		}
+
+		want := []string{"a", "b", "c"} // sorted by precedence (low to high)
+		if !reflect.DeepEqual(got, want) {
+			t.Fatalf("catalog order = %v, want %v", got, want)
+		}
+
+		// Also verify kind-filtered catalog is sorted.
+		kindFiltered := r.Catalog(KindTitles)
+		if len(kindFiltered) != 3 {
+			t.Fatalf("expected 3 kind-filtered entries, got %d", len(kindFiltered))
+		}
+		for i := 0; i < len(kindFiltered)-1; i++ {
+			if kindFiltered[i].Precedence > kindFiltered[i+1].Precedence {
+				t.Fatalf("kind-filtered not sorted by precedence")
+			}
+		}
+	}
+}
+
+// TestCatalog_SkipsDisabled: disabled providers don't appear in catalog.
+func TestCatalog_SkipsDisabled(t *testing.T) {
+	r := NewRegistry()
+	r.Register(&precMock{id: "a", kinds: []Kind{KindTitles}, precedence: 1, byKind: map[Kind][]Item{}})
+	r.Register(&disabledMock{id: "disabled", kinds: []Kind{KindTitles}})
+	r.Register(&precMock{id: "b", kinds: []Kind{KindTitles}, precedence: 2, byKind: map[Kind][]Item{}})
+
+	entries := r.Catalog("")
+	if len(entries) != 2 {
+		t.Fatalf("expected 2 entries, got %d", len(entries))
+	}
+	for _, e := range entries {
+		if e.ID == "disabled" {
+			t.Fatal("disabled provider should not appear in catalog")
+		}
+	}
+}
+
+// disabledMock is a disabled provider for testing.
+type disabledMock struct {
+	id         string
+	kinds      []Kind
+	precedence int
+}
+
+func (m *disabledMock) ID() string      { return m.id }
+func (m *disabledMock) Name() string    { return m.id }
+func (m *disabledMock) Kinds() []Kind   { return m.kinds }
+func (m *disabledMock) Precedence() int { return m.precedence }
+func (m *disabledMock) Enabled() bool   { return false }
+func (m *disabledMock) Fetch(_ context.Context, _ *http.Client, _ string, k Kind) ([]Item, error) {
+	return nil, nil
 }

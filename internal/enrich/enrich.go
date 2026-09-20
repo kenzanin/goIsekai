@@ -18,6 +18,7 @@ import (
 	"fmt"
 	"net/http"
 	"slices"
+	"sort"
 	"sync"
 
 	"goisekai/internal/logger"
@@ -52,6 +53,11 @@ type Provider interface {
 	Name() string
 	// Kinds returns the subset of enrichment kinds this provider supports.
 	Kinds() []Kind
+	// Precedence indicates the order this source runs; lower values run first.
+	// Default to highest value (runs last) when not specified.
+	Precedence() int
+	// Enabled indicates whether this source is active.
+	Enabled() bool
 	// Fetch fetches items for the given kind by searching with the title.
 	// The ctx may carry a timeout.
 	Fetch(ctx context.Context, httpc *http.Client, title string, k Kind) ([]Item, error)
@@ -59,9 +65,11 @@ type Provider interface {
 
 // CatalogEntry is one source visible in the enrichment catalog.
 type CatalogEntry struct {
-	ID    string `json:"id"`
-	Name  string `json:"name"`
-	Kinds []Kind `json:"kinds"`
+	ID         string `json:"id"`
+	Name       string `json:"name"`
+	Kinds      []Kind `json:"kinds"`
+	Precedence int    `json:"precedence,omitempty"`
+	Enabled    bool   `json:"enabled"`
 }
 
 // Registry holds all known enrichment providers.
@@ -83,6 +91,7 @@ func NewRegistry() *Registry {
 // Register adds a provider to the registry. If a provider with the same ID
 // already exists, the new one is ignored (the first plugin to claim an ID
 // wins, so the catalog stays stable across reloads).
+// Disabled providers are skipped entirely.
 func (r *Registry) Register(p Provider) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -90,14 +99,27 @@ func (r *Registry) Register(p Provider) {
 	if _, dup := r.byID[p.ID()]; dup {
 		return
 	}
+	if !p.Enabled() {
+		return
+	}
 	r.byID[p.ID()] = p
 	r.order = append(r.order, p.ID())
+	sort.Slice(r.order, func(i, j int) bool {
+		pi := r.byID[r.order[i]]
+		pj := r.byID[r.order[j]]
+		if pi.Precedence() != pj.Precedence() {
+			return pi.Precedence() < pj.Precedence()
+		}
+		return r.order[i] < r.order[j]
+	})
 	for _, k := range p.Kinds() {
 		r.byKind[k] = append(r.byKind[k], p)
 	}
 }
 
 // Catalog returns all registered sources, optionally filtered by kind.
+// Results are sorted by precedence (ascending), with source ID as tiebreaker.
+// Disabled sources are excluded.
 func (r *Registry) Catalog(kind Kind) []CatalogEntry {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
@@ -105,19 +127,32 @@ func (r *Registry) Catalog(kind Kind) []CatalogEntry {
 	var entries []CatalogEntry
 	if kind != "" {
 		for _, p := range r.byKind[kind] {
+			if !p.Enabled() {
+				continue
+			}
 			entries = append(entries, CatalogEntry{
-				ID:    p.ID(),
-				Name:  p.Name(),
-				Kinds: p.Kinds(),
+				ID:         p.ID(),
+				Name:       p.Name(),
+				Kinds:      p.Kinds(),
+				Precedence: p.Precedence(),
+				Enabled:    p.Enabled(),
 			})
 		}
+		sort.Slice(entries, func(i, j int) bool {
+			if entries[i].Precedence != entries[j].Precedence {
+				return entries[i].Precedence < entries[j].Precedence
+			}
+			return entries[i].ID < entries[j].ID
+		})
 	} else {
 		for _, id := range r.order {
 			p := r.byID[id]
 			entries = append(entries, CatalogEntry{
-				ID:    p.ID(),
-				Name:  p.Name(),
-				Kinds: p.Kinds(),
+				ID:         p.ID(),
+				Name:       p.Name(),
+				Kinds:      p.Kinds(),
+				Precedence: p.Precedence(),
+				Enabled:    p.Enabled(),
 			})
 		}
 	}

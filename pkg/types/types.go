@@ -57,6 +57,11 @@ type EnrichmentProvider struct {
 	ID    string   `json:"id"`
 	Name  string   `json:"name"`
 	Kinds []string `json:"kinds"`
+	// Precedence is the order this source runs; lower values run first.
+	// When omitted, defaults to the highest precedence value (runs last).
+	Precedence int `json:"precedence,omitempty"`
+	// Enabled indicates whether this source is active; when omitted, defaults to true.
+	Enabled *bool `json:"enabled,omitempty"`
 }
 
 // PluginMeta is the metadata a plugin optionally declares in its Init response.

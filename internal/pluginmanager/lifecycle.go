@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"goisekai/internal/enrich"
 	"goisekai/internal/logger"
+	"math"
 	"net/url"
 )
 
@@ -55,16 +56,25 @@ func (m *Manager) ensureLoaded(id string) error {
 	// in the catalog as soon as the plugin is first invoked.
 	if m.enrich != nil {
 		for _, ep := range p.meta.EnrichmentProviders {
+			if ep.Enabled != nil && !*ep.Enabled {
+				continue
+			}
 			ks := make([]enrich.Kind, len(ep.Kinds))
 			for i, k := range ep.Kinds {
 				ks[i] = enrich.Kind(k)
 			}
+			pr := ep.Precedence
+			if pr == 0 {
+				pr = math.MaxInt
+			}
 			m.enrich.Register(&pluginProvider{
-				pluginID: id,
-				id:       ep.ID,
-				name:     ep.Name,
-				kinds:    ks,
-				fetch:    m,
+				pluginID:   id,
+				id:         ep.ID,
+				name:       ep.Name,
+				kinds:      ks,
+				fetch:      m,
+				precedence: pr,
+				enabled:    true,
 			})
 		}
 	}

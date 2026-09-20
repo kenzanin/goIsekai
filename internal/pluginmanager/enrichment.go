@@ -8,6 +8,7 @@ import (
 	"goisekai/internal/logger"
 	"goisekai/pkg/types"
 	"net/http"
+	"sort"
 )
 
 // enrichmentFetcher is the interface the Manager implements so that
@@ -19,16 +20,20 @@ type enrichmentFetcher interface {
 // pluginProvider bridges the enrich.Provider interface to a plugin's
 // GetEnrichment export.
 type pluginProvider struct {
-	pluginID string
-	id       string
-	name     string
-	kinds    []enrich.Kind
-	fetch    enrichmentFetcher
+	pluginID   string
+	id         string
+	name       string
+	kinds      []enrich.Kind
+	fetch      enrichmentFetcher
+	precedence int
+	enabled    bool
 }
 
 func (p *pluginProvider) ID() string           { return p.id }
 func (p *pluginProvider) Name() string         { return p.name }
 func (p *pluginProvider) Kinds() []enrich.Kind { return p.kinds }
+func (p *pluginProvider) Precedence() int      { return p.precedence }
+func (p *pluginProvider) Enabled() bool        { return p.enabled }
 
 // Fetch calls the plugin's GetEnrichment export.
 func (p *pluginProvider) Fetch(_ context.Context, _ *http.Client, title string, k enrich.Kind) ([]enrich.Item, error) {
@@ -50,6 +55,7 @@ func (m *Manager) ensureInfoLoaded() {
 		}
 	}
 	m.mu.RUnlock()
+	sort.Strings(ids)
 	for _, id := range ids {
 		if err := m.ensureLoaded(id); err != nil {
 			logger.Warn("info script load", "id", id, "error", err)
