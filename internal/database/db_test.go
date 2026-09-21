@@ -727,3 +727,32 @@ func TestToggleChapterSkip(t *testing.T) {
 		t.Fatal("chapter should not be skipped after second toggle")
 	}
 }
+
+// TestSQLiteTune verifies that SQLite PRAGMA settings are configured
+// as required (cache_size=-64000, mmap_size=268435456, sync_mode=NORMAL).
+func TestSQLiteTune(t *testing.T) {
+	db := openTestDB(t)
+
+	var cacheSize, mmapSize, syncMode int64
+	if err := db.db.QueryRow(`PRAGMA cache_size`).Scan(&cacheSize); err != nil {
+		t.Fatalf("PRAGMA cache_size: %v", err)
+	}
+	if cacheSize != -64000 {
+		t.Errorf("cache_size = %d, want -64000", cacheSize)
+	}
+
+	if err := db.db.QueryRow(`PRAGMA mmap_size`).Scan(&mmapSize); err != nil {
+		t.Fatalf("PRAGMA mmap_size: %v", err)
+	}
+	if mmapSize != 268435456 {
+		t.Errorf("mmap_size = %d, want 268435456", mmapSize)
+	}
+
+	// sync_mode: NORMAL = 1, FULL = 2, OFF = 0.
+	if err := db.db.QueryRow(`PRAGMA synchronous`).Scan(&syncMode); err != nil {
+		t.Fatalf("PRAGMA synchronous: %v", err)
+	}
+	if syncMode != 1 {
+		t.Errorf("synchronous = %d, want 1 (NORMAL)", syncMode)
+	}
+}

@@ -159,4 +159,8 @@ var migrations = []string{
 	// before manga had integer primary keys, so the join that resolves a search
 	// hit back to its manga matches nothing and every search comes back empty.
 	`/* library-fts-rebuild: see migrateLibraryFTSRebuild */`,
+	// hit back to its manga matches nothing and every search comes back empty.
+	`/* library-fts-rebuild: see migrateLibraryFTSRebuild */`,
+	// Index 24: plugin_cache expires_at index for TTL-based cache cleanup scans.
+	`CREATE INDEX IF NOT EXISTS idx_plugin_cache_expires ON plugin_cache(expires_at)`,
 }

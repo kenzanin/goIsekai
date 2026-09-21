@@ -67,7 +67,7 @@ type DB struct{ db *sql.DB }
 // Open opens the SQLite database at path, enables foreign keys so cascade
 // deletes work, and applies pending migrations.
 func Open(path string) (*DB, error) {
-	db, err := sql.Open("sqlite", path+"?_foreign_keys=1&_journal_mode=WAL&_busy_timeout=5000")
+	db, err := sql.Open("sqlite", path+"?_foreign_keys=1&_journal_mode=WAL&_busy_timeout=5000&_pragma=cache_size=-64000&_pragma=mmap_size=268435456&_pragma=synchronous=1")
 	if err != nil {
 		return nil, err
 	}
@@ -86,3 +86,8 @@ func Open(path string) (*DB, error) {
 
 // Close closes the underlying database handle.
 func (d *DB) Close() error { return d.db.Close() }
+
+// Exec executes a statement against the underlying database.
+func (d *DB) Exec(query string, args ...any) (sql.Result, error) {
+	return d.db.Exec(query, args...)
+}

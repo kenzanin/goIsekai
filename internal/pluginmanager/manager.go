@@ -68,7 +68,9 @@ type Manager struct {
 	// db is the database handle for caching plugin responses.
 	db *database.DB
 	// cacheTTL is the TTL for cached plugin responses.
-	cacheTTL time.Duration
+	// chapterCacheTTL is the TTL for cached chapter lists.
+	chapterCacheTTL time.Duration
+	cacheTTL        time.Duration
 }
 
 // SetOnLoad registers a callback that fires once per plugin after its first
@@ -92,11 +94,12 @@ func (m *Manager) SetEnrichRegistry(reg *enrich.Registry) {
 // their network access through proxy. SetDB must be called before use for caching.
 func NewManager(proxy *hostnet.Proxy, pluginsDir string) *Manager {
 	return &Manager{
-		proxy:      proxy,
-		pluginsDir: pluginsDir,
-		ctx:        context.Background(),
-		plugins:    make(map[string]*loadedPlugin),
-		cacheTTL:   24 * time.Hour, // default TTL
+		proxy:           proxy,
+		pluginsDir:      pluginsDir,
+		ctx:             context.Background(),
+		plugins:         make(map[string]*loadedPlugin),
+		chapterCacheTTL: 168 * time.Hour, // default TTL for chapter lists
+		cacheTTL:        24 * time.Hour,  // default TTL for detail
 	}
 }
 
@@ -115,6 +118,11 @@ func (m *Manager) SetDB(db *database.DB, cacheTTL time.Duration) {
 // SetCacheTTL updates the cache TTL (e.g. from config reload).
 func (m *Manager) SetCacheTTL(ttl time.Duration) {
 	m.cacheTTL = ttl
+}
+
+// SetChapterCacheTTL updates the chapter list cache TTL.
+func (m *Manager) SetChapterCacheTTL(ttl time.Duration) {
+	m.chapterCacheTTL = ttl
 }
 
 // LoadedPlugin is metadata about a currently-registered plugin.

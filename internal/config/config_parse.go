@@ -171,6 +171,10 @@ func (c *Config) set(section, key, val string) {
 			if n, err := strconv.Atoi(val); err == nil && n >= 1 {
 				c.UpdateStaleDays = n
 			}
+		case "max_cache_gb":
+			if n, err := strconv.ParseFloat(val, 64); err == nil && n >= 0 {
+				c.MaxCacheGB = n
+			}
 		}
 	case "network":
 		switch key {
@@ -195,6 +199,10 @@ func (c *Config) set(section, key, val string) {
 		case "cache_ttl_hours":
 			if n, err := strconv.Atoi(val); err == nil && n >= 0 {
 				c.CacheTTLHours = n
+			}
+		case "chapter_cache_ttl_hours":
+			if n, err := strconv.Atoi(val); err == nil && n >= 0 {
+				c.ChapterCacheTTLHours = n
 			}
 		case "preconnect_enabled":
 			c.PreconnectEnabled = val == "true" || val == "1" || val == "yes"

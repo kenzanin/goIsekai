@@ -84,6 +84,8 @@ type Config struct {
 	// [maintenance] — plugin caching and preconnect.
 	// CacheTTLHours is the TTL for plugin response cache in hours.
 	CacheTTLHours int
+	// ChapterCacheTTLHours is the TTL for cached chapter lists in hours.
+	ChapterCacheTTLHours int
 	// PreconnectEnabled toggles HTTP preconnect to plugin hosts at startup.
 	PreconnectEnabled bool
 
@@ -104,6 +106,9 @@ type Config struct {
 	// CoverMaxDim caps the longer side of a cover in pixels when it is cached.
 	// 0 disables downscaling. Page images are never resized.
 	CoverMaxDim int
+	// MaxCacheGB is the maximum size of the image cache directory in GB;
+	// 0 disables size-based pruning.
+	MaxCacheGB float64
 
 	// EnhanceDefault is the scan-enhancement mode for plugins without an
 	// override in EnhancePlugins: "auto" rewrites black-and-white page images
@@ -162,12 +167,14 @@ func (c *Config) Save(path string) error {
 		"cdp_path", c.CDPPath,
 		"cdp_solve_timeout", strconv.Itoa(c.CDPSolveTimeout),
 		"cache_ttl_hours", strconv.Itoa(c.CacheTTLHours),
+		"chapter_cache_ttl_hours", strconv.Itoa(c.ChapterCacheTTLHours),
 		"preconnect_enabled", strconv.FormatBool(c.PreconnectEnabled))
 	put(f, "maintenance",
 		"backup_interval_hours", strconv.Itoa(c.BackupIntervalHours),
 		"backup_keep", strconv.Itoa(c.BackupKeep),
 		"prune_orphans", strconv.FormatBool(c.PruneOrphans),
-		"update_stale_days", strconv.Itoa(c.UpdateStaleDays))
+		"update_stale_days", strconv.Itoa(c.UpdateStaleDays),
+		"max_cache_gb", strconv.FormatFloat(c.MaxCacheGB, 'f', 1, 64))
 	putAlias(f, "genre", c.GenreAlias)
 	putAlias(f, "status", c.StatusAlias)
 	return f.SaveTo(path)

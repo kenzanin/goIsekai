@@ -50,6 +50,16 @@ CREATE TABLE chapter_pages (
     pages TEXT NOT NULL,
     fetched_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
+CREATE TABLE plugin_cache (
+    id TEXT PRIMARY KEY,
+    plugin_id TEXT NOT NULL,
+    manga_id TEXT NOT NULL,
+    function_name TEXT NOT NULL,
+    response TEXT NOT NULL,
+    cached_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    expires_at TIMESTAMP NOT NULL,
+    UNIQUE(plugin_id, manga_id, function_name)
+);
 CREATE TABLE read_history (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     chapter_id TEXT NOT NULL,

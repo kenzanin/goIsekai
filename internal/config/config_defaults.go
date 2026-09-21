@@ -20,18 +20,20 @@ func Default() *Config {
 		CDPSolveTimeout: 30,
 		APIKey:          "",
 
-		BackupIntervalHours: 24,
-		BackupKeep:          5,
-		PruneOrphans:        true,
-		UpdateStaleDays:     3,
-		CacheTTLHours:       24,
-		PreconnectEnabled:   false,
+		BackupIntervalHours:  24,
+		BackupKeep:           5,
+		PruneOrphans:         true,
+		UpdateStaleDays:      3,
+		CacheTTLHours:        24,
+		ChapterCacheTTLHours: 168,
+		PreconnectEnabled:    false,
 
 		GenreAlias:  DefaultGenreAlias(),
 		StatusAlias: DefaultStatusAlias(),
 
 		ImageFormat: "webp",
 		CoverMaxDim: 720,
+		MaxCacheGB:  2.0,
 
 		EnhanceDefault: "auto",
 		EnhancePlugins: map[string]string{},
