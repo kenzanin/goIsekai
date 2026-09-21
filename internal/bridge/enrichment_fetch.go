@@ -119,15 +119,19 @@ func (s *AppService) storeEnrichment(rowID string, items map[enrich.Kind][]enric
 	if cats, ok := items[enrich.KindCategories]; ok && len(cats) > 0 {
 		for src, srcItems := range sourceItems {
 			if srcCats, ok := srcItems[enrich.KindCategories]; ok && len(srcCats) > 0 {
-				names := make([]string, len(srcCats))
+				// Normalize categories through genre alias index before storing
+				rawNames := make([]string, len(srcCats))
 				for i, c := range srcCats {
-					names[i] = c.Value
+					rawNames[i] = c.Value
 				}
-				n, err := s.db.AddCategories(rowID, names, src)
-				if err != nil {
-					logger.Warn("store categories", "error", err)
-				} else {
-					logger.Info("enrich categories stored", "count", len(srcCats), "inserted", n, "source", src)
+				names := s.genres.normalize(rawNames)
+				if len(names) > 0 {
+					n, err := s.db.AddCategories(rowID, names, src)
+					if err != nil {
+						logger.Warn("store categories", "error", err)
+					} else {
+						logger.Info("enrich categories stored", "count", len(srcCats), "inserted", n, "source", src)
+					}
 				}
 			}
 		}
