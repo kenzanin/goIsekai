@@ -228,3 +228,47 @@ func (r *Registry) FetchFirst(ctx context.Context, httpc *http.Client, title str
 	}
 	return out
 }
+
+// FetchAll fetches items for a kind from every enabled provider that supports it,
+// returning a map from provider source to items. Unlike FetchFirst, this gathers
+// from all sources and doesn't stop at the first winner. Errors are logged but
+// don't prevent other providers from being queried.
+func (r *Registry) FetchAll(ctx context.Context, httpc *http.Client, title string, kinds []Kind) map[Kind][]Item {
+	out := make(map[Kind][]Item)
+	r.mu.RLock()
+	for _, id := range r.order {
+		p := r.byID[id]
+		if p == nil || !p.Enabled() {
+			continue
+		}
+		for _, kind := range p.Kinds() {
+			// Check if this kind was requested
+			found := false
+			for _, k := range kinds {
+				if k == kind {
+					found = true
+					break
+				}
+			}
+			if !found {
+				continue
+			}
+			items, err := p.Fetch(ctx, httpc, title, kind)
+			if err != nil {
+				logger.Debug("enrich fetch failed", "source", id, "kind", string(kind), "error", err)
+				continue
+			}
+			if len(items) == 0 {
+				logger.Debug("enrich fetch empty", "source", id, "kind", string(kind))
+				continue
+			}
+			for i := range items {
+				items[i].Source = id
+			}
+			out[kind] = append(out[kind], items...)
+			logger.Debug("enrich fetch ok", "source", id, "kind", string(kind), "count", len(items))
+		}
+	}
+	r.mu.RUnlock()
+	return out
+}

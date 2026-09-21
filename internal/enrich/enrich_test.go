@@ -2,6 +2,7 @@ package enrich
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"reflect"
 	"testing"
@@ -302,4 +303,103 @@ func (m *disabledMock) Precedence() int { return m.precedence }
 func (m *disabledMock) Enabled() bool   { return false }
 func (m *disabledMock) Fetch(_ context.Context, _ *http.Client, _ string, k Kind) ([]Item, error) {
 	return nil, nil
+}
+
+// TestFetchAll_GathersFromAllProviders: all enabled providers answer for a kind.
+func TestFetchAll_GathersFromAllProviders(t *testing.T) {
+	r := NewRegistry()
+	first := &precMock{
+		id:         "mangadex",
+		kinds:      []Kind{KindCategories, KindSummaries},
+		precedence: 1,
+		byKind: map[Kind][]Item{
+			KindCategories: {{Value: "Action"}},
+		},
+	}
+	second := &precMock{
+		id:         "kitsu",
+		kinds:      []Kind{KindCategories, KindSummaries},
+		precedence: 2,
+		byKind: map[Kind][]Item{
+			KindCategories: {{Value: "Adventure"}},
+			KindSummaries:  {{Value: "Kitsu summary"}},
+		},
+	}
+	third := &disabledMock{
+		id:    "disabled",
+		kinds: []Kind{KindCategories},
+	}
+
+	r.Register(first)
+	r.Register(second)
+	r.Register(third) // should be skipped
+
+	got := r.FetchAll(context.Background(), nil, "Title", []Kind{KindCategories, KindSummaries})
+
+	// Both mangadex and kitsu should return categories
+	if len(got[KindCategories]) != 2 {
+		t.Errorf("expected 2 category items, got %d", len(got[KindCategories]))
+	}
+
+	// Verify both sources are represented
+	sources := make(map[string]bool)
+	for _, item := range got[KindCategories] {
+		sources[item.Source] = true
+	}
+	if !sources["mangadex"] || !sources["kitsu"] {
+		t.Errorf("expected both mangadex and kitsu sources, got %v", sources)
+	}
+
+	// Disabled provider should not be queried
+	if sources["disabled"] {
+		t.Error("disabled provider should not appear in results")
+	}
+}
+
+// TestFetchAll_HandlesErrors: a failing provider doesn't suppress others.
+func TestFetchAll_HandlesErrors(t *testing.T) {
+	r := NewRegistry()
+	success := &precMock{
+		id:         "success",
+		kinds:      []Kind{KindCategories},
+		precedence: 1,
+		byKind: map[Kind][]Item{
+			KindCategories: {{Value: "Success category"}},
+		},
+	}
+	failure := &errorMock{
+		id:         "failure",
+		kinds:      []Kind{KindCategories},
+		precedence: 2,
+		err:        fmt.Errorf("network error"),
+	}
+
+	r.Register(success)
+	r.Register(failure)
+
+	got := r.FetchAll(context.Background(), nil, "Title", []Kind{KindCategories})
+
+	// Success should have returned items despite failure
+	if len(got[KindCategories]) != 1 {
+		t.Errorf("expected 1 item from success, got %d", len(got[KindCategories]))
+	}
+	if got[KindCategories][0].Source != "success" {
+		t.Errorf("expected item from success source, got %v", got[KindCategories][0].Source)
+	}
+}
+
+type errorMock struct {
+	id         string
+	kinds      []Kind
+	precedence int
+	err        error
+}
+
+func (m *errorMock) ID() string      { return m.id }
+func (m *errorMock) Name() string    { return m.id }
+func (m *errorMock) Kinds() []Kind   { return m.kinds }
+func (m *errorMock) Precedence() int { return m.precedence }
+func (m *errorMock) Enabled() bool   { return true }
+func (m *errorMock) Fetch(_ context.Context, _ *http.Client, _ string, k Kind) ([]Item, error) {
+	return nil, m.err
 }
