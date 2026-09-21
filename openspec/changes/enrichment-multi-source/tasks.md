@@ -14,11 +14,11 @@
 
 ## 3. Deterministic precedence
 
-- [ ] 3.1 Add an optional precedence and an optional enabled flag to the enrichment declaration type in `pkg/types`, documented as "lower runs first" and "absent means enabled, least preceding". Verify a decode test shows absent fields fall back to those defaults and declared fields survive a `PluginMeta` round trip.
-- [ ] 3.2 Extend the provider interface in `internal/enrich` with the precedence and enabled state, and make the registry keep a single order sorted by precedence then source identifier, used by both the unfiltered and the kind-filtered catalog as well as by the fetch. Verify a registry test that registers the same providers in shuffled orders and asserts identical catalog output, filtered and unfiltered, across runs.
-- [ ] 3.3 Make the info scripts load in a sorted order so that two scripts declaring the same source identifier resolve to a stable winner, since the first claim of an identifier currently wins and load order is randomized. Verify by declaring the same source identifier in two scripts and asserting the same winner across repeated runs.
-- [ ] 3.4 Have the plugin manager pass the declared precedence and enabled flag into provider registration and skip disabled declarations entirely. Verify a test asserting a disabled declaration produces no catalog entry and is never fetched.
-- [ ] 3.5 Carry precedence and enabled through the bridge's catalog entry so the catalog a caller reads exposes the order it will fetch in, and exclude disabled sources there too. Verify a bridge test asserting the order follows precedence and that a disabled source appears in neither the full nor the kind-filtered catalog.
+- [x] 3.1 Add an optional precedence and an optional enabled flag to the enrichment declaration type in `pkg/types`, documented as "lower runs first" and "absent means enabled, least preceding". Verify a decode test shows absent fields fall back to those defaults and declared fields survive a `PluginMeta` round trip.
+- [x] 3.2 Extend the provider interface in `internal/enrich` with the precedence and enabled state, and make the registry keep a single order sorted by precedence then source identifier, used by both the unfiltered and the kind-filtered catalog as well as by the fetch. Verify a registry test that registers the same providers in shuffled orders and asserts identical catalog output, filtered and unfiltered, across runs.
+- [x] 3.3 Make the info scripts load in a sorted order so that two scripts declaring the same source identifier resolve to a stable winner, since the first claim of an identifier currently wins and load order is randomized. Verify by declaring the same source identifier in two scripts and asserting the same winner across repeated runs.
+- [x] 3.4 Have the plugin manager pass the declared precedence and enabled flag into provider registration and skip disabled declarations entirely. Verify a test asserting a disabled declaration produces no catalog entry and is never fetched.
+- [x] 3.5 Carry precedence and enabled through the bridge's catalog entry so the catalog a caller reads exposes the order it will fetch in, and exclude disabled sources there too. Verify a bridge test asserting the order follows precedence and that a disabled source appears in neither the full nor the kind-filtered catalog.
 
 ## 4. Multi-source fetch
 
