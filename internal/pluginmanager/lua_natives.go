@@ -23,6 +23,8 @@ func registerHostNatives(state *lua.State, m *Manager, id string) {
 	_ = text.RawSetString("strip_html", luaStr1(state, pluginutil.StripHTML))
 	_ = text.RawSetString("strip_markdown", luaStr1(state, pluginutil.StripMarkdown))
 	_ = text.RawSetString("titlecase", luaStr1(state, pluginutil.Titlecase))
+	_ = text.RawSetString("normalize_title", luaStr1(state, pluginutil.NormalizeTitle))
+	_ = text.RawSetString("strip_link_blocks", luaStr1(state, pluginutil.StripLinkBlocks))
 	_ = text.RawSetString("normalize_status", luaNormalizeStatus(state))
 	_ = text.RawSetString("unescape", luaStr1(state, pluginutil.HTMLEntityUnescape))
 	_ = text.RawSetString("trim", luaStr1(state, strings.TrimSpace))

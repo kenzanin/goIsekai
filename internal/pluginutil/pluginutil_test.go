@@ -154,3 +154,44 @@ func TestStripMarkdown(t *testing.T) {
 		}
 	}
 }
+
+func TestNormalizeTitle(t *testing.T) {
+	tests := []struct {
+		in, want string
+	}{
+		{"Target Title", "target title"},
+		{"  Extra   spaces  ", "extra spaces"},
+		{"A-Title-With-Dashes", "a title with dashes"},
+		{"Target.Title", "target title"},
+		{"Target_Title", "target title"},
+		{"TARGET!@#$%TITLE", "target title"},
+		{"123 Main St.", "123 main st"},
+		{"", ""},
+		{"   ", ""},
+		{"Japanese Titre", "japanese titre"},
+		{"Ko̍ng-Fā", "ko ng fā"},
+	}
+	for _, tc := range tests {
+		if got := NormalizeTitle(tc.in); got != tc.want {
+			t.Errorf("NormalizeTitle(%q) = %q, want %q", tc.in, got, tc.want)
+		}
+	}
+}
+
+func TestStripLinkBlocks(t *testing.T) {
+	tests := []struct {
+		in, want string
+	}{
+		{"Links: https://example.com", ""},
+		{"Links:\nhttps://example.com\nSome text", "Some text"},
+		{"Links: \nhttps://x.com\nhttps://y.com", ""},
+		{"Normal text without links", "Normal text without links"},
+		{"Visit https://example.com for more", "Visit https://example.com for more"},
+		{"Text\nhttps://url.com\nmore text", "Text\n\nmore text"},
+	}
+	for _, tc := range tests {
+		if got := StripLinkBlocks(tc.in); got != tc.want {
+			t.Errorf("StripLinkBlocks(%q) = %q, want %q", tc.in, got, tc.want)
+		}
+	}
+}

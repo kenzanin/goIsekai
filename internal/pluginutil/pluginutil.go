@@ -104,6 +104,20 @@ func StripMarkdown(s string) string {
 	return strings.TrimSpace(s)
 }
 
+// urlBlock is a regex that matches a line starting with "Links:" followed
+// by URLs, typically found in some manga descriptions.
+var urlBlock = regexp.MustCompile(`(?mi)^Links?:.*$\n?`)
+
+// StripLinkBlocks removes promotional link blocks, bare URL lists, and trailer
+// links from text. It handles "Links:" blocks and trailing URLs on their own lines.
+func StripLinkBlocks(s string) string {
+	// Remove "Links:" blocks at the start or end of lines
+	s = urlBlock.ReplaceAllString(s, "")
+	// Remove trailing URLs (http/https) on lines by themselves
+	s = regexp.MustCompile(`(?m)^\s*https?://\S+\s*$`).ReplaceAllString(s, "")
+	return strings.TrimSpace(s)
+}
+
 // Titlecase uppercases the first rune only.
 func Titlecase(s string) string {
 	if s == "" {
@@ -111,6 +125,26 @@ func Titlecase(s string) string {
 	}
 	r, size := utf8.DecodeRuneInString(s)
 	return string(unicode.ToUpper(r)) + s[size:]
+}
+
+// NormalizeTitle lowercases, trims, strips non-alphanumeric characters
+// (keeping letters, digits, and spaces), and collapses whitespace runs.
+// Used for title comparison so that "A Title" and "a-title" match.
+func NormalizeTitle(s string) string {
+	s = strings.ToLower(strings.TrimSpace(s))
+	var b strings.Builder
+	b.Grow(len(s))
+	prevSpace := false
+	for _, r := range s {
+		if unicode.IsLetter(r) || unicode.IsDigit(r) {
+			b.WriteRune(r)
+			prevSpace = false
+		} else if !prevSpace {
+			b.WriteByte(' ')
+			prevSpace = true
+		}
+	}
+	return strings.TrimSpace(b.String())
 }
 
 func hexVal(c byte) (byte, bool) {

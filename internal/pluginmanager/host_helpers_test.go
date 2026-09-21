@@ -85,6 +85,49 @@ func TestJSNormalizeStatusForms(t *testing.T) {
 	}
 }
 
+// TestHostTextNormalizeTitle verifies that host.text.normalize_title collapses
+// case, punctuation, and repeated spacing so that such differences do not
+// prevent title matching.
+func TestHostTextNormalizeTitle(t *testing.T) {
+	chunk := `
+		function assert(c, msg) { if (!c) throw new Error(msg || "assertion failed"); }
+		// case insensitivity
+		assert(host.text.normalize_title("Target Title") === host.text.normalize_title("TARGET TITLE"));
+		// punctuation collapsed to space
+		assert(host.text.normalize_title("A-Title-With-Dashes") === host.text.normalize_title("A Title With Dashes"));
+		assert(host.text.normalize_title("Target.Title") === host.text.normalize_title("Target Title"));
+		// repeated spacing collapsed
+		assert(host.text.normalize_title("  Extra   spaces  ") === host.text.normalize_title("Extra spaces"));
+	`
+	if err := func() error {
+		vm := goja.New()
+		mgr := NewManager(hostnet.NewProxy(), t.TempDir())
+		if err := registerJSHostNatives(vm, mgr, "test"); err != nil {
+			return err
+		}
+		_, err := vm.RunString(chunk)
+		return err
+	}(); err != nil {
+		t.Fatalf("host.text.normalize_title in JS: %v", err)
+	}
+
+	luaChunk := `
+		local function assert(c, msg)
+			if not c then error(msg or "assertion failed") end
+		end
+		-- case insensitivity
+		assert(host.text.normalize_title("Target Title") == host.text.normalize_title("TARGET TITLE"))
+		-- punctuation collapsed to space
+		assert(host.text.normalize_title("A-Title-With-Dashes") == host.text.normalize_title("A Title With Dashes"))
+		assert(host.text.normalize_title("Target.Title") == host.text.normalize_title("Target Title"))
+		-- repeated spacing collapsed
+		assert(host.text.normalize_title("  Extra   spaces  ") == host.text.normalize_title("Extra spaces"))
+	`
+	if err := luaEval(t, luaChunk); err != nil {
+		t.Fatalf("host.text.normalize_title in Lua: %v", err)
+	}
+}
+
 // htmlFixtureMarkup is the markup every runtime scrapes in the equivalence
 // checks. The untrimmed title and the img without src are deliberate: they are
 // where a runtime that forgot the trim rule or the skip rule would diverge.

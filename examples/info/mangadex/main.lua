@@ -64,12 +64,23 @@ local function pick(map)
             return map[lang]
         end
     end
-    for _, text in pairs(map) do
-        if text ~= "" then
-            return text
+    return ""
+end
+
+-- titleMatches checks if a record's title or alt titles match the searched title
+local function titleMatches(record, searchedTitle)
+    local normalizedSearch = host.text.normalize_title(searchedTitle)
+    local title = pick(record.attributes and record.attributes.title)
+    if title ~= "" and host.text.normalize_title(title) == normalizedSearch then
+        return true
+    end
+    for _, entry in ipairs(record.attributes.altTitles or {}) do
+        local altTitle = pick(entry)
+        if altTitle ~= "" and host.text.normalize_title(altTitle) == normalizedSearch then
+            return true
         end
     end
-    return ""
+    return false
 end
 
 -- detail fetches the full record for the best search match, memoized.
@@ -84,7 +95,13 @@ local function detail(title)
         return nil
     end
 
-    local id = search.data[1].id
+    -- Verify the search result matches the searched title
+    local record = search.data[1]
+    if not titleMatches(record, title) then
+        return nil
+    end
+
+    local id = record.id
     local full = get(API
         .. "/manga/"
         .. id
@@ -121,7 +138,9 @@ local function summaries(data)
     if desc == "" then
         return items({})
     end
-    return items({ { value = host.text.strip_markdown(desc), url = SITE .. "/title/" .. data.id } })
+    -- Strip link blocks and markdown, then remove trailing URLs
+    desc = host.text.strip_link_blocks(host.text.strip_markdown(desc))
+    return items({ { value = desc, url = SITE .. "/title/" .. data.id } })
 end
 
 local function categories(data)

@@ -81,6 +81,24 @@ local function detail(title)
         log.debug("mangaupdates info: no match for " .. title)
         return nil
     end
+
+    -- Verify the search result matches the searched title
+    local recordTitle = record.name or ""
+    if host.text.normalize_title(recordTitle) ~= host.text.normalize_title(title) then
+        -- Also check against associated titles
+        local matched = false
+        for _, assoc in ipairs(results[1].associated or {}) do
+            if assoc.title and host.text.normalize_title(assoc.title) == host.text.normalize_title(title) then
+                matched = true
+                break
+            end
+        end
+        if not matched then
+            log.debug("mangaupdates info: title mismatch for " .. title)
+            return nil
+        end
+    end
+
     local full = decode(host.http.get(API .. "/series/" .. ("%d"):format(record.series_id), {
         ["Accept"] = "application/json",
     }))
@@ -126,7 +144,9 @@ local function summaries(data)
     if not data.description or data.description == "" then
         return items({})
     end
-    return items({ { value = host.text.strip_markdown(data.description), url = data.url } })
+    -- Strip link blocks and markdown, then remove trailing URLs
+    local desc = host.text.strip_link_blocks(host.text.strip_markdown(data.description))
+    return items({ { value = desc, url = data.url } })
 end
 
 local function categories(data)

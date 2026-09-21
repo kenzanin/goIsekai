@@ -16,15 +16,17 @@ func registerJSHostNatives(vm *goja.Runtime, m *Manager, id string) error {
 		fns  map[string]any
 	}{
 		{"text", map[string]any{
-			"url_encode":     jsStr1(vm, pluginutil.URLEncode),
-			"url_decode":     jsStr1(vm, pluginutil.URLDecode),
-			"html_decode":    jsStr1(vm, pluginutil.HTMLDecode),
-			"strip_html":     jsStr1(vm, pluginutil.StripHTML),
-			"strip_markdown": jsStr1(vm, pluginutil.StripMarkdown),
-			"titlecase":      jsStr1(vm, pluginutil.Titlecase),
-			"chapter_num":    jsFloat1(vm, pluginutil.ChapterNum),
-			"json_blob":      jsStr2(vm, pluginutil.JSONBlob),
-			"date_to_iso":    jsStr1(vm, pluginutil.DateToISONow),
+			"url_encode":        jsStr1(vm, pluginutil.URLEncode),
+			"url_decode":        jsStr1(vm, pluginutil.URLDecode),
+			"html_decode":       jsStr1(vm, pluginutil.HTMLDecode),
+			"strip_html":        jsStr1(vm, pluginutil.StripHTML),
+			"strip_markdown":    jsStr1(vm, pluginutil.StripMarkdown),
+			"titlecase":         jsStr1(vm, pluginutil.Titlecase),
+			"normalize_title":   jsStr1(vm, pluginutil.NormalizeTitle),
+			"strip_link_blocks": jsStr1(vm, pluginutil.StripLinkBlocks),
+			"chapter_num":       jsFloat1(vm, pluginutil.ChapterNum),
+			"json_blob":         jsStr2(vm, pluginutil.JSONBlob),
+			"date_to_iso":       jsStr1(vm, pluginutil.DateToISONow),
 		}},
 		{"codecs", map[string]any{
 			"base64_encode":     jsStr1(vm, pluginutil.Base64Encode),
