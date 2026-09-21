@@ -1,0 +1,15 @@
+name: enrichment-multi-source
+phase: planning
+status: proposed
+created: 2026-09-20
+authors:
+  - kenzanin
+schema_version: v1
+tags:
+  - enrichment
+  - plugin
+  - manga
+
+description: |
+  Add Kitsu enrichment source and demote MangaUpdates from runtime.
+  Source resolution by MangaDex cross-source id when available.
