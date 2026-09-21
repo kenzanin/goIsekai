@@ -67,20 +67,87 @@ local function pick(map)
     return ""
 end
 
--- titleMatches checks if a record's title or alt titles match the searched title
+-- titleMatches checks if a record's title or alt titles match the searched
+-- title. Exact normalized equality wins; an English alt title often carries a
+-- publisher prefix ("Trapped in a Dating Sim: ..."), so a contained match of
+-- the whole searched title also counts.
 local function titleMatches(record, searchedTitle)
     local normalizedSearch = host.text.normalize_title(searchedTitle)
-    local title = pick(record.attributes and record.attributes.title)
-    if title ~= "" and host.text.normalize_title(title) == normalizedSearch then
-        return true
+    local function exact(candidate)
+        return candidate ~= "" and host.text.normalize_title(candidate) == normalizedSearch
+    end
+    local function contains(candidate)
+        if candidate == "" then
+            return false
+        end
+        local normalized = host.text.normalize_title(candidate)
+        return #normalized > #normalizedSearch and normalized:find(normalizedSearch, 1, true) ~= nil
+    end
+    if exact(pick(record.attributes and record.attributes.title)) then
+        return "exact"
     end
     for _, entry in ipairs(record.attributes.altTitles or {}) do
-        local altTitle = pick(entry)
-        if altTitle ~= "" and host.text.normalize_title(altTitle) == normalizedSearch then
-            return true
+        if exact(pick(entry)) then
+            return "exact"
         end
     end
-    return false
+    if contains(pick(record.attributes and record.attributes.title)) then
+        return "contained"
+    end
+    for _, entry in ipairs(record.attributes.altTitles or {}) do
+        if contains(pick(entry)) then
+            return "contained"
+        end
+    end
+    return nil
+end
+
+-- titleMatchQuality returns "exact" for a normalized equality on the record's
+-- title or alt titles, "contained" when a candidate string merely contains the
+-- whole searched title, or nil when nothing matches.
+local function titleMatchQuality(record, searchedTitle)
+    return titleMatches(record, searchedTitle)
+end
+
+-- titleMatchScore ranks a contained match so the original series wins over
+-- sequels and spin-offs whose alt title merely contains the searched string.
+-- Lower is better: an exact match always wins first; contained candidates
+-- carrying a bracketed suffix ("(Republic Arc)") rank after clean ones.
+local function titleMatchScore(record, searchedTitle)
+    local normalizedSearch = host.text.normalize_title(searchedTitle)
+    local candidates = {}
+    local mainTitle = pick(record.attributes and record.attributes.title)
+    if mainTitle ~= "" then
+        candidates[#candidates + 1] = mainTitle
+    end
+    for _, entry in ipairs(record.attributes.altTitles or {}) do
+        local alt = pick(entry)
+        if alt ~= "" then
+            candidates[#candidates + 1] = alt
+        end
+    end
+    local best
+    for _, candidate in ipairs(candidates) do
+        local normalized = host.text.normalize_title(candidate)
+        if normalized == normalizedSearch then
+            return 0
+        end
+        if #normalized > #normalizedSearch and normalized:find(normalizedSearch, 1, true) then
+            -- A candidate ending with the searched string is a publisher
+            -- prefix ("Trapped in a Dating Sim: X") on the original; anything
+            -- else carries a sequel or spin-off suffix after the match.
+            local endsWith = normalized:sub(-#normalizedSearch) == normalizedSearch
+            local score = #normalized - #normalizedSearch
+            if normalized:sub(-1) == ")" and normalized:find("(", 1, true) then
+                score = score + 50
+            end
+            local rank = { endsWith and 0 or 1, score }
+            if not best or rank[1] < best[1] or (rank[1] == best[1] and rank[2] < best[2]) then
+                best = rank
+            end
+        end
+    end
+    return best
 end
 
 -- detail fetches the full record for the best search match, memoized.
@@ -90,14 +157,27 @@ local function detail(title)
     end
     memoTitle, memoDetail = title, nil
 
-    local search = get(API .. "/manga?limit=1&order[relevance]=desc&title=" .. host.text.url_encode(title))
-    if not search or type(search.data) ~= "table" or #search.data == 0 then
+    local search = get(API .. "/manga?limit=10&order[relevance]=desc&title=" .. host.text.url_encode(title))
+    if not search or type(search.data) ~= "table" then
         return nil
     end
 
-    -- Verify the search result matches the searched title
-    local record = search.data[1]
-    if not titleMatches(record, title) then
+    -- The most relevant hit is often a sequel or spin-off whose alt title
+    -- merely contains the searched string. Score every candidate so an exact
+    -- match anywhere wins, and the least-divergent contained match follows.
+    local record, bestScore
+    for _, candidate in ipairs(search.data) do
+        local score = titleMatchScore(candidate, title)
+        if score == 0 then
+            record = candidate
+            break
+        elseif score and (not bestScore
+            or score[1] < bestScore[1]
+            or (score[1] == bestScore[1] and score[2] < bestScore[2])) then
+            record, bestScore = candidate, score
+        end
+    end
+    if not record then
         return nil
     end
 

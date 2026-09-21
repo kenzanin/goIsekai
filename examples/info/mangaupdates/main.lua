@@ -82,27 +82,31 @@ local function detail(title)
         return nil
     end
 
-    -- Verify the search result matches the searched title
-    local recordTitle = record.name or ""
-    if host.text.normalize_title(recordTitle) ~= host.text.normalize_title(title) then
-        -- Also check against associated titles
-        local matched = false
-        for _, assoc in ipairs(results[1].associated or {}) do
-            if assoc.title and host.text.normalize_title(assoc.title) == host.text.normalize_title(title) then
-                matched = true
-                break
-            end
-        end
-        if not matched then
-            log.debug("mangaupdates info: title mismatch for " .. title)
-            return nil
-        end
-    end
-
     local full = decode(host.http.get(API .. "/series/" .. ("%d"):format(record.series_id), {
         ["Accept"] = "application/json",
     }))
     local data = full or {}
+
+    -- Verify the hit is the searched series. The API has no field named
+    -- record.name (the title lives in record.title), and associated titles
+    -- only exist in the detail response, so the check happens here: the
+    -- searched title must equal the record title or one of the associated
+    -- titles exactly (after normalization). The romaji variant hits pass via
+    -- their English associated entry; sequels and spin-offs fail it.
+    local wanted = host.text.normalize_title(title)
+    local matched = host.text.normalize_title(record.title or "") == wanted
+    if not matched then
+        for _, assoc in ipairs(data.associated or {}) do
+            if host.text.normalize_title(assoc.title or "") == wanted then
+                matched = true
+                break
+            end
+        end
+    end
+    if not matched then
+        log.debug("mangaupdates info: title mismatch for " .. title)
+        return nil
+    end
     data.url = data.url or record.url or SITE
     data.genres = data.genres or record.genres
     if not data.description or data.description == "" then
