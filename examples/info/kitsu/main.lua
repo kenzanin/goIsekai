@@ -10,7 +10,7 @@
 PLUGIN = {
 	contract_version = 1,
 	name = "Kitsu Info",
-	site_url = "https://kitsu.io",
+	site_url = "https://kitsu.app",
 	enrichment_providers = {
 		{
 			id = "kitsu",
@@ -21,8 +21,8 @@ PLUGIN = {
 	},
 }
 
-local API = "https://api.kitsu.io"
-local SITE = "https://kitsu.io"
+local API = "https://kitsu.app/api/edge"
+local SITE = "https://kitsu.app"
 
 -- Languages preferred for a displayed string, most preferred first.
 local PREFERRED = { "en", "ja-ro", "ko-ro", "ja", "ko" }
@@ -103,9 +103,10 @@ local function detail(title)
 		return nil
 	end
 
-	-- Fetch full details
+	-- Fetch the record (categories come from the relationship endpoint below;
+	-- the include parameter is rejected by the API with a 400).
 	local detailResp = host.http.get(
-		API .. "/manga/" .. record.id .. "?include=genres,authors,categories,squareCoverImage",
+		API .. "/manga/" .. record.id,
 		{ ["Accept"] = "application/vnd.api+json" }
 	)
 	if not detailResp or detailResp.status ~= 200 then
@@ -115,6 +116,19 @@ local function detail(title)
 	local full = host.json.decode(detailResp.body)
 	if not full or not full.data then
 		return nil
+	end
+
+	-- Categories live behind /manga/{id}/categories; stash them on the record
+	-- so the categories builder can read them without a second decode path.
+	local catsResp = host.http.get(
+		API .. "/manga/" .. record.id .. "/categories",
+		{ ["Accept"] = "application/vnd.api+json" }
+	)
+	if catsResp and catsResp.status == 200 then
+		local cats = host.json.decode(catsResp.body)
+		if cats and type(cats.data) == "table" then
+			full.data._categories = cats.data
+		end
 	end
 
 	memoDetail = full.data
@@ -155,14 +169,11 @@ end
 
 local function categories(data)
 	local out, seen = {}, {}
-	local included = data.included or {}
-	for _, item in ipairs(included) do
-		if item.type == "genres" then
-			local name = pick(item.attributes and item.attributes.name or {})
-			if name and name ~= "" and not seen[name] then
-				seen[name] = true
-				out[#out + 1] = { value = name, url = SITE .. "/manga/" .. data.id }
-			end
+	for _, item in ipairs(data._categories or {}) do
+		local name = item.attributes and item.attributes.title
+		if name and name ~= "" and not seen[name] then
+			seen[name] = true
+			out[#out + 1] = { value = name, url = SITE .. "/manga/" .. data.id }
 		end
 	end
 	return items(out)

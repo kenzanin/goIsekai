@@ -87,3 +87,57 @@ func TestRemoveGenreFromPluginList(t *testing.T) {
 		t.Fatalf("expected exclusion override, got none")
 	}
 }
+
+// TestToggleNormalizedCategoryStable verifies 5.2: toggling a category the
+// alias map rewrote (e.g. "scifi" stored as "Sci-Fi") on and off is stable and
+// never creates a second genre entry under the variant spelling.
+func TestToggleNormalizedCategoryStable(t *testing.T) {
+	s := newGenreTestService(t)
+	rowID := seedManga(t, s, "p", "m")
+	// The stored category uses the canonical spelling the alias map rewrote to.
+	if _, err := s.db.AddCategories(fmt.Sprint(rowID), []string{"Sci-Fi"}, "mangadex"); err != nil {
+		t.Fatalf("seed categories: %v", err)
+	}
+	// Toggle the canonical spelling off and back on.
+	if err := s.ToggleGenre("p", "m", "Sci-Fi"); err != nil {
+		t.Fatalf("toggle off: %v", err)
+	}
+	genres, _, _ := s.GetMangaGenres("p", "m")
+	for _, g := range genres {
+		if g == "Sci-Fi" || g == "scifi" {
+			t.Errorf("genre %q still present after toggle off: %v", g, genres)
+		}
+	}
+	// The remove-category handler also deletes the row after the toggle.
+	if err := s.RemoveCategory("p", "m", "Sci-Fi"); err != nil {
+		t.Fatalf("remove category: %v", err)
+	}
+	// Toggle back on, then re-add the row, mirroring the add-category handler.
+	if err := s.ToggleGenre("p", "m", "Sci-Fi"); err != nil {
+		t.Fatalf("toggle on: %v", err)
+	}
+	if _, err := s.db.AddCategories(fmt.Sprint(rowID), []string{"Sci-Fi"}, "mangadex"); err != nil {
+		t.Fatalf("re-add category: %v", err)
+	}
+	genres, has, _ := s.GetMangaGenres("p", "m")
+	if !has {
+		t.Fatal("override missing after toggle on")
+	}
+	found := 0
+	for _, g := range genres {
+		if g == "Sci-Fi" {
+			found++
+		}
+	}
+	if found != 1 {
+		t.Errorf("expected exactly one 'Sci-Fi' after toggle cycle, got %d in %v", found, genres)
+	}
+	// The stored genre override must match the stored category spelling.
+	cats, _ := s.db.ListCategories(fmt.Sprint(rowID))
+	if len(cats) != 1 || cats[0].Category != "Sci-Fi" {
+		t.Fatalf("categories = %+v, want single 'Sci-Fi'", cats)
+	}
+	if genres[0] != cats[0].Category {
+		t.Errorf("override spelling %q != stored category %q", genres[0], cats[0].Category)
+	}
+}

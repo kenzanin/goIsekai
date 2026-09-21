@@ -45,3 +45,4 @@ cmd/goisekai/goisekai
 
 # Deepwork state (git-local)
 .slim/deepwork/
+.aider*

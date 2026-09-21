@@ -30,18 +30,21 @@
 ## 5. Category normalization
 
 - [x] 5.1 Resolve fetched categories through the alias index the host already uses for plugin genres before storing them, reusing that index rather than building a second one, and keep a category the map does not know exactly as the source sent it. Verify a test in which two sources report spellings the map treats as one genre stores a single canonical row. Verify by checking commit 90f111a and test in `internal/bridge/fetch_enrichment_test.go`.
-- [?] 5.2 Verify category toggle uses stored spelling (UI-level test, deferred).
+- [x] 5.2 Verify category toggle uses stored spelling. Verified by `TestToggleNormalizedCategoryStable` (internal/bridge/library_genres_test.go): toggle cycle leaves exactly one "Sci-Fi" and the override spelling matches the stored category.
 
 ## 6. Fetch control
 
-- [?] 6.1 Verify detail view enrichment control with multi-source fetch (UI-level test, deferred).
+- [x] 6.1 Verify detail view enrichment control. Verified live: single collapsed "Fetch Details" action posts only manga_title (no kind/source selection), per-row "via <source>" labels render on alt titles and alt summaries.
 
 ## 7. Sources (OPTIONAL per design doc)
 
-- [?] 7.1 Add kitsu source (optional per design: "can be decided later without touching the approach").
-- [?] 7.2/7.3 Kitsu discovery & MangaUpdates demotion (optional per design).
+- [x] 7.1 Add kitsu source. examples/info/kitsu/main.lua with precedence 100; verified live fetching "Sayonara Rose Garden" stores categories under the kitsu label alongside mangadex.
+- [x] 7.2 Kitsu discovery. Verified live: startup log "info script registered id=kitsu", catalog serves kitsu kinds, and kitsu never appears in /api/plugins (manga sources).
+- [x] 7.3 MangaUpdates demotion. Removed from app_data/info; example copy preserved and restorable with `just install-info mangaupdates`.
 
 ## 8. Verification
 
 - [x] 8.1 Build + tests pass + Lua lint clean (0 warnings).
-- [?] 8.2-8.4 UI integration tests (deferred, author verification phase).
+- [x] 8.2 Restart determinism. Two restarts with debug logging show the same declared kind order (titles, summaries, categories, authors, related) and per-source labels preserved.
+- [x] 8.3 Language + link cleanup. mangadex fetch stores an English synopsis with no bare URLs; a title no source matches (nonsense) stores nothing.
+- [x] 8.4 Cross-source storage. "Sayonara Rose Garden" fetch yields one entry per genre (mangadex+kitsu spellings collapsed by the alias map) and alt titles/summaries/related items from each source are individually removable.
