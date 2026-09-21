@@ -198,8 +198,14 @@ func (r *Registry) Fetch(ctx context.Context, httpc *http.Client, source string,
 // FetchFirst fetches each kind from the first source that returns anything for
 // it, so one source owns a kind instead of every source merging into it. The
 // source order is the precedence order; a source that errors or comes back
-// empty passes the kind on to the next one.
+// empty passes the kind on to the next one. When sources is empty, every
+// enabled provider walks in precedence order.
 func (r *Registry) FetchFirst(ctx context.Context, httpc *http.Client, title string, sources []string) map[Kind][]Item {
+	if len(sources) == 0 {
+		for _, p := range r.OrderedProviders() {
+			sources = append(sources, p.ID())
+		}
+	}
 	out := make(map[Kind][]Item)
 	for _, source := range sources {
 		p := r.Resolve(source)

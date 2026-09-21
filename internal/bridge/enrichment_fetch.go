@@ -40,15 +40,24 @@ func (s *AppService) FetchEnrichment(pluginID, mangaID, title string, sources []
 
 	var items map[enrich.Kind][]enrich.Item
 
-	// Multi-source mode: fetch from all enabled providers
-	// Single-source mode: fetch only from specified sources (backward compatible)
+	// Multi-source mode: fetch from all enabled providers and merge. A kind
+	// stays first-source-wins only when the request names sources explicitly
+	// (the per-source API), so the UI button fills gaps from every source.
 	if len(sources) == 0 {
 		items = s.enrich.FetchAll(context.Background(), &http.Client{}, title, []enrich.Kind{
 			enrich.KindTitles, enrich.KindSummaries,
 			enrich.KindCategories, enrich.KindRelated, enrich.KindAuthors,
 		})
-	} else {
+	} else if len(sources) == 1 {
 		items = s.enrich.FetchFirst(context.Background(), &http.Client{}, title, sources)
+	} else {
+		merged := make(map[enrich.Kind][]enrich.Item)
+		for _, source := range sources {
+			for kind, kindItems := range s.enrich.FetchFirst(context.Background(), &http.Client{}, title, []string{source}) {
+				merged[kind] = append(merged[kind], kindItems...)
+			}
+		}
+		items = merged
 	}
 
 	// Store items grouped by source. For authors, only store the highest-precedence non-blank result.

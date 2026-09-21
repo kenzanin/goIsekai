@@ -143,17 +143,18 @@ func TestFetchEnrichmentPrefersTheFirstSource(t *testing.T) {
 		t.Fatalf("FetchEnrichment: %v", err)
 	}
 
+	// Named sources all contribute: mangadex's categories plus
+	// mangaupdates' categories and related merge into the store.
 	cats, _ := s.ListCategories("p1", "m1")
-	if len(cats) != 1 || cats[0].Value != "Action" || cats[0].Source != "mangadex" {
-		t.Errorf("categories = %+v, want only the first source's 'Action'", cats)
+	if len(cats) != 2 {
+		t.Errorf("categories = %+v, want both sources' entries", cats)
 	}
 	rels, _ := s.ListRelated("p1", "m1")
 	if len(rels) != 1 || rels[0].Value != "Related Manga" || rels[0].Source != "mangaupdates" {
 		t.Errorf("related = %+v, want the fallback source's entry", rels)
 	}
-	// The first source answered categories, so the second was never asked.
-	if n := len(fallback.titles); n != 1 {
-		t.Errorf("the fallback source was consulted %d times, want 1 (related only)", n)
+	if n := len(fallback.titles); n != 2 {
+		t.Errorf("the fallback source was consulted %d times, want 2 (once per kind)", n)
 	}
 }
 
