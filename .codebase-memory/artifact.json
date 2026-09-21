@@ -1,11 +1,11 @@
 {
     "schema_version": 2,
-    "commit": "ce9cadb66c36713c6f8d5ab65dc6f35c1d456ca5",
-    "indexed_at": "2026-09-15T09:03:42Z",
+    "commit": "90f111a4be1e53673f15d6a5b7eb9aa1f48e5984",
+    "indexed_at": "2026-09-21T07:25:07Z",
     "project": "home-kenzanin-tmp-goIsekai",
-    "nodes": 5323,
-    "edges": 14300,
-    "original_size": 16121856,
-    "compressed_size": 3164705,
+    "nodes": 9448,
+    "edges": 33445,
+    "original_size": 34471936,
+    "compressed_size": 7208856,
     "compression_level": 3
 }
