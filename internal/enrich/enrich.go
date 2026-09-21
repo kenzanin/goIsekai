@@ -272,3 +272,18 @@ func (r *Registry) FetchAll(ctx context.Context, httpc *http.Client, title strin
 	r.mu.RUnlock()
 	return out
 }
+
+// OrderedProviders returns all enabled providers sorted by precedence (ascending),
+// then by ID for determinism.
+func (r *Registry) OrderedProviders() []Provider {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
+	providers := make([]Provider, 0, len(r.order))
+	for _, id := range r.order {
+		if p := r.byID[id]; p != nil && p.Enabled() {
+			providers = append(providers, p)
+		}
+	}
+	return providers
+}

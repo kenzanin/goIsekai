@@ -12,6 +12,8 @@ import (
 )
 
 // FetchEnrichment fetches enrichment data from external sources and stores it.
+// When sources is empty, fetches from all enabled providers; when non-empty,
+// fetches only from those sources (backward-compatible single-source mode).
 func (s *AppService) FetchEnrichment(pluginID, mangaID, title string, sources []string) error {
 	if s.enrich == nil {
 		return fmt.Errorf("enrichment provider not configured")
@@ -33,90 +35,154 @@ func (s *AppService) FetchEnrichment(pluginID, mangaID, title string, sources []
 			return fmt.Errorf("enrichment requires a title")
 		}
 	}
-	logger.Debug("enrich fetch start", "title", title, "sources", sources)
-	items := s.enrich.FetchFirst(context.Background(), &http.Client{}, title, sources)
 
-	// Store alt titles.
-	if titles, ok := items[enrich.KindTitles]; ok && len(titles) > 0 {
-		names := make([]string, len(titles))
-		for i, t := range titles {
-			names[i] = t.Value
+	logger.Debug("enrich fetch start", "title", title, "sources", sources)
+
+	var items map[enrich.Kind][]enrich.Item
+
+	// Multi-source mode: fetch from all enabled providers
+	// Single-source mode: fetch only from specified sources (backward compatible)
+	if len(sources) == 0 {
+		items = s.enrich.FetchAll(context.Background(), &http.Client{}, title, []enrich.Kind{
+			enrich.KindTitles, enrich.KindSummaries,
+			enrich.KindCategories, enrich.KindRelated, enrich.KindAuthors,
+		})
+	} else {
+		items = s.enrich.FetchFirst(context.Background(), &http.Client{}, title, sources)
+	}
+
+	// Store items grouped by source. For authors, only store the highest-precedence non-blank result.
+	s.storeEnrichment(rowID, items, s.enrich.OrderedProviders())
+	return nil
+}
+
+// storeEnrichment stores fetched items by source. For items that support multiple sources
+// (categories, titles, etc.), each source's items are stored separately. For authors,
+// only the highest-precedence non-blank author is stored.
+func (s *AppService) storeEnrichment(rowID string, items map[enrich.Kind][]enrich.Item, providers []enrich.Provider) {
+	// Group items by source for multi-source storage
+	sourceItems := make(map[string]map[enrich.Kind][]enrich.Item)
+	for kind, kindItems := range items {
+		for _, item := range kindItems {
+			src := item.Source
+			if src == "" {
+				src = "unknown"
+			}
+			if sourceItems[src] == nil {
+				sourceItems[src] = make(map[enrich.Kind][]enrich.Item)
+			}
+			sourceItems[src][kind] = append(sourceItems[src][kind], item)
 		}
-		n, err := s.db.AddAltTitles(rowID, names, titles[0].Source)
-		if err != nil {
-			logger.Warn("store titles", "error", err)
-		} else {
-			logger.Info("enrich titles stored", "count", len(titles), "inserted", n, "source", titles[0].Source)
+	}
+
+	// Store alt titles per source
+	if titles, ok := items[enrich.KindTitles]; ok && len(titles) > 0 {
+		for src, srcItems := range sourceItems {
+			if srcTitles, ok := srcItems[enrich.KindTitles]; ok && len(srcTitles) > 0 {
+				names := make([]string, len(srcTitles))
+				for i, t := range srcTitles {
+					names[i] = t.Value
+				}
+				n, err := s.db.AddAltTitles(rowID, names, src)
+				if err != nil {
+					logger.Warn("store titles", "error", err)
+				} else {
+					logger.Info("enrich titles stored", "count", len(srcTitles), "inserted", n, "source", src)
+				}
+			}
 		}
 	} else {
 		logger.Debug("enrich titles: none found")
 	}
 
-	// Store alt summaries.
+	// Store alt summaries per source
 	if summs, ok := items[enrich.KindSummaries]; ok && len(summs) > 0 {
-		names := make([]string, len(summs))
-		for i, s := range summs {
-			names[i] = s.Value
-		}
-		n, err := s.db.AddAltDescriptions(rowID, names, summs[0].Source)
-		if err != nil {
-			logger.Warn("store summaries", "error", err)
-		} else {
-			logger.Info("enrich summaries stored", "count", len(summs), "inserted", n, "source", summs[0].Source)
+		for src, srcItems := range sourceItems {
+			if srcSummaries, ok := srcItems[enrich.KindSummaries]; ok && len(srcSummaries) > 0 {
+				names := make([]string, len(srcSummaries))
+				for i, s := range srcSummaries {
+					names[i] = s.Value
+				}
+				n, err := s.db.AddAltDescriptions(rowID, names, src)
+				if err != nil {
+					logger.Warn("store summaries", "error", err)
+				} else {
+					logger.Info("enrich summaries stored", "count", len(srcSummaries), "inserted", n, "source", src)
+				}
+			}
 		}
 	} else {
 		logger.Debug("enrich summaries: none found")
 	}
 
-	// Store categories.
+	// Store categories per source
 	if cats, ok := items[enrich.KindCategories]; ok && len(cats) > 0 {
-		names := make([]string, len(cats))
-		for i, c := range cats {
-			names[i] = c.Value
-		}
-		n, err := s.db.AddCategories(rowID, names, cats[0].Source)
-		if err != nil {
-			logger.Warn("store categories", "error", err)
-		} else {
-			logger.Info("enrich categories stored", "count", len(cats), "inserted", n, "source", cats[0].Source)
+		for src, srcItems := range sourceItems {
+			if srcCats, ok := srcItems[enrich.KindCategories]; ok && len(srcCats) > 0 {
+				names := make([]string, len(srcCats))
+				for i, c := range srcCats {
+					names[i] = c.Value
+				}
+				n, err := s.db.AddCategories(rowID, names, src)
+				if err != nil {
+					logger.Warn("store categories", "error", err)
+				} else {
+					logger.Info("enrich categories stored", "count", len(srcCats), "inserted", n, "source", src)
+				}
+			}
 		}
 	} else {
 		logger.Debug("enrich categories: none found")
 	}
-	// Store author (a single value, so the provider's items are joined).
+
+	// Store author - only highest-precedence non-blank author
 	if authors, ok := items[enrich.KindAuthors]; ok && len(authors) > 0 {
-		names := make([]string, 0, len(authors))
-		for _, a := range authors {
-			if strings.TrimSpace(a.Value) != "" {
-				names = append(names, strings.TrimSpace(a.Value))
+		// Find highest-precedence source with non-blank author
+		for _, p := range providers {
+			srcAuthors := sourceItems[p.ID()]
+			if srcAuthors == nil {
+				continue
+			}
+			kindAuthors, ok := srcAuthors[enrich.KindAuthors]
+			if !ok || len(kindAuthors) == 0 {
+				continue
+			}
+			// Find first non-blank author
+			for _, a := range kindAuthors {
+				if strings.TrimSpace(a.Value) != "" {
+					mangaIntID, _ := s.db.ResolveMangaIntID("", "")
+					_ = mangaIntID
+					if err := s.db.SetMangaAuthor(mangaIntID, a.Value); err != nil {
+						logger.Warn("store author", "error", err)
+					} else {
+						logger.Info("enrich author stored", "author", a.Value, "source", p.ID())
+					}
+					goto authorStored
+				}
 			}
 		}
-		if len(names) > 0 {
-			mangaIntID, _ := s.db.ResolveMangaIntID(pluginID, mangaID)
-			if err := s.db.SetMangaAuthor(mangaIntID, strings.Join(names, ", ")); err != nil {
-				logger.Warn("store author", "error", err)
-			} else {
-				logger.Info("enrich author stored", "author", strings.Join(names, ", "), "source", authors[0].Source)
-			}
-		}
+	authorStored:
 	} else {
 		logger.Debug("enrich authors: none found")
 	}
 
-	// Store related manga.
+	// Store related manga per source
 	if rels, ok := items[enrich.KindRelated]; ok && len(rels) > 0 {
-		rows := make([]database.RelatedRow, len(rels))
-		for i, r := range rels {
-			rows[i] = database.RelatedRow{Title: r.Value, URL: r.URL, Source: r.Source}
-		}
-		n, err := s.db.AddRelated(rowID, rows, rels[0].Source)
-		if err != nil {
-			logger.Warn("store related", "error", err)
-		} else {
-			logger.Info("enrich related stored", "count", len(rels), "inserted", n, "source", rels[0].Source)
+		for src, srcItems := range sourceItems {
+			if srcRels, ok := srcItems[enrich.KindRelated]; ok && len(srcRels) > 0 {
+				rows := make([]database.RelatedRow, len(srcRels))
+				for i, r := range srcRels {
+					rows[i] = database.RelatedRow{Title: r.Value, URL: r.URL, Source: r.Source}
+				}
+				n, err := s.db.AddRelated(rowID, rows, src)
+				if err != nil {
+					logger.Warn("store related", "error", err)
+				} else {
+					logger.Info("enrich related stored", "count", len(srcRels), "inserted", n, "source", src)
+				}
+			}
 		}
 	} else {
 		logger.Debug("enrich related: none found")
 	}
-	return nil
 }

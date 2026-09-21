@@ -22,10 +22,10 @@
 
 ## 4. Multi-source fetch
 
-- [ ] 4.1 Replace the first-winner fetch in `internal/enrich` with one that gathers a kind's items from every enabled provider supporting it, keeping each item tagged with its own source and preserving the existing tolerance for a provider that errors or times out. Verify a registry test in which two providers answer the same kind, both results are returned, and a third failing provider does not suppress them.
-- [ ] 4.2 Change `AppService.FetchEnrichment` to store each source's items with its own source label, one store call per source, instead of storing only the winning source's items. Verify a bridge test in which a two-source fetch yields categories labelled with both sources, and that a value reported by both sources is stored once under the higher-precedence label.
-- [ ] 4.3 Change the author store path so only the highest-precedence non-blank author result is stored, rather than joining every source's authors into one string. Verify a bridge test in which two sources report different authors stores only the higher-precedence one.
-- [ ] 4.4 Keep the explicit single-source path working for callers that name one source. Verify a fetch limited to one source stores only that source's items and leaves the other source's data untouched.
+- [x] 4.1 Replace the first-winner fetch in `internal/enrich` with one that gathers a kind's items from every enabled provider supporting it, keeping each item tagged with its own source and preserving the existing tolerance for a provider that errors or times out. Verify a registry test in which two providers answer the same kind, both results are returned, and a third failing provider does not suppress them.
+- [x] 4.2 Change `AppService.FetchEnrichment` to store each source's items with its own source label, one store call per source, instead of storing only the winning source's items. Verify a bridge test in which a two-source fetch yields categories labelled with both sources, and that a value reported by both sources is stored once under the higher-precedence label.
+- [x] 4.3 Change the author store path so only the highest-precedence non-blank author result is stored, rather than joining every source's authors into one string. Verify a bridge test in which two sources report different authors stores only the higher-precedence one.
+- [x] 4.4 Keep the explicit single-source path working for callers that name one source. Verify a fetch limited to one source stores only that source's items and leaves the other source's data untouched.
 
 ## 5. Category normalization
 

@@ -205,3 +205,56 @@ func TestGetEnrichmentReturnsEveryStoredSection(t *testing.T) {
 		t.Errorf("Related = %+v, want 1 'Related Manga'", got.Related)
 	}
 }
+
+// TestFetchEnrichmentMultiSource: when sources is empty, fetch from all enabled providers.
+func TestFetchEnrichmentMultiSource(t *testing.T) {
+	db, err := database.Open(filepath.Join(t.TempDir(), "enrich.db"))
+	if err != nil {
+		t.Fatalf("open db: %v", err)
+	}
+	defer func() { _ = db.Close() }()
+
+	mangaID, err := db.UpsertManga(database.Manga{
+		PluginID: "p1", SourceMangaID: "m1", Title: "Title",
+	})
+	if err != nil {
+		t.Fatalf("upsert manga: %v", err)
+	}
+	_ = mangaID
+
+	primary := &enrichMockProvider{
+		id:   "mangadex",
+		name: "MangaDex",
+		kinds: []enrich.Kind{
+			enrich.KindCategories,
+		},
+		items: map[enrich.Kind][]enrich.Item{
+			enrich.KindCategories: {{Value: "Action", Source: "mangadex"}},
+		},
+	}
+	fallback := &enrichMockProvider{
+		id:   "mangaupdates",
+		name: "MangaUpdates",
+		kinds: []enrich.Kind{
+			enrich.KindCategories,
+		},
+		items: map[enrich.Kind][]enrich.Item{
+			enrich.KindCategories: {{Value: "Adventure", Source: "mangaupdates"}},
+		},
+	}
+	reg := enrich.NewRegistry()
+	reg.Register(primary)
+	reg.Register(fallback)
+	s := NewAppService(db, nil, hostnet.NewProxy(), "", "", reg)
+
+	// Multi-source fetch (empty sources slice)
+	if err := s.FetchEnrichment("p1", "m1", "Title", nil); err != nil {
+		t.Fatalf("FetchEnrichment: %v", err)
+	}
+
+	// Both sources should have contributed categories
+	cats, _ := s.ListCategories("p1", "m1")
+	if len(cats) < 2 {
+		t.Errorf("expected categories from both sources, got %d items: %+v", len(cats), cats)
+	}
+}
