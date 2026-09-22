@@ -48,28 +48,32 @@ function search_manga(arg)
     local results = {}
     local seen = {}
 
-    -- Parse .post-title > h3 > a for title + href
-    -- Structure: <div class="post-title"><h3 class="h4"><a href="URL">TITLE</a></h3></div>
-    for href, title in host.regex.gmatch(body, [[(?s)post-title[^>]*>.*?<a[^>]*href="([^"]+)"[^>]*>([^<]+)</a>]]) do
-        local slug = host.regex.find(href, [[/manga/([^/]+)/]]) or host.regex.find(href, [[/manga/([^/]+)$]])
-        if slug and not seen[slug] then
-            seen[slug] = true
-            -- Find cover: search nearby for data-src or src with image URL
-            local cover = ""
-            local pos = host.regex.find_index(body, host.regex.quote(slug), 1)
-            if pos then
-                local area = body:sub(math.max(1, pos - 3000), math.min(#body, pos + 3000))
-                -- Madara lazy images: data-src with possible tabs/newlines before URL
-                cover = host.regex.find(area, [[data-src="[\t\n\s]*(https?://[^"]+)"]])
-                    or host.regex.find(area, [[data-src="(https?://[^"]+)"]])
-                    or host.regex.find(area, [[src="(https?://[^"]+)"]])
+    -- Madara search results are laid out one card per
+    -- `c-tabs-item__content` block: cover <img> first, then post-title link.
+    -- Parse per-card instead of scanning a ±3000-char window around the slug:
+    -- the first occurrence of a slug is the og:url in <head>, which makes the
+    -- window miss the card entirely (item #1 lost its cover), and far-apart
+    -- markup made the fallback regex grab a neighbouring card's cover
+    -- (covers "shifting" by one row). Capture up to the post-title close —
+    -- the cover always precedes it inside the same card.
+    for card in host.regex.gmatch(body, [[(?s)<div[^>]*class="[^"]*c-tabs-item__content.*?post-title.*?</h3>]]) do
+        local href = host.regex.find(card, [[href="([^"]*/manga/[^"/]+/)"]])
+        local title = host.regex.find(card, [[<h3[^>]*><a[^>]*>([^<]+)</a>]])
+        if href then
+            local slug = host.regex.find(href, [[/manga/([^/]+)/]]) or host.regex.find(href, [[/manga/([^/]+)$]])
+            if slug and not seen[slug] then
+                seen[slug] = true
+                -- Cover lives in the same card, before the title: prefer
+                -- data-src (lazy) then src; skip srcset width descriptors.
+                local cover = host.regex.find(card, [[data-src="[\t\n\s]*(https?://[^"]+)"]])
+                    or host.regex.find(card, [[\ssrc="(https?://[^"]+)"]])
                 if cover then cover = trim(cover) end
+                results[#results + 1] = {
+                    id = slug,
+                    title = unescape(title or ""),
+                    cover_url = cover or ""
+                }
             end
-            results[#results + 1] = {
-                id = slug,
-                title = unescape(title),
-                cover_url = cover or ""
-            }
         end
     end
 
