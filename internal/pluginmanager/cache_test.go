@@ -120,3 +120,53 @@ func TestDetailCacheTTL(t *testing.T) {
 		t.Fatalf("unexpected cached detail title: %s", detail2.Title)
 	}
 }
+
+// TestEmptyResultsNeverCached guards against cache poisoning: a plugin that
+// fails transiently (rate limit, offline) returns an empty detail {id} and an
+// empty chapter list [] with nil error. Those must NOT be written into
+// plugin_cache — otherwise every later call serves the empty payload until
+// the TTL expires and the detail page stays blank (the 04:42 mass-refresh bug).
+func TestEmptyResultsNeverCached(t *testing.T) {
+	pluginsDir := t.TempDir()
+	dst := filepath.Join(pluginsDir, "luaemptydetail")
+	if err := copyDir("testdata/luaemptydetail", dst); err != nil {
+		t.Fatalf("copy fixture: %v", err)
+	}
+	dbPath := filepath.Join(t.TempDir(), "test.db")
+	db, err := database.Open(dbPath)
+	if err != nil {
+		t.Fatalf("database.Open: %v", err)
+	}
+	defer func() { _ = db.Close() }()
+	mgr := NewManager(hostnet.NewProxy(), pluginsDir)
+	mgr.SetDB(db, 24*time.Hour)
+	mgr.SetChapterCacheTTL(168 * time.Hour)
+	if err := mgr.Discover(); err != nil {
+		t.Fatalf("Discover: %v", err)
+	}
+	defer func() { _ = mgr.Close() }()
+
+	// Empty detail: returned to caller but not cached.
+	detail, err := mgr.GetMangaDetail("luaemptydetail", "m1")
+	if err != nil {
+		t.Fatalf("GetMangaDetail: %v", err)
+	}
+	if detail.Title != "" {
+		t.Fatalf("expected empty detail title, got %q", detail.Title)
+	}
+	if _, err := db.GetCache("luaemptydetail", "m1", "get_manga_detail"); err == nil {
+		t.Fatal("empty detail was cached; want cache miss")
+	}
+
+	// Empty chapter list: returned to caller but not cached.
+	chapters, err := mgr.GetChapterList("luaemptydetail", "m1")
+	if err != nil {
+		t.Fatalf("GetChapterList: %v", err)
+	}
+	if len(chapters) != 0 {
+		t.Fatalf("expected empty chapters, got %d", len(chapters))
+	}
+	if _, err := db.GetCache("luaemptydetail", "m1", "get_chapter_list"); err == nil {
+		t.Fatal("empty chapter list was cached; want cache miss")
+	}
+}

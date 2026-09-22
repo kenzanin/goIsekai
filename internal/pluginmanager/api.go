@@ -119,8 +119,11 @@ func (m *Manager) GetMangaDetail(pluginID, mangaID string) (types.Manga, error) 
 	if err := json.Unmarshal([]byte(out), &result); err != nil {
 		return types.Manga{}, fmt.Errorf("plugin %s: invalid GetMangaDetail result: %w", pluginID, err)
 	}
-	// Cache the result for future calls.
-	if m.db != nil {
+	// Cache the result for future calls — but never cache an empty detail:
+	// a transient upstream failure (rate limit, WAF) makes plugins return a
+	// bare {id} with nil error, and caching that would blank the detail page
+	// until the TTL expires. Leave the cache absent so the next call retries.
+	if m.db != nil && result.Title != "" {
 		if cacheErr := m.db.SetCache(pluginID, mangaID, types.GetMangaDetailFunc, out, m.cacheTTL); cacheErr != nil {
 			logger.Warn("cache set", "plugin", pluginID, "manga", mangaID, "error", cacheErr)
 		}
@@ -159,8 +162,9 @@ func (m *Manager) GetChapterList(pluginID, mangaID string) ([]types.Chapter, err
 	if err := json.Unmarshal([]byte(out), &result); err != nil {
 		return nil, fmt.Errorf("plugin %s: invalid GetChapterList result: %w", pluginID, err)
 	}
-	// Cache the result for future calls.
-	if m.db != nil {
+	// Same empty-guard as GetMangaDetail: plugins return [] on transient
+	// upstream failures — never poison the cache with an empty list.
+	if m.db != nil && len(result) > 0 {
 		if cacheErr := m.db.SetCache(pluginID, mangaID, types.GetChapterListFunc, out, m.chapterCacheTTL); cacheErr != nil {
 			logger.Warn("cache set", "plugin", pluginID, "manga", mangaID, "error", cacheErr)
 		}
