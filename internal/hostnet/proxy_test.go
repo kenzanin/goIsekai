@@ -262,7 +262,7 @@ func TestConnectionPoolReuse(t *testing.T) {
 		if err != nil {
 			t.Fatalf("request %d: %v", i+1, err)
 		}
-		resp.Body.Close()
+		_ = resp.Body.Close()
 		responses = append(responses, resp.StatusCode)
 	}
 
@@ -300,7 +300,7 @@ func TestPreconnectWarmup(t *testing.T) {
 	if err != nil {
 		t.Fatalf("request after preconnect: %v", err)
 	}
-	resp.Body.Close()
+	_ = resp.Body.Close()
 
 	if resp.StatusCode != 200 {
 		t.Errorf("got status %d, want 200", resp.StatusCode)
@@ -330,7 +330,7 @@ func TestPreconnectFailureGraceful(t *testing.T) {
 	if err != nil {
 		t.Fatalf("request after failed preconnect: %v", err)
 	}
-	resp.Body.Close()
+	_ = resp.Body.Close()
 
 	if resp.StatusCode != 200 {
 		t.Errorf("got status %d, want 200", resp.StatusCode)

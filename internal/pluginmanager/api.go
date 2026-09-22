@@ -161,7 +161,7 @@ func (m *Manager) GetChapterList(pluginID, mangaID string) ([]types.Chapter, err
 	}
 	// Cache the result for future calls.
 	if m.db != nil {
-		if cacheErr := m.db.SetCache(pluginID, mangaID, types.GetChapterListFunc, out, m.cacheTTL); cacheErr != nil {
+		if cacheErr := m.db.SetCache(pluginID, mangaID, types.GetChapterListFunc, out, m.chapterCacheTTL); cacheErr != nil {
 			logger.Warn("cache set", "plugin", pluginID, "manga", mangaID, "error", cacheErr)
 		}
 	}

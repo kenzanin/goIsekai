@@ -18,13 +18,21 @@ func (s *Server) buildMangaDetailData(r *http.Request, pluginID, mangaID string)
 	_ = s.service.ClearMangaNew(pluginID, mangaID)
 	manga, chapters, err := s.service.GetMangaDetails(pluginID, mangaID)
 	challenge := false
+	cachedData := false
 	if err != nil {
 		if _, ok := errors.AsType[*hostnet.ChallengeError](err); ok {
 			challenge = true
 			s.logger.Warn("manga detail blocked by challenge", "plugin", pluginID, "manga", mangaID)
 		} else {
-			s.logger.Error("manga detail", "error", err, "plugin", pluginID, "manga", mangaID)
-			return nil
+			// Plugin unreachable (e.g. offline): the reader already prefers
+			// the persisted copy, so the detail page should too instead of
+			// blanking out. Serve it with a notice when a copy exists.
+			cachedData = true
+			manga, chapters, err = s.service.CachedMangaAndChapters(pluginID, mangaID)
+			if err != nil {
+				s.logger.Error("manga detail", "error", err, "plugin", pluginID, "manga", mangaID)
+				return nil
+			}
 		}
 	}
 	// Source plugins rarely supply an author; fall back to the one captured by
@@ -86,6 +94,7 @@ func (s *Server) buildMangaDetailData(r *http.Request, pluginID, mangaID string)
 		"Continue":       continueTo,
 		"InLibrary":      inLibrary,
 		"Challenge":      challenge,
+		"CachedData":     cachedData,
 		"ChCurrentPage":  chPage,
 		"ChTotalPages":   max((chTotal+chapterPageSize-1)/chapterPageSize, 1),
 		"ChHasNext":      chEnd < chTotal,

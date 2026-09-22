@@ -9,6 +9,7 @@ import (
 	"os/signal"
 	"path/filepath"
 	"syscall"
+	"time"
 
 	"goisekai/internal/bridge"
 	"goisekai/internal/config"
@@ -102,6 +103,10 @@ func main() {
 		logger.Fatal("open database", "error", err)
 	}
 
+	// Wire the database to the plugin manager with cache TTLs from config.
+	detailTTL := time.Duration(cfg.CacheTTLHours) * time.Hour
+	chapterTTL := time.Duration(cfg.ChapterCacheTTLHours) * time.Hour
+
 	proxy := setupProxy(cfg, db)
 
 	// Hot-reload the safe config subset (log level, user-agent, referer).
@@ -114,6 +119,8 @@ func main() {
 
 	mgr := pluginmanager.NewManager(proxy, pluginsDir)
 	mgr.SetInfoDir(infoDir)
+	mgr.SetDB(db, detailTTL)
+	mgr.SetChapterCacheTTL(chapterTTL)
 	if err := mgr.Discover(); err != nil {
 		logger.Fatal("discover plugins", "error", err)
 	}

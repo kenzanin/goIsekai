@@ -5,6 +5,7 @@
 --  data.Manga: types.Manga, data.AltTitles: []AltTitle, data.CurrentTitle: string
 --  data.Chapters: []types.Chapter, data.Progress: map[string]database.ChapterProgress
 --  data.Continue: *ContinuePoint, data.InLibrary: bool, data.Challenge: bool
+--  data.CachedData: bool (true when serving cached data due to offline/plugin error)
 --  data.ChCurrentPage/ChTotalPages: int
 --  data.Categories, data.Related (enrichment)
 
@@ -25,6 +26,7 @@ return function(data)
 	local continuePoint = data.Continue
 	local inLibrary = data.InLibrary or false
 	local challenge = data.Challenge or false
+	local cachedData = data.CachedData or false
 	local chPage = data.ChCurrentPage or 1
 	local chTotalPages = data.ChTotalPages or 1
 	local cats = data.Categories or {}
@@ -42,6 +44,12 @@ return function(data)
 	if challenge then
 		body = body
 			.. '<div class="bg-amber-500/15 border border-amber-500/40 text-amber-300 rounded-lg p-4 mb-6">This site needs human verification — go to <a href="/view/plugins" class="underline">Plugins → Human Verification</a> to paste your session cookies.</div>'
+	end
+
+	-- Cached data offline notice
+	if cachedData then
+		body = body
+			.. '<div class="bg-blue-500/15 border border-blue-500/40 text-blue-300 rounded-lg p-4 mb-6">Showing cached data — offline or plugin unavailable.</div>'
 	end
 
 	-- Cover (left column)
