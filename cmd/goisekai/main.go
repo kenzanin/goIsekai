@@ -5,9 +5,11 @@ import (
 	"flag"
 	"log"
 	"log/slog"
+	"math"
 	"os"
 	"os/signal"
 	"path/filepath"
+	"sync/atomic"
 	"syscall"
 	"time"
 
@@ -109,12 +111,16 @@ func main() {
 
 	proxy := setupProxy(cfg, db)
 
-	// Hot-reload the safe config subset (log level, user-agent, referer).
-	startConfigWatch(cfgPath, proxy)
+	// Hot-reload the safe config subset (log level, user-agent, referer,
+	// max_cache_gb). maxCacheGB carries the image-cache cap atomically so the
+	// maintenance goroutine never races with the watcher.
+	maxCacheGB := &atomic.Int64{}
+	maxCacheGB.Store(int64(math.Float64bits(cfg.MaxCacheGB)))
+	startConfigWatch(cfgPath, proxy, maxCacheGB)
 
 	// Maintenance: prune orphaned rows at startup, then back up + re-prune
 	// on the configured interval until shutdown.
-	maintenanceStop := startMaintenance(db, cfg, dataDir)
+	maintenanceStop := startMaintenance(db, cfg, dataDir, maxCacheGB)
 	defer close(maintenanceStop)
 
 	mgr := pluginmanager.NewManager(proxy, pluginsDir)

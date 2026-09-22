@@ -1,9 +1,11 @@
 package main
 
 import (
+	"math"
 	"os"
 	"path/filepath"
 	"sort"
+	"sync/atomic"
 	"time"
 
 	"goisekai/internal/config"
@@ -14,9 +16,9 @@ import (
 )
 
 // startConfigWatch polls goisekai.ini and applies the safe subset (log level,
-// user-agent, referer) live. Unsafe fields like host/port/cdp_engine need a
-// restart, so they are deliberately not applied here.
-func startConfigWatch(cfgPath string, proxy *hostnet.Proxy) {
+// user-agent, referer, max_cache_gb) live. Unsafe fields like
+// host/port/cdp_engine need a restart, so they are deliberately not applied here.
+func startConfigWatch(cfgPath string, proxy *hostnet.Proxy, maxCacheGB *atomic.Int64) {
 	_ = config.Watch(cfgPath, 5*time.Second, func(updated *config.Config) {
 		if err := logger.Init(updated.LogLevel); err == nil {
 			logger.Info("config reloaded", "log_level", updated.LogLevel)
@@ -24,8 +26,13 @@ func startConfigWatch(cfgPath string, proxy *hostnet.Proxy) {
 		proxy.SetDefaultHeader("User-Agent", updated.UserAgent)
 		proxy.SetDefaultHeader("Referer", updated.Referer)
 		proxy.SetSecCHUA(updated.SecCHUA)
+		maxCacheGB.Store(int64(math.Float64bits(updated.MaxCacheGB)))
+		logger.Info("config reloaded", "log_level", updated.LogLevel, "max_cache_gb", updated.MaxCacheGB)
 	})
 }
+
+// maxCacheGBBits reads the atomically-stored MaxCacheGB value.
+func maxCacheGBBits(v *atomic.Int64) float64 { return math.Float64frombits(uint64(v.Load())) }
 
 // pruneImageCache walks the image cache directory and deletes the oldest files
 // until the total size is at or below maxBytesGB (in GB). Returns bytes freed.
@@ -86,7 +93,8 @@ func pruneImageCache(cfg *config.Config, dataDir string, maxBytesGB float64) (in
 
 // startMaintenance prunes orphaned rows at startup, then backs up + re-prunes
 // on the configured interval until the returned channel is closed.
-func startMaintenance(db *database.DB, cfg *config.Config, dataDir string) chan struct{} {
+// maxCacheGB holds the hot-reloadable image-cache size cap (float64 bits).
+func startMaintenance(db *database.DB, cfg *config.Config, dataDir string, maxCacheGB *atomic.Int64) chan struct{} {
 	backupsDir := filepath.Join(dataDir, "backups")
 	if cfg.PruneOrphans {
 		if summary, err := db.PruneOrphans(); err != nil {
@@ -96,7 +104,7 @@ func startMaintenance(db *database.DB, cfg *config.Config, dataDir string) chan 
 		}
 	}
 	// Prune image cache at startup based on MaxCacheGB config.
-	if _, err := pruneImageCache(cfg, dataDir, cfg.MaxCacheGB); err != nil {
+	if _, err := pruneImageCache(cfg, dataDir, maxCacheGBBits(maxCacheGB)); err != nil {
 		logger.Error("prune image cache at startup", "error", err)
 	}
 	stop := make(chan struct{})
@@ -126,8 +134,8 @@ func startMaintenance(db *database.DB, cfg *config.Config, dataDir string) chan 
 					}
 				}
 				backup()
-				// Re-read MaxCacheGB each tick and prune if needed.
-				if _, err := pruneImageCache(cfg, dataDir, cfg.MaxCacheGB); err != nil {
+				// Re-read MaxCacheGB each tick (hot-reloadable) and prune if needed.
+				if _, err := pruneImageCache(cfg, dataDir, maxCacheGBBits(maxCacheGB)); err != nil {
 					logger.Error("prune image cache", "error", err)
 				}
 			}

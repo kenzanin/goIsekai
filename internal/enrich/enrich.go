@@ -249,13 +249,7 @@ func (r *Registry) FetchAll(ctx context.Context, httpc *http.Client, title strin
 		}
 		for _, kind := range p.Kinds() {
 			// Check if this kind was requested
-			found := false
-			for _, k := range kinds {
-				if k == kind {
-					found = true
-					break
-				}
-			}
+			found := slices.Contains(kinds, kind)
 			if !found {
 				continue
 			}
