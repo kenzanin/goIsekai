@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/PuerkitoBio/goquery"
 	"github.com/andybalholm/cascadia"
 	"github.com/antchfx/htmlquery"
 	"golang.org/x/net/html"
@@ -15,7 +14,6 @@ import (
 // once and shared by both query engines, so no lookup re-parses it.
 type Document struct {
 	root *html.Node
-	doc  *goquery.Document
 }
 
 // Parse parses the HTML markup and returns a document handle. Malformed markup
@@ -25,13 +23,12 @@ func Parse(markup string) (*Document, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &Document{root: root, doc: goquery.NewDocumentFromNode(root)}, nil
+	return &Document{root: root}, nil
 }
 
-// checkCSS compiles a selector with cascadia, the engine goquery matches with.
-// goquery.Find swallows a compile error and matches nothing instead, so an
-// unparseable selector would be indistinguishable from one that found no
-// element; compiling here keeps the two apart.
+// checkCSS compiles a selector with cascadia. Compile here rather than inside
+// the match so an unparseable selector surfaces as an error instead of
+// silently matching nothing.
 func checkCSS(selector string) error {
 	if _, err := cascadia.Compile(selector); err != nil {
 		return fmt.Errorf("invalid CSS selector %q: %w", selector, err)
@@ -39,72 +36,56 @@ func checkCSS(selector string) error {
 	return nil
 }
 
+// cssAll returns every element matching the selector, in document order.
+func (d *Document) cssAll(selector string) ([]*html.Node, error) {
+	if d.root == nil {
+		return nil, nil
+	}
+	if err := checkCSS(selector); err != nil {
+		return nil, err
+	}
+	sel, err := cascadia.Compile(selector)
+	if err != nil {
+		return nil, err // unreachable: checkCSS already validated
+	}
+	return cascadia.QueryAll(d.root, sel), nil
+}
+
+// cssOne returns the first element matching the selector, or nil.
+func (d *Document) cssOne(selector string) (*html.Node, error) {
+	nodes, err := d.cssAll(selector)
+	if err != nil {
+		return nil, err
+	}
+	if len(nodes) == 0 {
+		return nil, nil
+	}
+	return nodes[0], nil
+}
+
+// nodeText returns the concatenated text of all descendant text nodes.
+func nodeText(n *html.Node) string {
+	var sb strings.Builder
+	var walk func(*html.Node)
+	walk = func(cur *html.Node) {
+		if cur.Type == html.TextNode {
+			sb.WriteString(cur.Data)
+		}
+		for c := cur.FirstChild; c != nil; c = c.NextSibling {
+			walk(c)
+		}
+	}
+	walk(n)
+	return sb.String()
+}
+
 // FindText returns the trimmed text of the first element matching the selector.
 func (d *Document) FindText(selector string) (string, error) {
-	if d.doc == nil {
-		return "", nil
-	}
-	if err := checkCSS(selector); err != nil {
-		return "", err
-	}
-	return strings.TrimSpace(d.doc.Find(selector).First().Text()), nil
-}
-
-// FindAttr returns the named attribute of the first element matching the
-// selector, or the empty string when the element does not carry it.
-func (d *Document) FindAttr(selector, attr string) (string, error) {
-	if d.doc == nil {
-		return "", nil
-	}
-	if err := checkCSS(selector); err != nil {
-		return "", err
-	}
-	val, _ := d.doc.Find(selector).First().Attr(attr)
-	return val, nil
-}
-
-// FindListText returns the trimmed text of every element matching the
-// selector, in document order.
-func (d *Document) FindListText(selector string) ([]string, error) {
-	if d.doc == nil {
-		return nil, nil
-	}
-	if err := checkCSS(selector); err != nil {
-		return nil, err
-	}
-	var out []string
-	d.doc.Find(selector).Each(func(_ int, sel *goquery.Selection) {
-		out = append(out, strings.TrimSpace(sel.Text()))
-	})
-	return out, nil
-}
-
-// FindListAttr returns the named attribute of every element matching the
-// selector, in document order. Elements that do not carry the attribute are
-// skipped, so the list stays index-aligned with the values that exist.
-func (d *Document) FindListAttr(selector, attr string) ([]string, error) {
-	if d.doc == nil {
-		return nil, nil
-	}
-	if err := checkCSS(selector); err != nil {
-		return nil, err
-	}
-	var out []string
-	d.doc.Find(selector).Each(func(_ int, sel *goquery.Selection) {
-		if val, ok := sel.Attr(attr); ok {
-			out = append(out, val)
-		}
-	})
-	return out, nil
-}
-
-// XPathText returns the trimmed text of the first node the expression selects.
-func (d *Document) XPathText(expr string) (string, error) {
-	node, err := d.xpathOne(expr)
+	node, err := d.cssOne(selector)
 	if err != nil || node == nil {
 		return "", err
 	}
-	return strings.TrimSpace(htmlquery.InnerText(node)), nil
+	return strings.TrimSpace(nodeText(node)), nil
 }
 
 // nodeAttr returns the named attribute of a node and whether the node carries
@@ -118,6 +99,57 @@ func nodeAttr(n *html.Node, attr string) (string, bool) {
 		}
 	}
 	return "", false
+}
+
+// FindAttr returns the named attribute of the first element matching the
+// selector, or the empty string when the element does not carry it.
+func (d *Document) FindAttr(selector, attr string) (string, error) {
+	node, err := d.cssOne(selector)
+	if err != nil || node == nil {
+		return "", err
+	}
+	val, _ := nodeAttr(node, attr)
+	return val, nil
+}
+
+// FindListText returns the trimmed text of every element matching the
+// selector, in document order.
+func (d *Document) FindListText(selector string) ([]string, error) {
+	nodes, err := d.cssAll(selector)
+	if err != nil {
+		return nil, err
+	}
+	var out []string
+	for _, node := range nodes {
+		out = append(out, strings.TrimSpace(nodeText(node)))
+	}
+	return out, nil
+}
+
+// FindListAttr returns the named attribute of every element matching the
+// selector, in document order. Elements that do not carry the attribute are
+// skipped, so the list stays index-aligned with the values that exist.
+func (d *Document) FindListAttr(selector, attr string) ([]string, error) {
+	nodes, err := d.cssAll(selector)
+	if err != nil {
+		return nil, err
+	}
+	var out []string
+	for _, node := range nodes {
+		if val, ok := nodeAttr(node, attr); ok {
+			out = append(out, val)
+		}
+	}
+	return out, nil
+}
+
+// XPathText returns the trimmed text of the first node the expression selects.
+func (d *Document) XPathText(expr string) (string, error) {
+	node, err := d.xpathOne(expr)
+	if err != nil || node == nil {
+		return "", err
+	}
+	return strings.TrimSpace(htmlquery.InnerText(node)), nil
 }
 
 // XPathAttr returns the named attribute of the first node the expression

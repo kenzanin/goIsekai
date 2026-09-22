@@ -5,7 +5,6 @@ import (
 	"image/color"
 
 	"github.com/anthonynsimon/bild/effect"
-	"github.com/disintegration/imaging"
 )
 
 // EnhanceMode selects what happens to a page image before it is written to the
@@ -93,7 +92,7 @@ func isColourPage(img image.Image) bool {
 // mask, soft levels. Every stage is local, so the page keeps its screentones
 // instead of being flattened to two values.
 func enhanceScan(src image.Image) image.Image {
-	gray := imaging.Grayscale(src)
+	gray := effect.Grayscale(src)
 	clean := effect.Median(gray, denoiseRadius)
 	sharp := effect.UnsharpMask(clean, unsharpRadius, unsharpAmount)
 	return softLevels(sharp, softLevelLo, softLevelHi)

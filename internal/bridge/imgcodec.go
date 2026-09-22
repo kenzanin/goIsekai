@@ -5,7 +5,7 @@ import (
 	"image"
 	"time"
 
-	"github.com/disintegration/imaging"
+	"github.com/anthonynsimon/bild/transform"
 	"github.com/gen2brain/avif"
 	"github.com/gen2brain/jxl"
 	"github.com/gen2brain/webp"
@@ -98,7 +98,7 @@ func encodeForCache(data []byte, format ImageFormat, cover bool, maxDim int, enh
 		return data, false
 	}
 	if b := src.Bounds(); cover && needsDownscale(b.Dx(), b.Dy(), maxDim) {
-		src = imaging.Fit(src, maxDim, maxDim, imaging.Lanczos)
+		src = fitWithin(src, maxDim)
 		if stats != nil {
 			stats.resized = true
 			stats.resizeFrom = [2]int{b.Dx(), b.Dy()}
@@ -138,6 +138,23 @@ func encodeForCache(data []byte, format ImageFormat, cover bool, maxDim int, enh
 	return buf.Bytes(), true
 }
 
+// fitWithin scales the image down so neither side exceeds maxDim, keeping the
+// aspect ratio and never upscaling — the bild equivalent of imaging.Fit.
+func fitWithin(src image.Image, maxDim int) image.Image {
+	w, h := src.Bounds().Dx(), src.Bounds().Dy()
+	if w <= maxDim && h <= maxDim {
+		return src
+	}
+	if w > h {
+		h = max(1, h*maxDim/w) // truncation, imaging.Fit-compatible
+		w = maxDim
+	} else {
+		w = max(1, w*maxDim/h)
+		h = maxDim
+	}
+	return transform.Resize(src, w, h, transform.Lanczos)
+}
+
 // needsDownscale reports whether either side exceeds a positive cap.
 func needsDownscale(w, h, maxDim int) bool {
 	return maxDim > 0 && (w > maxDim || h > maxDim)
@@ -145,7 +162,7 @@ func needsDownscale(w, h, maxDim int) bool {
 
 // decodeImage decodes any format the process registered a decoder for. The webp
 // and jxl packages register themselves with image.RegisterFormat, so a source
-// in either reaches imaging.Fit like any other format.
+// in either reaches fitWithin like any other format.
 func decodeImage(data []byte) (image.Image, string, error) {
 	return image.Decode(bytes.NewReader(data))
 }

@@ -45,9 +45,6 @@ func TestParse(t *testing.T) {
 	if doc.root == nil {
 		t.Fatal("Document.root is nil")
 	}
-	if doc.doc == nil {
-		t.Fatal("Document.doc is nil")
-	}
 }
 
 // TestEnginesShareOneTree guards the reason the handle exists: a lookup must not
