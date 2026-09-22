@@ -34,6 +34,7 @@
 ## 6. Verification
 
 - [x] 6.1 `just build` and `just test` green.
+- [x] 6.5 Bugfix: cached chapters refused to open offline because Lua/JS plugins return an empty page list (not an error) when their upstream is unreachable, so `GetPageListCached` never hit its cache fallback and clobbered the good `chapter_pages` row with `[]`. Fix: empty result now also triggers the fallback, and an empty response never overwrites a good cache. Covered by `TestGetPageListCachedEmptyFallback` + the `luaemptypages` fixture (committed b6b2c72).
 - [ ] 6.2 Live offline check: start server, request detail page for a library manga, confirm online render; block network for the server process (or point the plugin at an unreachable host), reload the detail page, confirm cached render with the notice; confirm cover still loads from disk cache.
 - [ ] 6.3 Confirm `plugin_cache` table accumulates rows after a detail load (previously always empty), and a second load logs a cache hit instead of a plugin invoke.
 - [ ] 6.4 Reload goisekai.ini with `max_cache_gb` tiny, drop a large file into the images dir, run maintenance, confirm deletion.
