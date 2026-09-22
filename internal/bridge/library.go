@@ -116,40 +116,45 @@ func (s *AppService) GetPageList(pluginID, chapterID string) ([]types.Page, erro
 }
 
 // GetPageListCached is like GetPageList but falls back to the local cache.
+// A plugin that is unreachable (offline) typically returns an empty page list
+// rather than an error, so an empty result also triggers the cache fallback —
+// otherwise cached chapters would refuse to open offline.
 func (s *AppService) GetPageListCached(pluginID, chapterID string) ([]types.Page, error) {
+	chapterIntID, _ := s.resolveChapterIntID(pluginID, "", chapterID)
+
 	result, err := s.mgr.GetPageList(pluginID, chapterID)
-	if err == nil {
+	if err == nil && len(result) > 0 {
 		logger.Debug("page list cache: miss (online success)", "chapter", chapterID, "pages", len(result))
-		if raw, merr := json.Marshal(result); merr == nil {
-			chapterIntID, _ := s.resolveChapterIntID(pluginID, "", chapterID)
-			if chapterIntID != 0 {
-				if perr := s.db.SaveChapterPages(chapterIntID, raw); perr != nil {
-					logger.Warn("cache chapter pages", "chapter", chapterID, "error", perr)
-				}
+		if raw, merr := json.Marshal(result); merr == nil && chapterIntID != 0 {
+			if perr := s.db.SaveChapterPages(chapterIntID, raw); perr != nil {
+				logger.Warn("cache chapter pages", "chapter", chapterID, "error", perr)
 			}
 		}
 		return result, nil
 	}
-	logger.Debug("page list cache: plugin failed, trying local cache", "chapter", chapterID, "plugin_err", err)
-	chapterIntID, _ := s.resolveChapterIntID(pluginID, "", chapterID)
-	if chapterIntID == 0 {
-		return nil, fmt.Errorf("bridge: get page list: %w", err)
-	}
-	cached, cerr := s.db.GetChapterPages(chapterIntID)
-	if cerr != nil {
-		logger.Warn("read chapter pages cache", "chapter", chapterID, "error", cerr)
-		return nil, fmt.Errorf("bridge: get page list: %w", err)
-	}
-	if cached != nil {
-		logger.Info("page list cache: hit (serving cached)", "chapter", chapterID)
-		var pages []types.Page
-		if uerr := json.Unmarshal(cached, &pages); uerr != nil {
-			return nil, fmt.Errorf("bridge: unmarshal cached pages: %w", uerr)
+
+	// Plugin failed, handed back nothing, or is unreachable: fall back to the
+	// persisted copy. An empty result never overwrites a good cache.
+	logger.Debug("page list cache: plugin result unusable, trying local cache",
+		"chapter", chapterID, "pages", len(result), "plugin_err", err)
+	if chapterIntID != 0 {
+		cached, cerr := s.db.GetChapterPages(chapterIntID)
+		if cerr != nil {
+			logger.Warn("read chapter pages cache", "chapter", chapterID, "error", cerr)
+		} else if cached != nil {
+			logger.Info("page list cache: hit (serving cached)", "chapter", chapterID)
+			var pages []types.Page
+			if uerr := json.Unmarshal(cached, &pages); uerr != nil {
+				return nil, fmt.Errorf("bridge: unmarshal cached pages: %w", uerr)
+			}
+			return pages, nil
 		}
-		return pages, nil
 	}
-	logger.Debug("page list cache: miss (no cached data)", "chapter", chapterID)
-	return nil, fmt.Errorf("bridge: get page list: %w", err)
+	if err != nil {
+		return nil, fmt.Errorf("bridge: get page list: %w", err)
+	}
+	// No plugin error and nothing cached: the site genuinely had no pages.
+	return result, nil
 }
 
 // ToggleLibraryItem flips the in-library flag for a manga.

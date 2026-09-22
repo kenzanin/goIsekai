@@ -3,6 +3,7 @@ package bridge
 import (
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"path/filepath"
 	"sync/atomic"
 	"testing"
@@ -10,6 +11,7 @@ import (
 
 	"goisekai/internal/database"
 	"goisekai/internal/hostnet"
+	"goisekai/internal/pluginmanager"
 	"goisekai/pkg/types"
 )
 
@@ -101,6 +103,80 @@ func newTestService(t *testing.T) *AppService {
 	}
 	t.Cleanup(func() { _ = db.Close() })
 	return NewAppService(db, nil, hostnet.NewProxy(), "", "", nil)
+}
+
+// TestGetPageListCachedEmptyFallback verifies that a plugin returning an empty
+// page list (the offline/unreachable failure mode of Lua/JS plugins) falls back
+// to the persisted chapter page list instead of returning empty and clobbering
+// the good cache.
+func TestGetPageListCachedEmptyFallback(t *testing.T) {
+	db, err := database.Open(filepath.Join(t.TempDir(), "fallback.db"))
+	if err != nil {
+		t.Fatalf("open db: %v", err)
+	}
+	defer func() { _ = db.Close() }()
+
+	mangaIntID, err := db.UpsertManga(database.Manga{
+		PluginID: "luaemptypages", SourceMangaID: "src-1",
+		Title: "Offline Cache Manga",
+	})
+	if err != nil {
+		t.Fatalf("upsert manga: %v", err)
+	}
+	chapterIntID, err := db.UpsertChapter(database.Chapter{
+		MangaID: mangaIntID, SourceChapterID: "ch-1", Title: "Ch1", ChapterNum: 1,
+	})
+	if err != nil {
+		t.Fatalf("upsert chapter: %v", err)
+	}
+
+	// Seed a previously-fetched page list (the offline cache).
+	good := []byte(`[{"index":0,"url":"https://example.com/img/1.png"}]`)
+	if err := db.SaveChapterPages(chapterIntID, good); err != nil {
+		t.Fatalf("save cached pages: %v", err)
+	}
+
+	// Manager over the empty-pages fixture simulates an unreachable upstream.
+	pluginsDir := t.TempDir()
+	dst := filepath.Join(pluginsDir, "luaemptypages")
+	if err := os.MkdirAll(dst, 0o755); err != nil {
+		t.Fatalf("mkdir fixture: %v", err)
+	}
+	srcBytes, err := os.ReadFile(filepath.Join("..", "pluginmanager", "testdata", "luaemptypages", "main.lua"))
+	if err != nil {
+		t.Fatalf("read fixture: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(dst, "main.lua"), srcBytes, 0o644); err != nil {
+		t.Fatalf("write fixture: %v", err)
+	}
+	mgr := pluginmanager.NewManager(hostnet.NewProxy(), pluginsDir)
+	mgr.SetDB(db, time.Hour)
+	mgr.SetChapterCacheTTL(168 * time.Hour)
+	if err := mgr.Discover(); err != nil {
+		t.Fatalf("discover: %v", err)
+	}
+	defer func() { _ = mgr.Close() }()
+
+	s := NewAppService(db, mgr, hostnet.NewProxy(), "", "", nil)
+	pages, err := s.GetPageListCached("luaemptypages", "ch-1")
+	if err != nil {
+		t.Fatalf("GetPageListCached: %v", err)
+	}
+	if len(pages) != 1 {
+		t.Fatalf("expected 1 cached page, got %d", len(pages))
+	}
+	if pages[0].URL != "https://example.com/img/1.png" {
+		t.Errorf("page URL = %q, want cached URL", pages[0].URL)
+	}
+
+	// The good cache must be preserved, not replaced by the empty result.
+	stored, err := db.GetChapterPages(chapterIntID)
+	if err != nil {
+		t.Fatalf("read stored pages: %v", err)
+	}
+	if string(stored) != string(good) {
+		t.Errorf("cache clobbered: got %q, want %q", stored, good)
+	}
 }
 
 func TestGetMangaDetailsPersists(t *testing.T) {
