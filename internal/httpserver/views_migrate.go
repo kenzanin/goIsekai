@@ -132,6 +132,14 @@ func (s *Server) viewMigrate(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	// Host-side pagination, 30 per page (same as search).
+	const pageSize = 30
+	total := len(cands)
+	start := min((page-1)*pageSize, total)
+	end := min(start+pageSize, total)
+	hasNext := end < total
+	cands = cands[start:end]
+
 	var candidates []any
 	for _, c := range cands {
 		candidates = append(candidates, map[string]any{
@@ -148,6 +156,7 @@ func (s *Server) viewMigrate(w http.ResponseWriter, r *http.Request) {
 		"TargetPluginID": targetPluginID,
 		"Candidates":     candidates,
 		"Page":           page,
+		"HasNext":        hasNext,
 		"Failures":       failures,
 		"SearchError":    "",
 	}

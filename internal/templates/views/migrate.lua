@@ -82,11 +82,14 @@ return function(data)
 				coverHTML = '<div class="w-full aspect-[2/3] bg-neutral-800 flex items-center justify-center text-neutral-500 text-xl font-semibold">' .. h((c.Title or ""):sub(1,2)) .. '</div>'
 			end
 			local badge = badgeByID[c.PluginID] or ""
-			local exactBadge = c.IsExactMatch and ' <span class="text-[10px] uppercase tracking-wide px-1.5 py-0.5 rounded bg-emerald-500/15 text-emerald-400 font-medium">exact</span>' or ''
+			local exactBadge = ''
+			if c.IsExactMatch then
+				exactBadge = '<div class="absolute top-2 left-2 z-10 bg-emerald-500 text-white text-sm font-bold uppercase tracking-wide px-3 py-1 rounded-md shadow-lg shadow-black/50">EXACT</div>'
+			end
 			body = body .. '<div class="flex flex-col bg-neutral-900 rounded-lg overflow-hidden hover:-translate-y-0.5 hover:shadow-lg hover:shadow-black/40 hover:ring-1 hover:ring-amber-500/60 transition">'
-			body = body .. '<div class="relative overflow-hidden">' .. coverHTML .. '</div>'
+			body = body .. '<div class="relative overflow-hidden">' .. exactBadge .. coverHTML .. '</div>'
 			body = body .. '<div class="p-3 flex-1 flex flex-col">'
-			body = body .. '<div class="font-medium text-sm mb-1 truncate" title="' .. h(c.Title or "") .. '">' .. h(c.Title or "") .. exactBadge .. '</div>'
+			body = body .. '<div class="font-medium text-sm mb-1 truncate" title="' .. h(c.Title or "") .. '">' .. h(c.Title or "") .. '</div>'
 			body = body .. '<div class="mb-2">' .. badge .. '</div>'
 			body = body .. '<form method="post" action="/action/migrate-source/' .. h(pluginID) .. '/' .. h(mangaID) .. '" class="mt-auto">'
 			body = body .. '<input type="hidden" name="targetPluginID" value="' .. h(c.PluginID) .. '">'
@@ -98,7 +101,7 @@ return function(data)
 		body = body .. '</div>'
 		-- Pagination (simple Prev/Next, preserves q and plugin filter)
 		local page = data.Page or 1
-		local hasNext = #cands >= 24
+		local hasNext = data.HasNext == true
 		local hasPrev = page > 1
 		if hasNext or hasPrev then
 			local base = '/view/migrate/' .. h(pluginID) .. '/' .. h(mangaID) .. '?q=' .. h(q) .. '&pluginID=' .. h(targetPluginID) .. '&page='
