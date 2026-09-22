@@ -77,7 +77,7 @@ return function(data)
 			local coverURL = c.CoverURL or ""
 			local coverHTML
 			if coverURL ~= "" then
-				coverHTML = '<img src="/image?pluginID=' .. h(c.PluginID) .. '&url=' .. h(coverURL) .. '" alt="' .. h(c.Title or "") .. '" class="w-full aspect-[2/3] object-cover bg-neutral-800" loading="lazy" onerror="this.onerror=null;this.outerHTML=\'<div class=\\"w-full aspect-[2/3] bg-neutral-800 flex items-center justify-center text-neutral-500 text-2xl font-semibold\\">' .. h((c.Title or ""):sub(1,2)) .. '</div>\'">'
+				coverHTML = '<img src="/image?pluginID=' .. h(c.PluginID) .. '&url=' .. h(coverURL) .. '" alt="' .. h(c.Title or "") .. '" class="w-full aspect-[2/3] object-cover bg-neutral-800" loading="lazy" data-fallback="' .. h((c.Title or ""):sub(1,2)) .. '">'
 			else
 				coverHTML = '<div class="w-full aspect-[2/3] bg-neutral-800 flex items-center justify-center text-neutral-500 text-xl font-semibold">' .. h((c.Title or ""):sub(1,2)) .. '</div>'
 			end
