@@ -139,7 +139,7 @@ func (s *Server) viewLogs(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	logs := s.service.GetLogs()
-	filter := r.URL.Query().Get("filter") // "", "app" or "plugins"
+	filter := r.URL.Query().Get("filter") // "", "app", "plugins", "warn" or "error"
 	switch filter {
 	case "app":
 		out := logs[:0]
@@ -157,9 +157,22 @@ func (s *Server) viewLogs(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 		logs = out
+	case "warn", "error":
+		needle := " " + strings.ToUpper(filter) + " "
+		out := logs[:0]
+		for _, l := range logs {
+			if strings.Contains(l, needle) {
+				out = append(out, l)
+			}
+		}
+		logs = out
 	}
 	if len(logs) > limit {
 		logs = logs[len(logs)-limit:]
+	}
+	// Newest first: reverse in place.
+	for i, j := 0, len(logs)-1; i < j; i, j = i+1, j-1 {
+		logs[i], logs[j] = logs[j], logs[i]
 	}
 	s.renderPage(w, r, "views/logs", "logs", map[string]any{"Logs": logs, "Limit": limit, "Limits": []int{100, 250, 500, 1000, 2000}, "Filter": filter})
 }

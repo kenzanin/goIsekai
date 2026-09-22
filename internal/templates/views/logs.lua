@@ -2,7 +2,7 @@
 -- Live log viewer with WebSocket streaming and polling fallback.
 -- Replaces views/logs.jet.
 -- Called as: logs(data) -> string (body HTML only, layout wraps it)
--- data.Logs: []string, data.Limit: int, data.Limits: []int, data.Filter: string
+-- data.Logs: []string (newest-first, index 0 = newest line), data.Limit: int, data.Limits: []int, data.Filter: string
 
 return function(data)
 	local logs = data.Logs or {}
@@ -42,6 +42,8 @@ return function(data)
             <option value="all"]] .. (filter == "all" and " selected" or "") .. [[>All sources</option>
             <option value="app"]] .. (filter == "app" and " selected" or "") .. [[>App only</option>
             <option value="plugins"]] .. (filter == "plugins" and " selected" or "") .. [[>Plugins only</option>
+            <option value="warn"]] .. (filter == "warn" and " selected" or "") .. [[>Warnings only</option>
+            <option value="error"]] .. (filter == "error" and " selected" or "") .. [[>Errors only</option>
         </select>
         <select id="log-limit" class="bg-neutral-900 border border-neutral-700 rounded-md px-2 py-1.5 text-xs">
 ]] .. limitOpts .. [[        </select>
@@ -102,10 +104,12 @@ return function(data)
       var filter = document.getElementById("log-filter").value;
       if (filter === "app" && line.indexOf(" plugin=") !== -1) return;
       if (filter === "plugins" && line.indexOf(" plugin=") === -1) return;
+      if (filter === "warn" && line.indexOf(" WARN ") === -1) return;
+      if (filter === "error" && line.indexOf(" ERROR ") === -1) return;
       var pre = document.createElement("pre");
       pre.className = "text-xs font-mono whitespace-pre-wrap break-all border-b border-neutral-900 py-0.5 select-text";
       pre.textContent = line;
-      view.appendChild(pre);
+      view.insertBefore(pre, view.firstChild);
       colorLogLines();
       var limit = parseInt(document.getElementById("log-limit").value, 10);
       while (view.children.length > limit) { view.removeChild(view.firstChild); }
