@@ -77,6 +77,26 @@ func (d *DB) IsInLibrary(mangaID int64) (bool, error) {
 	return rows[0].InLibrary == 1, err
 }
 
+// RepointManga rewrites one manga's source identity by row id. It sets
+// plugin_id, source_manga_id plus the refreshed title, cover, description and
+// status, keeping custom_title and custom_description authoritative the same
+// way UpsertManga does (a user-edited title/description is not overwritten).
+func (d *DB) RepointManga(mangaID int64, pluginID, sourceMangaID, title, coverURL, description, status string) error {
+	_, err := d.db.Exec(
+		`UPDATE mangas SET
+			plugin_id = ?,
+			source_manga_id = ?,
+			title = CASE WHEN custom_title = 1 THEN title ELSE ? END,
+			cover_url = ?,
+			description = CASE WHEN custom_description = 1 THEN description ELSE ? END,
+			status = ?,
+			updated_at = CURRENT_TIMESTAMP
+		WHERE id = ?`,
+		pluginID, sourceMangaID, title, coverURL, description, status, mangaID,
+	)
+	return err
+}
+
 // GetMangaCached fetches a cached manga from the database by plugin ID and source manga ID.
 // Returns (Manga, true) on cache hit, or (zero value, false) when absent.
 func (d *DB) GetMangaCached(pluginID, sourceMangaID string) (Manga, error) {

@@ -42,6 +42,7 @@ func (s *Server) registerViewRoutes() {
 	s.Router.Get("/view/library", s.viewLibrary)
 	s.Router.Get("/view/search", s.viewSearch)
 	s.Router.Get("/view/manga/{pluginID}/{mangaID}", s.viewMangaDetail)
+	s.Router.Get("/view/migrate/{pluginID}/{mangaID}", s.viewMigrate)
 	s.Router.Get("/view/plugins", s.viewPlugins)
 	s.Router.Get("/view/settings", s.viewSettings)
 	s.Router.Get("/view/logs", s.viewLogs)

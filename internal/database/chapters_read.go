@@ -148,3 +148,21 @@ func (d *DB) resetProgress(where BoolExpression) error {
 		Exec(d.db)
 	return err
 }
+
+// ReadSourceIDs returns the source_chapter_ids of read chapters for a manga.
+func (d *DB) ReadSourceIDs(mangaID int64) ([]string, error) {
+	rows, err := d.db.Query(`SELECT source_chapter_id FROM chapters WHERE manga_id = ? AND (is_read = 1 OR last_page_read > 0)`, mangaID)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = rows.Close() }()
+	var out []string
+	for rows.Next() {
+		var id string
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		out = append(out, id)
+	}
+	return out, rows.Err()
+}

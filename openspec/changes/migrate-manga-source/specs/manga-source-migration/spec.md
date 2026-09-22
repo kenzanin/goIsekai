@@ -9,10 +9,16 @@ reader's place in it.
 ### Requirement: Migration candidates come from the active sources
 
 For a library entry, the system SHALL search every active source plugin for the
-same title, using the entry's current display title as the search term. Plugins
-that only provide metadata SHALL be excluded, and the entry's current source
-SHALL be excluded. When the search on the display title yields no candidate, the
-system MAY retry using the entry's alternative titles.
+same title, using the entry's current display title as the search term. Every
+result a source returns SHALL be offered as a candidate the reader can choose;
+normalized-title equality never filters the candidate list, it only feeds the
+automatic-selection requirement. Plugins that only provide metadata SHALL be
+excluded, and the entry's current source SHALL be excluded. A source that fails
+during discovery SHALL be skipped and its failure reported without removing the
+other sources' candidates; when every searched source fails, the system SHALL
+report that sources could not be reached rather than that no candidates were
+found. When the search on the display title yields no candidate, the system MAY
+retry using the entry's alternative titles.
 
 #### Scenario: Candidate found on the display title
 - **WHEN** the reader asks to migrate a library entry and another active source returns an exact title match
@@ -26,13 +32,21 @@ system MAY retry using the entry's alternative titles.
 - **WHEN** candidates are collected for a library entry
 - **THEN** the entry's own current source is excluded from the candidate list
 
+#### Scenario: A failing source does not hide the others
+- **WHEN** one source errors while candidates are collected and another source returns results
+- **THEN** the other source's results are still offered and the failure is reported
+
+#### Scenario: Every searched source fails
+- **WHEN** all searched sources fail during candidate collection
+- **THEN** the system reports that sources could not be reached, not that no candidates were found
+
 #### Scenario: No candidate on the display title
 - **WHEN** the display title search returns no candidate on any other source
 - **THEN** the system retries the search using the entry's alternative titles
 
-### Requirement: Automatic candidate selection only on an unambiguous match
-
-The system SHALL select a target source automatically when exactly one candidate's
+#### Scenario: No exact match lists the candidates
+- **WHEN** no candidate's normalized title equals the entry's normalized display title
+- **THEN** the sources' returned results remain listed for the reader to choose from
 title equals the entry's display title after normalization. When no candidate
 matches exactly, or when more than one does, the system SHALL present the
 candidates and require the reader to choose rather than picking one itself.

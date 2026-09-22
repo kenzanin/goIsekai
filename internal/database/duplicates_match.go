@@ -9,6 +9,11 @@ func normalizeTitle(s string) string {
 	return pluginutil.NormalizeTitle(s)
 }
 
+// NormalizeTitle is the exported form of normalizeTitle for use outside the database package.
+func NormalizeTitle(s string) string {
+	return pluginutil.NormalizeTitle(s)
+}
+
 // spansPlugins reports whether the member indices come from at least two
 // different plugin IDs.
 func spansPlugins(members map[int]struct{}, all []Manga) bool {

@@ -3,6 +3,7 @@ package database
 import (
 	"goisekai/internal/database/.gen/model"
 	. "goisekai/internal/database/.gen/table"
+	"strings"
 
 	. "github.com/go-jet/jet/v2/sqlite"
 )
@@ -69,4 +70,36 @@ func (d *DB) ListChaptersCached(mangaIntID int64) ([]Chapter, error) {
 		out[i] = chapterFromModel(m)
 	}
 	return out, nil
+}
+
+// DeleteChaptersNotIn removes every chapter of a manga whose source_chapter_id
+// is not in keepIDs and returns how many rows were removed. When keepIDs is
+// empty every chapter of that manga is removed. Cascading deletes take
+// chapter_pages and read_history with them.
+func (d *DB) DeleteChaptersNotIn(mangaID int64, keepIDs []string) (int64, error) {
+	if len(keepIDs) == 0 {
+		res, err := d.db.Exec(`DELETE FROM chapters WHERE manga_id = ?`, mangaID)
+		if err != nil {
+			return 0, err
+		}
+		return res.RowsAffected()
+	}
+	placeholders := make([]string, len(keepIDs))
+	args := make([]any, 0, len(keepIDs)+1)
+	args = append(args, mangaID)
+	for i, id := range keepIDs {
+		placeholders[i] = "?"
+		args = append(args, id)
+	}
+	var query strings.Builder
+	query.WriteString("DELETE FROM chapters WHERE manga_id = ? AND source_chapter_id NOT IN (" + placeholders[0])
+	for _, ph := range placeholders[1:] {
+		query.WriteString("," + ph)
+	}
+	query.WriteString(")")
+	res, err := d.db.Exec(query.String(), args...)
+	if err != nil {
+		return 0, err
+	}
+	return res.RowsAffected()
 }

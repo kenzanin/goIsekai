@@ -115,12 +115,20 @@ entry has been repointed but still has no chapters.
 
 ### Rank candidates by normalized title, decided by the host
 
-Every active, non-info plugin is searched with the display title.
-`normalizeTitle` (the duplicates subsystem's definition of "same title") decides
-whether a candidate is an exact match. Exactly one exact match is selected
-automatically; zero or several exact matches are presented for the reader to
-choose. The display-title pass falls back to the entry's alternative titles only
-when it produced nothing.
+Every active, non-info plugin is searched with the display title. Every result
+stays a candidate — the reader picks from what the sources returned;
+`normalizeTitle` (the duplicates subsystem's definition of "same title") exists
+only to decide the automatic-selection question. Exactly one exact match is
+selected automatically; zero or several exact matches are presented for the
+reader to choose. The display-title pass falls back to the entry's alternative
+titles only when it produced nothing.
+
+Search failures are per-source and never abort the batch: a plugin error (or
+the empty-results-with-nil-error failure mode) skips that source, the failure is
+reported beside the candidates, and the rest proceed. Only when every searched
+source fails does collection report "sources could not be reached" — distinct
+from "no candidates", because the reader's next step differs (retry vs pick
+another title).
 
 `FindPotentialDuplicates` was considered as the discovery mechanism and rejected:
 it compares rows already in the database, so it can never reveal a source the
@@ -135,10 +143,13 @@ existing decision to skip `FindPotentialDuplicates` when the library is filtered
 
 ### Refuse before writing when the target is already a library entry
 
-If the target pair already exists as its own library row, the migration is
-refused with a named conflict. Otherwise `UNIQUE(plugin_id, source_manga_id)`
-would abort the transaction and surface a constraint error instead of an
-explanation. Merging, overwriting or deleting either entry is out of scope.
+If the target pair already exists as its own row in `mangas`, the migration is
+refused with a named conflict. The check is by row, not by `in_library`: rows
+with `in_library = 0` also hold the unique pair, so the message says the target
+already exists in `mangas` rather than "already in the library". Otherwise
+`UNIQUE(plugin_id, source_manga_id)` would abort the transaction and surface a
+constraint error instead of an explanation. Merging, overwriting or deleting
+either entry is out of scope.
 
 ### Confirm through the existing action convention
 
@@ -164,8 +175,10 @@ client-side mechanism is introduced.
   enrichment action already exists if the reader wants it re-derived.
 - **Stale `plugin_id` in `library_fts` would break filtered search** → `SyncFTS`
   runs inside the same transaction.
-- **The old source URL in a bookmark or external link stops resolving** → the old
-  `source_manga_id` is not retained anywhere after a migration; accepted.
+- **Orphaned `plugin_cache` rows for the old pair** → one delete of the old
+  `(plugin_id, source_manga_id)` rows runs inside the migration transaction, so
+  no TTL-bounded garbage is left behind to be served if the old source is ever
+  re-added.
 - **The updates feed and new badge treat the target's chapter list as new
   input** → accepted; the existing clear-new action dismisses it.
 

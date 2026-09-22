@@ -120,6 +120,9 @@ func (s *AppService) syncMangas(library []database.Manga) error {
 // Chapters are kept only for library manga: a non-library row is detail-view
 // cache whose chapter list is re-fetched from the plugin on open.
 func (s *AppService) persistMangaDetails(pluginID string, m types.Manga, chapters []types.Chapter) error {
+	if m.Title == "" {
+		return nil
+	}
 	mangaIntID, err := s.db.UpsertManga(database.Manga{
 		PluginID:      pluginID,
 		SourceMangaID: m.ID,

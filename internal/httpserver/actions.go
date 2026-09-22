@@ -44,6 +44,7 @@ func (s *Server) registerActionRoutes() {
 	s.Router.Post("/action/clear-logs", s.handleClearLogs)
 	s.Router.Post("/action/clear-cache-all", s.handleClearAllCache)
 	s.Router.Post("/action/test-profile/{pluginID}", s.handleTestProfile)
+	s.Router.Post("/action/migrate-source/{pluginID}/{mangaID}", s.handleMigrateSource)
 	s.Router.Post("/action/reset-profile/{pluginID}", s.handleResetProfile)
 	// Restart the application process via syscall.Exec (true re-exec).
 	s.Router.Post("/action/restart", s.handleRestart)

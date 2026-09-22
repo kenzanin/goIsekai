@@ -48,6 +48,9 @@ func (s *AppService) GetMangaDetails(pluginID, mangaID string) (types.Manga, []t
 	}
 
 	manga, err := s.mgr.GetMangaDetail(pluginID, mangaID)
+	if err == nil && manga.Title == "" {
+		err = fmt.Errorf("empty title from plugin")
+	}
 	if err == nil {
 		manga.Genres = s.genres.normalize(manga.Genres)
 		manga.RawGenres = make([]string, len(manga.Genres))

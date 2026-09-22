@@ -87,6 +87,9 @@ func Open(path string) (*DB, error) {
 // Close closes the underlying database handle.
 func (d *DB) Close() error { return d.db.Close() }
 
+// Begin starts a transaction.
+func (d *DB) Begin() (*sql.Tx, error) { return d.db.Begin() }
+
 // Exec executes a statement against the underlying database.
 func (d *DB) Exec(query string, args ...any) (sql.Result, error) {
 	return d.db.Exec(query, args...)

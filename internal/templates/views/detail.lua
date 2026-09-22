@@ -206,6 +206,12 @@ return function(data)
 		end
 	end
 
+	-- Migrate button (beside Update)
+	local migrateHTML = ""
+	if inLibrary then
+		migrateHTML = '<a href="/view/migrate/' .. h(pluginID) .. '/' .. h(mangaID) .. '" class="ml-auto border border-amber-500/40 bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 rounded-md px-4 py-2 text-sm">⤴ Migrate</a>'
+	end
+
 	if continuePoint then
 		local cp = continuePoint
 		local label, titleAttr
@@ -234,7 +240,7 @@ return function(data)
 			.. h(label)
 			.. "</a>"
 	end
-	actionsHTML = actionsHTML .. (syncedHTML or "") .. "</div>"
+	actionsHTML = actionsHTML .. migrateHTML .. (syncedHTML or "") .. "</div>"
 
 	-- Main 2-column layout
 	body = body
