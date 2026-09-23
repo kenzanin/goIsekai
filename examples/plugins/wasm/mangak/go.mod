@@ -1,4 +1,4 @@
-module mangaka
+module mangak
 
 go 1.27.1
 
