@@ -4,7 +4,7 @@
 // (GOOS=wasip1 GOARCH=wasm, -buildmode=c-shared).
 //
 // Ported from the keiyoushi Madara multisrc extension at
-// extension-source/src/en/mangaka (site https://mangaka.cc, chapterMode =
+// extension-source/src/en/mangaka (site https://mangak.io, chapterMode =
 // AdminAjax). Madara's own selectors/endpoints are inherited from
 // extension-source/lib-multisrc/madara.
 //
@@ -31,7 +31,7 @@ import (
 )
 
 const (
-	siteURL = "https://mangaka.cc"
+	siteURL = "https://mangak.io"
 	ajaxURL = siteURL + "/wp-admin/admin-ajax.php"
 )
 
