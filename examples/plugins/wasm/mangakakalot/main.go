@@ -4,7 +4,8 @@
 // (GOOS=wasip1 GOARCH=wasm, -buildmode=c-shared).
 //
 // Ported from the keiyoushi MangaBox multisrc used by
-// extension-source/src/en/mangakakalot (site https://ww2.mangakakalots.com).
+// extension-source/src/en/mangakakalot (site https://www.mangakakalove.com,
+// the current live mirror; ww2.mangakakalots.com 404s every app route).
 //
 // ID scheme:
 //
@@ -29,7 +30,7 @@ import (
 	"goisekai/pkg/types"
 )
 
-const siteURL = "https://ww2.mangakakalots.com"
+const siteURL = "https://www.mangakakalove.com"
 
 // ─── ABI memory ─────────────────────────────────────────────────────────────
 //
@@ -292,20 +293,37 @@ func normalizeQuery(q string) string {
 	return reTrimUnder.ReplaceAllString(s, "")
 }
 
-// coverNear returns the image tag closest above the card href holding slug,
-// falling back to the first image after it.
+// cardIndex locates the card link whose href ends in slug. Matching on the
+// quoted path avoids treating a slug as a prefix of a longer one.
+func cardIndex(body, slug string) int {
+	for _, needle := range []string{`/manga/` + slug + `"`, `/manga/` + slug + `/`} {
+		if i := strings.Index(body, needle); i >= 0 {
+			return i
+		}
+	}
+	return strings.Index(body, slug)
+}
+
+// coverNear returns the cover image of the card whose link contains slug.
+// Current MangaBox markup nests <img> inside the anchor that carries the slug;
+// older markup places <img> before the title link. Prefer a following image
+// whose URL embeds the slug, otherwise use the nearest preceding image.
 func coverNear(body, slug string) string {
-	i := strings.Index(body, slug)
+	i := cardIndex(body, slug)
 	if i < 0 {
 		return ""
 	}
+	if j := strings.Index(body[i:], "<img"); j >= 0 {
+		j += i
+		if k := strings.IndexByte(body[j:], '>'); k >= 0 {
+			if u := imgURL(body[j : j+k+1]); strings.Contains(u, slug) {
+				return u
+			}
+		}
+	}
 	j := strings.LastIndex(body[:i], "<img")
 	if j < 0 {
-		j = strings.Index(body[i:], "<img")
-		if j < 0 {
-			return ""
-		}
-		j += i
+		return ""
 	}
 	k := strings.IndexByte(body[j:], '>')
 	if k < 0 {
