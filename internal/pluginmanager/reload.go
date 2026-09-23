@@ -30,11 +30,16 @@ func (m *Manager) UnloadPlugin(id string) error {
 	if p.kind == "js" && p.js != nil {
 		p.js.Interrupt("unloading")
 	}
+	if p.kind == "wasm" && p.wasmMod != nil {
+		_ = p.wasmMod.Close(m.ctx)
+	}
 	p.lunar = nil
 	p.js = nil
 	p.goPlugin = nil
 	p.goFns = nil
 	p.yaegi = nil
+	p.wasmMod = nil
+	p.wasmFns = nil
 	p.contractVersion = 0
 	p.meta = types.PluginMeta{}
 	p.loaded = false
@@ -56,6 +61,9 @@ func (m *Manager) ReloadPlugin(id string) (string, error) {
 	}
 	if old.kind == "js" && old.js != nil {
 		old.js.Interrupt("reloading")
+	}
+	if old.kind == "wasm" && old.wasmMod != nil {
+		_ = old.wasmMod.Close(m.ctx)
 	}
 	// Go native plugins have no explicit unload in pkg/plugin; dropping the
 	// handle leaks the mapped .so until process exit (acceptable on reload).
@@ -111,6 +119,10 @@ func (m *Manager) Close() error {
 		if p.kind == "lua" && p.lunar != nil {
 			_ = p.lunar.Close()
 		}
+	}
+	if m.runtime != nil {
+		_ = m.runtime.Close(m.ctx)
+		m.runtime = nil
 	}
 	return nil
 }

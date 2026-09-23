@@ -115,6 +115,11 @@ func (m *Manager) Discover() error {
 	if err := m.discoverGo(); err != nil {
 		return err
 	}
+
+	// Wasm plugins: one folder with main.wasm, or a single *.wasm file.
+	if err := m.discoverWasm(); err != nil {
+		return err
+	}
 	return nil
 }
 

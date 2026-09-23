@@ -34,6 +34,8 @@ func (m *Manager) ensureLoaded(id string) error {
 		loaded, err = m.loadGo(p.id, p.wasmPath)
 	case "yaegi":
 		loaded, err = m.loadYaegi(p.id, p.wasmPath)
+	case "wasm":
+		loaded, err = m.loadWasm(p.id, p.wasmPath)
 	default:
 		return fmt.Errorf("plugin %q: unknown kind %q", id, p.kind)
 	}
@@ -45,6 +47,8 @@ func (m *Manager) ensureLoaded(id string) error {
 	p.goPlugin = loaded.goPlugin
 	p.goFns = loaded.goFns
 	p.yaegi = loaded.yaegi
+	p.wasmMod = loaded.wasmMod
+	p.wasmFns = loaded.wasmFns
 	p.contractVersion = loaded.contractVersion
 	p.meta = loaded.meta
 	p.loaded = true

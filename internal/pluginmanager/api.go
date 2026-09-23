@@ -38,6 +38,9 @@ func (m *Manager) call(p *loadedPlugin, fnName, inputJSON string) (string, error
 	if p.kind == "yaegi" {
 		return callYaegi(m, p, fnName, inputJSON)
 	}
+	if p.kind == "wasm" {
+		return callWasm(p, fnName, inputJSON)
+	}
 	return "", fmt.Errorf("plugin %s %s: unsupported kind %q", p.id, fnName, p.kind)
 }
 

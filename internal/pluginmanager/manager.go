@@ -10,6 +10,8 @@ import (
 
 	"github.com/dop251/goja"
 	lunar "github.com/mmcdole/lunar"
+	"github.com/tetratelabs/wazero"
+	"github.com/tetratelabs/wazero/api"
 
 	"goisekai/internal/database"
 	"goisekai/internal/enrich"
@@ -38,6 +40,10 @@ type loadedPlugin struct {
 	js *goja.Runtime
 	// yaegi holds the Yaegi interpreter for yaegi-kind plugins.
 	yaegi *yaegiPlugin
+	// wasmMod is the instantiated wazero module for wasm-kind plugins.
+	wasmMod api.Module
+	// wasmFns caches resolved ABI exports for wasm-kind plugins.
+	wasmFns map[string]api.Function
 	// contractVersion is the plugin's resolved contract_version.
 	contractVersion int32
 	// meta is the metadata the plugin declared in its optional Init export.
@@ -62,6 +68,9 @@ type Manager struct {
 
 	mu      sync.RWMutex
 	plugins map[string]*loadedPlugin
+	// runtime is the shared wazero runtime for all wasm plugins, lazily
+	// created by ensureWasmRuntime and closed by Close.
+	runtime wazero.Runtime
 	onLoad  func(id string)  // called after first successful load
 	enrich  *enrich.Registry // optional enrichment registry; plugin providers registered on load
 

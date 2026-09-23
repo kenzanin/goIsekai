@@ -41,3 +41,10 @@ const (
 // all network access. It accepts an HTTPRequest JSON and returns an
 // HTTPResponse JSON.
 const HostHTTPRequestFunc = "host_http_request"
+
+// HostCallFunc is the generic host-helper import available to wasm plugins:
+// {"fn":"<namespace>.<name>","args":[...]} in, the JSON result out, or
+// {"error":"..."} on failure. It is the wasm equivalent of the Lua/JS `host`
+// object and reaches the same Go implementations. See
+// docs/plugin-wasm-helpers.md.
+const HostCallFunc = "host_call"

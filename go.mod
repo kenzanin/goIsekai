@@ -20,6 +20,7 @@ require (
 	github.com/goccy/go-json v0.10.6
 	github.com/gomarkdown/markdown v0.0.0-20260917010721-cc30ffac3c05
 	github.com/mmcdole/lunar v0.1.1
+	github.com/tetratelabs/wazero v1.12.0
 	github.com/traefik/yaegi v0.16.1
 	golang.org/x/net v0.58.0
 	gopkg.in/ini.v1 v1.67.3
@@ -57,7 +58,6 @@ require (
 	github.com/remyoudompheng/bigfft v0.0.0-20230129092748-24d4a6f8daec // indirect
 	github.com/stretchr/testify v1.11.1 // indirect
 	github.com/tam7t/hpkp v0.0.0-20160821193359-2b70b4024ed5 // indirect
-	github.com/tetratelabs/wazero v1.12.0 // indirect
 	golang.org/x/crypto v0.55.0 // indirect
 	golang.org/x/sys v0.47.0 // indirect
 	golang.org/x/text v0.41.0 // indirect
