@@ -61,6 +61,27 @@ func (m *Manager) Install(dirPath string) (string, error) {
 		return filepath.Join(destDir, "main.js"), nil
 	}
 
+	// WASM plugin: source is a folder containing main.wasm; copy it recursively.
+	mainWasm := filepath.Join(dirPath, "main.wasm")
+	if info, err := os.Stat(mainWasm); err == nil && !info.IsDir() {
+		id := filepath.Base(dirPath)
+		destDir := filepath.Join(m.pluginsDir, id)
+		logger.Debug("installing wasm plugin", "source", dirPath, "dest", destDir)
+		if filepath.Clean(dirPath) != filepath.Clean(destDir) {
+			if err := copyDir(dirPath, destDir); err != nil {
+				return "", fmt.Errorf("copy wasm plugin %s: %w", id, err)
+			}
+		}
+		p, err := m.loadWasm(id, filepath.Join(destDir, "main.wasm"))
+		if err != nil {
+			logger.Error("wasm plugin install failed", "id", id, "error", err)
+			return "", fmt.Errorf("install wasm plugin %s: %w", id, err)
+		}
+		m.registerLoaded(id, p)
+		logger.Debug("wasm plugin installed", "id", id)
+		return filepath.Join(destDir, "main.wasm"), nil
+	}
+
 	// Yaegi plugin: source is a folder containing main.go; copy it recursively.
 	mainGo := filepath.Join(dirPath, "main.go")
 	if info, err := os.Stat(mainGo); err == nil && !info.IsDir() {
@@ -140,5 +161,20 @@ func (m *Manager) LoadPlugin(path string) (string, error) {
 		return id, nil
 	}
 
-	return "", fmt.Errorf("no main.lua, main.js, or main.go found at %s", path)
+	mainWasm := filepath.Join(path, "main.wasm")
+	if info, err := os.Stat(mainWasm); err == nil && !info.IsDir() {
+		id := filepath.Base(path)
+		if _, dup := m.plugins[id]; dup {
+			return "", fmt.Errorf("plugin %q already loaded", id)
+		}
+		p, err := m.loadWasm(id, mainWasm)
+		if err != nil {
+			return "", err
+		}
+		m.registerLoaded(id, p)
+		logger.Info("plugin loaded (hot)", "id", id, "kind", "wasm")
+		return id, nil
+	}
+
+	return "", fmt.Errorf("no main.lua, main.js, main.go, or main.wasm found at %s", path)
 }
