@@ -4,7 +4,7 @@
 // (GOOS=wasip1 GOARCH=wasm, -buildmode=c-shared).
 //
 // Ported from the keiyoushi MangaBox multisrc used by
-// extension-source/src/en/mangakakalot (site https://www.mangakakalot.gg).
+// extension-source/src/en/mangakakalot (site https://ww2.mangakakalots.com).
 //
 // ID scheme:
 //
@@ -29,7 +29,7 @@ import (
 	"goisekai/pkg/types"
 )
 
-const siteURL = "https://www.mangakakalot.gg"
+const siteURL = "https://ww2.mangakakalots.com"
 
 // ─── ABI memory ─────────────────────────────────────────────────────────────
 //
