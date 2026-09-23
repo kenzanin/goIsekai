@@ -120,6 +120,15 @@ func httpBody(fn string, args ...string) (string, bool) {
 	return s, s != ""
 }
 
+const refHeader = `{"Referer":"https://www.mangakakalove.com/"}`
+const refJSONHeader = `{"Accept":"application/json, text/plain, */*","Referer":"https://www.mangakakalove.com/"}`
+
+// getHTML fetches a page; mangakakalove 403s any request without a Referer.
+func getHTML(u string) (string, bool) { return httpBody("http.get_body", u, refHeader) }
+
+// getJSON fetches the JSON API; same Referer gate plus an explicit Accept.
+func getJSON(u string) (string, bool) { return httpBody("http.get_body", u, refJSONHeader) }
+
 // main is required by the Go linker for package main; -buildmode=c-shared makes
 // the module a reactor (initialised through _initialize, main never runs).
 func main() {}
@@ -367,7 +376,7 @@ func searchImpl(arg string) []types.Manga {
 	} else {
 		target = siteURL + "/manga-list/hot-manga?page=" + strconv.Itoa(f.Page)
 	}
-	body, ok := httpBody(target)
+	body, ok := getHTML(target)
 	if !ok {
 		return nil
 	}
@@ -391,7 +400,7 @@ func detailImpl(arg string) types.Manga {
 	if slug == "" {
 		return m
 	}
-	body, ok := httpBody(siteURL + "/manga/" + url.PathEscape(slug))
+	body, ok := getHTML(siteURL + "/manga/" + url.PathEscape(slug))
 	if !ok {
 		return m
 	}
@@ -413,7 +422,7 @@ func chaptersImpl(arg string) []types.Chapter {
 	if slug == "" {
 		return nil
 	}
-	body, ok := httpBody(siteURL + "/api/manga/" + url.PathEscape(slug) + "/chapters?limit=-1")
+	body, ok := getJSON(siteURL + "/api/manga/" + url.PathEscape(slug) + "/chapters?limit=-1")
 	if !ok {
 		return nil
 	}
@@ -464,7 +473,7 @@ func pagesImpl(arg string) []types.Page {
 		return nil
 	}
 	chapterURL := siteURL + "/manga/" + url.PathEscape(slug) + "/" + url.PathEscape(chapterSlug)
-	body, ok := httpBody(chapterURL)
+	body, ok := getHTML(chapterURL)
 	if !ok {
 		return nil
 	}

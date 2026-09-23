@@ -45,6 +45,14 @@ func (s *Server) viewPlugins(w http.ResponseWriter, r *http.Request) {
 			}
 			if m.Logo != "" {
 				v.IconURL = resolveLogoURL(m.Logo, p.ID)
+			} else if m.Kind == "wasm" {
+				// go:embed wasm plugins can't export Init/PluginMeta — every wasm
+				// plugin ships logo.png beside main.wasm, so fall back to it.
+				v.IconURL = resolveLogoURL("logo.png", p.ID)
+			} else if m.Kind == "wasm" {
+				// go:embed wasm plugins can't export Init/PluginMeta — every wasm
+				// plugin ships logo.png beside main.wasm, so fall back to it.
+				v.IconURL = resolveLogoURL("logo.png", p.ID)
 			}
 		}
 		if row, ok, err := s.service.GetPluginVerifyState(p.ID); err == nil && ok {

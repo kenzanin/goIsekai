@@ -11,6 +11,7 @@ local KIND_BADGE = {
 	js = { label = "JS", class = "bg-amber-500/15 text-amber-400", title = "JavaScript plugin (main.js)" },
 	go = { label = "Go", class = "bg-sky-500/15 text-sky-400", title = "Native Go plugin (.so)" },
 	yaegi = { label = "Yaegi", class = "bg-emerald-500/15 text-emerald-400", title = "Yaegi-interpreted Go plugin" },
+	wasm = { label = "Wasm", class = "bg-blue-500/15 text-sky-400", title = "WebAssembly plugin (main.wasm)" },
 }
 
 return function(data)
