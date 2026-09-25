@@ -71,7 +71,7 @@ return function(data)
   <div id="zone-center" class="absolute top-12 bottom-14 left-[35%] right-[35%] z-10 cursor-pointer" title="Toggle bars"></div>
 
   <!-- Spinner -->
-  <div id="spinner" class="absolute inset-0 z-20 hidden items-center justify-center bg-neutral-950/70">
+  <div id="spinner" style="display:none" class="absolute inset-0 z-20 hidden items-center justify-center bg-neutral-950/70">
     <div class="h-10 w-10 animate-spin rounded-full border-2 border-neutral-700 border-t-indigo-500"></div>
   </div>
 

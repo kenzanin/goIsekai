@@ -45,6 +45,12 @@
   var stripView = document.getElementById('strip-view');
   var stripLoading = false; // strip is appending a neighbor chapter
 
+  // Abort controller for cancelable fetches
+  var loadAbortController = null;
+  // Bars stay visible only until the first page renders — after that the
+  // immersive default (hidden until tapped) resumes.
+  var initialLoad = true;
+
   // Auto-hide bars state
   var barsVisible = true;
   var topBar = document.getElementById('top-bar');
@@ -71,8 +77,8 @@
     progressLine.style.width = `${pct}%`;
   }
 
-  // Start with bars hidden
-  setBarsVisible(false);
+  // Start with bars visible during loading so user can cancel
+  setBarsVisible(true);
 
   function imageUrl(p, chapterID, prio) {
     var h = p.headers || {};
@@ -151,6 +157,14 @@
   function showError(v) {
     errPanel.style.display = v ? 'flex' : 'none';
   }
+
+  function abortLoad() {
+    if (loadAbortController) {
+      loadAbortController.abort();
+      loadAbortController = null;
+    }
+  }
+
   function showReaderError(msg) {
     var p = errPanel.querySelector('p');
     p.textContent = msg;
@@ -484,6 +498,10 @@
 
   function afterImage() {
     imgFails = 0;
+    if (initialLoad) {
+      initialLoad = false;
+      setBarsVisible(false);
+    }
     if (!measure()) {
       nextFrame(() => {
         measure();
@@ -889,7 +907,10 @@
     _lastFailedRetry = () => {
       loadChapter(resume);
     };
-    fetch(`/api/reader-data/${[pid, mid, cid].map(encodeURIComponent).join('/')}`)
+    loadAbortController = new AbortController();
+    fetch(`/api/reader-data/${[pid, mid, cid].map(encodeURIComponent).join('/')}`, {
+      signal: loadAbortController.signal
+    })
       .then((r) => {
         if (!r.ok) throw new Error(`HTTP ${r.status}`);
         return r.json();
@@ -919,8 +940,14 @@
         });
       })
       .catch((err) => {
+        if (err.name === 'AbortError') return;
         showReaderError(friendlyError(err));
       });
   }
+  // Abort fetch on back navigation (clicking manga title Back link)
+  document.querySelector('#top-bar a[href^="/view/manga/"]').addEventListener('click', () => {
+    abortLoad();
+  });
+
   loadChapter();
 })();
