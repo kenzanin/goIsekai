@@ -24,6 +24,8 @@ func imageExt(data []byte) string {
 		return ".png"
 	case len(data) >= 3 && bytes.Equal(data[:3], []byte{0xFF, 0xD8, 0xFF}):
 		return ".jpg"
+	case len(data) >= 12 && bytes.Equal(data[4:8], []byte("ftyp")) && bytes.HasPrefix(data[8:12], []byte("avif")):
+		return ".avif"
 	default:
 		return ".img"
 	}
@@ -99,7 +101,7 @@ func (s *AppService) readCachedImage(pluginID, mangaID, chapterID, url string) (
 	if base == "" {
 		return nil, false
 	}
-	for _, ext := range []string{".webp", ".img"} {
+	for _, ext := range []string{".webp", ".avif", ".img"} {
 		if data, err := os.ReadFile(base + ext); err == nil && validateImageFast(data) {
 			return data, true
 		}
