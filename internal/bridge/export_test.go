@@ -47,6 +47,35 @@ func TestImageExtAVIF(t *testing.T) {
 	}
 }
 
+func TestImageExtJXL(t *testing.T) {
+	container := []byte{0x00, 0x00, 0x00, 0x0c, 'J', 'X', 'L', ' ', 0x0d, 0x0a, 0x87, 0x0a}
+	if got := imageExt(container); got != ".jxl" {
+		t.Errorf("imageExt(JXL container) = %q, want .jxl", got)
+	}
+	bare := []byte{0xFF, 0x0A, 0x00, 0x00}
+	if got := imageExt(bare); got != ".jxl" {
+		t.Errorf("imageExt(JXL bare) = %q, want .jxl", got)
+	}
+}
+
+func TestImageContentType(t *testing.T) {
+	tests := []struct {
+		name string
+		data []byte
+		want string
+	}{
+		{"jxl container", []byte{0x00, 0x00, 0x00, 0x0c, 'J', 'X', 'L', ' ', 0x0d, 0x0a, 0x87, 0x0a}, "image/jxl"},
+		{"jxl bare", []byte{0xFF, 0x0A}, "image/jxl"},
+		{"avif", []byte{0, 0, 0, 0x20, 'f', 't', 'y', 'p', 'a', 'v', 'i', 'f'}, "image/avif"},
+		{"png", []byte("\x89PNG\r\n\x1a\n"), "image/png"},
+	}
+	for _, tt := range tests {
+		if got := ImageContentType(tt.data); got != tt.want {
+			t.Errorf("%s: ImageContentType = %q, want %q", tt.name, got, tt.want)
+		}
+	}
+}
+
 func TestZipImagesOrdering(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "out.cbz")
 	n, err := zipImages(path, [][]byte{
@@ -110,6 +139,24 @@ func TestReadCachedImageAVIF(t *testing.T) {
 	data, ok := s.readCachedImage("p", "m", "c", url)
 	if !ok || len(data) == 0 {
 		t.Fatalf("readCachedImage(AVIF): ok=%v len=%d, want cached .avif bytes", ok, len(data))
+	}
+	_ = os.RemoveAll(s.chapterCacheDir("p", "m", "c"))
+}
+
+// TestReadCachedImageJXL verifies readCachedImage finds .jxl cache files.
+func TestReadCachedImageJXL(t *testing.T) {
+	s := newTestServiceWithFormat(t, FormatJXL)
+	url := serveImage(t, "image/png", validPNG(t))
+	if _, err := s.GetImage("p", url, nil, "m", "c", PrioLow); err != nil {
+		t.Fatalf("GetImage: %v", err)
+	}
+
+	data, ok := s.readCachedImage("p", "m", "c", url)
+	if !ok || len(data) == 0 {
+		t.Fatalf("readCachedImage(JXL): ok=%v len=%d, want cached .jxl bytes", ok, len(data))
+	}
+	if !isJXL(data) {
+		t.Fatal("cached bytes are not JXL")
 	}
 	_ = os.RemoveAll(s.chapterCacheDir("p", "m", "c"))
 }

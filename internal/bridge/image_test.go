@@ -188,6 +188,7 @@ func TestImageCacheWritesConfiguredFormat(t *testing.T) {
 	}{
 		{FormatWebP, ".webp", isWebP},
 		{FormatAVIF, ".avif", isAVIF},
+		{FormatJXL, ".jxl", isJXL},
 	} {
 		t.Run(string(tc.format), func(t *testing.T) {
 			url := serveImage(t, "image/jpeg", validJPEG(t, 900, 1400))

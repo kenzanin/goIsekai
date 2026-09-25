@@ -3,6 +3,7 @@ package bridge
 import (
 	"bytes"
 	"image"
+	"net/http"
 	"time"
 
 	"github.com/anthonynsimon/bild/transform"
@@ -48,6 +49,22 @@ func (f ImageFormat) extension() string {
 // FormatExtension is the exported form used by cache readers that live
 // outside the codec path.
 func (f ImageFormat) FormatExtension() string { return f.extension() }
+
+// ImageContentType returns the MIME type for cached image bytes. It is
+// http.DetectContentType plus the formats Go's sniffing table does not know:
+// both JPEG XL signatures and AVIF's ftyp box fall through to
+// application/octet-stream there, which would serve a reader page as a
+// binary download instead of an image.
+func ImageContentType(data []byte) string {
+	switch {
+	case isJXL(data):
+		return "image/jxl"
+	case isAVIF(data):
+		return "image/avif"
+	default:
+		return http.DetectContentType(data)
+	}
+}
 
 // encodeStats reports where a cache write spent its time, for the caller's
 // debug log. Both fields are zero when the work they time did not happen.

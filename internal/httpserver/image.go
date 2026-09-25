@@ -50,9 +50,9 @@ func (s *Server) handleImage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// http.DetectContentType only inspects the first 512 bytes; pass the whole
-	// slice and let it look at the prefix.
-	w.Header().Set("Content-Type", http.DetectContentType(data))
+	// Sniff the MIME type: bridge.ImageContentType covers JXL and AVIF, which
+	// http.DetectContentType alone reports as application/octet-stream.
+	w.Header().Set("Content-Type", bridge.ImageContentType(data))
 	w.Header().Set("Cache-Control", "public, max-age=604800")
 	w.WriteHeader(http.StatusOK)
 	_, _ = w.Write(data)

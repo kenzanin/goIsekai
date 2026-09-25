@@ -186,7 +186,7 @@ func (s *Server) apiImage(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusBadGateway, "image fetch failed")
 		return
 	}
-	w.Header().Set("Content-Type", http.DetectContentType(data))
+	w.Header().Set("Content-Type", bridge.ImageContentType(data))
 	w.Header().Set("Cache-Control", "public, max-age=604800")
 	w.WriteHeader(http.StatusOK)
 	_, _ = w.Write(data)
