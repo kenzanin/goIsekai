@@ -3,6 +3,7 @@ package bridge
 import (
 	"image"
 	"image/color"
+	"sort"
 
 	"github.com/anthonynsimon/bild/effect"
 )
@@ -31,6 +32,84 @@ func (e enhanceConfig) modeFor(pluginID string) EnhanceMode {
 		return m
 	}
 	return e.defaultMode
+}
+
+// formatEnhanceStatus returns a human-readable status string showing the default
+// mode, which plugins are explicitly off, and which plugins are enabled/inherit.
+// pluginIDs are the installed plugin IDs (excluding info-only scripts).
+func (e enhanceConfig) formatEnhanceStatus(pluginIDs []string) string {
+	// Handle empty plugin list
+	if len(pluginIDs) == 0 {
+		return "enhance status: default=" + string(e.defaultMode) + " (no plugins)"
+	}
+
+	// Sort plugin IDs for deterministic output
+	sortedIDs := make([]string, len(pluginIDs))
+	copy(sortedIDs, pluginIDs)
+	sort.Strings(sortedIDs)
+
+	// Track which plugins are explicitly set to off vs enabled/inherit
+	offPlugins := make([]string, 0)
+	onPlugins := make([]string, 0)
+	for _, id := range sortedIDs {
+		mode := e.modeFor(id)
+		if mode == EnhanceOff {
+			offPlugins = append(offPlugins, id)
+		} else {
+			onPlugins = append(onPlugins, id)
+		}
+	}
+
+	// Build the main status string
+	result := "enhance status: default=" + string(e.defaultMode)
+
+	if len(offPlugins) > 0 {
+		result += " | off: " + stringsJoinPlugins(offPlugins)
+	}
+	if len(onPlugins) > 0 {
+		result += " | on: " + stringsJoinPlugins(onPlugins)
+	}
+
+	// If no explicit overrides at all, note that
+	if len(e.byPlugin) == 0 {
+		result += " (no overrides)"
+	}
+
+	// Check for unused overrides (plugin in config but not installed)
+	var unused []string
+	for id := range e.byPlugin {
+		found := false
+		for _, installed := range pluginIDs {
+			if installed == id {
+				found = true
+				break
+			}
+		}
+		if !found {
+			unused = append(unused, id)
+		}
+	}
+
+	if len(unused) > 0 {
+		sort.Strings(unused)
+		result += " | unused overrides: " + stringsJoinPlugins(unused)
+	}
+
+	return result
+}
+
+// stringsJoinPlugins joins plugin names with comma and space.
+func stringsJoinPlugins(plugins []string) string {
+	switch len(plugins) {
+	case 0:
+		return ""
+	default:
+		r := plugins[0]
+		for _, p := range plugins[1:] {
+			r += ", " + p
+		}
+		return r
+	}
 }
 
 // Soft-levels bounds. These are the narrowest pair that measured 100% of a real

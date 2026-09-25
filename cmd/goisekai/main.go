@@ -147,6 +147,7 @@ func main() {
 	enrichReg := enrich.NewRegistry()
 
 	svc := bridge.NewAppService(db, mgr, proxy, cfgPath, cacheDir, enrichReg)
+	svc.LogEnhanceStatus()
 	mgr.SetOnLoad(svc.SyncPluginMeta)
 	mgr.SetEnrichRegistry(enrichReg)
 

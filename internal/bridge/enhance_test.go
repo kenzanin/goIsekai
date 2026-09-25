@@ -7,6 +7,7 @@ import (
 	"image/jpeg"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -163,6 +164,53 @@ func TestEnhanceConfigModeFor(t *testing.T) {
 	empty := enhanceConfig{}
 	if got := empty.modeFor("kaliscan"); got != "" {
 		t.Errorf("unset default = %q, want the zero mode", got)
+	}
+}
+
+func TestFormatEnhanceStatus(t *testing.T) {
+	for _, tc := range []struct {
+		name       string
+		cfg        enhanceConfig
+		plugins    []string
+		wantSubstr string
+	}{
+		{
+			name:       "empty plugin list",
+			cfg:        enhanceConfig{defaultMode: EnhanceOff},
+			plugins:    nil,
+			wantSubstr: "enhance status: default=off (no plugins)",
+		},
+		{
+			name:       "no overrides",
+			cfg:        enhanceConfig{defaultMode: EnhanceAuto},
+			plugins:    []string{"kaliscan", "mangadex"},
+			wantSubstr: "enhance status: default=auto | on: kaliscan, mangadex (no overrides)",
+		},
+		{
+			name: "one plugin off",
+			cfg: enhanceConfig{
+				defaultMode: EnhanceAuto,
+				byPlugin:    map[string]EnhanceMode{"mangadex": EnhanceOff},
+			},
+			plugins:    []string{"mangadex", "kaliscan"},
+			wantSubstr: "enhance status: default=auto | off: mangadex | on: kaliscan",
+		},
+		{
+			name: "unused override",
+			cfg: enhanceConfig{
+				defaultMode: EnhanceAuto,
+				byPlugin:    map[string]EnhanceMode{"typo": EnhanceOff},
+			},
+			plugins:    []string{"mangadex"},
+			wantSubstr: "unused overrides: typo",
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			got := tc.cfg.formatEnhanceStatus(tc.plugins)
+			if !strings.Contains(got, tc.wantSubstr) {
+				t.Errorf("formatEnhanceStatus = %q, want substring %q", got, tc.wantSubstr)
+			}
+		})
 	}
 }
 

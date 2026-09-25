@@ -74,6 +74,16 @@ func (s *AppService) Log(level string, msg string) {
 	}
 }
 
+// LogEnhanceStatus logs the effective image-enhance configuration at startup.
+func (s *AppService) LogEnhanceStatus() {
+	plugins := s.mgr.LoadedPlugins()
+	ids := make([]string, len(plugins))
+	for i, p := range plugins {
+		ids[i] = p.ID
+	}
+	logger.Info(s.enhance.formatEnhanceStatus(ids))
+}
+
 // GetConfigPath returns the path to goisekai.ini.
 func (s *AppService) GetConfigPath() string {
 	return s.cfgPath
