@@ -31,6 +31,22 @@ func TestCompleteCSVRoundTrip(t *testing.T) {
 	}
 }
 
+func TestImageExtAVIF(t *testing.T) {
+	// AVIF files are ISOBMFF: 'ftyp' box at offset 4-7, 'avif' brand at offset 8-11.
+	avif := []byte{
+		0x00, 0x00, 0x00, 0x20, // box size
+		0x66, 0x74, 0x79, 0x70, // 'ftyp'
+		0x61, 0x76, 0x69, 0x66, // 'avif' brand
+		0x00, 0x00, 0x00, 0x00, // minor version
+		0x61, 0x76, 0x69, 0x66, // 'avif' compatible brand
+		0x6D, 0x69, 0x66, 0x31, // 'mif1'
+		0x00, 0x00, 0x00, 0x00, // filler
+	}
+	if got := imageExt(avif); got != ".avif" {
+		t.Errorf("imageExt(AVIF) = %q, want .avif", got)
+	}
+}
+
 func TestZipImagesOrdering(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "out.cbz")
 	n, err := zipImages(path, [][]byte{
@@ -77,6 +93,23 @@ func TestReadCachedImageDiskOnly(t *testing.T) {
 	// A never-fetched URL must miss (no network fallback in readCachedImage).
 	if _, ok := s.readCachedImage("p", "m", "c", "http://cdn.example.com/missing.png"); ok {
 		t.Fatal("readCachedImage hit for a URL never fetched")
+	}
+	_ = os.RemoveAll(s.chapterCacheDir("p", "m", "c"))
+}
+
+// TestReadCachedImageAVIF verifies readCachedImage finds .avif cache
+// files (the enhanced format) and not only .webp/.img.
+func TestReadCachedImageAVIF(t *testing.T) {
+	s := newTestServiceWithFormat(t, FormatAVIF)
+	url := serveImage(t, "image/png", validPNG(t))
+	if _, err := s.GetImage("p", url, nil, "m", "c", PrioLow); err != nil {
+		t.Fatalf("GetImage: %v", err)
+	}
+
+	// readCachedImage must find the .avif file.
+	data, ok := s.readCachedImage("p", "m", "c", url)
+	if !ok || len(data) == 0 {
+		t.Fatalf("readCachedImage(AVIF): ok=%v len=%d, want cached .avif bytes", ok, len(data))
 	}
 	_ = os.RemoveAll(s.chapterCacheDir("p", "m", "c"))
 }
