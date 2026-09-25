@@ -39,5 +39,9 @@ func (s *Server) servePluginStatic(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Logos are swapped in place under the same filename — without this the
+	// browser heuristically caches the old bytes (only Last-Modified is set)
+	// and stale logos show up for days. no-cache forces a cheap revalidate.
+	w.Header().Set("Cache-Control", "no-cache")
 	http.ServeFile(w, r, target)
 }

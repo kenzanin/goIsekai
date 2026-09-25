@@ -56,26 +56,9 @@ func (s *Server) viewLibrary(w http.ResponseWriter, r *http.Request) {
 		s.logger.Warn("library stats", "error", err)
 	}
 	mangaPluginMap := make(map[string]string) // mangaID -> pluginID (from DB)
-	// Resolve display names + icons from the DB-persisted plugin rows
-	// (populated by SyncPluginMeta after first load), overlaying runtime
-	// metas when they are fresher. PluginMetas alone is runtime-only and
-	// returns zero values for deferred plugins after a restart, which
-	// renders raw IDs in pills and cards.
-	dbPlugins, _ := s.service.ListPlugins()
-	pluginNameMap := make(map[string]string, len(dbPlugins)) // pluginID -> display name
-	pluginIconMap := make(map[string]string, len(dbPlugins)) // pluginID -> icon URL
-	for _, p := range dbPlugins {
-		pluginNameMap[p.ID] = p.Name
-		pluginIconMap[p.ID] = p.IconURL
-	}
-	for pid, m := range metas {
-		if m.Name != "" {
-			pluginNameMap[pid] = m.Name
-		}
-		if m.Logo != "" {
-			pluginIconMap[pid] = resolveLogoURL(m.Logo, pid)
-		}
-	}
+	// Display names + icons: DB rows as base, runtime metas overlay; wasm
+	// plugins fall back to their on-disk logo.png (see pluginDisplayMaps).
+	pluginNameMap, pluginIconMap := s.pluginDisplayMaps()
 	rows, err := s.service.QueryMangaPluginIDs()
 	if err == nil {
 		for _, r := range rows {

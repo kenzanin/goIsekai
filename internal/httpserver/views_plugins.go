@@ -49,10 +49,6 @@ func (s *Server) viewPlugins(w http.ResponseWriter, r *http.Request) {
 				// go:embed wasm plugins can't export Init/PluginMeta — every wasm
 				// plugin ships logo.png beside main.wasm, so fall back to it.
 				v.IconURL = resolveLogoURL("logo.png", p.ID)
-			} else if m.Kind == "wasm" {
-				// go:embed wasm plugins can't export Init/PluginMeta — every wasm
-				// plugin ships logo.png beside main.wasm, so fall back to it.
-				v.IconURL = resolveLogoURL("logo.png", p.ID)
 			}
 		}
 		if row, ok, err := s.service.GetPluginVerifyState(p.ID); err == nil && ok {
@@ -91,7 +87,13 @@ func (s *Server) pluginDisplayMaps() (map[string]string, map[string]string) {
 	icons := make(map[string]string, len(dbPlugins))
 	for _, p := range dbPlugins {
 		names[p.ID] = p.Name
-		icons[p.ID] = p.IconURL
+		if p.IconURL != "" {
+			icons[p.ID] = p.IconURL
+		} else if p.WasmPath != "" {
+			// wasm plugins can't export Init/PluginMeta — every wasm plugin
+			// ships logo.png beside main.wasm, so fall back to it.
+			icons[p.ID] = resolveLogoURL("logo.png", p.ID)
+		}
 	}
 	for pid, m := range s.service.PluginMetas() {
 		if m.Name != "" {
