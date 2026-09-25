@@ -128,12 +128,31 @@ func (s *AppService) GetImage(pluginID, url string, headers map[string]string, m
 		call.err = fmt.Errorf("unexpected status %d", resp.Status)
 		return nil, fmt.Errorf("bridge: get image %s: unexpected status %d", url, resp.Status)
 	}
-	// body already set in loop after validation
-	// L1 cache.
+	// body already set in loop after validation.
+	//
+	// Convert BEFORE caching and return the converted bytes: storing raw in
+	// L1 while disk holds the converted copy means a cold URL serves the
+	// reader/export the original source (JPEG, unenhanced) and the next
+	// request a different image. encodeForCache fails open, so a conversion
+	// error hands back the source unchanged.
+	enhance := mangaID != "" && chapterID != "" && s.enhance.modeFor(pluginID) == EnhanceAuto
+	var stats encodeStats
+	data, converted := encodeForCache(body, s.imgFormat, mangaID == "", s.coverMaxDim, enhance, &stats)
+	ext := ".img"
+	if converted {
+		ext = s.imgFormat.extension()
+	}
+	if stats.resized {
+		logger.Debug("cover resized",
+			"url", url, "from", stats.resizeFrom, "to", stats.resizeTo,
+			"max_dim", s.coverMaxDim)
+	}
+
+	// L1 cache: the same bytes L2 holds.
 	s.imageMu.Lock()
-	s.imageCache[url] = body
+	s.imageCache[url] = data
 	s.imageMu.Unlock()
-	call.data = body
+	call.data = data
 
 	// L2 cache: write to disk, converting to the configured format. Covers
 	// (mangaID empty) are also downscaled. Only a real page is ever enhanced:
@@ -142,26 +161,14 @@ func (s *AppService) GetImage(pluginID, url string, headers map[string]string, m
 	// as-is under .img.
 	if base := s.diskCachePath(pluginID, mangaID, chapterID, url); base != "" {
 		if err := os.MkdirAll(filepath.Dir(base), 0o755); err == nil {
-			enhance := mangaID != "" && chapterID != "" && s.enhance.modeFor(pluginID) == EnhanceAuto
-			var stats encodeStats
-			data, converted := encodeForCache(body, s.imgFormat, mangaID == "", s.coverMaxDim, enhance, &stats)
-			ext := ".img"
-			if converted {
-				ext = s.imgFormat.extension()
-			}
 			logger.Debug("image cache: write",
 				"url", url, "plugin", pluginID, "enhance", enhance,
 				"enhance_ms", stats.enhance.Milliseconds(),
 				"convert_ms", stats.encode.Milliseconds(),
 				"in_bytes", len(body), "out_bytes", len(data), "ext", ext)
-			if stats.resized {
-				logger.Debug("cover resized",
-					"url", url, "from", stats.resizeFrom, "to", stats.resizeTo,
-					"max_dim", s.coverMaxDim)
-			}
 			_ = os.WriteFile(base+ext, data, 0o644)
 		}
 	}
 
-	return body, nil
+	return data, nil
 }

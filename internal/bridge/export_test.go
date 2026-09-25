@@ -2,6 +2,7 @@ package bridge
 
 import (
 	"archive/zip"
+	"bytes"
 	"os"
 	"path/filepath"
 	"testing"
@@ -105,6 +106,33 @@ func TestZipImagesOrdering(t *testing.T) {
 			t.Errorf("entry %d = %q, want %q", i, names[i], want[i])
 		}
 	}
+}
+
+// TestGetImageReturnsConvertedBytes pins the cold-fetch contract: the bytes
+// handed back are the converted ones stored in the cache, not the raw source.
+// Serving the source made a first view and its second render two different
+// images (raw JPEG vs enhanced AVIF on disk), which exported as .jpg CBZs.
+func TestGetImageReturnsConvertedBytes(t *testing.T) {
+	url := serveImage(t, "image/png", validPNG(t))
+	s := newTestServiceWithFormat(t, FormatWebP)
+
+	got, err := s.GetImage("p", url, nil, "m", "c", PrioLow)
+	if err != nil {
+		t.Fatalf("GetImage: %v", err)
+	}
+	if !isWebP(got) {
+		t.Errorf("cold GetImage returned %s bytes, want converted webp", imageExt(got))
+	}
+
+	// L1 hit must serve the same converted bytes as the cold fetch.
+	got2, err := s.GetImage("p", url, nil, "m", "c", PrioLow)
+	if err != nil {
+		t.Fatalf("GetImage (L1): %v", err)
+	}
+	if !bytes.Equal(got, got2) {
+		t.Error("L1 hit returned different bytes than the cold fetch")
+	}
+	_ = os.RemoveAll(s.chapterCacheDir("p", "m", "c"))
 }
 
 func TestReadCachedImageDiskOnly(t *testing.T) {

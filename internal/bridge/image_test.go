@@ -491,9 +491,17 @@ func TestConcurrentGetImageSharesFetch(t *testing.T) {
 	if got := hits.Load(); got != 1 {
 		t.Errorf("upstream hits = %d, want 1", got)
 	}
+	if len(results[0]) == 0 {
+		t.Fatal("goroutine 0 returned no bytes")
+	}
 	for i, data := range results {
-		if string(data) != string(payload) {
-			t.Fatalf("goroutine %d got different bytes", i)
+		if !bytes.Equal(data, results[0]) {
+			t.Fatalf("goroutine %d returned different bytes than goroutine 0", i)
 		}
+	}
+	// The response carries the converted cache bytes, not the raw PNG source:
+	// disk and response must be the same image (see TestGetImageReturnsConvertedBytes).
+	if !isWebP(results[0]) {
+		t.Errorf("returned bytes are %s, want converted webp", imageExt(results[0]))
 	}
 }
