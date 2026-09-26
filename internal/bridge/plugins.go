@@ -6,7 +6,9 @@ import (
 	"goisekai/internal/database"
 	"goisekai/internal/logger"
 	"goisekai/internal/pluginmanager"
+	"goisekai/pkg/types"
 	"path/filepath"
+	"strconv"
 )
 
 // InstallPlugin copies a plugin folder into the managed plugins directory,
@@ -22,7 +24,7 @@ func (s *AppService) InstallPlugin(dirPath string) error {
 	if err := s.db.RegisterPlugin(database.Plugin{
 		ID:       id,
 		Name:     id,
-		Version:  "",
+		Version:  strconv.Itoa(int(types.ContractVersion)),
 		WasmPath: dest,
 		IsActive: true,
 	}); err != nil {

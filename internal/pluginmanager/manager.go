@@ -162,10 +162,17 @@ func (m *Manager) LoadedPlugins() []LoadedPlugin {
 			// plugin list the UI and search read.
 			continue
 		}
+		ver := p.contractVersion
+		if ver == 0 {
+			// ponytail: lazy plugin not loaded yet — CheckVersion rejects
+			// anything but ContractVersion at load, so 0 is never a real
+			// declaration. Upgrade: persist declared version on first load.
+			ver = types.ContractVersion
+		}
 		out = append(out, LoadedPlugin{
 			ID:               p.id,
 			Kind:             p.kind,
-			Version:          strconv.Itoa(int(p.contractVersion)),
+			Version:          strconv.Itoa(int(ver)),
 			Loaded:           p.loaded,
 			WasmPath:         p.wasmPath,
 			VerifyURL:        p.meta.VerifyURL,
