@@ -129,6 +129,7 @@ func (s *Server) viewLibrary(w http.ResponseWriter, r *http.Request) {
 	s.renderPage(w, r, "views/library", "library", map[string]any{
 		"Mangas":          mangas[start:end],
 		"Q":               q,
+		"ResultCount":     total,
 		"Ratios":          ratios,
 		"LibraryStats":    statsMap,
 		"Page":            page,

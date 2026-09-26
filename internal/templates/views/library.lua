@@ -39,8 +39,12 @@ return function(data)
 		Ratios = ratios,
 	})
 
-	local subtitle = tostring(stats.TotalTitles or 0)
-		.. " titles · "
+	local titleCount = data.ResultCount
+	if not titleCount then
+		titleCount = stats.TotalTitles or 0
+	end
+	local subtitle = tostring(titleCount)
+		.. (q ~= "" and " results · " or " titles · ")
 		.. tostring(totalPages)
 		.. " page"
 		.. (totalPages > 1 and "s" or "")
