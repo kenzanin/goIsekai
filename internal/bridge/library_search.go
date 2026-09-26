@@ -7,28 +7,43 @@ import (
 	"strings"
 )
 
-// SearchLibrary runs an FTS-backed fuzzy search across the user's library,
-// scoring candidates by match quality and returning the top 50.
+// SearchLibrary runs a fuzzy search across the user's library, scoring
+// candidates by match quality and returning the top 50. Candidates come from
+// the FTS index (title+alt prefix tokens) unioned with a substring scan (mid-
+// token partials + descriptions). Ranking is tiered: title/alt-title matches
+// (30–100) always outrank description-only matches (1–20).
 func (s *AppService) SearchLibrary(q string) ([]SearchHit, error) {
 	if strings.TrimSpace(q) == "" {
 		return nil, nil
 	}
-	candidates, err := s.db.SearchLibraryFTS(q)
+	fts, err := s.db.SearchLibraryFTS(q)
 	if err != nil {
 		return nil, fmt.Errorf("bridge: fts search: %w", err)
 	}
-	if len(candidates) == 0 {
-		return nil, nil
+	scan, err := s.db.SearchLibrarySubstring(q)
+	if err != nil {
+		return nil, fmt.Errorf("bridge: substring search: %w", err)
 	}
-	lq := strings.ToLower(q)
+	seen := make(map[string]bool, len(fts)+len(scan))
 	var hits []SearchHit
-	for _, c := range candidates {
+	lq := strings.ToLower(q)
+	process := func(c database.CandidateRow) {
 		score := scoreString(c.Title, lq)
-		// Also check alt titles — take the best score.
-		alts, err := s.db.ListAltTitles(c.MangaRowID)
-		if err == nil {
+		if alts, err := s.db.ListAltTitles(c.MangaRowID); err == nil {
 			for _, a := range alts {
 				if s := scoreString(a.Title, lq); s > score {
+					score = s
+				}
+			}
+		}
+		// Description tier: /5 keeps it strictly below the title/alt band
+		// (min 30) — exact 20, prefix 16, substring 12, subsequence 6.
+		if s := scoreString(c.Description, lq) / 5; s > score {
+			score = s
+		}
+		if ads, err := s.db.ListAltDescriptions(c.MangaRowID); err == nil {
+			for _, a := range ads {
+				if s := scoreString(a.Description, lq) / 5; s > score {
 					score = s
 				}
 			}
@@ -40,6 +55,18 @@ func (s *AppService) SearchLibrary(q string) ([]SearchHit, error) {
 				Title:         c.Title,
 				Score:         score,
 			})
+		}
+	}
+	for _, c := range fts {
+		if !seen[c.MangaRowID] {
+			seen[c.MangaRowID] = true
+			process(c)
+		}
+	}
+	for _, c := range scan {
+		if !seen[c.MangaRowID] {
+			seen[c.MangaRowID] = true
+			process(c)
 		}
 	}
 	sort.Slice(hits, func(i, j int) bool {

@@ -184,6 +184,7 @@ type CandidateRow struct {
 	PluginID      string
 	SourceMangaID string
 	Title         string
+	Description   string
 }
 
 // SearchLibraryFTS runs a prefix-tokenized FTS5 query over title+alt and
@@ -197,7 +198,7 @@ func (d *DB) SearchLibraryFTS(q string) ([]CandidateRow, error) {
 	if match == "" {
 		return nil, nil
 	}
-	rows, err := d.db.Query(`SELECT f.manga_row_id, f.plugin_id, m.source_manga_id, m.title
+	rows, err := d.db.Query(`SELECT f.manga_row_id, f.plugin_id, m.source_manga_id, m.title, m.description
 		FROM library_fts f JOIN mangas m ON m.id = f.manga_row_id
 		WHERE library_fts MATCH ? ORDER BY rank`, match)
 	if err != nil {
@@ -207,7 +208,7 @@ func (d *DB) SearchLibraryFTS(q string) ([]CandidateRow, error) {
 	var out []CandidateRow
 	for rows.Next() {
 		var c CandidateRow
-		if err := rows.Scan(&c.MangaRowID, &c.PluginID, &c.SourceMangaID, &c.Title); err != nil {
+		if err := rows.Scan(&c.MangaRowID, &c.PluginID, &c.SourceMangaID, &c.Title, &c.Description); err != nil {
 			return nil, err
 		}
 		out = append(out, c)
