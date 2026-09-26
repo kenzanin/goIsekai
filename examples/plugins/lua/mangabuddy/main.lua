@@ -198,7 +198,7 @@ function get_page_list(arg)
     -- (chapter cover /thumb/ images and the discord gif don't match this shape).
     local pages = {}
     local seen = {}
-    for u in host.regex.gmatch(html, [[data-src="(https://cdn1\.love4awalk\.xyz/[^"]*?/\d+/\d+\.webp)"]]) do
+    for u in host.regex.gmatch(html, [[data-src="(https://cdn1\.love4awalk\.xyz/[^"]*?/[\d.]+/\d+\.webp)"]]) do
         if not seen[u] then
             seen[u] = true
             pages[#pages + 1] = {url = u}
