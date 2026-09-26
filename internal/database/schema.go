@@ -25,6 +25,11 @@ const dbStorageMigration = 22
 // regenerated from the integer-keyed table the storage migration introduced.
 const libraryFTSMigration = 23
 
+// genresColumnMigration is the index for the plugins.genres ALTER TABLE.
+// Special-cased for the same reason as skipColumnMigration: rewind-replay
+// tests (and future rebuilds) can land on it twice.
+const genresColumnMigration = 26
+
 // migrations is an ordered list of DDL statements applied in sequence.
 // Version is tracked via PRAGMA user_version; migrations[i] is applied when
 // user_version < len(migrations) so partial upgrades resume correctly.
@@ -163,4 +168,7 @@ var migrations = []string{
 	`/* library-fts-rebuild: see migrateLibraryFTSRebuild */`,
 	// Index 24: plugin_cache expires_at index for TTL-based cache cleanup scans.
 	`CREATE INDEX IF NOT EXISTS idx_plugin_cache_expires ON plugin_cache(expires_at)`,
+	// Index 25: cached normalized genre list per plugin (JSON [{name,slug}]).
+	// NULL = not fetched yet, "[]" = no genre export (never re-invoke).
+	`ALTER TABLE plugins ADD COLUMN genres TEXT;`,
 }

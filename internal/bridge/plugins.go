@@ -1,11 +1,12 @@
 package bridge
 
 import (
+	"encoding/json"
 	"fmt"
-	"path/filepath"
-
 	"goisekai/internal/database"
+	"goisekai/internal/logger"
 	"goisekai/internal/pluginmanager"
+	"path/filepath"
 )
 
 // InstallPlugin copies a plugin folder into the managed plugins directory,
@@ -26,6 +27,11 @@ func (s *AppService) InstallPlugin(dirPath string) error {
 		IsActive: true,
 	}); err != nil {
 		return fmt.Errorf("bridge: register plugin: %w", err)
+	}
+	// Warm the genre cache so the first search page render is instant. A
+	// failure here is non-fatal: ListGenres self-heals on first use.
+	if _, err := s.ListGenres(id); err != nil {
+		logger.Warn("genre cache warmup failed", "plugin", id, "error", err)
 	}
 	return nil
 }
@@ -53,10 +59,53 @@ func (s *AppService) ReloadPlugin(id string) (string, error) {
 // Genre re-exports the plugin manager's genre descriptor for views.
 type Genre = pluginmanager.Genre
 
-// ListGenres returns the genre list a plugin advertises via its optional
-// GetGenres export, or nil when the plugin does not support genre browsing.
+// ListGenres returns the cached genre list for a plugin, normalized to
+// canonical name spellings (slugs stay verbatim — they are the search
+// filter tokens). Cache states in plugins.genres: NULL = not fetched yet
+// (fetch + persist now, one live plugin call ever), "[]" = plugin has no
+// genre export (never re-invoke), JSON array = the cached list.
 func (s *AppService) ListGenres(pluginID string) ([]Genre, error) {
-	return s.mgr.GetGenres(pluginID)
+	if cached, found, err := s.db.GetPluginGenres(pluginID); err != nil {
+		return nil, fmt.Errorf("bridge: read genre cache: %w", err)
+	} else if found {
+		return decodeGenreCache(pluginID, cached)
+	}
+	genres, err := s.mgr.GetGenres(pluginID)
+	if err != nil {
+		return nil, err
+	}
+	// Normalize names one at a time so dedup can't desync name↔slug pairs.
+	norm := make([]Genre, 0, len(genres))
+	for _, g := range genres {
+		name := g.Name
+		if fixed := s.genres.normalize([]string{name}); len(fixed) > 0 {
+			name = fixed[0]
+		} else {
+			name = ""
+		}
+		if name == "" {
+			continue
+		}
+		norm = append(norm, Genre{Name: name, Slug: g.Slug})
+	}
+	b, mErr := json.Marshal(norm)
+	if mErr == nil {
+		if err := s.db.SetPluginGenres(pluginID, string(b)); err != nil {
+			logger.Warn("genre cache persist failed", "plugin", pluginID, "error", err)
+		}
+	}
+	return norm, nil
+}
+
+// decodeGenreCache parses a cached genre JSON payload. A corrupt payload is
+// logged and treated as a miss-safe empty list rather than failing the view.
+func decodeGenreCache(pluginID, raw string) ([]Genre, error) {
+	var out []Genre
+	if err := json.Unmarshal([]byte(raw), &out); err != nil {
+		logger.Warn("genre cache corrupt, ignoring", "plugin", pluginID, "error", err)
+		return []Genre{}, nil
+	}
+	return out, nil
 }
 
 // ListPlugins returns all registered plugins.

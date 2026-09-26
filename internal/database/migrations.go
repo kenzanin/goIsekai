@@ -88,6 +88,15 @@ func columnExists(tx *sql.Tx, ddl string) bool {
 	return cnt > 0
 }
 
+// tableExists reports whether a base table is present.
+func tableExists(tx *sql.Tx, name string) bool {
+	var cnt int
+	_ = tx.QueryRow(
+		`SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name=?`, name,
+	).Scan(&cnt)
+	return cnt > 0
+}
+
 // runMigrations applies any not-yet-applied migrations inside a transaction,
 // gating on PRAGMA user_version and bumping it after each applied statement.
 func (d *DB) runMigrations() error {
@@ -110,9 +119,13 @@ func (d *DB) runMigrations() error {
 			}
 			continue
 		}
-		if i == skipColumnMigration || i == authorMigration {
+		if i == skipColumnMigration || i == authorMigration || i == genresColumnMigration {
 			// Idempotent: test DBs and databases rebuilt by the storage
-			// migration may already carry these columns.
+			// migration may already carry these columns; synthetic fixtures
+			// may lack the plugins table entirely.
+			if i == genresColumnMigration && !tableExists(tx, "plugins") {
+				continue
+			}
 			if !columnExists(tx, migrations[i]) {
 				if _, err := tx.Exec(migrations[i]); err != nil {
 					return fmt.Errorf("applying migration %d: %w", i, err)
