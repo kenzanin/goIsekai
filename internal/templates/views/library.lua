@@ -89,11 +89,14 @@ return function(data)
 		.. chip
 		.. '<form method="get" action="/view/library" class="flex-1 min-w-[180px] max-w-md" role="search">'
 		.. (pluginID ~= "" and '<input type="hidden" name="pluginID" value="' .. h(pluginID) .. '">' or "")
-		.. '<div class="relative">'
+		.. '<div class="flex gap-2">'
+		.. '<div class="relative flex-1">'
 		.. '<svg class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-500 pointer-events-none" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path stroke-linecap="round" d="m21 21-4.35-4.35"/></svg>'
 		.. '<input type="search" name="q" value="'
 		.. h(q)
 		.. '" placeholder="Search library…" class="w-full bg-neutral-900 border border-neutral-700 rounded-md pl-9 pr-3 py-1.5 text-sm placeholder-neutral-500 focus:outline-none focus:border-indigo-500">'
+		.. '</div>'
+		.. '<button type="submit" class="bg-indigo-600 hover:bg-indigo-500 text-white rounded-md px-3 py-1.5 text-sm font-medium">Search</button>'
 		.. "</div></form>"
 		.. topPagination
 		.. '<div class="view-mode-toggle shrink-0 flex items-center gap-1" role="group" aria-label="View mode" data-view-mode="grid">'
