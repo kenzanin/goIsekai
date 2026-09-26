@@ -35,6 +35,18 @@ func (s *Server) viewLibrary(w http.ResponseWriter, r *http.Request) {
 		}
 		mangas = filtered
 	}
+	// Optional per-plugin filter (?pluginID=). Purely in-memory over the
+	// ListLibrary() result — combines with q and pagination below.
+	pluginID := strings.TrimSpace(r.URL.Query().Get("pluginID"))
+	if pluginID != "" {
+		kept := make([]database.Manga, 0, len(mangas))
+		for _, m := range mangas {
+			if m.PluginID == pluginID {
+				kept = append(kept, m)
+			}
+		}
+		mangas = kept
+	}
 	// Host-side pagination: slice the full library (newest-updated first)
 	// so the grid renders one page at a time.
 	const pageSize = 24
@@ -126,9 +138,16 @@ func (s *Server) viewLibrary(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 	}
+	// Display name for the pluginID filter chip (same fallback as statsMap).
+	pluginFilterName := pluginNameMap[pluginID]
+	if pluginFilterName == "" {
+		pluginFilterName = pluginID
+	}
 	s.renderPage(w, r, "views/library", "library", map[string]any{
 		"Mangas":          mangas[start:end],
 		"Q":               q,
+		"PluginID":        pluginID,
+		"PluginName":      pluginFilterName,
 		"ResultCount":     total,
 		"Ratios":          ratios,
 		"LibraryStats":    statsMap,

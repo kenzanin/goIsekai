@@ -41,6 +41,15 @@ return function(data)
 			if libCount == 0 then
 				countLabel = "0 manga"
 			end
+			-- Count links to the library filtered by this plugin when > 0.
+			local countHTML = h(countLabel)
+			if libCount > 0 then
+				countHTML = '<a href="/view/library?pluginID='
+					.. h(id)
+					.. '" class="hover:underline">'
+					.. h(countLabel)
+					.. "</a>"
+			end
 
 			local cardHTML = '<div class="bg-neutral-900 rounded-lg p-4 border border-neutral-800">'
 
@@ -80,7 +89,7 @@ return function(data)
 				.. profileBadge
 				.. "</div>"
 				.. '<div class="text-[10px] text-neutral-500">'
-				.. h(countLabel)
+				.. countHTML
 				.. "</div>"
 				.. '<div class="text-xs font-mono text-neutral-500 truncate">'
 				.. h(id)

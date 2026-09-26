@@ -123,6 +123,81 @@ func TestViewLibrarySearchFiltersNonMatching(t *testing.T) {
 	}
 }
 
+func TestViewLibraryPluginIDFilter(t *testing.T) {
+	s, db := testServerFullDB(t, "", true)
+
+	seedManga(t, db, "p1", "a", "Solo Leveling")
+	seedManga(t, db, "p1", "b", "Solo Side Story")
+	seedManga(t, db, "p2", "c", "Berserk")
+
+	tests := []struct {
+		name    string
+		url     string
+		want    []string
+		notWant []string
+	}{
+		{
+			name: "filter by plugin",
+			url:  "/view/library?pluginID=p1",
+			want: []string{
+				"Solo Leveling", "Solo Side Story",
+				"2 results · 1 page",
+				"Source: p1",
+				`href="/view/library?pluginID=p1"`,
+			},
+			notWant: []string{"Berserk"},
+		},
+		{
+			name: "plugin filter combines with q",
+			url:  "/view/library?pluginID=p1&q=Solo",
+			want: []string{
+				"Solo Leveling", "Solo Side Story",
+				"2 results · 1 page",
+				`name="pluginID" value="p1"`,  // search form keeps the filter
+				`href="/view/library?q=Solo"`, // clear chip keeps q
+			},
+			notWant: []string{"Berserk"},
+		},
+		{
+			name: "q hit outside plugin is scoped away",
+			url:  "/view/library?pluginID=p1&q=Berserk",
+			want: []string{"0 results · 1 page"},
+			notWant: []string{
+				`href="/view/manga/p2/c"`, // Berserk card
+				`href="/view/manga/p1/`,   // any p1 card
+			},
+		},
+		{
+			name:    "other plugin sees only its manga",
+			url:     "/view/library?pluginID=p2",
+			want:    []string{"Berserk", "1 results · 1 page"},
+			notWant: []string{"Solo Leveling", "Solo Side Story"},
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			req := httptest.NewRequest("GET", tc.url, nil)
+			rec := httptest.NewRecorder()
+			s.Router.ServeHTTP(rec, req)
+			if rec.Code != 200 {
+				t.Fatalf("status = %d, want 200; body: %s", rec.Code, rec.Body.String())
+			}
+			body := rec.Body.String()
+			for _, want := range tc.want {
+				if !strings.Contains(body, want) {
+					t.Fatalf("expected %q in response for %s", want, tc.url)
+				}
+			}
+			for _, nw := range tc.notWant {
+				if strings.Contains(body, nw) {
+					t.Fatalf("%q should be filtered out for %s", nw, tc.url)
+				}
+			}
+		})
+	}
+}
+
 func TestViewLibrarySearchHidesStatsRow(t *testing.T) {
 	s, db := testServerFullDB(t, "", true)
 

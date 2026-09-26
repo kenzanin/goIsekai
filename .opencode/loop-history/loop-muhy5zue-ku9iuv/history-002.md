@@ -1,0 +1,13 @@
+# Attempt 002 — PASS
+- Goal: klik plugin → list manga dari plugin itu (filter library ?pluginID=)
+- Lane: fixer (session fix-3 resumed, attempt 2/2)
+- Result: IMPLEMENTED — pluginID filter + card/sidebar links + scoped search + chip clear
+- Files: views_library.go (filter+param), views/library.lua (chip/subtitle/hid-input/pagBase), plugin_cards.lua (count line link), library_sidebar.lua (row link), views_test.go (TestViewLibraryPluginIDFilter)
+- Gates: gofmt clean · luacheck 0/0 · build PASS · httpserver tests PASS 30.1s · lint 0 issues
+- E2E (2x consecutive, identical assertions): pluginLink=1 filter=1 scopedQ=1 pagination=1 sidebar=1 regression=1
+  - /view/library?pluginID=mangakatana → chip "Source: MangaKatana", "11 results · 1 page", 11/11 cards mangakatana-only
+  - ?q=solo scoped: hidden name="pluginID" value="mangakatana" in form
+  - ?pluginID=kaliscan&page=2 pagination works; sidebar + plugin-page count lines link out
+  - regression: ?q=hero still "38 results"
+- Manual hot-fix by orchestrator on production code: NONE (attempt-1 e2e assertion was case-sensitivity + regex issue in the harness only; production code untouched)
+- Verdict: PASS — loop complete (max 2 attempts, finished in 2)

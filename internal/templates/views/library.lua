@@ -39,17 +39,41 @@ return function(data)
 		Ratios = ratios,
 	})
 
+	local pluginID = data.PluginID or ""
+	local pluginName = data.PluginName or pluginID
 	local titleCount = data.ResultCount
 	if not titleCount then
 		titleCount = stats.TotalTitles or 0
 	end
 	local subtitle = tostring(titleCount)
-		.. (q ~= "" and " results · " or " titles · ")
+		.. ((q ~= "" or pluginID ~= "") and " results · " or " titles · ")
 		.. tostring(totalPages)
 		.. " page"
 		.. (totalPages > 1 and "s" or "")
 
-	local pagBase = "/view/library" .. (q ~= "" and "?q=" .. h(q) or "")
+	local query = ""
+	if q ~= "" then
+		query = query .. "?q=" .. h(q)
+	end
+	if pluginID ~= "" then
+		query = query .. (query == "" and "?" or "&") .. "pluginID=" .. h(pluginID)
+	end
+	local pagBase = "/view/library" .. query
+
+	-- Source filter chip: clears pluginID, keeps q.
+	local chip = ""
+	if pluginID ~= "" then
+		local clearURL = "/view/library"
+		if q ~= "" then
+			clearURL = clearURL .. "?q=" .. h(q)
+		end
+		chip = '<a href="'
+			.. clearURL
+			.. '" class="inline-flex items-center gap-1.5 rounded-md border border-neutral-700 px-2.5 py-1 text-xs text-neutral-400 hover:bg-neutral-800 hover:text-neutral-200" title="Clear source filter">'
+			.. "Source: "
+			.. h(pluginName)
+			.. ' <span class="text-neutral-500">✕</span></a>'
+	end
 	local topPagination = pagination({
 		Pagination = { Base = pagBase, Param = "page", Current = page, Total = totalPages, Compact = true },
 	})
@@ -62,7 +86,9 @@ return function(data)
 		.. '<div class="text-xs text-neutral-500">'
 		.. h(subtitle)
 		.. "</div></div>"
+		.. chip
 		.. '<form method="get" action="/view/library" class="flex-1 min-w-[180px] max-w-md" role="search">'
+		.. (pluginID ~= "" and '<input type="hidden" name="pluginID" value="' .. h(pluginID) .. '">' or "")
 		.. '<div class="relative">'
 		.. '<svg class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-500 pointer-events-none" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path stroke-linecap="round" d="m21 21-4.35-4.35"/></svg>'
 		.. '<input type="search" name="q" value="'
