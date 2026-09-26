@@ -164,27 +164,28 @@ function get_chapter_list(arg)
         return host.json.encode({})
     end
 
-    -- Chapter rows are <a href="/series/comic/{slug}/chapter/{N}">; the
-    -- same URL repeats for the "latest chapter" card, so dedupe by number.
+    -- Chapter rows are <a href="/series/comic/{slug}/chapter/{N}"> where N
+    -- may be decimal (7.1); keep the raw token so URLs round-trip exactly.
+    -- The same URL repeats for the "latest chapter" card, so dedupe by token.
     local nums = {}
     local seen = {}
-    local pat = '/series/comic/' .. host.regex.quote(manga_id) .. '/chapter/(\\d+)'
-    for _, n in ipairs(host.regex.find_all(html, pat)) do
-        if not seen[n] then
-            seen[n] = true
-            nums[#nums + 1] = tonumber(n)
+    local pat = '/series/comic/' .. host.regex.quote(manga_id) .. '/chapter/([\\d.]+)'
+    for _, raw in ipairs(host.regex.find_all(html, pat)) do
+        if not seen[raw] then
+            seen[raw] = true
+            nums[#nums + 1] = raw
         end
     end
-    table.sort(nums, function(a, b) return a > b end)
+    table.sort(nums, function(a, b) return (tonumber(a) or 0) > (tonumber(b) or 0) end)
 
     local chapters = {}
-    for _, n in ipairs(nums) do
+    for _, raw in ipairs(nums) do
         chapters[#chapters + 1] = {
-            id = manga_id .. ":" .. tostring(n),
+            id = manga_id .. ":" .. raw,
             manga_id = manga_id,
-            chapter_num = n,
-            title = "Chapter " .. tostring(n),
-            url = BASE .. "/series/comic/" .. manga_id .. "/chapter/" .. tostring(n),
+            chapter_num = tonumber(raw) or 0,
+            title = "Chapter " .. raw,
+            url = BASE .. "/series/comic/" .. manga_id .. "/chapter/" .. raw,
             uploaded_at = ""
         }
     end
@@ -196,7 +197,7 @@ end
 -- arg: '"urlSlug:N"' (chapter id from get_chapter_list)  ->  array of {url}
 function get_page_list(arg)
     local chapter_id = host.json.decode(arg) -- e.g. "urlSlug:37"
-    local manga_id, num = host.regex.find(chapter_id, [[^(.*?):(\d+)$]])
+    local manga_id, num = host.regex.find(chapter_id, [[^(.*?):([\d.]+)$]])
     if not manga_id or not num then
         return host.json.encode({})
     end
