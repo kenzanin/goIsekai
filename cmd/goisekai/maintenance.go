@@ -96,6 +96,16 @@ func pruneImageCache(cfg *config.Config, dataDir string, maxBytesGB float64) (in
 // maxCacheGB holds the hot-reloadable image-cache size cap (float64 bits).
 func startMaintenance(db *database.DB, cfg *config.Config, dataDir string, maxCacheGB *atomic.Int64) chan struct{} {
 	backupsDir := filepath.Join(dataDir, "backups")
+	healFTS := func() {
+		rebuilt, err := db.EnsureLibraryFTS()
+		if err != nil {
+			logger.Error("library fts check", "error", err)
+			return
+		}
+		if rebuilt {
+			logger.Info("library_fts index rebuilt")
+		}
+	}
 	if cfg.PruneOrphans {
 		if summary, err := db.PruneOrphans(); err != nil {
 			logger.Error("prune orphans", "error", err)
@@ -103,6 +113,8 @@ func startMaintenance(db *database.DB, cfg *config.Config, dataDir string, maxCa
 			logger.Info("pruned orphaned rows", "summary", summary)
 		}
 	}
+	// Keep the library search index consistent with library membership.
+	healFTS()
 	// Prune image cache at startup based on MaxCacheGB config.
 	if _, err := pruneImageCache(cfg, dataDir, maxCacheGBBits(maxCacheGB)); err != nil {
 		logger.Error("prune image cache at startup", "error", err)
@@ -133,6 +145,7 @@ func startMaintenance(db *database.DB, cfg *config.Config, dataDir string, maxCa
 						logger.Info("pruned orphaned rows", "summary", summary)
 					}
 				}
+				healFTS()
 				backup()
 				// Re-read MaxCacheGB each tick (hot-reloadable) and prune if needed.
 				if _, err := pruneImageCache(cfg, dataDir, maxCacheGBBits(maxCacheGB)); err != nil {

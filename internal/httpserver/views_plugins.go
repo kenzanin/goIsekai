@@ -21,6 +21,7 @@ type PluginView struct {
 	SiteURL           string
 	PinnedProfile     string   // current pinned TLS profile name, "" = auto
 	AvailableProfiles []string // selectable profile names for dropdown
+	LibraryCount      int      // in-library manga contributed by this plugin
 }
 
 // viewPlugins renders the plugin manager page.
@@ -30,9 +31,18 @@ func (s *Server) viewPlugins(w http.ResponseWriter, r *http.Request) {
 		s.logger.Error("plugin list", "error", err)
 	}
 	metas := s.service.PluginMetas()
+	// Per-plugin library counts (same source as the library sidebar).
+	libCounts := make(map[string]int)
+	if pc, pcErr := s.service.CountLibraryByPlugin(); pcErr != nil {
+		s.logger.Warn("plugin library counts", "error", pcErr)
+	} else {
+		for _, c := range pc {
+			libCounts[c.PluginID] = c.Count
+		}
+	}
 	views := make([]PluginView, 0, len(plugins))
 	for _, p := range plugins {
-		v := PluginView{Plugin: p}
+		v := PluginView{Plugin: p, LibraryCount: libCounts[p.ID]}
 		if m, ok := metas[p.ID]; ok {
 			v.Kind = m.Kind
 			v.Loaded = m.Loaded

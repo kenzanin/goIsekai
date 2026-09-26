@@ -36,6 +36,11 @@ return function(data)
 			local verifyURL = p.VerifyURL or ""
 			local pinnedProfile = p.PinnedProfile or ""
 			local availableProfiles = p.AvailableProfiles or {}
+			local libCount = p.LibraryCount or 0
+			local countLabel = libCount .. " manga in library"
+			if libCount == 0 then
+				countLabel = "0 manga"
+			end
 
 			local cardHTML = '<div class="bg-neutral-900 rounded-lg p-4 border border-neutral-800">'
 
@@ -73,6 +78,9 @@ return function(data)
 				.. h(name)
 				.. kindBadge
 				.. profileBadge
+				.. "</div>"
+				.. '<div class="text-[10px] text-neutral-500">'
+				.. h(countLabel)
 				.. "</div>"
 				.. '<div class="text-xs font-mono text-neutral-500 truncate">'
 				.. h(id)

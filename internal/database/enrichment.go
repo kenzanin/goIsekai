@@ -186,5 +186,6 @@ func (d *DB) ResetEnrichment(mangaRowID string) error {
 	if _, err := d.db.Exec(`UPDATE mangas SET custom_title = 0, custom_description = 0, genres = NULL WHERE id = ?`, mangaRowID); err != nil {
 		return err
 	}
-	return nil
+	// Dropping the alt titles changes what is searchable.
+	return d.SyncFTS(mangaRowID)
 }

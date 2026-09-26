@@ -241,7 +241,7 @@ func (s *AppService) MigrateMangaSource(oldPluginID, oldMangaID, newPluginID, ne
 		return fmt.Errorf("migration: clean cache: %w", err)
 	}
 	// Re-index FTS.
-	if err := syncFTSTx(tx, fmt.Sprintf("%d", oldRowID)); err != nil {
+	if err := database.SyncFTSTx(tx, fmt.Sprintf("%d", oldRowID)); err != nil {
 		return fmt.Errorf("migration: reindex: %w", err)
 	}
 
@@ -316,46 +316,4 @@ func deleteChaptersNotInTx(tx *sql.Tx, mangaID int64, keepIDs []string) error {
 	}
 	_, err := tx.Exec(`DELETE FROM chapters WHERE manga_id = ? AND source_chapter_id NOT IN (`+strings.Join(place, ",")+`)`, args...)
 	return err
-}
-
-func syncFTSTx(tx *sql.Tx, mangaRowID string) error {
-	if _, err := tx.Exec(`DELETE FROM library_fts WHERE manga_row_id = ?`, mangaRowID); err != nil {
-		return err
-	}
-	// indexLibraryFTS is not exported; re-derive via the same SQL the DB uses.
-	// Simplest: call the two-resource insert that the DB helper performs, but
-	// via tx. Mirror alttitles.go:indexLibraryFTS.
-	var title, pluginID string
-	if err := tx.QueryRow(`SELECT title, plugin_id FROM mangas WHERE id = ?`, mangaRowID).Scan(&title, &pluginID); err != nil {
-		return err
-	}
-	rows, err := tx.Query(`SELECT title FROM alt_titles WHERE manga_row_id = ?`, mangaRowID)
-	if err != nil {
-		return err
-	}
-	defer func() { _ = rows.Close() }()
-	var altTitles []string
-	for rows.Next() {
-		var t string
-		if err := rows.Scan(&t); err != nil {
-			return err
-		}
-		altTitles = append(altTitles, t)
-	}
-	if err := rows.Err(); err != nil {
-		return err
-	}
-	content := title
-	if len(altTitles) > 0 {
-		content += " " + strings.Join(altTitles, " ")
-	}
-	_, err = tx.Exec(`INSERT INTO library_fts (manga_row_id, plugin_id, title, alt_titles) VALUES (?, ?, ?, ?)`,
-		mangaRowID, pluginID, title, strings.Join(altTitles, " "))
-	if err != nil {
-		// library_fts may not exist on very old DBs; best-effort.
-		logger.Warn("migrate: fts reindex failed", "error", err)
-		return nil
-	}
-	_ = content
-	return nil
 }

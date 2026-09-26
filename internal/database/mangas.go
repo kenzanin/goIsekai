@@ -1,6 +1,8 @@
 package database
 
 import (
+	"strconv"
+
 	"goisekai/internal/database/.gen/model"
 
 	. "goisekai/internal/database/.gen/table"
@@ -50,16 +52,23 @@ func (d *DB) UpsertManga(m Manga) (int64, error) {
 		`SELECT id FROM mangas WHERE plugin_id = ? AND source_manga_id = ?`,
 		m.PluginID, m.SourceMangaID,
 	).Scan(&id)
-	return id, err
+	if err != nil {
+		return 0, err
+	}
+	return id, d.SyncFTS(strconv.FormatInt(id, 10))
 }
 
-// ToggleLibrary flips the in_library flag (0 <-> 1) for a manga.
+// ToggleLibrary flips the in_library flag (0 <-> 1) for a manga and keeps the
+// search index in step with the new membership.
 func (d *DB) ToggleLibrary(mangaID int64) error {
 	_, err := Mangas.UPDATE().
 		SET(Mangas.InLibrary.SET(Int(1).SUB(Mangas.InLibrary))).
 		WHERE(Mangas.ID.EQ(Int(mangaID))).
 		Exec(d.db)
-	return err
+	if err != nil {
+		return err
+	}
+	return d.SyncFTS(strconv.FormatInt(mangaID, 10))
 }
 
 // IsInLibrary reports whether a manga is currently saved in the library.
@@ -94,7 +103,10 @@ func (d *DB) RepointManga(mangaID int64, pluginID, sourceMangaID, title, coverUR
 		WHERE id = ?`,
 		pluginID, sourceMangaID, title, coverURL, description, status, mangaID,
 	)
-	return err
+	if err != nil {
+		return err
+	}
+	return d.SyncFTS(strconv.FormatInt(mangaID, 10))
 }
 
 // GetMangaCached fetches a cached manga from the database by plugin ID and source manga ID.

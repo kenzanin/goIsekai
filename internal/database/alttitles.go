@@ -14,7 +14,7 @@ type AltTitleRow struct {
 
 // AddAltTitles inserts each title via INSERT OR IGNORE (the UNIQUE
 // (manga_row_id, title) constraint dedups) and returns how many rows were
-// actually inserted.
+// actually inserted. The row is re-indexed so new titles become searchable.
 func (d *DB) AddAltTitles(mangaRowID string, titles []string, source string) (int, error) {
 	inserted := 0
 	for _, t := range titles {
@@ -28,13 +28,19 @@ func (d *DB) AddAltTitles(mangaRowID string, titles []string, source string) (in
 		}
 		inserted += int(n)
 	}
-	return inserted, nil
+	if inserted == 0 {
+		return 0, nil
+	}
+	return inserted, d.SyncFTS(mangaRowID)
 }
 
-// RemoveAltTitle deletes a single alternative title from a manga.
+// RemoveAltTitle deletes a single alternative title from a manga and
+// re-indexes the row so the dropped title stops matching.
 func (d *DB) RemoveAltTitle(mangaRowID, title string) error {
-	_, err := d.db.Exec(`DELETE FROM alt_titles WHERE manga_row_id = ? AND title = ?`, mangaRowID, title)
-	return err
+	if _, err := d.db.Exec(`DELETE FROM alt_titles WHERE manga_row_id = ? AND title = ?`, mangaRowID, title); err != nil {
+		return err
+	}
+	return d.SyncFTS(mangaRowID)
 }
 
 // ListAltTitles returns a manga's alternative titles ordered by title.
@@ -83,7 +89,7 @@ func (d *DB) SwapMainTitle(pluginID, sourceMangaID, newTitle string) error {
 	if _, err := tx.Exec(`UPDATE mangas SET title = ?, custom_title = 1 WHERE id = ?`, newTitle, rowID); err != nil {
 		return err
 	}
-	if _, err := tx.Exec(`UPDATE library_fts SET title = ?, alt = COALESCE((SELECT group_concat(title, ' ') FROM alt_titles WHERE manga_row_id = ?), '') WHERE manga_row_id = ?`, newTitle, rowID, rowID); err != nil {
+	if _, err := tx.Exec(`UPDATE library_fts SET title = ?, alt = COALESCE((SELECT group_concat(title, ' ') FROM alt_titles WHERE manga_row_id = ?), '') WHERE CAST(manga_row_id AS TEXT) = ?`, newTitle, rowID, rowID); err != nil {
 		return err
 	}
 	return tx.Commit()
@@ -115,10 +121,17 @@ func indexLibraryFTS(x ftsExecer, mangaRowID string) error {
 // SyncFTS (re)indexes a single manga row in library_fts: the row is removed
 // first, then re-inserted with its alt titles when it is still in the library.
 func (d *DB) SyncFTS(mangaRowID string) error {
-	if _, err := d.db.Exec(`DELETE FROM library_fts WHERE manga_row_id = ?`, mangaRowID); err != nil {
+	return SyncFTSTx(d.db, mangaRowID)
+}
+
+// SyncFTSTx is SyncFTS against an open transaction, used by source migration.
+// Keys are compared as text: FTS5 stores manga_row_id without column affinity,
+// so a bound integer id and its string form are different values.
+func SyncFTSTx(tx ftsExecer, mangaRowID string) error {
+	if _, err := tx.Exec(`DELETE FROM library_fts WHERE CAST(manga_row_id AS TEXT) = ?`, mangaRowID); err != nil {
 		return err
 	}
-	return indexLibraryFTS(d.db, mangaRowID)
+	return indexLibraryFTS(tx, mangaRowID)
 }
 
 // RebuildLibraryFTS wipes and fully re-indexes library_fts from the mangas and
@@ -128,6 +141,41 @@ func (d *DB) RebuildLibraryFTS() error {
 		return err
 	}
 	return indexLibraryFTS(d.db, "")
+}
+
+// LibraryFTSDrift reports whether library_fts disagrees with the in-library
+// mangas: a missing row, a dangling or duplicate row, or stale title/alt
+// content. Key comparison is text-based so integer and legacy text row keys
+// both match.
+func (d *DB) LibraryFTSDrift() (bool, error) {
+	var drift int
+	err := d.db.QueryRow(`SELECT EXISTS (
+		SELECT 1 FROM mangas m
+		WHERE m.in_library = 1
+		  AND CAST(m.id AS TEXT) NOT IN (SELECT CAST(manga_row_id AS TEXT) FROM library_fts)
+	) OR EXISTS (
+		SELECT 1 FROM library_fts f
+		WHERE CAST(f.manga_row_id AS TEXT) NOT IN (SELECT CAST(id AS TEXT) FROM mangas WHERE in_library = 1)
+	) OR (SELECT COUNT(*) FROM mangas WHERE in_library = 1) <> (SELECT COUNT(*) FROM library_fts)
+	OR EXISTS (
+		SELECT 1 FROM mangas m
+		WHERE m.in_library = 1
+		  AND EXISTS (SELECT 1 FROM library_fts f
+			WHERE CAST(f.manga_row_id AS TEXT) = CAST(m.id AS TEXT)
+			  AND (f.title IS NOT m.title
+			       OR f.alt IS NOT COALESCE((SELECT group_concat(title, ' ') FROM alt_titles WHERE manga_row_id = m.id), '')))
+	)`).Scan(&drift)
+	return drift == 1, err
+}
+
+// EnsureLibraryFTS rebuilds library_fts when LibraryFTSDrift reports
+// disagreement with the library, and reports whether a rebuild ran.
+func (d *DB) EnsureLibraryFTS() (bool, error) {
+	drift, err := d.LibraryFTSDrift()
+	if err != nil || !drift {
+		return false, err
+	}
+	return true, d.RebuildLibraryFTS()
 }
 
 // CandidateRow is a library search hit resolved back to its manga.
