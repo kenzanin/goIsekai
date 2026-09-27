@@ -6,11 +6,32 @@ import (
 	neturl "net/url"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"goisekai/internal/logger"
 	"goisekai/pkg/types"
 )
+
+// withDefaultReferer returns headers with siteURL filled in as Referer when
+// the caller didn't set one (any casing). Empty siteURL or an explicit Referer
+// returns headers unchanged.
+func withDefaultReferer(headers map[string]string, siteURL string) map[string]string {
+	if siteURL == "" {
+		return headers
+	}
+	for k := range headers {
+		if strings.EqualFold(k, "Referer") {
+			return headers
+		}
+	}
+	h := make(map[string]string, len(headers)+1)
+	for k, v := range headers {
+		h[k] = v
+	}
+	h["Referer"] = siteURL
+	return h
+}
 
 // GetImage fetches image bytes for pluginID from url (with optional per-request
 // headers) through the hostnet proxy. Results are cached in memory (L1) and on
@@ -90,6 +111,10 @@ func (s *AppService) GetImage(pluginID, url string, headers map[string]string, m
 	}()
 	s.hostAcquire(host, prio)
 	defer s.hostRelease(host, prio)
+	// Gated image CDNs (rx.resmk.org) 403 without a same-site Referer. When the
+	// caller set none (reader ?referer= / Page.Headers always win), fall back to
+	// the plugin's site_url — what a browser sends on a normal page load.
+	headers = withDefaultReferer(headers, s.mgr.SiteURL(pluginID))
 	var resp types.HTTPResponse
 	var err error
 	var body []byte

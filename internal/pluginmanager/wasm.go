@@ -130,6 +130,7 @@ func (m *Manager) loadWasm(id, path string) (*loadedPlugin, error) {
 		wasmMod:         mod,
 		wasmFns:         fns,
 		contractVersion: ver,
+		meta:            readPluginJSONMeta(filepath.Dir(path)),
 	}, nil
 }
 
@@ -259,7 +260,13 @@ func (m *Manager) discoverWasm() error {
 				logger.Error("plugin id collision, skipping", "id", id, "kind", "wasm")
 				continue
 			}
-			m.plugins[id] = &loadedPlugin{id: id, wasmPath: path, kind: "wasm"}
+			lp := &loadedPlugin{id: id, wasmPath: path, kind: "wasm"}
+			if g.folder {
+				// Seed site_url before first load so gated image CDNs get a
+				// Referer without a plugin invoke (lazy plugins stay lazy).
+				lp.meta = readPluginJSONMeta(filepath.Dir(path))
+			}
+			m.plugins[id] = lp
 			logger.Info("wasm plugin registered", "id", id, "path", path)
 		}
 	}

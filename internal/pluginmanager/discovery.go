@@ -3,6 +3,7 @@ package pluginmanager
 import (
 	"encoding/json"
 	"goisekai/internal/logger"
+	"goisekai/pkg/types"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -14,6 +15,25 @@ import (
 // same folder name (both /plugins/mangadex and /info/mangadex can coexist);
 // the declared enrichment provider id stays the bare folder name.
 const infoPrefix = "info:"
+
+// readPluginJSONMeta reads <dir>/plugin.json into plugin metadata. Wasm has
+// no Init/PLUGIN export, so plugin.json is the only place a wasm plugin can
+// declare its site_url (used as the default image Referer). Missing or
+// malformed files yield the zero value.
+func readPluginJSONMeta(dir string) types.PluginMeta {
+	if dir == "" {
+		return types.PluginMeta{}
+	}
+	data, err := os.ReadFile(filepath.Join(dir, "plugin.json"))
+	if err != nil {
+		return types.PluginMeta{}
+	}
+	var meta types.PluginMeta
+	if err := json.Unmarshal(data, &meta); err != nil {
+		return types.PluginMeta{}
+	}
+	return meta
+}
 
 // isInfoPlugin reports whether an id belongs to an enrichment script.
 func isInfoPlugin(id string) bool {

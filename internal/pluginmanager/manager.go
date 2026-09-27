@@ -192,3 +192,17 @@ func (m *Manager) LoadedPlugins() []LoadedPlugin {
 func (m *Manager) Proxy() *hostnet.Proxy {
 	return m.proxy
 }
+
+// SiteURL returns the plugin's declared site_url, or "" when the plugin is
+// unknown or declared none. Nil-safe: test services run without a manager.
+func (m *Manager) SiteURL(id string) string {
+	if m == nil {
+		return ""
+	}
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	if p, ok := m.plugins[id]; ok {
+		return p.meta.SiteURL
+	}
+	return ""
+}
