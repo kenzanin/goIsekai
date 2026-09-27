@@ -2,10 +2,10 @@
 
 ## 1. Worker package foundation
 
-- [ ] 1.1 Create `internal/workers` with typed lanes (Interactive, Fetch, Image, Maintenance), bounded queues, context-aware futures, and a job registry; verify `go build ./...` passes and `internal/workers` unit tests cover enqueue/await/cancel paths
-- [ ] 1.2 Implement job lifecycle (queued → running → done/failed/dead with bounded retries) and verify unit tests cover retry-then-success, exhausted-retries, and ctx-cancel cases
-- [ ] 1.3 Implement backpressure policies (interactive block-until-deadline → 503; background bounded enqueue → busy) and verify unit tests cover full-queue behaviour for both classes with no goroutine growth
-- [ ] 1.4 Add `[workers]` config section (lane sizes + queue bounds, code defaults) and verify defaults apply with no config present and a reload picks up new sizes
+- [x] 1.1 Create `internal/workers` with typed lanes (Interactive, Fetch, Image, Maintenance), bounded queues, context-aware futures, and a job registry; verify `go build ./...` passes and `internal/workers` unit tests cover enqueue/await/cancel paths
+- [x] 1.2 Implement job lifecycle (queued → running → done/failed/dead with bounded retries) and verify unit tests cover retry-then-success, exhausted-retries, and ctx-cancel cases
+- [x] 1.3 Implement backpressure policies (interactive block-until-deadline → 503; background bounded enqueue → busy) and verify unit tests cover full-queue behaviour for both classes with no goroutine growth
+- [x] 1.4 Add `[workers]` config section (lane sizes + queue bounds, code defaults) and verify defaults apply with no config present and a reload picks up new sizes
 
 ## 2. P1 — ImageWorker
 

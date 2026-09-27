@@ -207,5 +207,67 @@ func (c *Config) set(section, key, val string) {
 		case "preconnect_enabled":
 			c.PreconnectEnabled = val == "true" || val == "1" || val == "yes"
 		}
+	case "workers":
+		switch key {
+		case "interactive_size":
+			if n, err := strconv.Atoi(val); err == nil && n > 0 {
+				c.WorkersInteractiveSize = n
+			}
+		case "interactive_queue":
+			if n, err := strconv.Atoi(val); err == nil && n > 0 {
+				c.WorkersInteractiveQueue = n
+			}
+		case "fetch_size":
+			if n, err := strconv.Atoi(val); err == nil && n > 0 {
+				c.WorkersFetchSize = n
+			}
+		case "fetch_queue":
+			if n, err := strconv.Atoi(val); err == nil && n > 0 {
+				c.WorkersFetchQueue = n
+			}
+		case "image_size":
+			if n, err := strconv.Atoi(val); err == nil && n > 0 {
+				c.WorkersImageSize = n
+			}
+		case "image_queue":
+			if n, err := strconv.Atoi(val); err == nil && n > 0 {
+				c.WorkersImageQueue = n
+			}
+		case "maintenance_size":
+			if n, err := strconv.Atoi(val); err == nil && n > 0 {
+				c.WorkersMaintenanceSize = n
+			}
+		case "maintenance_queue":
+			if n, err := strconv.Atoi(val); err == nil && n > 0 {
+				c.WorkersMaintenanceQueue = n
+			}
+		}
 	}
+}
+
+// WorkerPoolConfig maps the [workers] INI section onto the workers pool
+// sizing (zero values mean "use code default" there).
+func (c *Config) WorkerPoolConfig() WorkersSizing {
+	return WorkersSizing{
+		InteractiveSize:  c.WorkersInteractiveSize,
+		InteractiveQueue: c.WorkersInteractiveQueue,
+		FetchSize:        c.WorkersFetchSize,
+		FetchQueue:       c.WorkersFetchQueue,
+		ImageSize:        c.WorkersImageSize,
+		ImageQueue:       c.WorkersImageQueue,
+		MaintenanceSize:  c.WorkersMaintenanceSize,
+		MaintenanceQueue: c.WorkersMaintenanceQueue,
+	}
+}
+
+// WorkersSizing is the config-facing view of workers.Config lane sizes.
+type WorkersSizing struct {
+	InteractiveSize  int
+	InteractiveQueue int
+	FetchSize        int
+	FetchQueue       int
+	ImageSize        int
+	ImageQueue       int
+	MaintenanceSize  int
+	MaintenanceQueue int
 }

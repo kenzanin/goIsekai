@@ -120,6 +120,17 @@ type Config struct {
 	// a plugin.
 	EnhancePlugins map[string]string
 
+	// [workers] — lane sizing for the background worker pools.
+	// Zero/absent values fall back to code defaults (4/2/8/1 workers).
+	WorkersInteractiveSize  int
+	WorkersInteractiveQueue int
+	WorkersFetchSize        int
+	WorkersFetchQueue       int
+	WorkersImageSize        int
+	WorkersImageQueue       int
+	WorkersMaintenanceSize  int
+	WorkersMaintenanceQueue int
+
 	// aliasTouched records the names a config file line already supplied, so
 	// the first line for a name replaces the built-in variants instead of
 	// appending to them.

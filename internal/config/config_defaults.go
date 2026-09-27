@@ -37,6 +37,15 @@ func Default() *Config {
 
 		EnhanceDefault: "auto",
 		EnhancePlugins: map[string]string{},
+		// [workers] — zero means "use code default" in workers.Config.
+		WorkersInteractiveSize:  0,
+		WorkersInteractiveQueue: 0,
+		WorkersFetchSize:        0,
+		WorkersFetchQueue:       0,
+		WorkersImageSize:        0,
+		WorkersImageQueue:       0,
+		WorkersMaintenanceSize:  0,
+		WorkersMaintenanceQueue: 0,
 	}
 	c.CacheDir = filepath.Join(c.DataDir, "cache")
 	c.InfoDir = filepath.Join(c.DataDir, "info")

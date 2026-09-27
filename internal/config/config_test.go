@@ -18,6 +18,42 @@ func TestLoadMissingFileReturnsDefaults(t *testing.T) {
 	}
 }
 
+// task 1.4: [workers] section parses lane sizes and queues.
+func TestWorkersSection(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "goisekai.ini")
+	body := "[workers]\n" +
+		"interactive_size = 6\n" +
+		"interactive_queue = 50\n" +
+		"fetch_size = 3\n" +
+		"fetch_queue = 12\n" +
+		"image_size = 10\n" +
+		"image_queue = 100\n" +
+		"maintenance_size = 2\n" +
+		"maintenance_queue = 4\n"
+	if err := os.WriteFile(path, []byte(body), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	c, err := Load(path)
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	if c.WorkersInteractiveSize != 6 || c.WorkersInteractiveQueue != 50 ||
+		c.WorkersFetchSize != 3 || c.WorkersFetchQueue != 12 ||
+		c.WorkersImageSize != 10 || c.WorkersImageQueue != 100 ||
+		c.WorkersMaintenanceSize != 2 || c.WorkersMaintenanceQueue != 4 {
+		t.Fatalf("[workers] not parsed: %+v", c)
+	}
+
+	// Absent keys stay zero (code defaults apply in workers.Config).
+	c2, err := Load(filepath.Join(t.TempDir(), "none.ini"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if c2.WorkersInteractiveSize != 0 || c2.WorkersImageQueue != 0 {
+		t.Fatalf("absent [workers] keys must stay 0: %+v", c2)
+	}
+}
+
 func TestRoundTrip(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "goisekai.ini")
 	c := Default()
