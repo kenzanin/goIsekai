@@ -9,9 +9,9 @@
 
 ## 2. P1 — ImageWorker
 
-- [ ] 2.1 Move `GetImage` fetch waits onto the image lane (high/low sub-queues, `hostAcquire` + `paceImage` on workers) and verify bridge tests still pass, including `image-fetch-priority` semantics (2 high + 1 low per host, pacing gap)
-- [ ] 2.2 Add enqueue-time dedupe for identical image URLs and verify a unit test shows concurrent identical fetches share one job and all waiters get the result
-- [ ] 2.3 Route `handleImage` through enqueue-and-await futures and verify `/image` responses are byte-identical to before while pacing sleeps no longer occur on request goroutines (observable via a burst test keeping host lanes at 2+1)
+- [x] 2.1 Move `GetImage` fetch waits onto the image lane (high/low sub-queues, `hostAcquire` + `paceImage` on workers) and verify bridge tests still pass, including `image-fetch-priority` semantics (2 high + 1 low per host, pacing gap)
+- [x] 2.2 Add enqueue-time dedupe for identical image URLs and verify a unit test shows concurrent identical fetches share one job and all waiters get the result
+- [x] 2.3 Route `handleImage` through enqueue-and-await futures and verify `/image` responses are byte-identical to before while pacing sleeps no longer occur on request goroutines (observable via a burst test keeping host lanes at 2+1)
 - [ ] 2.4 Verify reader behaviour unchanged in the live app (page load + prefetch) and that a cold-chapter CBZ export no longer blocks its HTTP request for the whole loop
 
 ## 3. P2 — FetchWorker + async actions

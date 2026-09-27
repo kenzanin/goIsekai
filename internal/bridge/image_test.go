@@ -11,6 +11,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"slices"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -29,7 +30,9 @@ func newTestServiceWithCache(t *testing.T) *AppService {
 		t.Fatalf("open db: %v", err)
 	}
 	t.Cleanup(func() { _ = db.Close() })
-	return NewAppService(db, nil, hostnet.NewProxy(), "", t.TempDir(), nil)
+	s := NewAppService(db, nil, hostnet.NewProxy(), "", t.TempDir(), nil)
+	t.Cleanup(s.Shutdown)
+	return s
 }
 
 // newTestServiceWithFormat is newTestServiceWithCache with the cache encoding
@@ -503,5 +506,100 @@ func TestConcurrentGetImageSharesFetch(t *testing.T) {
 	// disk and response must be the same image (see TestGetImageReturnsConvertedBytes).
 	if !isWebP(results[0]) {
 		t.Errorf("returned bytes are %s, want converted webp", imageExt(results[0]))
+	}
+}
+
+// TestImageBurstKeepsHostLanes2Plus1 bursts one host with 2 high + 2 low
+// distinct URLs while handlers hold their lanes open: at most 2 high + 1 low
+// may be in flight at once (the 2+1 host lanes) and every response is the
+// same converted cache bytes.
+func TestImageBurstKeepsHostLanes2Plus1(t *testing.T) {
+	var buf bytes.Buffer
+	if err := png.Encode(&buf, image.NewRGBA(image.Rect(0, 0, 4, 4))); err != nil {
+		t.Fatalf("png.Encode: %v", err)
+	}
+	payload := buf.Bytes()
+
+	var mu sync.Mutex
+	inFlight, maxInFlight := 0, 0
+	entered := make(chan string, 8)
+	release := make(chan struct{})
+	closeRelease := sync.OnceFunc(func() { close(release) })
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		mu.Lock()
+		inFlight++
+		if inFlight > maxInFlight {
+			maxInFlight = inFlight
+		}
+		mu.Unlock()
+		entered <- r.URL.Query().Get("prio")
+		<-release
+		mu.Lock()
+		inFlight--
+		mu.Unlock()
+		w.Header().Set("Content-Type", "image/png")
+		_, _ = w.Write(payload)
+	}))
+	t.Cleanup(srv.Close)
+	t.Cleanup(closeRelease)
+
+	s := newTestServiceWithCache(t)
+
+	reqs := []struct {
+		url  string
+		prio Prio
+	}{
+		{srv.URL + "/img?i=0&prio=high", PrioHigh},
+		{srv.URL + "/img?i=1&prio=high", PrioHigh},
+		{srv.URL + "/img?i=2&prio=low", PrioLow},
+		{srv.URL + "/img?i=3&prio=low", PrioLow},
+	}
+	results := make([][]byte, len(reqs))
+	errs := make([]error, len(reqs))
+	var wg sync.WaitGroup
+	for i, req := range reqs {
+		wg.Go(func() {
+			results[i], errs[i] = s.GetImage("p", req.url, nil, "m", "c", req.prio)
+		})
+	}
+
+	// The 3 lane holders (2 high + 1 low) reach the handler one pace slot
+	// apart; the 4th request must stay out while they hold.
+	got := []string{<-entered, <-entered, <-entered}
+	slices.Sort(got)
+	if !slices.Equal(got, []string{"high", "high", "low"}) {
+		t.Fatalf("first 3 in flight = %v, want [high high low]", got)
+	}
+	select {
+	case extra := <-entered:
+		closeRelease()
+		t.Fatalf("4th request entered while 2+1 lanes were held (prio=%s)", extra)
+	case <-time.After(2 * time.Second):
+	}
+	closeRelease()
+
+	select {
+	case <-entered:
+	case <-time.After(3 * time.Second):
+		t.Fatal("4th request never entered after lanes released")
+	}
+	wg.Wait()
+
+	mu.Lock()
+	defer mu.Unlock()
+	if maxInFlight != 3 {
+		t.Errorf("max in flight = %d, want 3 (2 high + 1 low)", maxInFlight)
+	}
+	for i := range results {
+		if errs[i] != nil {
+			t.Fatalf("GetImage %d: %v", i, errs[i])
+		}
+		if !isWebP(results[i]) {
+			t.Fatalf("response %d is %s, want converted webp", i, imageExt(results[i]))
+		}
+		if !bytes.Equal(results[i], results[0]) {
+			t.Fatalf("response %d bytes differ from response 0", i)
+		}
 	}
 }

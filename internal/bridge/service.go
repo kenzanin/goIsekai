@@ -17,6 +17,7 @@ import (
 	"goisekai/internal/hostnet"
 	"goisekai/internal/logger"
 	"goisekai/internal/pluginmanager"
+	"goisekai/internal/workers"
 	"goisekai/pkg/types"
 )
 
@@ -26,6 +27,7 @@ type AppService struct {
 	db          *database.DB
 	mgr         *pluginmanager.Manager
 	proxy       *hostnet.Proxy
+	pool        *workers.Pool
 	cfgPath     string
 	cacheDir    string
 	imageMu     sync.RWMutex
@@ -53,6 +55,7 @@ func NewAppService(db *database.DB, mgr *pluginmanager.Manager, proxy *hostnet.P
 		cfgPath:     cfgPath,
 		cacheDir:    cacheDir,
 		imageCache:  make(map[string][]byte),
+		pool:        workers.New(loadWorkerPool(cfgPath)),
 		enrich:      enrichReg,
 		genres:      loadGenreIndex(cfgPath),
 		statusAlias: loadStatusAlias(cfgPath),
@@ -60,6 +63,11 @@ func NewAppService(db *database.DB, mgr *pluginmanager.Manager, proxy *hostnet.P
 		coverMaxDim: loadCoverMaxDim(cfgPath),
 		enhance:     loadEnhanceConfig(cfgPath),
 	}
+}
+
+// Shutdown stops the worker pool.
+func (s *AppService) Shutdown() {
+	s.pool.Shutdown()
 }
 
 // Log receives a console message from the frontend and writes it to the Go logger.

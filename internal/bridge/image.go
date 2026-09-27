@@ -1,6 +1,7 @@
 package bridge
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	neturl "net/url"
@@ -10,6 +11,7 @@ import (
 	"time"
 
 	"goisekai/internal/logger"
+	"goisekai/internal/workers"
 	"goisekai/pkg/types"
 )
 
@@ -92,11 +94,35 @@ func (s *AppService) GetImage(pluginID, url string, headers map[string]string, m
 	}
 	call := &imageCall{done: make(chan struct{})}
 	s.imageFlight.Store(url, call)
-	defer func() {
+	wprio := workers.PriorityLow
+	if prio == PrioHigh {
+		wprio = workers.PriorityHigh
+	}
+	if _, err := s.pool.Enqueue(context.Background(), &workers.Job{
+		Lane:        workers.LaneImage,
+		Priority:    wprio,
+		MaxAttempts: 1,
+		Run: func(context.Context) error {
+			defer func() {
+				s.imageFlight.Delete(url)
+				close(call.done)
+			}()
+			call.data, call.err = s.fetchImage(pluginID, url, headers, mangaID, chapterID, prio)
+			return call.err
+		},
+	}); err != nil {
 		s.imageFlight.Delete(url)
+		call.err = fmt.Errorf("bridge: get image %s: %w", url, err)
 		close(call.done)
-	}()
+	}
+	<-call.done
+	return call.data, call.err
+}
 
+// fetchImage performs the paced, host-laned upstream fetch and cache write on
+// an image worker, so pacing sleeps and lane waits never block the caller's
+// goroutine.
+func (s *AppService) fetchImage(pluginID, url string, headers map[string]string, mangaID, chapterID string, prio Prio) ([]byte, error) {
 	logger.Debug("fetching image", "url", url, "plugin", pluginID)
 	// At-home image nodes 404 bursts: a browser's draw+prefetch fires several
 	// fetches at once. Serialize per host and pace requests ~1s apart (the
@@ -145,12 +171,11 @@ func (s *AppService) GetImage(pluginID, url string, headers map[string]string, m
 	}
 	if err != nil {
 		logger.Error("image fetch failed", "url", url, "error", err)
-		call.err = err
 		return nil, fmt.Errorf("bridge: get image %s: %w", url, err)
 	}
 	if resp.Status < 200 || resp.Status >= 300 {
 		logger.Error("image bad status", "url", url, "status", resp.Status)
-		call.err = fmt.Errorf("unexpected status %d", resp.Status)
+
 		return nil, fmt.Errorf("bridge: get image %s: unexpected status %d", url, resp.Status)
 	}
 	// body already set in loop after validation.
@@ -177,7 +202,6 @@ func (s *AppService) GetImage(pluginID, url string, headers map[string]string, m
 	s.imageMu.Lock()
 	s.imageCache[url] = data
 	s.imageMu.Unlock()
-	call.data = data
 
 	// L2 cache: write to disk, converting to the configured format. Covers
 	// (mangaID empty) are also downscaled. Only a real page is ever enhanced:

@@ -185,6 +185,7 @@ func main() {
 		logger.Fatal("http server", "error", err)
 	}
 
-	// Ordered shutdown: HTTP → plugins → DB → logs → PID file (PID is deferred).
+	// Ordered shutdown: HTTP → worker pool → plugins → DB → logs → PID file (PID is deferred).
+	svc.Shutdown()
 	shutdown(srv, mgr, db)
 }
