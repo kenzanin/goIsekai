@@ -403,3 +403,97 @@ func TestShutdownRejects(t *testing.T) {
 		t.Fatalf("want ErrClosed, got %v", err)
 	}
 }
+
+// task 3.2: a second enqueue with the same DedupeKey returns the in-flight
+// job instead of starting a duplicate (design spec scenario).
+func TestDedupeReturnsInflightJob(t *testing.T) {
+	p := New(Config{MaintenanceSize: 1, MaintenanceQueue: 8})
+	defer p.Shutdown()
+
+	started := make(chan struct{})
+	release := make(chan struct{})
+	runs := 0
+	first, err := p.Enqueue(context.Background(), &Job{
+		Lane:      LaneMaintenance,
+		DedupeKey: "sync:library",
+		Run: func(ctx context.Context) error {
+			runs++
+			close(started)
+			<-release
+			return nil
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	<-started
+
+	second, err := p.Enqueue(context.Background(), &Job{
+		Lane:      LaneMaintenance,
+		DedupeKey: "sync:library",
+		Run: func(ctx context.Context) error {
+			runs++
+			return nil
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if first.GetID() != second.GetID() {
+		t.Fatalf("dedupe returned a different job: %s vs %s", first.GetID(), second.GetID())
+	}
+
+	close(release)
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+	if err := first.Await(ctx); err != nil {
+		t.Fatalf("await: %v", err)
+	}
+	if runs != 1 {
+		t.Fatalf("job body ran %d times, want 1", runs)
+	}
+}
+
+// task 3.2: once the job is done the key is free again — a later enqueue
+// starts a fresh job rather than resolving to a dead future.
+func TestDedupeKeyFreedAfterCompletion(t *testing.T) {
+	p := New(Config{MaintenanceSize: 1, MaintenanceQueue: 8})
+	defer p.Shutdown()
+
+	key := "sync:manga:p1:m1"
+	first, err := p.Enqueue(context.Background(), &Job{
+		Lane:      LaneMaintenance,
+		DedupeKey: key,
+		Run:       func(ctx context.Context) error { return nil },
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+	if err := first.Await(ctx); err != nil {
+		t.Fatalf("await: %v", err)
+	}
+
+	var ran atomic.Bool
+	second, err := p.Enqueue(context.Background(), &Job{
+		Lane:      LaneMaintenance,
+		DedupeKey: key,
+		Run: func(ctx context.Context) error {
+			ran.Store(true)
+			return nil
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if first.GetID() == second.GetID() {
+		t.Fatal("completed job still owned the dedupe key")
+	}
+	if err := second.Await(ctx); err != nil {
+		t.Fatalf("await second: %v", err)
+	}
+	if !ran.Load() {
+		t.Fatal("second job did not run")
+	}
+}

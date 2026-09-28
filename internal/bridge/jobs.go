@@ -9,7 +9,10 @@ import (
 // tracking; the finished path is announced via the job status callback so the
 // WS/toast surface can point the user at the file.
 func (s *AppService) EnqueueExportCBZ(ctx context.Context, pluginID, mangaID, chapterID, title string) (string, error) {
-	job := &workers.Job{Lane: workers.LaneImage}
+	job := &workers.Job{
+		Lane:      workers.LaneImage,
+		DedupeKey: "export:" + pluginID + ":" + mangaID + ":" + chapterID,
+	}
 	job.Run = func(ctx context.Context) error {
 		path, exportErr := s.ExportCBZ(pluginID, mangaID, chapterID, title)
 		if exportErr == nil {

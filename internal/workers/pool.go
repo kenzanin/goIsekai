@@ -108,6 +108,7 @@ type Job struct {
 	Lane        Lane
 	Priority    Priority // image lane only
 	PluginKey   string   // fetch lane: fairness key, one in-flight per key
+	DedupeKey   string   // when set, a second enqueue returns the in-flight job
 	Run         func(ctx context.Context) error
 	MaxAttempts int // <=0 means default (3)
 }
@@ -157,6 +158,16 @@ func (f *Future) GetID() string {
 // Await blocks until the job finishes or ctx is cancelled. Returns the job
 // error (nil on success), ctx.Err() if waiting was abandoned (the queued job
 // is cancelled), or ErrClosed after Shutdown.
+// isDone reports whether the job has already delivered its result.
+func (f *Future) isDone() bool {
+	select {
+	case <-f.done:
+		return true
+	default:
+		return false
+	}
+}
+
 func (f *Future) Await(ctx context.Context) error {
 	select {
 	case <-f.done:
@@ -257,6 +268,7 @@ type Pool struct {
 
 	registry    map[string]*jobHandle
 	detail      map[string]string // job ID -> result detail (e.g. export path)
+	dedupe      map[string]string // DedupeKey -> in-flight job ID (design 3.2)
 	regMu    sync.Mutex
 
 	nInteractive atomic.Int64
@@ -290,6 +302,7 @@ func New(cfg Config) *Pool {
 		fetchInUse:  map[string]bool{},
 		registry:    map[string]*jobHandle{},
 		detail:      map[string]string{},
+		dedupe:      map[string]string{},
 		rootCtx:     ctx,
 		stop:        cancel,
 	}
@@ -408,14 +421,27 @@ func (p *Pool) Enqueue(ctx context.Context, job *Job) (*Future, error) {
 	h.fut.done = make(chan struct{})
 	h.fut.info = h
 	h.setPool(p) // link for status callbacks
-	h.setStatus(StatusQueued) // triggers callback if set
 	jctx, cancel := context.WithCancel(p.rootCtx)
 	h.jctx = jctx
 	h.cancel = cancel
 
+	// Dedupe (design 3.2): while a job with this DedupeKey is queued or running,
+	// a second enqueue returns that job's future instead of starting a duplicate.
 	p.regMu.Lock()
+	if job.DedupeKey != "" {
+		if id, ok := p.dedupe[job.DedupeKey]; ok {
+			if old, live := p.registry[id]; live && !old.fut.isDone() {
+				p.regMu.Unlock()
+				cancel()
+				return old.fut, nil
+			}
+			delete(p.dedupe, job.DedupeKey) // stale: the job already finished
+		}
+		p.dedupe[job.DedupeKey] = job.ID
+	}
 	p.registry[job.ID] = h
 	p.regMu.Unlock()
+	h.setStatus(StatusQueued) // triggers callback if set
 
 	var lane *poolLane
 	switch job.Lane {
@@ -680,6 +706,9 @@ func (h *jobHandle) lastErrSnapshot() error {
 
 func (p *Pool) deregister(id string) {
 	p.regMu.Lock()
+	if h, ok := p.registry[id]; ok && h.job.DedupeKey != "" && p.dedupe[h.job.DedupeKey] == id {
+		delete(p.dedupe, h.job.DedupeKey)
+	}
 	delete(p.registry, id)
 	delete(p.detail, id)
 	p.regMu.Unlock()

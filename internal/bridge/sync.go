@@ -164,8 +164,9 @@ func (s *AppService) persistMangaDetails(pluginID string, m types.Manga, chapter
 // Returns a job ID for tracking.
 func (s *AppService) EnqueueSyncLibrary(ctx context.Context) (string, error) {
 	fut, err := s.pool.Enqueue(ctx, &workers.Job{
-		Lane: workers.LaneFetch,
-		Run:  s.fetchLibrarySyncFn,
+		Lane:      workers.LaneFetch,
+		DedupeKey: "sync:library",
+		Run:       s.fetchLibrarySyncFn,
 	})
 	if err != nil {
 		return "", err
@@ -183,6 +184,7 @@ func (s *AppService) EnqueueSyncManga(ctx context.Context, pluginID, mangaID str
 		Lane:      workers.LaneFetch,
 		Run:       func(ctx context.Context) error { return s.SyncManga(pluginID, mangaID) },
 		PluginKey: pluginID,
+		DedupeKey: "sync:manga:" + pluginID + ":" + mangaID,
 	})
 	if err != nil {
 		return "", err
