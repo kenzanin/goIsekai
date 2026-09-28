@@ -1,12 +1,14 @@
 package bridge
 
 import (
+	"context"
 	"fmt"
 	"time"
 
 	"goisekai/internal/config"
 	"goisekai/internal/database"
 	"goisekai/internal/logger"
+	"goisekai/internal/workers"
 	"goisekai/pkg/types"
 )
 
@@ -156,4 +158,34 @@ func (s *AppService) persistMangaDetails(pluginID string, m types.Manga, chapter
 		}
 	}
 	return nil
+}
+
+// EnqueueSyncLibrary queues a full library sync on the fetch lane.
+// Returns a job ID for tracking.
+func (s *AppService) EnqueueSyncLibrary(ctx context.Context) (string, error) {
+	fut, err := s.pool.Enqueue(ctx, &workers.Job{
+		Lane: workers.LaneFetch,
+		Run:  s.fetchLibrarySyncFn,
+	})
+	if err != nil {
+		return "", err
+	}
+	return fut.GetID(), nil
+}
+
+func (s *AppService) fetchLibrarySyncFn(ctx context.Context) error {
+	return s.SyncLibrary()
+}
+
+// EnqueueSyncManga queues a single manga sync on the fetch lane.
+func (s *AppService) EnqueueSyncManga(ctx context.Context, pluginID, mangaID string) (string, error) {
+	fut, err := s.pool.Enqueue(ctx, &workers.Job{
+		Lane:      workers.LaneFetch,
+		Run:       func(ctx context.Context) error { return s.SyncManga(pluginID, mangaID) },
+		PluginKey: pluginID,
+	})
+	if err != nil {
+		return "", err
+	}
+	return fut.GetID(), nil
 }

@@ -1,6 +1,7 @@
 package httpserver
 
 import (
+	"encoding/json"
 	"net/http"
 )
 
@@ -22,20 +23,22 @@ func (s *Server) handleToggleLibrary(w http.ResponseWriter, r *http.Request) {
 func (s *Server) handleSyncManga(w http.ResponseWriter, r *http.Request) {
 	pluginID := param(r, "pluginID")
 	mangaID := param(r, "mangaID")
-	if err := s.service.SyncManga(pluginID, mangaID); err != nil {
+	jobID, err := s.service.EnqueueSyncManga(r.Context(), pluginID, mangaID)
+	if err != nil {
 		s.logger.Warn("sync manga", "plugin", pluginID, "manga", mangaID, "error", err)
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	s.toastRedirect(w, r, "/view/manga/"+pluginID+"/"+mangaID, "Manga refreshed")
+	_ = json.NewEncoder(w).Encode(map[string]string{"jobID": jobID})
 }
 
 // handleSync re-fetches chapter lists for every library manga.
 func (s *Server) handleSync(w http.ResponseWriter, r *http.Request) {
-	if err := s.service.SyncLibrary(); err != nil {
+	jobID, err := s.service.EnqueueSyncLibrary(r.Context())
+	if err != nil {
 		s.logger.Error("sync library", "error", err)
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	s.toastRedirect(w, r, "/view/library", "Library sync finished")
+	_ = json.NewEncoder(w).Encode(map[string]string{"jobID": jobID})
 }

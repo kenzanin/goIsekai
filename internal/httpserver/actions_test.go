@@ -25,9 +25,12 @@ func TestActionSync(t *testing.T) {
 	req := httptest.NewRequest("POST", "/action/sync", nil)
 	rec := httptest.NewRecorder()
 	s.Router.ServeHTTP(rec, req)
-	// Sync with empty library should redirect without error.
-	if rec.Code != 303 && rec.Code != 302 {
-		t.Fatalf("status = %d, want 303/302", rec.Code)
+	// Sync enqueues a fetch-lane job and returns a job reference immediately.
+	if rec.Code != 200 {
+		t.Fatalf("status = %d, want 200", rec.Code)
+	}
+	if !strings.Contains(rec.Body.String(), "jobID") {
+		t.Fatalf("body = %q, want a jobID", rec.Body.String())
 	}
 }
 

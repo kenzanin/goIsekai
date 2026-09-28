@@ -130,6 +130,7 @@ type Future struct {
 	mu     sync.Mutex
 	result error
 	info   *jobHandle
+	pool   *Pool // back-reference for status callbacks
 }
 
 // jobHandle couples a Future with its cancellation + registry entry.
@@ -143,6 +144,14 @@ type jobHandle struct {
 	status   JobStatus
 	attempts int
 	lastErr  error
+}
+
+// GetID returns the job ID. Safe to call before and after completion.
+func (f *Future) GetID() string {
+	if f == nil || f.info == nil || f.info.job == nil {
+		return ""
+	}
+	return f.info.job.ID
 }
 
 // Await blocks until the job finishes or ctx is cancelled. Returns the job
@@ -259,6 +268,10 @@ type Pool struct {
 	wg      sync.WaitGroup
 	rootCtx context.Context
 	stop    context.CancelFunc
+
+	// StatusChanged is called when a job's status changes (queued/running/done/failed).
+	// The ID and status are passed; the callback runs synchronously during the state update.
+	StatusChanged func(id string, status JobStatus)
 }
 
 // New creates a Pool with the given sizing and starts all workers.
@@ -385,12 +398,14 @@ func (p *Pool) Enqueue(ctx context.Context, job *Job) (*Future, error) {
 
 	h := &jobHandle{
 		job:    job,
-		fut:    &Future{},
+		fut:    &Future{pool: p},
 		status: StatusQueued,
 		run:    nil, // assigned below after wrap
 	}
 	h.fut.done = make(chan struct{})
 	h.fut.info = h
+	h.setPool(p) // link for status callbacks
+	h.setStatus(StatusQueued) // triggers callback if set
 	jctx, cancel := context.WithCancel(p.rootCtx)
 	h.jctx = jctx
 	h.cancel = cancel
@@ -621,7 +636,26 @@ func (h *jobHandle) setStatus(s JobStatus) {
 	h.mu.Lock()
 	h.status = s
 	h.mu.Unlock()
+	// Notify status change callback if set (design D6).
+	if h.job != nil && h.job.ID != "" && h.fut != nil && h.fut.info == h {
+		if cb := h.getPool().StatusChanged; cb != nil {
+			cb(h.job.ID, s)
+		}
+	}
 }
+
+// getPool returns the Pool owning this job handle via the Future.
+func (h *jobHandle) getPool() *Pool { return h.fut.getPool() }
+
+func (f *Future) getPool() *Pool {
+	if f == nil {
+		return nil
+	}
+	return f.pool
+}
+
+// setPool links the Future to its Pool for callbacks.
+func (h *jobHandle) setPool(p *Pool) { if h.fut != nil { h.fut.pool = p } }
 
 func (h *jobHandle) setAttempt(n int) {
 	h.mu.Lock()

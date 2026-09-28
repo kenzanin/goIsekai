@@ -1,8 +1,8 @@
 package httpserver
 
 import (
+	"encoding/json"
 	"net/http"
-	"path/filepath"
 )
 
 // handleClearLogs empties the in-memory log buffer.
@@ -27,15 +27,25 @@ func (s *Server) handleExportCBZ(w http.ResponseWriter, r *http.Request) {
 	if title == "" {
 		title = chapterID
 	}
-	path, err := s.service.ExportCBZ(pluginID, mangaID, chapterID, title)
+	jobID, err := s.service.EnqueueExportCBZ(r.Context(), pluginID, mangaID, chapterID, title)
 	if err != nil {
 		s.logger.Error("export cbz", "pluginID", pluginID, "mangaID", mangaID, "chapterID", chapterID, "error", err)
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	w.Header().Set("Content-Disposition", "attachment; filename=\""+filepath.Base(path)+"\"")
-	w.Header().Set("Content-Type", "application/vnd.comicbook+zip")
-	http.ServeFile(w, r, path)
+	_ = json.NewEncoder(w).Encode(map[string]string{"jobID": jobID, "path": ""})
+}
+
+// handleJobStatus returns the status of a background job.
+func (s *Server) handleJobStatus(w http.ResponseWriter, r *http.Request) {
+	jobID := param(r, "jobID")
+	status, ok := s.service.GetJobStatus(jobID)
+	if !ok {
+		http.Error(w, "job not found", http.StatusNotFound)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	_ = json.NewEncoder(w).Encode(status)
 }
 
 // handleClearAllCache removes the entire image cache directory.

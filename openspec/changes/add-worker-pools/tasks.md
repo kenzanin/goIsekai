@@ -28,6 +28,6 @@
 
 ## 5. P4 — MaintenanceWorker + integration
 
-- [ ] 5.1 Move the maintenance ticker jobs (PruneOrphans, healFTS, DB backup, pruneImageCache) onto the maintenance lane serially and verify startup/tick behaviour is unchanged in the live log
+- [x] 5.1 Move the maintenance ticker jobs (PruneOrphans, healFTS, DB backup, pruneImageCache) onto the maintenance lane serially and verify startup/tick behaviour is unchanged in the live log
 - [ ] 5.2 Run the full gate (`just check` + `just test`) and verify zero regressions across database, bridge, and httpserver suites
 - [ ] 5.3 Live E2E: verify in the running app that UI stays interactive while a bulk sync runs, covers load through the image lane with correct priority, and sync/export return job refs with toast progress
