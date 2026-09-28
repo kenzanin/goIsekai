@@ -497,3 +497,87 @@ func TestDedupeKeyFreedAfterCompletion(t *testing.T) {
 		t.Fatal("second job did not run")
 	}
 }
+
+// task 4.1: a stalled interactive invoke for one plugin must not block
+// unrelated interactive jobs beyond the per-plugin mutex — the gate parks
+// same-plugin siblings at the tail so they hold no worker while waiting.
+func TestInteractiveStalledPluginDoesNotBlockOthers(t *testing.T) {
+	p := New(Config{InteractiveSize: 2, InteractiveQueue: 8})
+	defer p.Shutdown()
+
+	release := make(chan struct{})
+	gotVM := make(chan struct{}, 1)
+	otherDone := make(chan error, 1)
+	// Simulates the plugin VM mutex: whoever runs first holds it until its
+	// release; siblings block on it inside Run exactly like real plugin
+	// invokes would. (It must be taken inside Run — holding it from the test
+	// body would deadlock parked jobs that no running job owns.)
+	var pluginMu sync.Mutex
+
+	// Stall plugin A: holds one worker + the per-plugin gate slot.
+	futA, err := p.Enqueue(context.Background(), &Job{
+		Lane:      LaneInteractive,
+		PluginKey: "plugin-a",
+		Run: func(ctx context.Context) error {
+			pluginMu.Lock()
+			gotVM <- struct{}{} // "VM is now held"
+			<-release
+			pluginMu.Unlock()
+			return nil
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Wait until A actually holds the VM, then queue the siblings: they
+	// block on the plugin mutex like real VM calls. With the gate they park
+	// at the tail and hold no extra worker; without it they would eat
+	// workers and starve B.
+	select {
+	case <-gotVM:
+	case <-time.After(2 * time.Second):
+		t.Fatal("stalled invoke never started")
+	}
+	for i := 0; i < 3; i++ {
+		if _, err := p.Enqueue(context.Background(), &Job{
+			Lane:      LaneInteractive,
+			PluginKey: "plugin-a",
+			Run: func(ctx context.Context) error {
+				pluginMu.Lock() // blocks until A releases
+				pluginMu.Unlock()
+				return nil
+			},
+		}); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	// Plugin B must complete while A is stalled.
+	go func() {
+		futB, err := p.Enqueue(context.Background(), &Job{
+			Lane:      LaneInteractive,
+			PluginKey: "plugin-b",
+			Run:       func(ctx context.Context) error { return nil },
+		})
+		if err != nil {
+			otherDone <- err
+			return
+		}
+		otherDone <- futB.Await(context.Background())
+	}()
+
+	select {
+	case err := <-otherDone:
+		if err != nil {
+			t.Fatalf("unrelated interactive job blocked by stalled plugin: %v", err)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("unrelated interactive job starved behind stalled plugin")
+	}
+
+	close(release)
+	if err := futA.Await(context.Background()); err != nil {
+		t.Fatalf("stalled job errored: %v", err)
+	}
+}

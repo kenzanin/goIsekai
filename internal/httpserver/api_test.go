@@ -2,6 +2,8 @@ package httpserver
 
 import (
 	"bytes"
+	"context"
+	"fmt"
 	"github.com/goccy/go-json"
 	"image"
 	"image/png"
@@ -10,6 +12,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/go-chi/chi/v5"
@@ -19,6 +22,7 @@ import (
 	"goisekai/internal/hostnet"
 	"goisekai/internal/pluginmanager"
 	"goisekai/internal/templates"
+	"goisekai/internal/workers"
 )
 
 // testServer builds a minimal Server wired to a temp DB and cache dir.
@@ -419,5 +423,91 @@ func TestAPISetProgressNoBody(t *testing.T) {
 	s.Router.ServeHTTP(rec, req)
 	if rec.Code == 500 {
 		t.Fatal("expected non-500 for empty body")
+	}
+}
+
+// ── Task 4.2: interactive lane backpressure maps to 503 ─────────────────────
+
+// testServerSized is testServerFull with a [workers] INI pinning the
+// interactive lane to 1 worker + 1 queue slot so saturation is reachable.
+func testServerSized(t *testing.T) *Server {
+	t.Helper()
+	cfgPath := filepath.Join(t.TempDir(), "goisekai.ini")
+	body := "[workers]\ninteractive_size = 1\ninteractive_queue = 1\n"
+	if err := os.WriteFile(cfgPath, []byte(body), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	db, err := database.Open(filepath.Join(t.TempDir(), "test.db"))
+	if err != nil {
+		t.Fatalf("open db: %v", err)
+	}
+	t.Cleanup(func() { _ = db.Close() })
+	proxy := hostnet.NewProxy()
+	pmgr := pluginmanager.NewManager(proxy, t.TempDir())
+	svc := bridge.NewAppService(db, pmgr, proxy, cfgPath, t.TempDir(), nil)
+	t.Cleanup(svc.Shutdown)
+	r := chi.NewRouter()
+	logger := slog.New(slog.NewTextHandler(&bytes.Buffer{}, nil))
+	s := &Server{Router: r, logger: logger, service: svc}
+	s.Router.Route("/api", func(sub chi.Router) {
+		sub.Use(s.requireAPIKey)
+		s.registerAPIRoutes(sub)
+		s.registerReaderRoutes(sub)
+		s.registerWSRoutes(sub)
+		s.registerSandboxRoutes(sub)
+	})
+	return s
+}
+
+// Saturate the interactive lane (1 worker, 1 queue slot) with stalled jobs,
+// then verify the search API surfaces 503 instead of hanging or 502.
+func TestSearchQueueFullReturns503(t *testing.T) {
+	s := testServerSized(t)
+	pool := s.service.GetPool()
+	if pool == nil {
+		t.Fatal("service pool is nil")
+	}
+	release := make(chan struct{})
+	defer close(release)
+	// Fill the single worker with a stalled interactive job.
+	if _, err := pool.Enqueue(context.Background(), &workers.Job{
+		Lane: workers.LaneInteractive,
+		Run:  func(ctx context.Context) error { <-release; return nil },
+	}); err != nil {
+		t.Fatal(err)
+	}
+	// Fill the single queue slot.
+	if _, err := pool.Enqueue(context.Background(), &workers.Job{
+		Lane: workers.LaneInteractive,
+		Run:  func(ctx context.Context) error { <-release; return nil },
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	req := httptest.NewRequest("GET", "/api/search?q=x&pluginID=dummy", nil)
+	rec := httptest.NewRecorder()
+	s.Router.ServeHTTP(rec, req)
+	if rec.Code != http.StatusServiceUnavailable {
+		t.Fatalf("status = %d, want 503 (body %q)", rec.Code, rec.Body.String())
+	}
+	if !strings.Contains(rec.Body.String(), "busy") {
+		t.Fatalf("body = %q, want busy message", rec.Body.String())
+	}
+}
+
+// Plugin-level failures must NOT classify as queue-full (cache fallbacks rely
+// on the distinction).
+func TestIsQueueFullClassification(t *testing.T) {
+	if bridge.IsQueueFull(nil) {
+		t.Fatal("nil must not be queue-full")
+	}
+	if !bridge.IsQueueFull(fmt.Errorf("wrap: %w", workers.ErrEnqueueTimeout)) {
+		t.Fatal("ErrEnqueueTimeout must be queue-full")
+	}
+	if !bridge.IsQueueFull(fmt.Errorf("wrap: %w", workers.ErrBusy)) {
+		t.Fatal("ErrBusy must be queue-full")
+	}
+	if bridge.IsQueueFull(fmt.Errorf("plugin exploded")) {
+		t.Fatal("plugin error must not be queue-full")
 	}
 }

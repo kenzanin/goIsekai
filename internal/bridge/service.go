@@ -5,7 +5,8 @@
 package bridge
 
 import (
-	"fmt"
+		"context"
+"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -181,8 +182,19 @@ func (s *AppService) QueryMangaPluginIDs() ([]database.MangaPluginIDRow, error) 
 }
 
 // GetChapterList fetches the chapter list for a manga from the plugin.
+// Rides the interactive lane (task 4.1).
 func (s *AppService) GetChapterList(pluginID, mangaID string) ([]types.Chapter, error) {
-	chapters, err := s.mgr.GetChapterList(pluginID, mangaID)
+	var (
+		chapters []types.Chapter
+		err      error
+	)
+	runErr := s.runOnInteractive(context.Background(), pluginID, func(context.Context) error {
+		chapters, err = s.mgr.GetChapterList(pluginID, mangaID)
+		return err
+	})
+	if runErr != nil {
+		return nil, fmt.Errorf("bridge: get chapter list: %w", runErr)
+	}
 	if err != nil {
 		return nil, fmt.Errorf("bridge: get chapter list: %w", err)
 	}

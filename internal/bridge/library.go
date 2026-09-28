@@ -1,13 +1,13 @@
 package bridge
 
 import (
+	"context"
 	"fmt"
 	"slices"
 
 	"goisekai/internal/database"
 	"goisekai/internal/logger"
 	"goisekai/pkg/types"
-
 	"github.com/goccy/go-json"
 )
 
@@ -17,7 +17,17 @@ import (
 // that path with nothing to match.
 func (s *AppService) SearchManga(pluginID string, filter types.SearchFilter) ([]types.Manga, error) {
 	filter.Genres = slices.DeleteFunc(filter.Genres, func(g string) bool { return g == "" })
-	result, err := s.mgr.Search(pluginID, filter)
+	var (
+		result []types.Manga
+		err    error
+	)
+	runErr := s.runOnInteractive(context.Background(), pluginID, func(context.Context) error {
+		result, err = s.mgr.Search(pluginID, filter)
+		return err
+	})
+	if runErr != nil {
+		return nil, fmt.Errorf("bridge: search manga: %w", runErr)
+	}
 	if err != nil {
 		return nil, fmt.Errorf("bridge: search manga: %w", err)
 	}
@@ -40,6 +50,9 @@ func (s *AppService) ClearMangaNew(pluginID, mangaID string) error {
 }
 
 // GetMangaDetails fetches a manga and its chapter list from a plugin.
+// The plugin invoke rides the interactive lane (task 4.1); the body keeps
+// calling s.mgr.* directly — routing s.GetChapterList from inside would nest
+// same-lane awaits.
 func (s *AppService) GetMangaDetails(pluginID, mangaID string) (types.Manga, []types.Chapter, error) {
 	mangaIntID, _ := s.db.ResolveMangaIntID(pluginID, mangaID)
 
@@ -47,7 +60,17 @@ func (s *AppService) GetMangaDetails(pluginID, mangaID string) (types.Manga, []t
 		return s.cachedMangaFallback(pluginID, mangaID, mangaIntID)
 	}
 
-	manga, err := s.mgr.GetMangaDetail(pluginID, mangaID)
+	var (
+		manga types.Manga
+		err   error
+	)
+	runErr := s.runOnInteractive(context.Background(), pluginID, func(context.Context) error {
+		manga, err = s.mgr.GetMangaDetail(pluginID, mangaID)
+		return err
+	})
+	if runErr != nil {
+		return types.Manga{}, nil, fmt.Errorf("bridge: get manga details: %w", runErr)
+	}
 	if err == nil && manga.Title == "" {
 		err = fmt.Errorf("empty title from plugin")
 	}
@@ -103,7 +126,17 @@ func (s *AppService) resolveChapterIntID(pluginID, mangaID, chapterID string) (i
 
 // GetPageList delegates to the plugin's GetPageList function.
 func (s *AppService) GetPageList(pluginID, chapterID string) ([]types.Page, error) {
-	result, err := s.mgr.GetPageList(pluginID, chapterID)
+	var (
+		result []types.Page
+		err    error
+	)
+	runErr := s.runOnInteractive(context.Background(), pluginID, func(context.Context) error {
+		result, err = s.mgr.GetPageList(pluginID, chapterID)
+		return err
+	})
+	if runErr != nil {
+		return nil, fmt.Errorf("bridge: get page list: %w", runErr)
+	}
 	if err != nil {
 		return nil, fmt.Errorf("bridge: get page list: %w", err)
 	}
@@ -124,8 +157,21 @@ func (s *AppService) GetPageList(pluginID, chapterID string) ([]types.Page, erro
 // otherwise cached chapters would refuse to open offline.
 func (s *AppService) GetPageListCached(pluginID, chapterID string) ([]types.Page, error) {
 	chapterIntID, _ := s.resolveChapterIntID(pluginID, "", chapterID)
-
-	result, err := s.mgr.GetPageList(pluginID, chapterID)
+	var (
+		result []types.Page
+		err    error
+	)
+	runErr := s.runOnInteractive(context.Background(), pluginID, func(context.Context) error {
+		result, err = s.mgr.GetPageList(pluginID, chapterID)
+		return err
+	})
+	if IsQueueFull(runErr) {
+		// Lane backpressure: surface 503-able error, never mask it with a
+		// stale cache read.
+		return nil, fmt.Errorf("bridge: get page list: %w", runErr)
+	}
+	// Plugin failed (incl. lane-cancelled invocation), handed back nothing, or
+	// is unreachable: fall through to the fallback below.
 	if err == nil && len(result) > 0 {
 		logger.Debug("page list cache: miss (online success)", "chapter", chapterID, "pages", len(result))
 		if raw, merr := json.Marshal(result); merr == nil && chapterIntID != 0 {

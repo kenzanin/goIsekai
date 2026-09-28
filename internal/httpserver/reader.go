@@ -85,6 +85,9 @@ func (s *Server) viewReader(w http.ResponseWriter, r *http.Request) {
 	}
 	manga, chapters, err := s.readerChapters(pluginID, mangaID)
 	if err != nil {
+		if s.serviceQueueFull(w, err, "reader") {
+			return
+		}
 		s.logger.Error("reader detail", "error", err, "plugin", pluginID, "manga", mangaID)
 		http.Error(w, "failed to load manga: "+err.Error(), http.StatusBadGateway)
 		return
@@ -128,6 +131,9 @@ func (s *Server) readerData(w http.ResponseWriter, r *http.Request) {
 	}
 	pages, err := s.service.GetPageListCached(pluginID, chapterID)
 	if err != nil {
+		if s.serviceQueueFull(w, err, "reader-pages") {
+			return
+		}
 		s.logger.Error("reader page list", "error", err, "plugin", pluginID, "chapter", chapterID)
 		http.Error(w, "failed to load pages: "+err.Error(), http.StatusBadGateway)
 		return

@@ -47,6 +47,9 @@ func (s *Server) apiMangaDetail(w http.ResponseWriter, r *http.Request) {
 	_ = s.service.ClearMangaNew(pluginID, mangaID)
 	manga, chapters, err := s.service.GetMangaDetails(pluginID, mangaID)
 	if err != nil {
+		if s.serviceQueueFull(w, err, "detail") {
+			return
+		}
 		if _, ok := errors.AsType[*hostnet.ChallengeError](err); ok {
 			writeErr(w, http.StatusForbidden, "source requires verification")
 			return

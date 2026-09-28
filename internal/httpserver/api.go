@@ -10,6 +10,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
+	"goisekai/internal/bridge"
 	"goisekai/internal/database"
 )
 
@@ -23,6 +24,18 @@ func writeJSON(w http.ResponseWriter, status int, v any) {
 // writeErr writes a JSON error envelope {"error":"msg"} with the given status.
 func writeErr(w http.ResponseWriter, status int, msg string) {
 	writeJSON(w, status, map[string]string{"error": msg})
+}
+
+// serviceQueueFull maps lane backpressure from bridge calls to 503 (design
+// D6: overload visible, request deadline honored). Returns true when it wrote
+// the response; the caller returns immediately.
+func (s *Server) serviceQueueFull(w http.ResponseWriter, err error, op string) bool {
+	if !bridge.IsQueueFull(err) {
+		return false
+	}
+	s.logger.Warn("interactive lane saturated", "op", op, "error", err)
+	writeErr(w, http.StatusServiceUnavailable, op+" busy, retry shortly")
+	return true
 }
 
 // requireAPIKey returns a middleware that enforces X-API-Key authentication

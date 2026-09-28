@@ -39,6 +39,9 @@ func (s *Server) apiSearch(w http.ResponseWriter, r *http.Request) {
 			writeErr(w, http.StatusForbidden, "source requires verification")
 			return
 		}
+		if s.serviceQueueFull(w, err, "search") {
+			return
+		}
 		s.logger.Error("api search", "error", err, "plugin", pluginID, "q", q)
 		writeErr(w, http.StatusBadGateway, "search failed: "+err.Error())
 		return

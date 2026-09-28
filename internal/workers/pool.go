@@ -265,6 +265,11 @@ type Pool struct {
 	// PluginKey (design: FetchWorker).
 	fetchInUse map[string]bool
 	fetchMu    sync.Mutex
+	// interactiveInUse applies the same per-plugin fairness to the interactive
+	// lane (task 4.1): a stalled plugin invoke holds one worker plus its VM
+	// mutex instead of parking sibling invokes on extra workers.
+	interactiveInUse map[string]bool
+	interactiveMu    sync.Mutex
 
 	registry    map[string]*jobHandle
 	detail      map[string]string // job ID -> result detail (e.g. export path)
@@ -299,7 +304,8 @@ func New(cfg Config) *Pool {
 		imageHigh:   &poolLane{name: LaneImage, queue: make(chan *jobHandle, cfg.ImageQueue)},
 		imageLow:    &poolLane{name: LaneImage, queue: make(chan *jobHandle, cfg.ImageQueue)},
 		maintenance: &poolLane{name: LaneMaintenance, queue: make(chan *jobHandle, cfg.MaintenanceQueue)},
-		fetchInUse:  map[string]bool{},
+		fetchInUse:      map[string]bool{},
+		interactiveInUse: map[string]bool{},
 		registry:    map[string]*jobHandle{},
 		detail:      map[string]string{},
 		dedupe:      map[string]string{},
@@ -325,7 +331,7 @@ func New(cfg Config) *Pool {
 func (p *Pool) spawnInteractive() {
 	p.nInteractive.Add(1)
 	p.wg.Add(1)
-	go p.worker(p.interactive, nil)
+	go p.worker(p.interactive, p.interactiveGate)
 }
 
 func (p *Pool) spawnFetch() {
@@ -374,7 +380,7 @@ func (p *Pool) ResizeLane(lane Lane, n int) {
 		case LaneInteractive:
 			if p.nInteractive.CompareAndSwap(cur, cur+1) {
 				p.wg.Add(1)
-				go p.worker(p.interactive, nil)
+				go p.worker(p.interactive, p.interactiveGate)
 			}
 		case LaneFetch:
 			if p.nFetch.CompareAndSwap(cur, cur+1) {
@@ -535,26 +541,35 @@ func (p *Pool) Enqueue(ctx context.Context, job *Job) (*Future, error) {
 	}
 }
 
+// takeKey implements per-plugin fairness for one lane: at most one in-flight
+// job per PluginKey — the worker parks others at the queue tail. An empty key
+// always passes.
+func (p *Pool) takeKey(inUse map[string]bool, mu *sync.Mutex, key string) (take bool, release func()) {
+	if key == "" {
+		return true, func() {}
+	}
+	mu.Lock()
+	if inUse[key] {
+		mu.Unlock()
+		return false, nil
+	}
+	inUse[key] = true
+	mu.Unlock()
+	return true, func() {
+		mu.Lock()
+		delete(inUse, key)
+		mu.Unlock()
+	}
+}
 // fetchGate enforces per-plugin fairness: returns false when another job for
 // the same PluginKey is in flight — the worker then parks this job at the
 // queue tail.
 func (p *Pool) fetchGate(h *jobHandle) (take bool, release func()) {
-	key := h.job.PluginKey
-	if key == "" {
-		return true, func() {}
-	}
-	p.fetchMu.Lock()
-	if p.fetchInUse[key] {
-		p.fetchMu.Unlock()
-		return false, nil
-	}
-	p.fetchInUse[key] = true
-	p.fetchMu.Unlock()
-	return true, func() {
-		p.fetchMu.Lock()
-		delete(p.fetchInUse, key)
-		p.fetchMu.Unlock()
-	}
+	return p.takeKey(p.fetchInUse, &p.fetchMu, h.job.PluginKey)
+}
+// interactiveGate is fetchGate for the interactive lane (task 4.1).
+func (p *Pool) interactiveGate(h *jobHandle) (take bool, release func()) {
+	return p.takeKey(p.interactiveInUse, &p.interactiveMu, h.job.PluginKey)
 }
 
 // worker runs jobs from one lane sequentially-per-slot. gate, when non-nil,
@@ -568,21 +583,32 @@ func (p *Pool) worker(lane *poolLane, gate func(*jobHandle) (bool, func())) {
 		case h := <-lane.queue:
 			release := func() {}
 			if gate != nil {
-				take, rel := gate(h)
-				if !take {
-					// Requeue at tail for fairness.
+				requeued := false
+				for {
+					take, rel := gate(h)
+					if take {
+						release = rel
+						break
+					}
+					// Same PluginKey in flight: park at the queue tail for
+					// fairness. If the tail is full of same-key siblings the
+					// put fails — sleep-retry instead of spinning or
+					// dropping the job.
 					select {
 					case lane.queue <- h:
-					default:
-						// Queue full of same-key jobs: run anyway rather
-						// than drop — rare, bounded by queue size.
-						take, rel = true, func() {}
+						requeued = true // back to the tail; work the next handle
+					case <-p.rootCtx.Done():
+						return
+					case <-time.After(time.Millisecond):
+						// retry the gate
 					}
-					if !take {
-						continue
+					if requeued {
+						break
 					}
 				}
-				release = rel
+				if requeued {
+					continue // outer job loop: dequeue the next handle
+				}
 			}
 			h.run(h.jctx)
 			release()
