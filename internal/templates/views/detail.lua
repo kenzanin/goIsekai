@@ -189,7 +189,7 @@ return function(data)
 				.. h(pluginID)
 				.. "/"
 				.. h(mangaID)
-				.. '" class="ml-auto inline-flex items-center gap-2">'
+				.. '" class="ml-auto inline-flex items-center gap-2" data-job-action="sync-manga">'
 				.. '<span class="text-xs text-neutral-500 cursor-default" title="Last refresh check - click Update to refresh now">updated '
 				.. synced:sub(1, 10) .. " " .. synced:sub(12, 16)
 				.. '</span>'
@@ -200,7 +200,7 @@ return function(data)
 				.. h(pluginID)
 				.. "/"
 				.. h(mangaID)
-				.. '" class="ml-auto">'
+				.. '" class="ml-auto" data-job-action="sync-manga">'
 				.. '<button type="submit" title="Refresh this manga now" class="border border-neutral-700 text-neutral-300 hover:bg-neutral-800 rounded-md px-4 py-2 text-sm cursor-pointer">⟳ Update</button>'
 				.. '</form>'
 		end

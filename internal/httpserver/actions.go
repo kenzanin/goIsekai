@@ -41,7 +41,6 @@ func (s *Server) registerActionRoutes() {
 	s.Router.Post("/action/save-settings", s.handleSaveSettings)
 	s.Router.Post("/action/save-verify/{pluginID}", s.handleSaveVerify)
 	s.Router.Post("/action/export-cbz/{pluginID}/{mangaID}/{chapterID}", s.handleExportCBZ)
-	s.Router.Get("/action/job-status/{jobID}", s.handleJobStatus)
 	s.Router.Post("/action/clear-logs", s.handleClearLogs)
 	s.Router.Post("/action/clear-cache-all", s.handleClearAllCache)
 	s.Router.Post("/action/test-profile/{pluginID}", s.handleTestProfile)

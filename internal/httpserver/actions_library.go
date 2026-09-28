@@ -5,6 +5,19 @@ import (
 	"net/http"
 )
 
+// jobRef is the immediate response for an enqueued long-running action.
+// Shape is fixed by design.md: {"status":"ok","job_id":"<id>"} — field order
+// matters, so this is a struct rather than a map (maps marshal alphabetically).
+type jobRef struct {
+	Status string `json:"status"`
+	JobID  string `json:"job_id"`
+}
+
+func writeJobRef(w http.ResponseWriter, jobID string) {
+	w.Header().Set("Content-Type", "application/json")
+	_ = json.NewEncoder(w).Encode(jobRef{Status: "ok", JobID: jobID})
+}
+
 // handleToggleLibrary flips a manga's in-library flag.
 func (s *Server) handleToggleLibrary(w http.ResponseWriter, r *http.Request) {
 	pluginID := param(r, "pluginID")
@@ -29,7 +42,7 @@ func (s *Server) handleSyncManga(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	_ = json.NewEncoder(w).Encode(map[string]string{"jobID": jobID})
+	writeJobRef(w, jobID)
 }
 
 // handleSync re-fetches chapter lists for every library manga.
@@ -40,5 +53,5 @@ func (s *Server) handleSync(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	_ = json.NewEncoder(w).Encode(map[string]string{"jobID": jobID})
+	writeJobRef(w, jobID)
 }

@@ -255,7 +255,8 @@ type Pool struct {
 	fetchInUse map[string]bool
 	fetchMu    sync.Mutex
 
-	registry map[string]*jobHandle
+	registry    map[string]*jobHandle
+	detail      map[string]string // job ID -> result detail (e.g. export path)
 	regMu    sync.Mutex
 
 	nInteractive atomic.Int64
@@ -270,8 +271,9 @@ type Pool struct {
 	stop    context.CancelFunc
 
 	// StatusChanged is called when a job's status changes (queued/running/done/failed).
-	// The ID and status are passed; the callback runs synchronously during the state update.
-	StatusChanged func(id string, status JobStatus)
+	// ID, status and any result detail are passed; the callback runs synchronously
+	// during the state update.
+	StatusChanged func(id string, status JobStatus, detail string)
 }
 
 // New creates a Pool with the given sizing and starts all workers.
@@ -287,6 +289,7 @@ func New(cfg Config) *Pool {
 		maintenance: &poolLane{name: LaneMaintenance, queue: make(chan *jobHandle, cfg.MaintenanceQueue)},
 		fetchInUse:  map[string]bool{},
 		registry:    map[string]*jobHandle{},
+		detail:      map[string]string{},
 		rootCtx:     ctx,
 		stop:        cancel,
 	}
@@ -639,7 +642,7 @@ func (h *jobHandle) setStatus(s JobStatus) {
 	// Notify status change callback if set (design D6).
 	if h.job != nil && h.job.ID != "" && h.fut != nil && h.fut.info == h {
 		if cb := h.getPool().StatusChanged; cb != nil {
-			cb(h.job.ID, s)
+			cb(h.job.ID, s, h.getPool().detailOf(h.job.ID))
 		}
 	}
 }
@@ -678,5 +681,20 @@ func (h *jobHandle) lastErrSnapshot() error {
 func (p *Pool) deregister(id string) {
 	p.regMu.Lock()
 	delete(p.registry, id)
+	delete(p.detail, id)
 	p.regMu.Unlock()
+}
+
+// SetDetail records a result detail for a job (e.g. the finished CBZ path) so
+// status callbacks can announce it. Safe to call from inside a job's Run.
+func (p *Pool) SetDetail(id, detail string) {
+	p.regMu.Lock()
+	p.detail[id] = detail
+	p.regMu.Unlock()
+}
+
+func (p *Pool) detailOf(id string) string {
+	p.regMu.Lock()
+	defer p.regMu.Unlock()
+	return p.detail[id]
 }

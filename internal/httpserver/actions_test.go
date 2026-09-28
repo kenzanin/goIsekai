@@ -29,8 +29,9 @@ func TestActionSync(t *testing.T) {
 	if rec.Code != 200 {
 		t.Fatalf("status = %d, want 200", rec.Code)
 	}
-	if !strings.Contains(rec.Body.String(), "jobID") {
-		t.Fatalf("body = %q, want a jobID", rec.Body.String())
+	// Contract is character-for-character: {"status":"ok","job_id":"<id>"}.
+	if !strings.Contains(rec.Body.String(), `"status":"ok"`) || !strings.Contains(rec.Body.String(), `"job_id":`) {
+		t.Fatalf("body = %q, want {\"status\":\"ok\",\"job_id\":...}", rec.Body.String())
 	}
 }
 

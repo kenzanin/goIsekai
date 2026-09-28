@@ -80,15 +80,158 @@
       });
   };
 
+  // Job actions: sync / sync-manga / export-cbz POST JSON {status:"ok",job_id}
+  // then stream progress over /jobs/ws (subscribe {"job_id":"<id>"}).
+  // Contract field is job_id (snake_case). Server pushes
+  // {job_id, status: queued|running|done|failed, path?} (path only on
+  // export-cbz done). Usage: <form data-job-action="sync" ...> + delegated
+  // submit listener below, or window.submitJobAction(form, {successMessage}).
+  var JOB_DEFAULTS = {
+    sync: {
+      queued: 'Sync queued',
+      running: 'Sync running',
+      done: 'Sync done',
+      failed: 'Sync failed',
+    },
+    'sync-manga': {
+      queued: 'Manga sync queued',
+      running: 'Manga sync running',
+      done: 'Manga sync done',
+      failed: 'Manga sync failed',
+    },
+    'export-cbz': {
+      queued: 'CBZ export queued',
+      running: 'CBZ export running',
+      done: 'CBZ ready',
+      failed: 'CBZ export failed',
+    },
+  };
+  var jobToast = (msg, type) => {
+    if (typeof Alpine !== 'undefined' && Alpine.store('toast')) {
+      Alpine.store('toast').show(msg, type);
+    }
+  };
+  var jobKind = (form) => {
+    var hint = (form.getAttribute('data-job-action') || '').trim();
+    if (hint && hint !== 'true') return hint;
+    var action = form.getAttribute('action') || '';
+    if (action.indexOf('export-cbz') !== -1) return 'export-cbz';
+    if (action.indexOf('sync-manga') !== -1) return 'sync-manga';
+    return 'sync';
+  };
+  window.submitJobAction = (form, opts) => {
+    if (!form) return;
+    opts = opts || {};
+    var kind = jobKind(form);
+    var defaults = JOB_DEFAULTS[kind] || JOB_DEFAULTS.sync;
+    var queuedMsg = opts.queuedMessage || defaults.queued;
+    var runningMsg = opts.runningMessage || defaults.running;
+    var doneMsg = opts.successMessage || opts.doneMessage || defaults.done;
+    var failedMsg = opts.failedMessage || defaults.failed;
+    var btn = form.querySelector('button[type="submit"]') || form.querySelector('button');
+    var origHTML = btn ? btn.innerHTML : null;
+    if (btn) btn.disabled = true;
+    var restoreBtn = () => {
+      if (btn) {
+        btn.disabled = false;
+        if (origHTML !== null) btn.innerHTML = origHTML;
+      }
+    };
+    var action = form.getAttribute('action') || form.action;
+    var method = (form.getAttribute('method') || form.method || 'POST').toUpperCase();
+    fetch(action, {
+      method: method,
+      body: new URLSearchParams(new FormData(form)),
+      credentials: 'same-origin',
+    })
+      .then((resp) => {
+        if (!resp.ok) {
+          return resp.text().then((t) => {
+            var m = (t || '').trim() || `Request failed (${resp.status})`;
+            if (/^</.test(m)) m = `Request failed (${resp.status})`;
+            throw new Error(m);
+          });
+        }
+        return resp.json();
+      })
+      .then((data) => {
+        var jobID = data?.job_id;
+        if (!jobID) throw new Error('Bad response: missing job_id');
+        jobToast(queuedMsg, 'info');
+        var scheme = window.location.protocol === 'https:' ? 'wss://' : 'ws://';
+        var ws = new WebSocket(`${scheme}${window.location.host}/jobs/ws`);
+        ws.onopen = () => {
+          ws.send(JSON.stringify({ job_id: jobID }));
+        };
+        ws.onmessage = (ev) => {
+          var msg = null;
+          try {
+            msg = JSON.parse(ev.data);
+          } catch {
+            return;
+          }
+          if (!msg || msg.job_id !== jobID) return;
+          if (msg.status === 'running') {
+            jobToast(runningMsg, 'info');
+          } else if (msg.status === 'done') {
+            if (kind === 'export-cbz' && msg.path) {
+              jobToast(`${doneMsg}: ${msg.path}`, 'success');
+            } else {
+              jobToast(doneMsg, 'success');
+            }
+            restoreBtn();
+            ws.close();
+          } else if (msg.status === 'failed') {
+            jobToast(failedMsg, 'error');
+            restoreBtn();
+            ws.close();
+          }
+        };
+        ws.onerror = () => {
+          jobToast(failedMsg, 'error');
+          restoreBtn();
+          try {
+            ws.close();
+          } catch {
+            /* socket already closed */
+          }
+        };
+      })
+      .catch((err) => {
+        jobToast(err?.message || 'Network error — check your connection', 'error');
+        restoreBtn();
+      });
+  };
+  // Delegated submit for job-action forms (capture so it wins over the
+  // detail-page SPA interceptor; export-cbz is excluded there anyway).
+  document.addEventListener(
+    'submit',
+    (e) => {
+      var t = e.target;
+      var form = t && t.tagName === 'FORM' ? t : t?.closest?.('form');
+      if (!form || typeof form.getAttribute !== 'function') return;
+      var hint = form.getAttribute('data-job-action');
+      if (hint === null || hint === undefined) return;
+      e.preventDefault();
+      e.stopImmediatePropagation();
+      window.submitJobAction(form, {
+        successMessage: form.getAttribute('data-success-message') || undefined,
+      });
+    },
+    true,
+  );
+
   // Cover image error fallback: swap broken <img data-fallback="XY"> for an
   // initial-letter placeholder (kept outside inline onerror so the Lua template
   // never has to escape quotes into an HTML attribute).
   document.addEventListener('error', (e) => {
     const img = e.target;
-    if (!(img instanceof HTMLImageElement) || !img.hasAttribute('data-fallback')) return;
+    if (!img || typeof img.getAttribute !== 'function') return;
+    const fallback = img.getAttribute('data-fallback');
+    if (fallback === null || fallback === undefined) return;
     const ph = document.createElement('div');
     ph.className = 'w-full aspect-[2/3] bg-neutral-800 flex items-center justify-center text-neutral-500 text-2xl font-semibold';
-    ph.textContent = img.getAttribute('data-fallback') || '';
+    ph.textContent = fallback || '';
     img.replaceWith(ph);
   }, true);
 

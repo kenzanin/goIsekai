@@ -1,7 +1,6 @@
 package httpserver
 
 import (
-	"encoding/json"
 	"net/http"
 )
 
@@ -33,19 +32,7 @@ func (s *Server) handleExportCBZ(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	_ = json.NewEncoder(w).Encode(map[string]string{"jobID": jobID, "path": ""})
-}
-
-// handleJobStatus returns the status of a background job.
-func (s *Server) handleJobStatus(w http.ResponseWriter, r *http.Request) {
-	jobID := param(r, "jobID")
-	status, ok := s.service.GetJobStatus(jobID)
-	if !ok {
-		http.Error(w, "job not found", http.StatusNotFound)
-		return
-	}
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(status)
+	writeJobRef(w, jobID)
 }
 
 // handleClearAllCache removes the entire image cache directory.

@@ -162,7 +162,7 @@ return function(data)
 
 			-- CBZ download button
 			rowHTML = rowHTML
-				.. '<form method="post" action="/action/export-cbz/'
+				.. '<form method="post" data-job-action="export-cbz" action="/action/export-cbz/'
 				.. h(pluginID)
 				.. "/"
 				.. h(mangaID)

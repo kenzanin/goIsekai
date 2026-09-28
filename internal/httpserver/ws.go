@@ -11,9 +11,12 @@ import (
 )
 
 // JobStatusWSMessage is the JSON message format for job status WS updates.
+// Field names match design.md's contract: job_id (snake_case), status, and an
+// optional path carried only on done for export jobs.
 type JobStatusWSMessage struct {
-	JobID   string `json:"jobID"`
+	JobID   string `json:"job_id"`
 	Status  string `json:"status"`
+	Path    string `json:"path,omitempty"`
 	Attempt int    `json:"attempt,omitempty"`
 }
 
@@ -23,8 +26,8 @@ func (s *Server) registerWSRoutes(r chi.Router) {
 	r.Handle("/jobs/ws", websocket.Handler(s.streamJobs))
 	// Wire the pool's StatusChanged callback for job broadcasts.
 	if pool := s.service.GetPool(); pool != nil {
-		pool.StatusChanged = func(id string, status workers.JobStatus) {
-			s.broadcastJobStatus(id, status.String())
+		pool.StatusChanged = func(id string, status workers.JobStatus, detail string) {
+			s.broadcastJobStatus(id, status.String(), detail)
 		}
 	}
 }
@@ -63,7 +66,7 @@ var clients = &jobClients{
 }
 
 // streamJobs maintains a WS connection for job status updates.
-// Clients can send {"jobID": "..."} to filter for a specific job.
+// Clients can send {"job_id": "..."} to filter for a specific job.
 func (s *Server) streamJobs(ws *websocket.Conn) {
 	defer func() {
 		s.unregisterJobClient(ws)
@@ -78,7 +81,9 @@ func (s *Server) streamJobs(ws *websocket.Conn) {
 	readDone := make(chan struct{})
 	go func() {
 		for {
-			var msg struct{ JobID string }
+			var msg struct {
+				JobID string `json:"job_id"`
+			}
 			if err := json.NewDecoder(ws).Decode(&msg); err != nil {
 				close(readDone)
 				return
@@ -119,11 +124,10 @@ func (c *jobClients) filterClient(ws *websocket.Conn, jobID string) {
 }
 
 // broadcastJobStatus is called by the pool when job status changes.
-func (s *Server) broadcastJobStatus(id string, statusStr string) {
+func (s *Server) broadcastJobStatus(id string, statusStr string, path string) {
 	clients.mu.Lock()
 	defer clients.mu.Unlock()
-
-	msg, _ := json.Marshal(JobStatusWSMessage{JobID: id, Status: statusStr})
+	msg, _ := json.Marshal(JobStatusWSMessage{JobID: id, Status: statusStr, Path: path})
 
 	// Send to filtered connections
 	if conns, ok := clients.filtered[id]; ok {
