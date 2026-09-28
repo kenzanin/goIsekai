@@ -1,6 +1,7 @@
 package bridge
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -106,6 +107,14 @@ func (s *AppService) GetChapterProgresses(pluginID, mangaID string) (map[string]
 // and validated. A new URL overwrites the stored one so the next page render
 // uses it. The re-downloaded bytes are cached as usual.
 func (s *AppService) RefetchCover(pluginID, mangaID string) error {
+	// task 3.1: cover refetch is fetch work — it walks the same plugin +
+	// host paths as a sync, so it takes a fetch-lane slot keyed by plugin.
+	return s.runOnFetch(context.Background(), pluginID, func(context.Context) error {
+		return s.refetchCover(pluginID, mangaID)
+	})
+}
+
+func (s *AppService) refetchCover(pluginID, mangaID string) error {
 	cached, err := s.db.GetMangaCached(pluginID, mangaID)
 	if err != nil {
 		return fmt.Errorf("bridge: refetch cover: %w", err)

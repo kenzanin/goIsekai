@@ -1,6 +1,7 @@
 package bridge
 
 import (
+	"context"
 	"sync"
 
 	"database/sql"
@@ -80,30 +81,38 @@ func (s *AppService) collectCandidatesWithTitle(currentPluginID, title string) (
 		wg.Add(1)
 		go func(plugID, plugName string) {
 			defer wg.Done()
-			results, searchErr := s.mgr.Search(plugID, types.SearchFilter{Query: title})
+			// task 3.1: each source's search rides the fetch lane under its own
+			// PluginKey, so one slow source serializes only its own lookups while
+			// the other sources keep going.
+			searchErr := s.runOnFetch(context.Background(), plugID, func(context.Context) error {
+				results, err := s.mgr.Search(plugID, types.SearchFilter{Query: title})
+				if err != nil {
+					return err
+				}
+				if len(results) == 0 {
+					return nil
+				}
+				local := make([]MigrationCandidate, 0, len(results))
+				for _, r := range results {
+					local = append(local, MigrationCandidate{
+						PluginID:      plugID,
+						PluginName:    plugName,
+						SourceMangaID: r.ID,
+						Title:         r.Title,
+						IsExactMatch:  pluginutil.NormalizeTitle(r.Title) == normalizedTitle,
+					})
+				}
+				mu.Lock()
+				candidates = append(candidates, local...)
+				mu.Unlock()
+				return nil
+			})
 			if searchErr != nil {
 				logger.Warn("migration candidate search failed", "plugin", plugID, "error", searchErr)
 				mu.Lock()
 				failures = append(failures, plugID)
 				mu.Unlock()
-				return
 			}
-			if len(results) == 0 {
-				return
-			}
-			var local []MigrationCandidate
-			for _, r := range results {
-				local = append(local, MigrationCandidate{
-					PluginID:      plugID,
-					PluginName:    plugName,
-					SourceMangaID: r.ID,
-					Title:         r.Title,
-					IsExactMatch:  pluginutil.NormalizeTitle(r.Title) == normalizedTitle,
-				})
-			}
-			mu.Lock()
-			candidates = append(candidates, local...)
-			mu.Unlock()
 		}(p.ID, p.Name)
 	}
 	wg.Wait()

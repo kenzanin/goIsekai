@@ -27,3 +27,19 @@ func (s *AppService) EnqueueExportCBZ(ctx context.Context, pluginID, mangaID, ch
 	return fut.GetID(), nil
 }
 
+// runOnFetch routes a request-shaped fetch unit through the fetch lane so
+// per-plugin fairness applies (one in-flight job per PluginKey), then waits
+// for its result. Library sync stays fire-and-forget at the enqueue seam; the
+// paths that need a value back (task 3.1: migration candidate search,
+// enrichment fetch, cover refetch) join the lane instead of bypassing it.
+func (s *AppService) runOnFetch(ctx context.Context, pluginKey string, fn func(context.Context) error) error {
+	fut, err := s.pool.Enqueue(ctx, &workers.Job{
+		Lane:      workers.LaneFetch,
+		PluginKey: pluginKey,
+		Run:       fn,
+	})
+	if err != nil {
+		return err
+	}
+	return fut.Await(ctx)
+}

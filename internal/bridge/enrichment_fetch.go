@@ -15,6 +15,14 @@ import (
 // When sources is empty, fetches from all enabled providers; when non-empty,
 // fetches only from those sources (backward-compatible single-source mode).
 func (s *AppService) FetchEnrichment(pluginID, mangaID, title string, sources []string) error {
+	// task 3.1: ride the fetch lane so a slow source serializes only its own
+	// enrichment work, not the whole request path.
+	return s.runOnFetch(context.Background(), pluginID, func(context.Context) error {
+		return s.fetchEnrichment(pluginID, mangaID, title, sources)
+	})
+}
+
+func (s *AppService) fetchEnrichment(pluginID, mangaID, title string, sources []string) error {
 	if s.enrich == nil {
 		return fmt.Errorf("enrichment provider not configured")
 	}
