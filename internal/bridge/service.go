@@ -70,6 +70,11 @@ func (s *AppService) Shutdown() {
 	s.pool.Shutdown()
 }
 
+// GetPool returns the worker pool.
+func (s *AppService) GetPool() *workers.Pool {
+	return s.pool
+}
+
 // Log receives a console message from the frontend and writes it to the Go logger.
 func (s *AppService) Log(level string, msg string) {
 	switch level {

@@ -118,11 +118,6 @@ func main() {
 	maxCacheGB.Store(int64(math.Float64bits(cfg.MaxCacheGB)))
 	startConfigWatch(cfgPath, proxy, maxCacheGB)
 
-	// Maintenance: prune orphaned rows at startup, then back up + re-prune
-	// on the configured interval until shutdown.
-	maintenanceStop := startMaintenance(db, cfg, dataDir, maxCacheGB)
-	defer close(maintenanceStop)
-
 	mgr := pluginmanager.NewManager(proxy, pluginsDir)
 	mgr.SetInfoDir(infoDir)
 	mgr.SetDB(db, detailTTL)
@@ -151,6 +146,15 @@ func main() {
 	mgr.SetOnLoad(svc.SyncPluginMeta)
 	mgr.SetEnrichRegistry(enrichReg)
 
+	// Signal handling: wait for SIGTERM/SIGINT, then shut down gracefully.
+	mainCtx, stop := signal.NotifyContext(context.Background(), syscall.SIGTERM, syscall.SIGINT)
+	defer stop()
+
+	// Maintenance: prune orphaned rows at startup, then back up + re-prune
+	// on the configured interval onto the maintenance lane.
+	maintenanceStop := startMaintenance(mainCtx, db, cfg, dataDir, maxCacheGB, svc.GetPool())
+	defer close(maintenanceStop)
+
 	// Hourly background refresh of stale library manga (update_stale_days).
 	schedulerStop := make(chan struct{})
 	bridge.StartLibraryScheduler(svc, schedulerStop)
@@ -168,18 +172,14 @@ func main() {
 		srv.OpenBrowser()
 	}
 
-	// Signal handling: wait for SIGTERM/SIGINT, then shut down gracefully.
-	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGTERM, syscall.SIGINT)
-	defer stop()
-
 	errCh := make(chan error, 1)
 	go func() {
 		errCh <- srv.ListenAndServe()
 	}()
 
 	select {
-	case <-ctx.Done():
-		logger.Info("received shutdown signal", "signal", ctx.Err())
+	case <-mainCtx.Done():
+		logger.Info("received shutdown signal", "signal", mainCtx.Err())
 	case err := <-errCh:
 		// Server exited on its own (port bind failure, etc.).
 		logger.Fatal("http server", "error", err)

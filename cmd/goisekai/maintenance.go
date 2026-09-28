@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"math"
 	"os"
 	"path/filepath"
@@ -13,6 +14,7 @@ import (
 	"goisekai/internal/hostnet"
 	"goisekai/internal/logger"
 	"goisekai/internal/pluginmanager"
+	"goisekai/internal/workers"
 )
 
 // startConfigWatch polls goisekai.ini and applies the safe subset (log level,
@@ -94,7 +96,9 @@ func pruneImageCache(cfg *config.Config, dataDir string, maxBytesGB float64) (in
 // startMaintenance prunes orphaned rows at startup, then backs up + re-prunes
 // on the configured interval until the returned channel is closed.
 // maxCacheGB holds the hot-reloadable image-cache size cap (float64 bits).
-func startMaintenance(db *database.DB, cfg *config.Config, dataDir string, maxCacheGB *atomic.Int64) chan struct{} {
+// The pool handles the periodic maintenance jobs; a stop channel is returned
+// for graceful shutdown. Initial work runs immediately.
+func startMaintenance(ctx context.Context, db *database.DB, cfg *config.Config, dataDir string, maxCacheGB *atomic.Int64, pool *workers.Pool) chan struct{} {
 	backupsDir := filepath.Join(dataDir, "backups")
 	healFTS := func() {
 		rebuilt, err := db.EnsureLibraryFTS()
@@ -119,20 +123,46 @@ func startMaintenance(db *database.DB, cfg *config.Config, dataDir string, maxCa
 	if _, err := pruneImageCache(cfg, dataDir, maxCacheGBBits(maxCacheGB)); err != nil {
 		logger.Error("prune image cache at startup", "error", err)
 	}
-	stop := make(chan struct{})
-	go func() {
-		interval := time.Duration(cfg.BackupIntervalHours) * time.Hour
-		if interval <= 0 {
-			return // backups disabled
+
+	// If backup interval is configured, do an initial backup at startup.
+	if cfg.BackupIntervalHours > 0 {
+		if _, err := db.BackupTo(backupsDir, cfg.BackupKeep); err != nil {
+			logger.Error("db backup", "error", err)
+		} else {
+			logger.Info("db backup written", "dir", backupsDir, "keep", cfg.BackupKeep)
 		}
-		backup := func() {
-			if _, err := db.BackupTo(backupsDir, cfg.BackupKeep); err != nil {
-				logger.Error("db backup", "error", err)
-			} else {
-				logger.Info("db backup written", "dir", backupsDir, "keep", cfg.BackupKeep)
+	}
+
+	stop := make(chan struct{})
+	if cfg.BackupIntervalHours <= 0 {
+		return stop // backups disabled, no background work
+	}
+
+	// Batch all maintenance tasks into one job for the maintenance lane.
+	doBatch := func(ctx context.Context) error {
+		if cfg.PruneOrphans {
+			if summary, err := db.PruneOrphans(); err == nil && summary != "clean" {
+				logger.Info("pruned orphaned rows", "summary", summary)
 			}
 		}
-		backup() // first backup at startup
+		healFTS()
+		if _, err := db.BackupTo(backupsDir, cfg.BackupKeep); err != nil {
+			logger.Error("db backup", "error", err)
+		} else {
+			logger.Info("db backup written", "dir", backupsDir, "keep", cfg.BackupKeep)
+		}
+		if _, err := pruneImageCache(cfg, dataDir, maxCacheGBBits(maxCacheGB)); err != nil {
+			logger.Error("prune image cache", "error", err)
+		}
+		return nil
+	}
+
+	go func() {
+		interval := time.Duration(cfg.BackupIntervalHours) * time.Hour
+		backupJob := &workers.Job{
+			Lane: workers.LaneMaintenance,
+			Run:  func(ctx context.Context) error { return doBatch(ctx) },
+		}
 		ticker := time.NewTicker(interval)
 		defer ticker.Stop()
 		for {
@@ -140,16 +170,8 @@ func startMaintenance(db *database.DB, cfg *config.Config, dataDir string, maxCa
 			case <-stop:
 				return
 			case <-ticker.C:
-				if cfg.PruneOrphans {
-					if summary, err := db.PruneOrphans(); err == nil && summary != "clean" {
-						logger.Info("pruned orphaned rows", "summary", summary)
-					}
-				}
-				healFTS()
-				backup()
-				// Re-read MaxCacheGB each tick (hot-reloadable) and prune if needed.
-				if _, err := pruneImageCache(cfg, dataDir, maxCacheGBBits(maxCacheGB)); err != nil {
-					logger.Error("prune image cache", "error", err)
+				if _, err := pool.Enqueue(ctx, backupJob); err != nil {
+					logger.Error("maintenance enqueue", "error", err)
 				}
 			}
 		}
