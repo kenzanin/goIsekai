@@ -23,8 +23,8 @@
 
 ## 4. P3 — InteractiveWorker
 
-- [ ] 4.1 Route UI-facing plugin invokes (search, detail, chapter list, reader-data) through the interactive lane and verify a stalled plugin invoke does not block unrelated interactive jobs beyond the per-plugin mutex
-- [ ] 4.2 Verify interactive queue exhaustion fails with 503 before the request deadline and never grows goroutines unboundedly
+- [x] 4.1 Route UI-facing plugin invokes (search, detail, chapter list, reader-data) through the interactive lane and verify a stalled plugin invoke does not block unrelated interactive jobs beyond the per-plugin mutex
+- [x] 4.2 Verify interactive queue exhaustion fails with 503 before the request deadline and never grows goroutines unboundedly
 
 ## 5. P4 — MaintenanceWorker + integration
 

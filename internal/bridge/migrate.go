@@ -64,10 +64,6 @@ func (s *AppService) collectCandidatesWithTitle(currentPluginID, title string) (
 			activeMap[dp.ID] = dp.IsActive
 		}
 	}
-	type candResult struct {
-		cands  []MigrationCandidate
-		failed string
-	}
 	var wg sync.WaitGroup
 	var mu sync.Mutex
 	for _, p := range s.mgr.LoadedPlugins() {

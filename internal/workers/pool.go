@@ -271,9 +271,9 @@ type Pool struct {
 	interactiveInUse map[string]bool
 	interactiveMu    sync.Mutex
 
-	registry    map[string]*jobHandle
-	detail      map[string]string // job ID -> result detail (e.g. export path)
-	dedupe      map[string]string // DedupeKey -> in-flight job ID (design 3.2)
+	registry map[string]*jobHandle
+	detail   map[string]string // job ID -> result detail (e.g. export path)
+	dedupe   map[string]string // DedupeKey -> in-flight job ID (design 3.2)
 	regMu    sync.Mutex
 
 	nInteractive atomic.Int64
@@ -298,19 +298,19 @@ func New(cfg Config) *Pool {
 	cfg = cfg.withDefaults()
 	ctx, cancel := context.WithCancel(context.Background())
 	p := &Pool{
-		cfg:         cfg,
-		interactive: &poolLane{name: LaneInteractive, queue: make(chan *jobHandle, cfg.InteractiveQueue)},
-		fetch:       &poolLane{name: LaneFetch, queue: make(chan *jobHandle, cfg.FetchQueue)},
-		imageHigh:   &poolLane{name: LaneImage, queue: make(chan *jobHandle, cfg.ImageQueue)},
-		imageLow:    &poolLane{name: LaneImage, queue: make(chan *jobHandle, cfg.ImageQueue)},
-		maintenance: &poolLane{name: LaneMaintenance, queue: make(chan *jobHandle, cfg.MaintenanceQueue)},
-		fetchInUse:      map[string]bool{},
+		cfg:              cfg,
+		interactive:      &poolLane{name: LaneInteractive, queue: make(chan *jobHandle, cfg.InteractiveQueue)},
+		fetch:            &poolLane{name: LaneFetch, queue: make(chan *jobHandle, cfg.FetchQueue)},
+		imageHigh:        &poolLane{name: LaneImage, queue: make(chan *jobHandle, cfg.ImageQueue)},
+		imageLow:         &poolLane{name: LaneImage, queue: make(chan *jobHandle, cfg.ImageQueue)},
+		maintenance:      &poolLane{name: LaneMaintenance, queue: make(chan *jobHandle, cfg.MaintenanceQueue)},
+		fetchInUse:       map[string]bool{},
 		interactiveInUse: map[string]bool{},
-		registry:    map[string]*jobHandle{},
-		detail:      map[string]string{},
-		dedupe:      map[string]string{},
-		rootCtx:     ctx,
-		stop:        cancel,
+		registry:         map[string]*jobHandle{},
+		detail:           map[string]string{},
+		dedupe:           map[string]string{},
+		rootCtx:          ctx,
+		stop:             cancel,
 	}
 	for i := 0; i < cfg.InteractiveSize; i++ {
 		p.spawnInteractive()
@@ -485,8 +485,7 @@ func (p *Pool) Enqueue(ctx context.Context, job *Job) (*Future, error) {
 				h.setErr(nil)
 				return nil
 			}
-			var pe *ErrPermanent
-			if errors.As(err, &pe) {
+			if _, ok := errors.AsType[*ErrPermanent](err); ok {
 				break // permanent: no retry
 			}
 			if attempt < job.MaxAttempts {
@@ -561,12 +560,14 @@ func (p *Pool) takeKey(inUse map[string]bool, mu *sync.Mutex, key string) (take 
 		mu.Unlock()
 	}
 }
+
 // fetchGate enforces per-plugin fairness: returns false when another job for
 // the same PluginKey is in flight — the worker then parks this job at the
 // queue tail.
 func (p *Pool) fetchGate(h *jobHandle) (take bool, release func()) {
 	return p.takeKey(p.fetchInUse, &p.fetchMu, h.job.PluginKey)
 }
+
 // interactiveGate is fetchGate for the interactive lane (task 4.1).
 func (p *Pool) interactiveGate(h *jobHandle) (take bool, release func()) {
 	return p.takeKey(p.interactiveInUse, &p.interactiveMu, h.job.PluginKey)
@@ -610,7 +611,8 @@ func (p *Pool) worker(lane *poolLane, gate func(*jobHandle) (bool, func())) {
 					continue // outer job loop: dequeue the next handle
 				}
 			}
-			h.run(h.jctx)
+			// Error rides the Future (lastErrSnapshot below); callers Await it.
+			_ = h.run(h.jctx)
 			release()
 			// Deliver result exactly once.
 			h.fut.once.Do(func() {
@@ -651,7 +653,8 @@ func (p *Pool) imageWorker() {
 }
 
 func (p *Pool) runHandle(h *jobHandle) {
-	h.run(h.jctx)
+	// Error rides the Future (lastErrSnapshot below); callers Await it.
+	_ = h.run(h.jctx)
 	h.fut.once.Do(func() {
 		h.fut.mu.Lock()
 		h.fut.result = h.lastErrSnapshot()
@@ -710,7 +713,11 @@ func (f *Future) getPool() *Pool {
 }
 
 // setPool links the Future to its Pool for callbacks.
-func (h *jobHandle) setPool(p *Pool) { if h.fut != nil { h.fut.pool = p } }
+func (h *jobHandle) setPool(p *Pool) {
+	if h.fut != nil {
+		h.fut.pool = p
+	}
+}
 
 func (h *jobHandle) setAttempt(n int) {
 	h.mu.Lock()
