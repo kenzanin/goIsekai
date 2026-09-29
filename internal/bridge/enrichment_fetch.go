@@ -69,14 +69,14 @@ func (s *AppService) fetchEnrichment(pluginID, mangaID, title string, sources []
 	}
 
 	// Store items grouped by source. For authors, only store the highest-precedence non-blank result.
-	s.storeEnrichment(rowID, items, s.enrich.OrderedProviders())
+	s.storeEnrichment(pluginID, mangaID, rowID, items, s.enrich.OrderedProviders())
 	return nil
 }
 
 // storeEnrichment stores fetched items by source. For items that support multiple sources
 // (categories, titles, etc.), each source's items are stored separately. For authors,
 // only the highest-precedence non-blank author is stored.
-func (s *AppService) storeEnrichment(rowID string, items map[enrich.Kind][]enrich.Item, providers []enrich.Provider) {
+func (s *AppService) storeEnrichment(pluginID, mangaID, rowID string, items map[enrich.Kind][]enrich.Item, providers []enrich.Provider) {
 	// Group items by source for multi-source storage
 	sourceItems := make(map[string]map[enrich.Kind][]enrich.Item)
 	for kind, kindItems := range items {
@@ -171,8 +171,7 @@ func (s *AppService) storeEnrichment(rowID string, items map[enrich.Kind][]enric
 			// Find first non-blank author
 			for _, a := range kindAuthors {
 				if strings.TrimSpace(a.Value) != "" {
-					mangaIntID, _ := s.db.ResolveMangaIntID("", "")
-					_ = mangaIntID
+					mangaIntID, _ := s.db.ResolveMangaIntID(pluginID, mangaID)
 					if err := s.db.SetMangaAuthor(mangaIntID, a.Value); err != nil {
 						logger.Warn("store author", "error", err)
 					} else {

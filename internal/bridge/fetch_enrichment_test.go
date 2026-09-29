@@ -318,3 +318,59 @@ func TestFetchEnrichmentNormalizesCategories(t *testing.T) {
 		t.Errorf("expected normalized category 'Sci-Fi', got %q", cats[0].Value)
 	}
 }
+
+// TestFetchEnrichmentStoresAuthorOnRightManga pins the author storage path:
+// storeEnrichment must resolve the int row id for the manga it was fetched
+// for, never a blank (pluginID, sourceID) pair — which silently resolved to
+// id 0 and dropped every enrichment author (regression found via the
+// codebase-memory complexity sweep).
+func TestFetchEnrichmentStoresAuthorOnRightManga(t *testing.T) {
+	db, err := database.Open(filepath.Join(t.TempDir(), "enrich.db"))
+	if err != nil {
+		t.Fatalf("open db: %v", err)
+	}
+	defer func() { _ = db.Close() }()
+
+	if _, err := db.UpsertManga(database.Manga{
+		PluginID: "p1", SourceMangaID: "m1", Title: "Title",
+	}); err != nil {
+		t.Fatalf("upsert manga: %v", err)
+	}
+	// A second manga so a wrong-row write cannot pass by accident.
+	if _, err := db.UpsertManga(database.Manga{
+		PluginID: "p2", SourceMangaID: "m2", Title: "Other",
+	}); err != nil {
+		t.Fatalf("upsert second manga: %v", err)
+	}
+
+	reg := enrich.NewRegistry()
+	reg.Register(&enrichMockProvider{
+		id:    "p1",
+		name:  "P1",
+		kinds: []enrich.Kind{enrich.KindAuthors},
+		items: map[enrich.Kind][]enrich.Item{
+			enrich.KindAuthors: {{Source: "p1", Value: "  Yuki Kodama  "}},
+		},
+	})
+
+	s := NewAppService(db, nil, hostnet.NewProxy(), "", "", reg)
+	if err := s.FetchEnrichment("p1", "m1", "", []string{"p1"}); err != nil {
+		t.Fatalf("fetch enrichment: %v", err)
+	}
+
+	intID, _ := db.ResolveMangaIntID("p1", "m1")
+	if intID == 0 {
+		t.Fatal("fixture broken: manga p1|m1 not found")
+	}
+	author, ok, err := db.GetMangaAuthor(intID)
+	if err != nil {
+		t.Fatalf("get author: %v", err)
+	}
+	if !ok {
+		t.Fatal("author not stored on the fetched manga (wrote to wrong row or dropped)")
+	}
+	// Stored verbatim; TrimSpace is only the blank guard in storeEnrichment.
+	if author != "  Yuki Kodama  " {
+		t.Errorf("author = %q, want verbatim %q", author, "  Yuki Kodama  ")
+	}
+}
