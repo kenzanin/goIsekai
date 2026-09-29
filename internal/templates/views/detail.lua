@@ -34,7 +34,7 @@ return function(data)
 
 	-- Back button
 	local body = [[<div class="mb-4">
-    <button onclick="if (history.length > 1) { history.back(); } else { window.location.href = '/view/library'; }" class="inline-flex items-center gap-1.5 text-sm text-neutral-400 hover:text-neutral-200 transition" aria-label="Back">
+    <button onclick="window.backToList ? backToList() : (window.location.href = '/view/library')" class="inline-flex items-center gap-1.5 text-sm text-neutral-400 hover:text-neutral-200 transition" aria-label="Back">
         <svg xmlns="http://www.w3.org/2000/svg" class="size-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg>
         Back
     </button></div>

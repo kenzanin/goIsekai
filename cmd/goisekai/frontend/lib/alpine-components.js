@@ -28,6 +28,41 @@
       Alpine.store('toast').show(msg, type || 'success');
     }
   };
+  // List-page memory for the detail-page Back button: remember the last list
+  // URL (search/library/updates/history) so the in-page Back returns exactly
+  // where the user came from. history.back() is unreliable — the stack may
+  // hold reader or stale entries — and the library fallback loses search
+  // results. MangaDex-style back-to-list, no hack.
+  window.rememberListPage = () => {
+    try {
+      if (/^\/view\/(search|library|updates|history)/.test(window.location.pathname)) {
+        sessionStorage.setItem('gsk:last-list', window.location.pathname + window.location.search);
+      }
+    } catch {
+      /* storage unavailable */
+    }
+  };
+  window.backToList = () => {
+    try {
+      const u = sessionStorage.getItem('gsk:last-list');
+      if (u && u.charAt(0) === '/') {
+        window.location.href = u;
+        return;
+      }
+    } catch {
+      /* storage unavailable */
+    }
+    const ref = document.referrer;
+    if (
+      ref &&
+      ref.indexOf(window.location.origin) === 0 &&
+      /\/view\/(search|library|updates|history)/.test(ref)
+    ) {
+      window.location.href = ref;
+      return;
+    }
+    window.location.href = '/view/library';
+  };
   // Global helper: submit a form via SPA fetch (same as submit event handler).
   // Called as: @click="submitForm($el.closest('form'))"
   window.submitForm = (form) => {
@@ -63,6 +98,7 @@
             Alpine.initTree(main);
           }
           if (window.syncEnrichmentPanel) syncEnrichmentPanel();
+          rememberListPage();
           // An action mutates the current page, it does not navigate: the
           // address bar keeps the page URL. `/action/` is never a page, and
           // writing it in makes a reload or a back press land on the action.
@@ -626,6 +662,7 @@
                 Alpine.initTree(main);
               }
               if (window.syncEnrichmentPanel) syncEnrichmentPanel();
+              rememberListPage();
               // See submitForm: never leave an /action/ URL in the address bar.
               const u = resp.url || '';
               if (u.indexOf(window.location.origin) === 0 && u.indexOf('/action/') === -1) {
@@ -776,6 +813,7 @@ window.setLoading = (btn, loading) => {
 // Relative timestamps: any element carrying data-ts shows "3h ago"
 // =====================================================================
 document.addEventListener('DOMContentLoaded', () => {
+  rememberListPage();
   // Mermaid diagrams (About page): convert code.language-mermaid blocks to
   // divs mermaid renders as SVG, dark-themed to match the UI. No-op elsewhere.
   var mmd = document.querySelectorAll('code.language-mermaid');
