@@ -237,11 +237,16 @@
       const idx = current + k;
       if (!preloaded[idx]) {
         const im = new Image();
-        im.src = imageUrl(pages[idx], undefined, 'low');
+        im.src = imageUrl(pages[idx], undefined, 'high');
         preloaded[idx] = im;
       }
     }
     var spill = readAhead - budget;
+    // Evict bookkeeping for pages far behind the reading position; the
+    // browser HTTP cache keeps the bytes, this only frees the Image handles.
+    for (const idx in preloaded) {
+      if (/^\d+$/.test(idx) && +idx < current - readAhead) delete preloaded[idx];
+    }
     if (spill > 0 && nextChID) {
       if (nextPages) prefetchNext(spill);
       else warmNeighbor(nextChID, 'next');
@@ -255,7 +260,7 @@
     for (let k = 0; k < Math.min(n, nextPages.length); k++) {
       if (!preloaded[`n${k}`]) {
         const im = new Image();
-        im.src = imageUrl(nextPages[k], nextChID, 'low');
+        im.src = imageUrl(nextPages[k], nextChID, 'high');
         preloaded[`n${k}`] = im;
       }
     }
@@ -265,7 +270,7 @@
     for (let k = 0; k < Math.min(n, prevPages.length); k++) {
       if (!preloaded[`p${k}`]) {
         const im = new Image();
-        im.src = imageUrl(prevPages[k], prevChID, 'low');
+        im.src = imageUrl(prevPages[k], prevChID, 'high');
         preloaded[`p${k}`] = im;
       }
     }
@@ -909,7 +914,7 @@
     };
     loadAbortController = new AbortController();
     fetch(`/api/reader-data/${[pid, mid, cid].map(encodeURIComponent).join('/')}`, {
-      signal: loadAbortController.signal
+      signal: loadAbortController.signal,
     })
       .then((r) => {
         if (!r.ok) throw new Error(`HTTP ${r.status}`);

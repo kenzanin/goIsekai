@@ -504,3 +504,32 @@ func TestFrontendActionSubmitStaysInPlace(t *testing.T) {
 func contains(haystack []string, needle string) bool {
 	return slices.Contains(haystack, needle)
 }
+
+// TestReaderPrefetchURLMatchesDisplay pins the read-ahead cache-key contract:
+// prefetched images must use the exact same /image URL the reader draws with,
+// or the browser treats them as two different resources and re-fetches every
+// page turn — the prefetch warms the server cache but never the browser cache.
+// (prio=low prefetch vs prio=high display shipped exactly that bug.) The strip
+// renderer is exempt: it paints <img> elements directly, no prefetch layer.
+func TestReaderPrefetchURLMatchesDisplay(t *testing.T) {
+	data, err := os.ReadFile(filepath.Join(frontendLibDir, "reader.js"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	src := string(data)
+	// Every prefetch call site lives between the prefetch helpers and the
+	// strip-mode section; a 'low' argument there reintroduces the split key.
+	start := strings.Index(src, "function prefetch()")
+	end := strings.Index(src, "// ---- Vertical strip mode")
+	if start < 0 || end < 0 || end <= start {
+		t.Fatal("reader.js layout changed: cannot locate prefetch section")
+	}
+	section := src[start:end]
+	if strings.Contains(section, "'low'") {
+		t.Error("prefetch section requests 'low' priority images — the URL then " +
+			"differs from the 'high' display URL and the browser cache never hits")
+	}
+	if !strings.Contains(section, "'high'") {
+		t.Error("prefetch section no longer requests images; display URLs must be reused verbatim")
+	}
+}
