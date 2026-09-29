@@ -52,3 +52,5 @@ cmd/goisekai/goisekai
 .opencode/echoes-state.json
 # Local helper scripts
 ai.sh
+# Tray wrapper binary
+/goisekai-tray
