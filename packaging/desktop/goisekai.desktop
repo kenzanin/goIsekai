@@ -1,0 +1,13 @@
+[Desktop Entry]
+Type=Application
+Version=1.0
+Name=goIsekai
+GenericName=Manga Library Manager
+Comment=Manga library manager and reader with plugin-based sources
+Exec=/home/kenzanin/tmp/goIsekai/goisekai -logLevel info
+Path=/home/kenzanin/tmp/goIsekai
+Icon=goisekai
+Terminal=false
+Categories=Network;Viewer;
+Keywords=manga;reader;library;comic;
+StartupWMClass=goisekai
