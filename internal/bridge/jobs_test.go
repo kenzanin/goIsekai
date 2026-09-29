@@ -20,10 +20,8 @@ func TestRunOnFetchPerPluginFairness(t *testing.T) {
 	release := make(chan struct{})
 
 	var wg sync.WaitGroup
-	for i := 0; i < 2; i++ {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+	for range 2 {
+		wg.Go(func() {
 			_ = s.runOnFetch(context.Background(), "slow-plugin", func(context.Context) error {
 				if n := slowInFlight.Add(1); n > maxSlow.Load() {
 					maxSlow.Store(n)
@@ -33,7 +31,7 @@ func TestRunOnFetchPerPluginFairness(t *testing.T) {
 				slowInFlight.Add(-1)
 				return nil
 			})
-		}()
+		})
 	}
 
 	// Hold the slow plugin's slot first, so the probe below is meaningful.
@@ -65,4 +63,3 @@ func TestRunOnFetchPerPluginFairness(t *testing.T) {
 		t.Fatalf("slow plugin ran %d jobs at once, want 1", maxSlow.Load())
 	}
 }
-

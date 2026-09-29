@@ -6,8 +6,8 @@ import (
 	"time"
 
 	"github.com/go-chi/chi/v5"
-	"golang.org/x/net/websocket"
 	"goisekai/internal/workers"
+	"golang.org/x/net/websocket"
 )
 
 // JobStatusWSMessage is the JSON message format for job status WS updates.

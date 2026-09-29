@@ -313,7 +313,7 @@ func TestSyncFTSReplacesNotDuplicates(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for i := 0; i < 3; i++ {
+	for range 3 {
 		if err := db.SyncFTS(fmt.Sprint(id)); err != nil {
 			t.Fatal(err)
 		}

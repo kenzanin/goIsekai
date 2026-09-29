@@ -335,7 +335,7 @@ func TestFetchPluginFairness(t *testing.T) {
 	var inflight atomic.Int32
 	var maxSeen atomic.Int32
 	var wg sync.WaitGroup
-	for i := 0; i < 4; i++ {
+	for range 4 {
 		wg.Add(1)
 		_, err := p.Enqueue(context.Background(), &Job{
 			Lane:      LaneFetch,
@@ -539,7 +539,7 @@ func TestInteractiveStalledPluginDoesNotBlockOthers(t *testing.T) {
 	case <-time.After(2 * time.Second):
 		t.Fatal("stalled invoke never started")
 	}
-	for i := 0; i < 3; i++ {
+	for range 3 {
 		if _, err := p.Enqueue(context.Background(), &Job{
 			Lane:      LaneInteractive,
 			PluginKey: "plugin-a",

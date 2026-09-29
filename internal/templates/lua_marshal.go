@@ -57,7 +57,7 @@ func marshalGoToLua(S *lua.State, v any) lua.Value {
 	default:
 		// Try reflection for slices, structs, and other types.
 		rv := reflect.ValueOf(v)
-		if rv.Kind() == reflect.Ptr {
+		if rv.Kind() == reflect.Pointer {
 			if rv.IsNil() {
 				return lua.Nil()
 			}
@@ -146,7 +146,7 @@ func marshalStructToLua(S *lua.State, rv reflect.Value) lua.Value {
 		fv := rv.Field(i)
 		// Flatten embedded (anonymous) structs so their fields appear at the parent level.
 		if field.Anonymous {
-			if fv.Kind() == reflect.Ptr {
+			if fv.Kind() == reflect.Pointer {
 				if fv.IsNil() {
 					continue
 				}

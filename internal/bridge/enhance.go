@@ -3,7 +3,9 @@ package bridge
 import (
 	"image"
 	"image/color"
+	"slices"
 	"sort"
+	"strings"
 
 	"github.com/anthonynsimon/bild/effect"
 )
@@ -78,13 +80,7 @@ func (e enhanceConfig) formatEnhanceStatus(pluginIDs []string) string {
 	// Check for unused overrides (plugin in config but not installed)
 	var unused []string
 	for id := range e.byPlugin {
-		found := false
-		for _, installed := range pluginIDs {
-			if installed == id {
-				found = true
-				break
-			}
-		}
+		found := slices.Contains(pluginIDs, id)
 		if !found {
 			unused = append(unused, id)
 		}
@@ -104,11 +100,12 @@ func stringsJoinPlugins(plugins []string) string {
 	case 0:
 		return ""
 	default:
-		r := plugins[0]
+		var r strings.Builder
+		r.WriteString(plugins[0])
 		for _, p := range plugins[1:] {
-			r += ", " + p
+			r.WriteString(", " + p)
 		}
-		return r
+		return r.String()
 	}
 }
 

@@ -3,6 +3,7 @@ package bridge
 import (
 	"context"
 	"fmt"
+	"maps"
 	"net/http"
 	neturl "net/url"
 	"os"
@@ -28,9 +29,7 @@ func withDefaultReferer(headers map[string]string, siteURL string) map[string]st
 		}
 	}
 	h := make(map[string]string, len(headers)+1)
-	for k, v := range headers {
-		h[k] = v
-	}
+	maps.Copy(h, headers)
 	h["Referer"] = siteURL
 	return h
 }

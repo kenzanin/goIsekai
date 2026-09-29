@@ -49,11 +49,13 @@ return function(data)
 		-- per section (repeating per page boundary).
 		local isNew = entry.HasNew == true
 		if isNew and not seenNew then
-			rows[#rows + 1] = [[<div class="sticky top-0 z-10 -mx-2 py-2 px-2 bg-neutral-950/95 backdrop-blur text-sm font-semibold text-red-400 border-b border-neutral-800 flex items-center gap-2">
+			rows[#rows + 1] =
+				[[<div class="sticky top-0 z-10 -mx-2 py-2 px-2 bg-neutral-950/95 backdrop-blur text-sm font-semibold text-red-400 border-b border-neutral-800 flex items-center gap-2">
     <span class="w-2 h-2 rounded-full bg-red-500 animate-pulse"></span>New chapters</div>]]
 			seenNew = true
 		elseif not isNew and not seenRest then
-			rows[#rows + 1] = [[<div class="sticky top-0 z-10 -mx-2 py-2 px-2 bg-neutral-950/95 backdrop-blur text-sm font-semibold text-neutral-300 border-b border-neutral-800">Library updates</div>]]
+			rows[#rows + 1] =
+				[[<div class="sticky top-0 z-10 -mx-2 py-2 px-2 bg-neutral-950/95 backdrop-blur text-sm font-semibold text-neutral-300 border-b border-neutral-800">Library updates</div>]]
 			seenRest = true
 		end
 

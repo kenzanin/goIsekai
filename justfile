@@ -88,7 +88,7 @@ fmt-prod:
 
 # apply the stdlib/language modernizations for the Go version in go.mod
 modernize:
-    CGO_ENABLED=0 modernize -fix {{pkgs}}
+    CGO_ENABLED=0 go fix {{pkgs}}
 
 # lint every Go package
 lint:

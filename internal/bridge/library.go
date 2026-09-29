@@ -5,10 +5,10 @@ import (
 	"fmt"
 	"slices"
 
+	"github.com/goccy/go-json"
 	"goisekai/internal/database"
 	"goisekai/internal/logger"
 	"goisekai/pkg/types"
-	"github.com/goccy/go-json"
 )
 
 // SearchManga delegates to the plugin's Search function. Blank genre entries

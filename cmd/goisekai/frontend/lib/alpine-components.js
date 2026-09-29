@@ -224,16 +224,21 @@
   // Cover image error fallback: swap broken <img data-fallback="XY"> for an
   // initial-letter placeholder (kept outside inline onerror so the Lua template
   // never has to escape quotes into an HTML attribute).
-  document.addEventListener('error', (e) => {
-    const img = e.target;
-    if (!img || typeof img.getAttribute !== 'function') return;
-    const fallback = img.getAttribute('data-fallback');
-    if (fallback === null || fallback === undefined) return;
-    const ph = document.createElement('div');
-    ph.className = 'w-full aspect-[2/3] bg-neutral-800 flex items-center justify-center text-neutral-500 text-2xl font-semibold';
-    ph.textContent = fallback || '';
-    img.replaceWith(ph);
-  }, true);
+  document.addEventListener(
+    'error',
+    (e) => {
+      const img = e.target;
+      if (!img || typeof img.getAttribute !== 'function') return;
+      const fallback = img.getAttribute('data-fallback');
+      if (fallback === null || fallback === undefined) return;
+      const ph = document.createElement('div');
+      ph.className =
+        'w-full aspect-[2/3] bg-neutral-800 flex items-center justify-center text-neutral-500 text-2xl font-semibold';
+      ph.textContent = fallback || '';
+      img.replaceWith(ph);
+    },
+    true,
+  );
 
   // =====================================================================
   // Alpine stores — registered inside alpine:init so Alpine is guaranteed

@@ -375,8 +375,7 @@ func TestChallengeRetryStillChallenged(t *testing.T) {
 	if err == nil {
 		t.Fatal("err = nil, want ChallengeError (retry still challenged)")
 	}
-	var ce *ChallengeError
-	if !errors.As(err, &ce) {
+	if _, ok := errors.AsType[*ChallengeError](err); !ok {
 		t.Fatalf("err = %v (%T), want *ChallengeError", err, err)
 	}
 	if solver.calls != 1 {

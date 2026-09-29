@@ -181,14 +181,7 @@ return function(data)
 		.. h(q)
 		.. '" placeholder="Manga title..." class="w-full bg-neutral-900 border border-neutral-700 rounded-md px-3 py-2 text-sm">'
 		.. "</div>"
-		.. (genreOpts ~= "" and (
-			'<div>'
-			.. '<label for="genre" class="block text-xs text-neutral-400 mb-1">Genre</label>'
-			.. '<select id="genre" name="genre" class="bg-neutral-900 border border-neutral-700 rounded-md px-3 py-2 text-sm">'
-			.. genreOpts
-			.. "</select>"
-			.. "</div>"
-		) or "")
+		.. (genreOpts ~= "" and ("<div>" .. '<label for="genre" class="block text-xs text-neutral-400 mb-1">Genre</label>' .. '<select id="genre" name="genre" class="bg-neutral-900 border border-neutral-700 rounded-md px-3 py-2 text-sm">' .. genreOpts .. "</select>" .. "</div>") or "")
 		.. '<button type="submit" class="bg-indigo-600 hover:bg-indigo-500 text-white rounded-md px-4 py-2 text-sm font-medium">Search</button>'
 		.. (topPagination ~= "" and topPagination or "")
 		.. "</form>"
