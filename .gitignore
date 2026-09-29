@@ -46,3 +46,9 @@ cmd/goisekai/goisekai
 # Deepwork state (git-local)
 .slim/deepwork/
 .aider*
+# Codebase-memory MCP graph artifacts (regenerated per machine)
+.codebase-memory/
+# OpenCode/Echoes session state (local)
+.opencode/echoes-state.json
+# Local helper scripts
+ai.sh
