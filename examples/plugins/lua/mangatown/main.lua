@@ -9,6 +9,9 @@ PLUGIN = {
 	site_url = "https://m.mangatown.com",
 	logo = "logo.png",
 	thumb_ratio = 0.703,
+	-- Page lists assemble from ~1 request per 2 pages (chapterfun pairs);
+	-- a 34-page chapter needs ~18 round-trips. Extend the 15 s invoke default.
+	timeout = 60,
 }
 
 local util = require("util")
@@ -96,26 +99,10 @@ function get_page_list(arg)
 	if chapter_id == nil or chapter_id == "" then
 		return host.json.encode({}), nil
 	end
-	local base = "https://m.mangatown.com/manga/" .. chapter_id .. "/"
-	local first = host.http.get_body(base .. "1.html")
-	if first == "" then
-		return host.json.encode({}), nil
-	end
-
-	local pages = {}
-	for n = 1, util.parse_page_count(first, chapter_id) do
-		local html = first
-		if n > 1 then
-			html = host.http.get_body(base .. tostring(n) .. ".html")
-		end
-		local src = util.parse_page_image(html)
-		if src ~= "" then
-			pages[#pages + 1] = {
-				index = n - 1,
-				url = src,
-				headers = IMAGE_HEADERS,
-			}
-		end
-	end
+	-- Desktop chapterfun path: 2 images per request (a 34-page mobile
+	-- chapter costs N round-trips and blows the 15 s invoke timeout).
+	local pages = util.get_page_urls(function(url, headers)
+		return host.http.get_body(url, headers) or ""
+	end, chapter_id) or {}
 	return host.json.encode(pages), nil
 end

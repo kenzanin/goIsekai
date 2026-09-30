@@ -2,6 +2,11 @@
 -- Sibling module required by main.lua via require("util")
 local util = {}
 
+-- Referer required by every reader/chapterfun image (zjcdn.mangahere.org).
+function util.image_headers()
+	return { Referer = "https://m.mangatown.com/" }
+end
+
 -- ─── Search result parsing ─────────────────────────────────────────────────
 -- GET https://www.mangatown.com/search.php?name=...&page=N (desktop site;
 -- the mobile search path renders nothing). Each result row:
@@ -151,6 +156,143 @@ function util.parse_page_image(html)
 		src = "https:" .. src
 	end
 	return src
+end
+
+-- ─── Page list via desktop chapterfun (2 images per request) ──────────
+-- A long mobile chapter is N round-trips (34-page chapter ≈ 18-30 s, over
+-- the 15 s invoke timeout — live-verified). The desktop path returns 2
+-- pages per request from a Dean-Edwards packed JS blob:
+--   1. mobile {chapter_id}/1.html   → page count (max N.html in select)
+--   2. desktop /manga/{chapter_id}/ → var chapter_id={cid}
+--   3. chapterfun.ashx?cid={cid}&page=K&key= (K=1,3,5..) → packed JS with
+--      pix (folder) + 2 filenames
+-- The packed pix truncates the folder's decimal suffix ("070." serves
+-- "070.0", "09-011." serves "09-011.5"): re-append the chapter's decimal
+-- part (integer chapters get "0"). DM5 replies overlap ([K,K+1]); dedupe
+-- by filename, order preserved.
+
+-- Dean-Edwards unpacker for the p,a,c,k,e,d payload chapterfun returns.
+local function unpack_packer(js)
+	-- Full packer tail: }('PAYLOAD',BASE,COUNT,'w|w'.split('|'),0,{})
+	local payload, base, words = host.regex.find(js, [[(?s)\}\('(.*)',(\d+),\d+,'(.*)'\.split\('\|'\),0,\{\}\)]])
+	if payload == nil then
+		return nil
+	end
+	local n = tonumber(base)
+	-- Words include EMPTY entries; gmatch("[^|]+") would drop them and
+	-- shift every later index, so split manually.
+	local list = {}
+	local start = 1
+	while true do
+		local pipe = words:find("|", start, true)
+		if pipe == nil then
+			list[#list + 1] = words:sub(start)
+			break
+		end
+		list[#list + 1] = words:sub(start, pipe - 1)
+		start = pipe + 1
+	end
+	-- base-N index encoder (Dean-Edwards e function): 0-9, then a-z
+	-- (toString(36)) for 10-35, then A-Z (fromCharCode(c+29)) for 36-61.
+	local function enc(x)
+		local digits = ""
+		while true do
+			local r = x % n
+			local c
+			if r < 10 then
+				c = tostring(r)
+			elseif r < 36 then
+				c = string.char(87 + r) -- 'a' + (r - 10)
+			else
+				c = string.char(29 + r) -- 'A' + (r - 36)
+			end
+			digits = c .. digits
+			x = math.floor(x / n)
+			if x == 0 then
+				break
+			end
+		end
+		return digits
+	end
+	local dict = {}
+	for i, w in ipairs(list) do
+		dict[enc(i - 1)] = w
+	end
+	return payload:gsub("%w+", dict)
+end
+
+local function chapter_num_suffix(chapter_id)
+	-- "kimi_no_knife/c070" → "0"; "kimi_no_kakera/v09/c011.5" → "5"
+	local num = host.regex.find(chapter_id, [[c([0-9][0-9.]*)$]]) or ""
+	if num:find("%.", 1, true) then
+		return num:match("%.([0-9]+)$") or "0"
+	end
+	return "0"
+end
+
+-- get_page_urls builds the full page list; get_body is the host fetch
+-- closure (url, headers) handed over from main.lua. Entry is the DESKTOP
+-- reader alone: one fetch carries both var chapter_id (cid) and
+-- var total_pages (the mobile pager is a 9-link window, unusable for
+-- totals, and skipping it saves a round-trip inside the 15 s invoke
+-- budget — a 34-page chapter costs 1 + 17 chapterfun calls).
+function util.get_page_urls(get_body, chapter_id)
+	local mob_base = "https://m.mangatown.com/manga/" .. chapter_id .. "/"
+	local desk_base = "https://www.mangatown.com/manga/" .. chapter_id .. "/"
+	local desk = get_body(desk_base)
+	if desk == "" or desk == nil then
+		return nil
+	end
+	local cid = host.regex.find(desk, [[var chapter_id=([0-9]+);]])
+	local total = tonumber(host.regex.find(desk, [[var total_pages=(\d+);]]) or "")
+	if cid == nil or total == nil or total < 1 then
+		-- No desktop reader data: fall back to per-page mobile scraping.
+		local first = get_body(mob_base .. "1.html")
+		if first == "" then
+			return nil
+		end
+		local pages = {}
+		for i = 1, util.parse_page_count(first, chapter_id) do
+			local html = (i == 1) and first or get_body(mob_base .. tostring(i) .. ".html")
+			local src = util.parse_page_image(html)
+			if src ~= "" then
+				pages[#pages + 1] = { index = i - 1, url = src, headers = util.image_headers() }
+			end
+		end
+		return pages
+	end
+
+	local suffix = chapter_num_suffix(chapter_id)
+	local seen = {}
+	local urls = {}
+	local k = 1
+	while #urls < total and k <= total do
+		local packed = get_body(
+			"https://www.mangatown.com/chapterfun.ashx?cid=" .. cid .. "&page=" .. tostring(k) .. "&key=",
+			{ Referer = desk_base }
+		)
+		if packed == "" or packed == nil then
+			break
+		end
+		local js = unpack_packer(packed)
+		if js == nil then
+			break
+		end
+		-- Re-append the truncated decimal folder suffix, then join.
+		local pix = (host.regex.find(js, [[pix="([^"]+)"]]) or "") .. suffix
+		for fname in host.regex.gmatch(js, [["(/[^"]+%.jpg)"]]) do
+			if not seen[fname] then
+				seen[fname] = true
+				urls[#urls + 1] = {
+					index = #urls,
+					url = "https:" .. pix .. fname,
+					headers = util.image_headers(),
+				}
+			end
+		end
+		k = k + 2
+	end
+	return urls
 end
 
 return util
