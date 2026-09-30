@@ -27,7 +27,7 @@ return function(data)
 		.. '<div class="mb-4 border-t border-neutral-800 pt-4">'
 		.. '<button type="button" id="enrichment-btn" data-key="'
 		.. h(pluginID)
-		.. ':'
+		.. ":"
 		.. h(mangaID)
 		.. '" onclick="'
 		.. chevOnClick
@@ -35,12 +35,14 @@ return function(data)
 		.. '<svg class="size-3.5 text-neutral-500 chev transition-transform" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>'
 		.. '<span class="text-xs font-semibold text-neutral-300 uppercase tracking-wide">Enrichment</span>'
 		.. "</button>"
-		.. '<div id="enrichment-body" class="hidden" ' .. xData .. '>'
+		.. '<div id="enrichment-body" class="hidden" '
+		.. xData
+		.. ">"
 
 	-- Fetch button with spinner + Reset button side by side
 	body = body
-	.. (author ~= "" and ('<p class="text-sm text-neutral-400 mb-2">' .. "Author: " .. h(author) .. "</p>") or "")
-	.. '<div class="mb-3 flex items-center gap-2">'
+		.. (author ~= "" and ('<p class="text-sm text-neutral-400 mb-2">' .. "Author: " .. h(author) .. "</p>") or "")
+		.. '<div class="mb-3 flex items-center gap-2">'
 		.. '<form method="post" action="/action/fetch-enrichment/'
 		.. h(pluginID)
 		.. "/"
@@ -60,8 +62,8 @@ return function(data)
 		.. h(mangaID)
 		.. '">'
 		.. '<button type="submit" class="border border-red-600/50 text-red-400 hover:bg-red-500/10 rounded-md px-3 py-1.5 text-xs font-medium" data-confirm="Reset all enrichment data to original plugin values?">Reset to Original</button>'
-		.. '</form>'
-		.. '</div>'
+		.. "</form>"
+		.. "</div>"
 
 	-- Alt titles — click to set (no confirm)
 	local atCount = #altTitles
@@ -70,7 +72,7 @@ return function(data)
 			.. '<div class="mb-3">'
 			.. '<span class="text-[11px] font-semibold text-neutral-400 uppercase">Alternative titles ('
 			.. atCount
-			.. ')</span>'
+			.. ")</span>"
 		local atBody = '<div class="flex flex-wrap gap-1.5 mt-1">'
 		-- Current title badge
 		atBody = atBody
@@ -123,7 +125,7 @@ return function(data)
 			.. '<div class="mb-3">'
 			.. '<span class="text-[11px] font-semibold text-neutral-400 uppercase">Alternative synopses ('
 			.. asCount
-			.. ')</span>'
+			.. ")</span>"
 		for _, a in ipairs(altSummaries) do
 			body = body
 				.. '<div class="flex items-start gap-2 py-1">'
@@ -163,14 +165,19 @@ return function(data)
 		body = body .. '<span class="text-[11px] font-semibold text-neutral-400 uppercase">Categories / Genres</span>'
 		body = body .. '<div class="flex flex-wrap gap-1.5 mt-1">'
 		for _, c in ipairs(cats) do
-			if not c.Value or c.Value == "" then goto next end
+			if not c.Value or c.Value == "" then
+				goto next
+			end
 			local isCurrent = false
 			for _, g in ipairs(pluginGenres) do
-				if g == c.Value then isCurrent = true; break end
+				if g == c.Value then
+					isCurrent = true
+					break
+				end
 			end
 			body = body
 				.. '<form method="post" action="'
-				.. (isCurrent and '/action/remove-category/' or '/action/add-category/')
+				.. (isCurrent and "/action/remove-category/" or "/action/add-category/")
 				.. h(pluginID)
 				.. "/"
 				.. h(mangaID)
@@ -179,16 +186,13 @@ return function(data)
 				.. h(c.Value)
 				.. '">'
 				.. '<span class="inline-flex items-center gap-1 rounded-full '
-				.. (isCurrent
-					and 'bg-indigo-500/20 border-indigo-600/60 text-indigo-300 cursor-pointer hover:bg-indigo-500/30'
-					or 'bg-neutral-800 border-neutral-700 text-neutral-300 cursor-pointer hover:bg-neutral-700')
+				.. (isCurrent and "bg-indigo-500/20 border-indigo-600/60 text-indigo-300 cursor-pointer hover:bg-indigo-500/30" or "bg-neutral-800 border-neutral-700 text-neutral-300 cursor-pointer hover:bg-neutral-700")
 				.. '" @click="submitForm($el.closest(&apos;form&apos;))">'
 				.. h(c.Value)
-				.. '</span></form>'
+				.. "</span></form>"
 			::next::
 		end
 		body = body .. "</div></div>"
-
 	end
 
 	body = body .. "</div></div>"

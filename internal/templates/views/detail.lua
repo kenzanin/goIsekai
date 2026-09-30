@@ -53,11 +53,7 @@ return function(data)
 	end
 
 	-- Cover (left column)
-	local coverWrap = '<div id="cover-wrap" class="relative" data-key="'
-		.. h(pluginID)
-		.. ":"
-		.. h(mangaID)
-		.. '">'
+	local coverWrap = '<div id="cover-wrap" class="relative" data-key="' .. h(pluginID) .. ":" .. h(mangaID) .. '">'
 	local coverHTML
 	if manga.CoverURL and manga.CoverURL ~= "" then
 		coverHTML = coverWrap
@@ -70,27 +66,27 @@ return function(data)
 			.. h(manga.Title or "")
 			.. '" class="w-full aspect-[2/3] rounded-xl object-cover">'
 			.. '<div id="cover-dim" class="lib-dim" style="display:'
-				.. (data.CoverDim == 1 and "block" or "none")
-				.. ';position:absolute;top:0;left:0;right:0;bottom:0;border-radius:0.75rem;background:rgba(0,0,0,0.82);backdrop-filter:blur(3px);"></div>'
-			.. '</div>'
+			.. (data.CoverDim == 1 and "block" or "none")
+			.. ';position:absolute;top:0;left:0;right:0;bottom:0;border-radius:0.75rem;background:rgba(0,0,0,0.82);backdrop-filter:blur(3px);"></div>'
+			.. "</div>"
 			.. '<div class="mt-2 flex items-center gap-3 text-xs">'
-				.. '<form action="/action/toggle-cover-dim/'
-				.. h(pluginID)
-				.. '/'
-				.. h(data.MangaID)
-				.. '" method="POST" style="display:inline">'
-				.. '<button type="submit" id="cover-dim-btn" title="Dim the cover image" class="inline-flex items-center text-neutral-400 hover:text-neutral-200 transition cursor-pointer">'
-					.. (data.CoverDim == 1 and "Show cover" or "Hide cover")
-					.. '</button>'
-				.. '</form>'
-				.. '<form action="/action/refetch-cover/'
-				.. h(pluginID)
-				.. '/'
-				.. h(data.MangaID)
-				.. '" method="POST" style="display:inline">'
-				.. '<button type="submit" title="Re-download the cover from the source" class="inline-flex items-center text-neutral-400 hover:text-neutral-200 transition cursor-pointer">Get cover</button>'
-				.. '</form>'
-			.. '</div>'
+			.. '<form action="/action/toggle-cover-dim/'
+			.. h(pluginID)
+			.. "/"
+			.. h(data.MangaID)
+			.. '" method="POST" style="display:inline">'
+			.. '<button type="submit" id="cover-dim-btn" title="Dim the cover image" class="inline-flex items-center text-neutral-400 hover:text-neutral-200 transition cursor-pointer">'
+			.. (data.CoverDim == 1 and "Show cover" or "Hide cover")
+			.. "</button>"
+			.. "</form>"
+			.. '<form action="/action/refetch-cover/'
+			.. h(pluginID)
+			.. "/"
+			.. h(data.MangaID)
+			.. '" method="POST" style="display:inline">'
+			.. '<button type="submit" title="Re-download the cover from the source" class="inline-flex items-center text-neutral-400 hover:text-neutral-200 transition cursor-pointer">Get cover</button>'
+			.. "</form>"
+			.. "</div>"
 	else
 		coverHTML = '<div class="w-full aspect-[2/3] bg-neutral-800 rounded-xl flex items-center justify-center text-neutral-500 text-4xl font-semibold">'
 			.. h(getInitials(manga.Title or ""))
@@ -104,36 +100,43 @@ return function(data)
 	local genreCount = #genres
 	local genreTagsHTML = ""
 	for i, g in ipairs(genres) do
-		if not g or g == "" then goto next end
+		if not g or g == "" then
+			goto next
+		end
 		local isInOverride = false
 		for _, og in ipairs(overrideGenres) do
-			if og == g then isInOverride = true; break end
+			if og == g then
+				isInOverride = true
+				break
+			end
 		end
 		local hidden = i > maxVisible and ' style="display:none"' or ""
 		genreTagsHTML = genreTagsHTML
 			.. '<form method="post" action="/action/'
 			.. (isInOverride and "remove" or "add")
-			.. '-genre/'
+			.. "-genre/"
 			.. h(pluginID)
 			.. "/"
 			.. h(mangaID)
 			.. '" class="inline genre-tag"'
 			.. hidden
-			.. '>'
+			.. ">"
 			.. '<input type="hidden" name="genre" value="'
 			.. h(g)
 			.. '">'
 			.. '<span class="inline-flex items-center gap-1 rounded-full bg-indigo-500/15 text-indigo-400 text-xs pl-2 pr-1 cursor-pointer hover:bg-indigo-500/25" onclick="submitForm(this.closest(\'form\'))">'
 			.. h(g)
-			.. (isInOverride and '<span class="size-4 inline-flex items-center justify-center rounded-full text-indigo-500 hover:text-red-400 hover:bg-neutral-700" onclick="event.preventDefault();submitForm(this.closest(\'form\'))">&times;</span>' or '')
-			.. '</span></form>'
+			.. (isInOverride and '<span class="size-4 inline-flex items-center justify-center rounded-full text-indigo-500 hover:text-red-400 hover:bg-neutral-700" onclick="event.preventDefault();submitForm(this.closest(\'form\'))">&times;</span>' or "")
+			.. "</span></form>"
 		::next::
 	end
 
 	-- Show more toggle
 	local showMoreHTML = ""
 	if genreCount > maxVisible then
-		showMoreHTML = '<button type="button" id="genre-showmore" onclick="toggleGenreTags(\'genre-showmore\',' .. maxVisible .. ')" class="text-xs text-indigo-400 hover:text-indigo-300 ml-1 cursor-pointer" data-show="0">Show more</button>'
+		showMoreHTML = '<button type="button" id="genre-showmore" onclick="toggleGenreTags(\'genre-showmore\','
+			.. maxVisible
+			.. ')" class="text-xs text-indigo-400 hover:text-indigo-300 ml-1 cursor-pointer" data-show="0">Show more</button>'
 	end
 	genreTagsHTML = genreTagsHTML .. showMoreHTML
 
@@ -142,7 +145,9 @@ return function(data)
 	local seenRelated = {}
 	for _, r in ipairs(rels) do
 		local name = r.Value or ""
-		if name == "" or seenRelated[name] then goto next end
+		if name == "" or seenRelated[name] then
+			goto next
+		end
 		seenRelated[name] = true
 		relatedTagsHTML = relatedTagsHTML
 			.. '<form method="post" action="/action/remove-related/'
@@ -154,9 +159,11 @@ return function(data)
 			.. h(name)
 			.. '">'
 			.. '<span class="inline-flex items-center gap-1 rounded-full bg-emerald-500/10 text-emerald-400 text-xs pl-2 pr-1 cursor-pointer hover:bg-emerald-500/20">'
-			.. (r.URL and r.URL ~= "" and ('<a href="' .. h(r.URL) .. '" target="_blank" class="hover:underline">' .. h(name) .. "</a>") or h(name))
+			.. (r.URL and r.URL ~= "" and ('<a href="' .. h(r.URL) .. '" target="_blank" class="hover:underline">' .. h(
+				name
+			) .. "</a>") or h(name))
 			.. '<span class="size-4 inline-flex items-center justify-center rounded-full text-emerald-500 hover:text-red-400 hover:bg-neutral-700" onclick="submitForm(this.closest(\'form\'))">&times;</span>'
-			.. '</span></form>'
+			.. "</span></form>"
 		::next::
 	end
 
@@ -165,9 +172,9 @@ return function(data)
 	if manga.Description and manga.Description ~= "" then
 		synopsisHTML = [[<div class="mb-3">
 			<span class="text-xs font-semibold text-neutral-300 uppercase tracking-wide">Synopsis</span>
-			<div id="synopsis-text" class="text-sm text-neutral-400 mt-1.5 max-h-[4.5rem] overflow-hidden transition-all duration-300 relative">]]
-			.. h(manga.Description)
-			.. [[<span id="synopsis-fade" class="absolute inset-x-0 bottom-0 h-8 bg-gradient-to-t from-neutral-950 to-transparent pointer-events-none"></span></div>
+			<div id="synopsis-text" class="text-sm text-neutral-400 mt-1.5 max-h-[4.5rem] overflow-hidden transition-all duration-300 relative">]] .. h(
+			manga.Description
+		) .. [[<span id="synopsis-fade" class="absolute inset-x-0 bottom-0 h-8 bg-gradient-to-t from-neutral-950 to-transparent pointer-events-none"></span></div>
 			<button type="button" id="synopsis-toggle" onclick="var t=document.getElementById('synopsis-text');var f=document.getElementById('synopsis-fade');var b=document.getElementById('synopsis-toggle');t.classList.toggle('max-h-[4.5rem]');t.classList.toggle('max-h-none');f.style.display=t.classList.contains('max-h-none')?'none':'block';b.textContent=t.classList.contains('max-h-none')?'Show less':'Read more';" class="text-xs text-indigo-400 hover:text-indigo-300 transition mt-1 cursor-pointer">Read more</button></div>]]
 	end
 
@@ -191,10 +198,12 @@ return function(data)
 				.. h(mangaID)
 				.. '" class="ml-auto inline-flex items-center gap-2" data-job-action="sync-manga">'
 				.. '<span class="text-xs text-neutral-500 cursor-default" title="Last refresh check - click Update to refresh now">updated '
-				.. synced:sub(1, 10) .. " " .. synced:sub(12, 16)
-				.. '</span>'
+				.. synced:sub(1, 10)
+				.. " "
+				.. synced:sub(12, 16)
+				.. "</span>"
 				.. '<button type="submit" title="Refresh this manga now" class="border border-neutral-700 text-neutral-300 hover:bg-neutral-800 rounded-md px-4 py-2 text-sm cursor-pointer">⟳ Update</button>'
-				.. '</form>'
+				.. "</form>"
 		else
 			syncedHTML = '<form method="post" action="/action/sync-manga/'
 				.. h(pluginID)
@@ -202,14 +211,18 @@ return function(data)
 				.. h(mangaID)
 				.. '" class="ml-auto" data-job-action="sync-manga">'
 				.. '<button type="submit" title="Refresh this manga now" class="border border-neutral-700 text-neutral-300 hover:bg-neutral-800 rounded-md px-4 py-2 text-sm cursor-pointer">⟳ Update</button>'
-				.. '</form>'
+				.. "</form>"
 		end
 	end
 
 	-- Migrate button (beside Update)
 	local migrateHTML = ""
 	if inLibrary then
-		migrateHTML = '<a href="/view/migrate/' .. h(pluginID) .. '/' .. h(mangaID) .. '" class="ml-auto border border-amber-500/40 bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 rounded-md px-4 py-2 text-sm">⤴ Migrate</a>'
+		migrateHTML = '<a href="/view/migrate/'
+			.. h(pluginID)
+			.. "/"
+			.. h(mangaID)
+			.. '" class="ml-auto border border-amber-500/40 bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 rounded-md px-4 py-2 text-sm">⤴ Migrate</a>'
 	end
 
 	if continuePoint then
@@ -248,12 +261,12 @@ return function(data)
 		-- Left: cover (300px)
 		.. '<div class="md:w-[300px] md:shrink-0">'
 		.. coverHTML
-		.. '</div>'
+		.. "</div>"
 		-- Right: info column
 		.. '<div class="flex-1 min-w-0">'
 		.. '<h1 class="text-2xl font-semibold mb-2 leading-tight">'
 		.. h(manga.Title or "")
-		.. '</h1>'
+		.. "</h1>"
 
 	-- Plugin badge + status
 	body = body
@@ -262,15 +275,14 @@ return function(data)
 		.. (pluginIcon ~= "" and ('<img src="' .. h(pluginIcon) .. '" alt="" class="h-3.5 w-3.5 rounded-sm object-cover">') or "")
 		.. h(pluginName)
 		.. "</span>"
-		.. (manga.Status and manga.Status ~= "" and ('<span class="text-xs px-2 py-0.5 rounded-full bg-neutral-700/50 text-neutral-400">' .. h(manga.Status) .. "</span>") or "")
+		.. (manga.Status and manga.Status ~= "" and ('<span class="text-xs px-2 py-0.5 rounded-full bg-neutral-700/50 text-neutral-400">' .. h(
+			manga.Status
+		) .. "</span>") or "")
 		.. "</div>"
 
 	-- Genres
 	if genreTagsHTML ~= "" then
-		body = body
-			.. '<div class="flex flex-wrap gap-1.5 mb-3">'
-			.. genreTagsHTML
-			.. "</div>"
+		body = body .. '<div class="flex flex-wrap gap-1.5 mb-3">' .. genreTagsHTML .. "</div>"
 	end
 
 	-- Synopsis
@@ -286,7 +298,7 @@ return function(data)
 			.. '<div id="related-text" class="text-sm text-neutral-400 mt-1.5 max-h-[6rem] overflow-hidden transition-all duration-300 relative">'
 			.. '<div class="flex flex-wrap gap-1.5">'
 			.. relatedTagsHTML
-			.. '</div>'
+			.. "</div>"
 			.. '<span id="related-fade" class="absolute inset-x-0 bottom-0 h-8 bg-gradient-to-t from-neutral-950 to-transparent pointer-events-none"></span></div>'
 			.. '<button type="button" id="related-toggle" onclick="var t=document.getElementById(&quot;related-text&quot;);var f=document.getElementById(&quot;related-fade&quot;);var b=document.getElementById(&quot;related-toggle&quot;);t.classList.toggle(&quot;max-h-[6rem]&quot;);t.classList.toggle(&quot;max-h-none&quot;);f.style.display=t.classList.contains(&quot;max-h-none&quot;)?&quot;none&quot;:&quot;block&quot;;b.textContent=t.classList.contains(&quot;max-h-none&quot;)?&quot;Show less&quot;:&quot;Read more&quot;;" class="text-xs text-indigo-400 hover:text-indigo-300 transition mt-1 cursor-pointer">Read more</button></div>'
 	end
