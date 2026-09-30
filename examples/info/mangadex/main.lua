@@ -67,54 +67,57 @@ local function pick(map)
     return ""
 end
 
--- titleMatches checks if a record's title or alt titles match the searched
--- title. Exact normalized equality wins; an English alt title often carries a
--- publisher prefix ("Trapped in a Dating Sim: ..."), so a contained match of
--- the whole searched title also counts.
-local function titleMatches(record, searchedTitle)
-    local normalizedSearch = host.text.normalize_title(searchedTitle)
-    local function exact(candidate)
-        return candidate ~= "" and host.text.normalize_title(candidate) == normalizedSearch
-    end
-    local function contains(candidate)
-        if candidate == "" then
-            return false
-        end
-        local normalized = host.text.normalize_title(candidate)
-        return #normalized > #normalizedSearch and normalized:find(normalizedSearch, 1, true) ~= nil
-    end
-    if exact(pick(record.attributes and record.attributes.title)) then
-        return "exact"
-    end
-    for _, entry in ipairs(record.attributes.altTitles or {}) do
-        if exact(pick(entry)) then
-            return "exact"
-        end
-    end
-    if contains(pick(record.attributes and record.attributes.title)) then
-        return "contained"
-    end
-    for _, entry in ipairs(record.attributes.altTitles or {}) do
-        if contains(pick(entry)) then
-            return "contained"
-        end
-    end
-    return nil
+-- normTitle normalizes a title for comparison: apostrophes are stripped
+-- first so romanizations like "Ten'i" match the flattened "Teni" form other
+-- sources use, then the host normalizer does the rest.
+local function normTitle(s)
+    return host.text.normalize_title((s:gsub("'", ""):gsub("\226\128\153", "")))
 end
 
--- titleMatchQuality returns "exact" for a normalized equality on the record's
--- title or alt titles, "contained" when a candidate string merely contains the
--- whole searched title, or nil when nothing matches.
-local function titleMatchQuality(record, searchedTitle)
-    return titleMatches(record, searchedTitle)
+-- tokens splits a normalized title into words.
+local function tokens(normalized)
+    local t = {}
+    for w in normalized:gmatch("%S+") do
+        t[#t + 1] = w
+    end
+    return t
 end
 
--- titleMatchScore ranks a contained match so the original series wins over
--- sequels and spin-offs whose alt title merely contains the searched string.
--- Lower is better: an exact match always wins first; contained candidates
--- carrying a bracketed suffix ("(Republic Arc)") rank after clean ones.
+-- fuzzyRank scores a romanization-variant match ("Haburaretara" vs
+-- "Haburareta node", "Doukyuu" vs "Doukyuusei"): every searched token must
+-- find an exact or prefix-tolerant partner in the candidate (prefix matching
+-- only for tokens of 4+ chars so short words stay strict). Returns nil below
+-- 70% coverage or on titles shorter than 3 tokens. Lower is better; the last
+-- tier after exact and contained.
+local function fuzzyRank(searchTokens, candidateTokens)
+    if #searchTokens < 3 then
+        return nil
+    end
+    local used, matched = {}, 0
+    for _, want in ipairs(searchTokens) do
+        for i, have in ipairs(candidateTokens) do
+            if not used[i] and (want == have
+                or (#want >= 4 and #have >= 4
+                    and (want:sub(1, #have) == have or have:sub(1, #want) == want))) then
+                used[i] = true
+                matched = matched + 1
+                break
+            end
+        end
+    end
+    if matched < #searchTokens * 0.7 then
+        return nil
+    end
+    return { 2, (#searchTokens - matched) * 1000 + (#candidateTokens - matched) }
+end
+
+-- titleMatchScore ranks candidates so the right series wins. Lower is better:
+-- an exact normalized match always wins first (score 0); a contained match
+-- (bracketed suffixes penalized) follows; romanization variants take the
+-- fuzzy tier last. nil means no match at all.
 local function titleMatchScore(record, searchedTitle)
-    local normalizedSearch = host.text.normalize_title(searchedTitle)
+    local normalizedSearch = normTitle(searchedTitle)
+    local searchTokens = tokens(normalizedSearch)
     local candidates = {}
     local mainTitle = pick(record.attributes and record.attributes.title)
     if mainTitle ~= "" then
@@ -128,10 +131,11 @@ local function titleMatchScore(record, searchedTitle)
     end
     local best
     for _, candidate in ipairs(candidates) do
-        local normalized = host.text.normalize_title(candidate)
+        local normalized = normTitle(candidate)
         if normalized == normalizedSearch then
             return 0
         end
+        local rank
         if #normalized > #normalizedSearch and normalized:find(normalizedSearch, 1, true) then
             -- A candidate ending with the searched string is a publisher
             -- prefix ("Trapped in a Dating Sim: X") on the original; anything
@@ -141,10 +145,12 @@ local function titleMatchScore(record, searchedTitle)
             if normalized:sub(-1) == ")" and normalized:find("(", 1, true) then
                 score = score + 50
             end
-            local rank = { endsWith and 0 or 1, score }
-            if not best or rank[1] < best[1] or (rank[1] == best[1] and rank[2] < best[2]) then
-                best = rank
-            end
+            rank = { endsWith and 0 or 1, score }
+        else
+            rank = fuzzyRank(searchTokens, tokens(normalized))
+        end
+        if rank and (not best or rank[1] < best[1] or (rank[1] == best[1] and rank[2] < best[2])) then
+            best = rank
         end
     end
     return best
