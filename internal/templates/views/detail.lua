@@ -240,11 +240,11 @@ return function(data)
 		end
 		actionsHTML = actionsHTML
 			.. '<a href="/view/read/'
-			.. h(pluginID)
+			.. h(ue(pluginID))
 			.. "/"
-			.. h(mangaID)
+			.. h(ue(mangaID))
 			.. "/"
-			.. h(cp.ChapterID or "")
+			.. h(ue(cp.ChapterID or ""))
 			.. "?page="
 			.. tostring(cp.Page or 1)
 			.. '" class="bg-indigo-600 hover:bg-indigo-500 text-white rounded-md px-4 py-2 text-sm font-medium" title="'

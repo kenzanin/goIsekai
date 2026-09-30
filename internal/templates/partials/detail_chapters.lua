@@ -82,11 +82,11 @@ return function(data)
 				.. h(cID)
 				.. '" form="chapter-actions" class="size-4 accent-indigo-600 shrink-0">'
 				.. '<a href="/view/read/'
-				.. h(pluginID)
+				.. h(ue(pluginID))
 				.. "/"
-				.. h(mangaID)
+				.. h(ue(mangaID))
 				.. "/"
-				.. h(cID)
+				.. h(ue(cID))
 				.. '" class="flex-1 flex items-center justify-between gap-4 min-w-0">'
 				.. '<span class="text-sm">'
 				.. '<span class="text-neutral-400 mr-2">Ch. '
@@ -139,11 +139,11 @@ return function(data)
 			-- Mark read button
 			rowHTML = rowHTML
 				.. '<form method="post" action="/action/mark-read/'
-				.. h(pluginID)
+				.. h(ue(pluginID))
 				.. "/"
-				.. h(mangaID)
+				.. h(ue(mangaID))
 				.. "/"
-				.. h(cID)
+				.. h(ue(cID))
 				.. '">'
 				.. '<button type="submit" title="Mark read" class="size-7 inline-flex items-center justify-center rounded-md border border-neutral-700 hover:bg-neutral-800 text-sm" aria-label="Mark read"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="size-4"><polyline points="20 6 9 17 4 12"/></svg></button>'
 				.. "</form>"
@@ -151,11 +151,11 @@ return function(data)
 			-- Reset progress button
 			rowHTML = rowHTML
 				.. '<form method="post" action="/action/reset-progress/'
-				.. h(pluginID)
+				.. h(ue(pluginID))
 				.. "/"
-				.. h(mangaID)
+				.. h(ue(mangaID))
 				.. "/"
-				.. h(cID)
+				.. h(ue(cID))
 				.. '">'
 				.. '<button type="submit" title="Reset progress" class="size-7 inline-flex items-center justify-center rounded-md border border-neutral-700 hover:bg-neutral-800 text-sm" aria-label="Reset progress" data-confirm="Are you sure?"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="size-4"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg></button>'
 				.. "</form>"
@@ -163,11 +163,11 @@ return function(data)
 			-- CBZ download button
 			rowHTML = rowHTML
 				.. '<form method="post" data-job-action="export-cbz" action="/action/export-cbz/'
-				.. h(pluginID)
+				.. h(ue(pluginID))
 				.. "/"
-				.. h(mangaID)
+				.. h(ue(mangaID))
 				.. "/"
-				.. h(cID)
+				.. h(ue(cID))
 				.. '">'
 				.. '<input type="hidden" name="title" value="'
 				.. h(manga.Title or "")
@@ -180,11 +180,11 @@ return function(data)
 			local isSkipped = p.IsSkipped or false
 			rowHTML = rowHTML
 				.. '<form method="post" action="/action/toggle-skip/'
-				.. h(pluginID)
+				.. h(ue(pluginID))
 				.. "/"
-				.. h(mangaID)
+				.. h(ue(mangaID))
 				.. "/"
-				.. h(cID)
+				.. h(ue(cID))
 				.. '">'
 				.. '<button type="submit" title="'
 				.. (isSkipped and "Unskip this chapter" or "Skip this chapter")

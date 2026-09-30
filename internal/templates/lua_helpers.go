@@ -3,6 +3,7 @@ package templates
 import (
 	"fmt"
 	"html"
+	"net/url"
 
 	lua "github.com/mmcdole/lunar"
 )
@@ -11,6 +12,7 @@ import (
 func luaHelpers(S *lua.State) map[string]lua.NativeFunc {
 	return map[string]lua.NativeFunc{
 		"h":                hHelper(S),
+		"ue":               ueHelper(S),
 		"formatDate":       formatDateHelper(S),
 		"formatChapterNum": formatChapterNumHelper(S),
 		"getInitials":      getInitialsHelper(S),
@@ -46,5 +48,23 @@ func hHelper(S *lua.State) lua.NativeFunc {
 			s = arg.String()
 		}
 		return frame.ReturnString(html.EscapeString(s))
+	}
+}
+
+// ueHelper returns a Lua native function that URL path-escapes its argument.
+// Use it inside h() when splicing plugin-supplied IDs into URL paths —
+// chapter IDs may contain slashes (e.g. "slug/c070") that would otherwise
+// add path segments and 404 the fixed-segment route.
+func ueHelper(S *lua.State) lua.NativeFunc {
+	return func(frame lua.Frame) lua.Outcome {
+		arg, ok := frame.Argument(0)
+		if !ok {
+			return frame.ReturnString("")
+		}
+		s, err := frame.ToString(arg)
+		if err != nil {
+			s = arg.String()
+		}
+		return frame.ReturnString(url.PathEscape(s))
 	}
 }
