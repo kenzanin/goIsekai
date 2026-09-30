@@ -102,7 +102,7 @@ func (a *app) start() error {
 	cmd.Stdout = logF
 	cmd.Stderr = logF
 	if err := cmd.Start(); err != nil {
-		logF.Close()
+		_ = logF.Close() // error path: the Start error is what matters
 		return err
 	}
 	a.cmd, a.logF = cmd, logF
