@@ -18,7 +18,7 @@ func callYaegi(m *Manager, p *loadedPlugin, fnName, inputJSON string) (string, e
 		return "", fmt.Errorf("yaegi plugin %s: not loaded", p.id)
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), invokeTimeout)
+	ctx, cancel := context.WithTimeout(context.Background(), p.invokeDeadline())
 	defer cancel()
 
 	out, err := yp.callWithTimeout(ctx, fnName, inputJSON)

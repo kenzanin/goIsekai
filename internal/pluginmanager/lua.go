@@ -7,7 +7,7 @@ import (
 	lua "github.com/mmcdole/lunar"
 
 	"goisekai/pkg/types"
-)
+	)
 
 // luaFnNames maps host ABI function names to the snake_case globals a Lua
 // plugin defines (the Lua-facing ABI; design.md). One map drives both the
@@ -40,8 +40,9 @@ func callLua(p *loadedPlugin, fnName, inputJSON string) (string, error) {
 		return "", fmt.Errorf("lua plugin %s: %s is not a function", p.id, fnName)
 	}
 
-	// Set a wall-clock deadline on the State's context.
-	ctx, cancel := context.WithTimeout(context.Background(), invokeTimeout)
+	// Set a wall-clock deadline on the State's context (PLUGIN.timeout may
+	// extend the default for round-trip-heavy calls).
+	ctx, cancel := context.WithTimeout(context.Background(), p.invokeDeadline())
 	defer cancel()
 	if err := state.SetContext(ctx); err != nil {
 		return "", fmt.Errorf("lua plugin %s %s: set context: %w", p.id, fnName, err)

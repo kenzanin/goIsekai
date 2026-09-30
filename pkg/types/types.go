@@ -92,6 +92,10 @@ type PluginMeta struct {
 	// Name is the human-readable site name (e.g. "MangaDex"). Falls back to the
 	// plugin ID when empty.
 	Name string `json:"name,omitempty"`
+	// Timeout overrides the default 15 s invoke deadline for this plugin, in
+	// seconds. Only for sources that need many sequential round-trips per call
+	// (e.g. page lists assembled from N reader requests). Must be > 0.
+	Timeout int `json:"timeout,omitempty"`
 	// SiteURL is the homepage URL of the source site.
 	SiteURL string `json:"site_url,omitempty"`
 	// Logo identifies the plugin's logo image. It can be:

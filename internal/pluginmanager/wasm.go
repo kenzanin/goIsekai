@@ -147,7 +147,7 @@ func callWasm(p *loadedPlugin, fnName, inputJSON string) (string, error) {
 		return "", fmt.Errorf("wasm plugin %s: no export %s", p.id, fnName)
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), invokeTimeout)
+	ctx, cancel := context.WithTimeout(context.Background(), p.invokeDeadline())
 	defer cancel()
 
 	input := []byte(inputJSON)

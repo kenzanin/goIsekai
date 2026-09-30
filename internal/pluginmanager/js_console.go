@@ -28,7 +28,7 @@ func callJS(p *loadedPlugin, fnName, inputJSON string) (string, error) {
 	stop := make(chan struct{})
 	go func() {
 		select {
-		case <-time.After(invokeTimeout):
+		case <-time.After(p.invokeDeadline()):
 			p.js.Interrupt("timeout")
 		case <-stop:
 		}

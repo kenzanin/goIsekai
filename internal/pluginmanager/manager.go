@@ -55,6 +55,15 @@ type loadedPlugin struct {
 	mu sync.Mutex
 }
 
+// invokeDeadline returns the per-invocation wall-clock budget: the plugin's
+// PLUGIN.timeout (seconds) when declared, else the shared 15 s default.
+func (p *loadedPlugin) invokeDeadline() time.Duration {
+	if p.meta.Timeout > 0 {
+		return time.Duration(p.meta.Timeout) * time.Second
+	}
+	return invokeTimeout
+}
+
 // Manager loads Lua/JS/Yaegi plugins and exposes their search/detail operations
 // to the host. It wires host_http_request to the hostnet proxy.
 type Manager struct {
