@@ -49,7 +49,15 @@ function util.parse_manga_detail(html, manga_id)
 	local detail = { id = manga_id }
 
 	detail.title = host.text.trim(host.text.unescape(host.regex.find(html, [[class="title">([^<]+)<]]) or ""))
-	detail.cover_url = host.text.unescape(host.regex.find(html, [[class="manga-detail">\s*<img src="([^"]+)"]]) or "")
+	-- Real markup: <div class="manga-detail"> <div class="manga-detail-top"> <p class="title"> then
+	-- <img src="//fmcdn..." ... class="detail-cover" /> — match the unique detail-cover
+	-- img itself (class comes AFTER src), then normalize the protocol-relative URL.
+	local cover = host.regex.find(html, [[<img src="([^"]+)"[^>]*class="detail-cover"]]) or ""
+	cover = host.text.unescape(cover)
+	if cover:sub(1, 2) == "//" then
+		cover = "https:" .. cover
+	end
+	detail.cover_url = cover
 
 	-- Author(s): <a ...>NAME</a> lives on the same <p> as Artist(s), so cut
 	-- at <br (or </p> when there is no artist row).
