@@ -95,7 +95,7 @@ return function(data)
 		.. '<input type="search" name="q" value="'
 		.. h(q)
 		.. '" placeholder="Search library…" class="w-full bg-neutral-900 border border-neutral-700 rounded-md pl-9 pr-3 py-1.5 text-sm placeholder-neutral-500 focus:outline-none focus:border-indigo-500">'
-		.. '</div>'
+		.. "</div>"
 		.. '<button type="submit" class="bg-indigo-600 hover:bg-indigo-500 text-white rounded-md px-3 py-1.5 text-sm font-medium">Search</button>'
 		.. "</div></form>"
 		.. topPagination
