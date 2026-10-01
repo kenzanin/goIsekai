@@ -7,7 +7,7 @@ import (
 	lua "github.com/mmcdole/lunar"
 
 	"goisekai/pkg/types"
-	)
+)
 
 // luaFnNames maps host ABI function names to the snake_case globals a Lua
 // plugin defines (the Lua-facing ABI; design.md). One map drives both the
