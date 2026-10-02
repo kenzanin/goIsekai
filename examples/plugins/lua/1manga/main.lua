@@ -328,14 +328,25 @@ function get_page_list(arg)
 	-- afterward, so the cost is paid once per chapter.
 	-- ponytail: the GraphQL pages field used to carry the list in plaintext;
 	-- if the encrypted blob ever becomes readable again, drop this probing.
-	local function pageExists(i)
+	-- The extension varies per chapter (older chapters are .jpg, newer ones
+	-- .jpeg), so probe candidates once on page 1 instead of hardcoding one.
+	local ext
+	for _, c in ipairs({ "jpg", "jpeg", "png", "webp" }) do
 		local resp =
-			host.http.get(IMG_CDN .. slug .. "/" .. number .. "/" .. i .. ".jpg", { ["Referer"] = SITE_URL .. "/" })
-		return resp ~= nil and resp.status == 200
+			host.http.get(IMG_CDN .. slug .. "/" .. number .. "/1." .. c, { ["Referer"] = SITE_URL .. "/" })
+		if resp ~= nil and resp.status == 200 then
+			ext = c
+			break
+		end
 	end
-	if not pageExists(1) then
+	if not ext then
 		log.error("1manga pages: page 1 missing for " .. chapterID)
 		return host.json.encode({})
+	end
+	local function pageExists(i)
+		local resp =
+			host.http.get(IMG_CDN .. slug .. "/" .. number .. "/" .. i .. "." .. ext, { ["Referer"] = SITE_URL .. "/" })
+		return resp ~= nil and resp.status == 200
 	end
 	local lo, hi = 1, 200
 	while lo < hi do
@@ -352,7 +363,7 @@ function get_page_list(arg)
 		-- table encodes as [] and the host decodes headers as a map.
 		pages[#pages + 1] = {
 			index = i - 1,
-			url = IMG_CDN .. slug .. "/" .. number .. "/" .. i .. ".jpg",
+			url = IMG_CDN .. slug .. "/" .. number .. "/" .. i .. "." .. ext,
 		}
 	end
 
