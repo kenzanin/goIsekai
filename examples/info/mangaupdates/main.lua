@@ -17,16 +17,16 @@
 -- is memoized in the VM and reused by the remaining kinds of the same title.
 
 PLUGIN = {
-    contract_version = 1,
-    name = "MangaUpdates Info",
-    site_url = "https://www.mangaupdates.com",
-    enrichment_providers = {
-        {
-            id = "mangaupdates",
-            name = "MangaUpdates",
-            kinds = { "titles", "summaries", "categories", "authors", "related" },
-        },
-    },
+	contract_version = 1,
+	name = "MangaUpdates Info",
+	site_url = "https://www.mangaupdates.com",
+	enrichment_providers = {
+		{
+			id = "mangaupdates",
+			name = "MangaUpdates",
+			kinds = { "titles", "summaries", "categories", "authors", "related" },
+		},
+	},
 }
 
 local API = "https://api.mangaupdates.com/v1"
@@ -37,14 +37,14 @@ local SITE = "https://www.mangaupdates.com"
 local memoTitle, memoDetail
 
 local function decode(resp)
-    if not resp or resp.status ~= 200 then
-        return nil
-    end
-    local body, err = host.json.decode(resp.body)
-    if err or not body then
-        return nil
-    end
-    return body
+	if not resp or resp.status ~= 200 then
+		return nil
+	end
+	local body, err = host.json.decode(resp.body)
+	if err or not body then
+		return nil
+	end
+	return body
 end
 
 -- detail searches for the best match and loads its full record, memoized.
@@ -52,162 +52,196 @@ end
 -- record already carries genres and description, so it stands in when the
 -- detail response leaves them out.
 local function detail(title)
-    if memoTitle == title then
-        return memoDetail
-    end
-    memoTitle, memoDetail = title, nil
+	if memoTitle == title then
+		return memoDetail
+	end
+	memoTitle, memoDetail = title, nil
 
-    local search = decode(host.http.post(API .. "/series/search", host.json.encode({ search = title }), {
-        ["Content-Type"] = "application/json",
-        ["Accept"] = "application/json",
-    }))
-    local results = search and search.results
-    if type(results) ~= "table" or #results == 0 then
-        log.debug("mangaupdates info: no match for " .. title)
-        return nil
-    end
+	local search = decode(host.http.post(API .. "/series/search", host.json.encode({ search = title }), {
+		["Content-Type"] = "application/json",
+		["Accept"] = "application/json",
+	}))
+	local results = search and search.results
+	if type(results) ~= "table" or #results == 0 then
+		log.debug("mangaupdates info: no match for " .. title)
+		return nil
+	end
 
-    -- A light novel tops the results for the title of the manga adapted from
-    -- it, and its metadata carries a "(Novel)" suffix that makes the alternative
-    -- titles differ from every other source's. Take the first manga instead.
-    local record
-    for _, hit in ipairs(results) do
-        if hit.record and hit.record.type ~= "Novel" then
-            record = hit.record
-            break
-        end
-    end
-    if not record then
-        log.debug("mangaupdates info: no match for " .. title)
-        return nil
-    end
+	-- A light novel tops the results for the title of the manga adapted from
+	-- it, and its metadata carries a "(Novel)" suffix that makes the alternative
+	-- titles differ from every other source's. Take the first manga instead.
+	local record
+	for _, hit in ipairs(results) do
+		if hit.record and hit.record.type ~= "Novel" then
+			record = hit.record
+			break
+		end
+	end
+	if not record then
+		log.debug("mangaupdates info: no match for " .. title)
+		return nil
+	end
 
-    local full = decode(host.http.get(API .. "/series/" .. ("%d"):format(record.series_id), {
-        ["Accept"] = "application/json",
-    }))
-    local data = full or {}
+	local full = decode(host.http.get(API .. "/series/" .. ("%d"):format(record.series_id), {
+		["Accept"] = "application/json",
+	}))
+	local data = full or {}
 
-    -- Verify the hit is the searched series. The API has no field named
-    -- record.name (the title lives in record.title), and associated titles
-    -- only exist in the detail response, so the check happens here: the
-    -- searched title must equal the record title or one of the associated
-    -- titles exactly (after normalization). The romaji variant hits pass via
-    -- their English associated entry; sequels and spin-offs fail it.
-    local wanted = host.text.normalize_title(title)
-    local matched = host.text.normalize_title(record.title or "") == wanted
-    if not matched then
-        for _, assoc in ipairs(data.associated or {}) do
-            if host.text.normalize_title(assoc.title or "") == wanted then
-                matched = true
-                break
-            end
-        end
-    end
-    if not matched then
-        log.debug("mangaupdates info: title mismatch for " .. title)
-        return nil
-    end
-    data.url = data.url or record.url or SITE
-    data.genres = data.genres or record.genres
-    if not data.description or data.description == "" then
-        data.description = record.description
-    end
+	-- Verify the hit is the searched series. The API has no field named
+	-- record.name (the title lives in record.title), and associated titles
+	-- only exist in the detail response, so the check happens here: the
+	-- searched title must equal the record title or one of the associated
+	-- titles exactly (after normalization). The romaji variant hits pass via
+	-- their English associated entry; sequels and spin-offs fail it.
+	-- ponytail: when exact equality fails, a token-overlap fallback catches
+	-- romaji variants the publisher never lists ("Ke wo" vs "Ie wo", "no de"
+	-- vs "node"): 70%+ of 4+-char-prefix-tolerant tokens must agree, so an
+	-- unrelated series sharing a couple of words still fails.
+	local wanted = host.text.normalize_title(title)
+	local function variantMatch(candidate)
+		local wantTokens, candTokens = {}, {}
+		for w in wanted:gmatch("%S+") do
+			wantTokens[#wantTokens + 1] = w
+		end
+		local normalized = host.text.normalize_title(candidate or "")
+		for w in normalized:gmatch("%S+") do
+			candTokens[#candTokens + 1] = w
+		end
+		if #wantTokens < 3 then
+			return false
+		end
+		local used, matchedCount = {}, 0
+		for _, want in ipairs(wantTokens) do
+			for i, have in ipairs(candTokens) do
+				if
+					not used[i]
+					and (
+						want == have
+						or (#want >= 4 and #have >= 4 and (want:sub(1, #have) == have or have:sub(1, #want) == want))
+					)
+				then
+					used[i] = true
+					matchedCount = matchedCount + 1
+					break
+				end
+			end
+		end
+		return matchedCount >= #wantTokens * 0.7
+	end
+	local matched = variantMatch(record.title)
+	if not matched then
+		for _, assoc in ipairs(data.associated or {}) do
+			if host.text.normalize_title(assoc.title or "") == wanted or variantMatch(assoc.title) then
+				matched = true
+				break
+			end
+		end
+	end
+	if not matched then
+		log.debug("mangaupdates info: title mismatch for " .. title)
+		return nil
+	end
+	data.url = data.url or record.url or SITE
+	data.genres = data.genres or record.genres
+	if not data.description or data.description == "" then
+		data.description = record.description
+	end
 
-    memoDetail = data
-    return memoDetail
+	memoDetail = data
+	return memoDetail
 end
 
 local function items(list)
-    return host.json.encode(list)
+	return host.json.encode(list)
 end
 
 -- collected turns a list of {name=..., url=...} pairs into deduped items.
 local function collected(data, entries, name)
-    local out, seen = {}, {}
-    for _, entry in ipairs(entries or {}) do
-        local value = name(entry)
-        if value and value ~= "" and not seen[value] then
-            seen[value] = true
-            out[#out + 1] = { value = value, url = entry.url or data.url }
-        end
-    end
-    return items(out)
+	local out, seen = {}, {}
+	for _, entry in ipairs(entries or {}) do
+		local value = name(entry)
+		if value and value ~= "" and not seen[value] then
+			seen[value] = true
+			out[#out + 1] = { value = value, url = entry.url or data.url }
+		end
+	end
+	return items(out)
 end
 
 local function titles(data)
-    local associated = {}
-    for _, entry in ipairs(data.associated or {}) do
-        associated[#associated + 1] = { name = entry.title, url = data.url }
-    end
-    return collected(data, associated, function(entry)
-        return entry.name
-    end)
+	local associated = {}
+	for _, entry in ipairs(data.associated or {}) do
+		associated[#associated + 1] = { name = entry.title, url = data.url }
+	end
+	return collected(data, associated, function(entry)
+		return entry.name
+	end)
 end
 
 local function summaries(data)
-    if not data.description or data.description == "" then
-        return items({})
-    end
-    -- Strip link blocks and markdown, then remove trailing URLs
-    local desc = host.text.strip_link_blocks(host.text.strip_markdown(data.description))
-    return items({ { value = desc, url = data.url } })
+	if not data.description or data.description == "" then
+		return items({})
+	end
+	-- Strip link blocks and markdown, then remove trailing URLs
+	local desc = host.text.strip_link_blocks(host.text.strip_markdown(data.description))
+	return items({ { value = desc, url = data.url } })
 end
 
 local function categories(data)
-    local genres = {}
-    for _, entry in ipairs(data.genres or {}) do
-        genres[#genres + 1] = { name = entry.genre, url = data.url }
-    end
-    return collected(data, genres, function(entry)
-        return entry.name
-    end)
+	local genres = {}
+	for _, entry in ipairs(data.genres or {}) do
+		genres[#genres + 1] = { name = entry.genre, url = data.url }
+	end
+	return collected(data, genres, function(entry)
+		return entry.name
+	end)
 end
 
 local function authors(data)
-    return collected(data, data.authors, function(entry)
-        return entry.name
-    end)
+	return collected(data, data.authors, function(entry)
+		return entry.name
+	end)
 end
 
 -- related returns category_recommendations[], the list the site renders under
 -- "Recommendations". related_series[] is deliberately unused: it carries only
 -- direct plot relations, which are empty or single-entry for most series.
 local function related(data)
-    local recs = {}
-    for _, entry in ipairs(data.category_recommendations or {}) do
-        recs[#recs + 1] = { name = entry.series_name, url = entry.series_url }
-    end
-    return collected(data, recs, function(entry)
-        return entry.name
-    end)
+	local recs = {}
+	for _, entry in ipairs(data.category_recommendations or {}) do
+		recs[#recs + 1] = { name = entry.series_name, url = entry.series_url }
+	end
+	return collected(data, recs, function(entry)
+		return entry.name
+	end)
 end
 
 local BY_KIND = {
-    titles = titles,
-    summaries = summaries,
-    categories = categories,
-    authors = authors,
-    related = related,
+	titles = titles,
+	summaries = summaries,
+	categories = categories,
+	authors = authors,
+	related = related,
 }
 
 -- getEnrichment(arg) — arg is {"title":..., "kind":..., "source":...}.
 -- Returns a JSON array of {value, url}; an unknown kind or a failed lookup
 -- yields an empty array, which the host records as "nothing found".
 function getEnrichment(arg)
-    local req = host.json.decode(arg)
-    if not req or not req.title or req.title == "" then
-        return items({})
-    end
+	local req = host.json.decode(arg)
+	if not req or not req.title or req.title == "" then
+		return items({})
+	end
 
-    local build = BY_KIND[req.kind]
-    if not build then
-        return items({})
-    end
+	local build = BY_KIND[req.kind]
+	if not build then
+		return items({})
+	end
 
-    local data = detail(req.title)
-    if not data then
-        return items({})
-    end
+	local data = detail(req.title)
+	if not data then
+		return items({})
+	end
 
-    return build(data)
+	return build(data)
 end
