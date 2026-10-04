@@ -192,7 +192,7 @@ graph TD
 - **Custom confirm & toast** — in-page confirm modal and stacked toast notifications (success/error/info), replacing browser-native dialogs
 - **Live logs** — merged app + plugin logs over WebSocket, filterable, selectable, copyable, clearable
 - **Auto-backup & orphan prune** — scheduled SQLite backups with configurable retention, plus automatic cleanup of orphaned chapters, history, and alt-titles at startup
-- **Restart API** — `POST /api/restart` re-execs the binary in-place for zero-downtime reloads
+- **Restart action** — `POST /action/restart` re-execs the binary in-place for zero-downtime reloads
 - **Brotli precompression** — static JS/CSS served as `.br` when the client accepts it
 - **Single static binary** — pure Go, `CGO_ENABLED=0`, cross-compiles to Linux/Windows/macOS trivially
 
@@ -211,11 +211,11 @@ Host/port come from CLI flags or `goisekai.ini` (flags win):
 
 ## Plugins
 
-Plugins implement a small ABI (`Init`, `SearchManga`, `GetMangaDetails`, `GetChapterList`, `GetPageList`) and call the host function `http_request` for all networking. All runtimes are interchangeable — pick Lua for quick ones, JS for JSON-heavy ones, Yaegi when Go stdlib matters.
+Plugins implement a small ABI (`Init`, plus `Search`, `GetMangaDetail`, `GetChapterList`, `GetPageList`, `GetGenres`, `GetEnrichment`) and call the host function `http_request` for all networking. Lua plugins use snake_case (`search_manga`, `get_manga_detail`, ...), JS plugins use camelCase (`searchManga`, `getMangaDetail`, ...), WASM uses the PascalCase names. All runtimes are interchangeable — pick Lua for quick ones, JS for JSON-heavy ones, Yaegi when Go stdlib matters.
 
 ### Lua plugins (no toolchain needed)
 
-One folder per site under `plugins/lua/<id>/`, with `main.lua` as the entry point; sibling modules are pre-loaded and loadable via `require("module")` (sandboxed to the plugin folder).
+One folder per site under `app_data/plugins/<id>/`, with `main.lua` as the entry point; sibling modules are pre-loaded and loadable via `require("module")` (sandboxed to the plugin folder). Example plugins live in `examples/plugins/lua/<id>/` for reference.
 
 ```lua
 local PLUGIN = {

@@ -1,5 +1,7 @@
 # Reader Features Plan
 
+> **Status: LIVE** — Features are already implemented in `cmd/goisekai/frontend/lib/reader.js`. This document is for reference only.
+
 ## Overview
 Improve the manga reader UX with5 features + 3 bonus UX improvements. All are frontend-only changes in `cmd/goisekai/frontend/` (Alpine.js + Tailwind CSS). No backend changes needed — uses existing Wails bindings.
 

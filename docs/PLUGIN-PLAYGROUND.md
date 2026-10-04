@@ -10,19 +10,19 @@ terminal — no browser, no server restarts, no copy-paste workflows.
 ./goisekai
 
 # List loaded plugins
-curl -s localhost:3333/api/sandbox/plugins/ | jq
+curl -s localhost:8080/api/sandbox/plugins/ | jq
 
 # Search
-curl -s 'localhost:3333/api/sandbox/plugins/kaliscan/search?q=naruto' | jq
+curl -s 'localhost:8080/api/sandbox/plugins/kaliscan/search?q=naruto' | jq
 
 # Detail
-curl -s 'localhost:3333/api/sandbox/plugins/kaliscan/detail/solo-leveling' | jq
+curl -s 'localhost:8080/api/sandbox/plugins/kaliscan/detail/solo-leveling' | jq
 
 # Chapters
-curl -s 'localhost:3333/api/sandbox/plugins/kaliscan/chapters/solo-leveling' | jq
+curl -s 'localhost:8080/api/sandbox/plugins/kaliscan/chapters/solo-leveling' | jq
 
 # Pages (chapter ID uses : separator, not /)
-curl -s 'localhost:3333/api/sandbox/plugins/kaliscan/pages/solo-leveling:chapter-1' | jq
+curl -s 'localhost:8080/api/sandbox/plugins/kaliscan/pages/solo-leveling:chapter-1' | jq
 ```
 
 ## Hot Reload Cycle
@@ -31,30 +31,30 @@ Edit → reload → test. No server restart needed.
 
 ```bash
 # 1. Edit your plugin
-vim examples/lua/kaliscan/main.lua
+vim examples/plugins/lua/kaliscan/main.lua
 
 # 2. Reload it live
-curl -s -X POST localhost:3333/api/sandbox/plugins/kaliscan/reload | jq
+curl -s -X POST localhost:8080/api/sandbox/plugins/kaliscan/reload | jq
 
 # 3. Test immediately
-curl -s 'localhost:3333/api/sandbox/plugins/kaliscan/search?q=naruto' | jq
+curl -s 'localhost:8080/api/sandbox/plugins/kaliscan/search?q=naruto' | jq
 ```
 
 ## Plugin Lifecycle
 
 ```bash
 # Load a plugin from an external path (without installing to app_data/)
-curl -s -X POST localhost:3333/api/sandbox/plugins/load \
+curl -s -X POST localhost:8080/api/sandbox/plugins/load \
   -H 'Content-Type: application/json' \
   -d '{"path":"/home/you/my-plugin/main.lua"}' | jq
 # → {"id":"my-plugin"}
 
 # Unload
-curl -s -X POST localhost:3333/api/sandbox/plugins/my-plugin/unload | jq
+curl -s -X POST localhost:8080/api/sandbox/plugins/my-plugin/unload | jq
 # → {"status":"unloaded"}
 
 # Reload (unload + load from same path)
-curl -s -X POST localhost:3333/api/sandbox/plugins/my-plugin/reload | jq
+curl -s -X POST localhost:8080/api/sandbox/plugins/my-plugin/reload | jq
 # → {"id":"my-plugin"}
 ```
 
@@ -70,6 +70,10 @@ curl -s -X POST localhost:3333/api/sandbox/plugins/my-plugin/reload | jq
 | `GET` | `/api/sandbox/plugins/{id}/detail/{mangaID}` | Get manga details + chapter list |
 | `GET` | `/api/sandbox/plugins/{id}/chapters/{mangaID}` | Get chapter list |
 | `GET` | `/api/sandbox/plugins/{id}/pages/{chapterID}` | Get page image URLs |
+
+> Note: Sandbox routes are under `/api/` and require an API key if configured
+> (via `-apiKey` flag or `api_key` in `goisekai.ini`). When no key is set,
+t> the routes are unauthenticated.
 
 ## Writing a New Plugin
 
@@ -174,15 +178,15 @@ sandbox responses.
 ### 1. Start with the dummy plugin
 
 ```bash
-cp -r examples/lua/dummy app_data/plugins/dummy-lua
+cp -r examples/plugins/lua/dummy app_data/plugins/dummy-lua
 # or
-cp examples/js/dummy/main.js app_data/plugins/dummy-js.js
+cp examples/plugins/js/dummy/main.js app_data/plugins/dummy-js.js
 ```
 
 ### 2. Test baseline
 
 ```bash
-curl -s 'localhost:3333/api/sandbox/plugins/dummy-lua/search?q=test' | jq
+curl -s 'localhost:8080/api/sandbox/plugins/dummy-lua/search?q=test' | jq
 ```
 
 ### 3. Implement real logic
@@ -194,14 +198,14 @@ Replace hardcoded catalog with `http_request` calls to the target site.
 ```bash
 # Edit → reload → test (repeat every 5 seconds)
 vim app_data/plugins/dummy-lua/main.lua
-curl -s -X POST localhost:3333/api/sandbox/plugins/dummy-lua/reload | jq
-curl -s 'localhost:3333/api/sandbox/plugins/dummy-lua/search?q=naruto' | jq
+curl -s -X POST localhost:8080/api/sandbox/plugins/dummy-lua/reload | jq
+curl -s 'localhost:8080/api/sandbox/plugins/dummy-lua/search?q=naruto' | jq
 ```
 
 ### 5. Check logs
 
 Plugin `log.info/warn/error` calls appear in the response at `/view/logs`.
-Filter by plugin: `curl 'localhost:3333/view/logs?filter=plugins'`
+Filter by plugin: `curl 'localhost:8080/view/logs?filter=plugins'`
 
 ### 6. Install when ready
 
@@ -210,7 +214,7 @@ Filter by plugin: `curl 'localhost:3333/view/logs?filter=plugins'`
 cp my-plugin/main.lua app_data/plugins/my-plugin/main.lua
 
 # Or use the hot-load API
-curl -s -X POST localhost:3333/api/sandbox/plugins/load \
+curl -s -X POST localhost:8080/api/sandbox/plugins/load \
   -d '{"path":"my-plugin/main.lua"}'
 ```
 
