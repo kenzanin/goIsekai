@@ -80,7 +80,7 @@ return function(data)
     if (selecting || hasSelection()) return;
     var limit = document.getElementById("log-limit").value;
     var filter = document.getElementById("log-filter").value;
-    fetch("/view/logs?limit=" + limit + "&filter=" + filter + "&partial=1")
+    fetch("/view/logs?limit=" + limit + "&filter=" + filter, { headers: { "X-Partial": "true" } })
       .then(function(r) { return r.text(); })
       .then(function(html) {
         var doc = new DOMParser().parseFromString(html, "text/html");
