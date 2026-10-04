@@ -196,6 +196,19 @@ graph TD
 - **Brotli precompression** — static JS/CSS served as `.br` when the client accepts it
 - **Single static binary** — pure Go, `CGO_ENABLED=0`, cross-compiles to Linux/Windows/macOS trivially
 
+### Worker Pools
+
+The host manages **4 bounded worker lanes** for concurrency control:
+
+| Lane | Purpose | Default Workers | Default Queue |
+|------|---------|-----------------|----------------|
+| interactive | UI-driven plugin calls | 4 | 32 |
+| fetch | metadata/downloads | 2 | 8 |
+| image | page/image CDN traffic | 8 | 64 |
+| maintenance | auto-backup, orphan prune | 1 | 8 |
+
+Configure via `[workers]` section in `goisekai.ini` (`interactive_size`, `fetch_size`, `image_size`, `maintenance_size`, plus `..._queue` for queue depths). The fetch lane enforces per-plugin fairness (max one in-flight job per plugin).
+
 ## Quick start
 
 ```sh
