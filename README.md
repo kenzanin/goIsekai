@@ -28,6 +28,7 @@ flowchart TD
             GO[plugin.Load<br/>`.so`]
         end
         HostNet[TLS fingerprint<br/>profile ladder]
+        Workers[Worker Pools<br/>interactive/fetch<br/>image/maintenance]
         DB[(SQLite<br/>modernc.org)]
         Cache[(WebP disk)]
         Backup[auto-backup]
@@ -53,6 +54,9 @@ flowchart TD
     HostNet --> Sites
     HostNet -.->|WAF block| CDP
     CDP -.->|cookies| HostNet
+    Bridge --> Workers
+    Workers --> PM
+    Workers --> HostNet
     Bridge --> DB
     Bridge --> Cache
     Bridge --> Backup
