@@ -1,8 +1,8 @@
 # goIsekai
 
-A self-hosted manga reader with sandboxed plugins. Three source runtimes — zero-toolchain **Lua**, pure-Go **JS** (goja), and **Yaegi** (interpreted Go) — power your sources; one fast server-rendered UI reads them all.
+A self-hosted manga reader with sandboxed plugins. Five source backends — zero-toolchain **Lua**, pure-Go **JS** (goja), **Yaegi** (interpreted Go), **WASM** (TinyGo/wasip1), and native **Go** (.so) — power your sources; one fast server-rendered UI reads them all.
 
-goIsekai is a single static Go binary that serves a chi + Lua template engine + Alpine.js SPA with Tailwind CSS. Manga sources are plugins executed in isolated sandboxes, so a crashing or malicious plugin can never take down the host. All network traffic goes through a Chrome-fingerprinted TLS client with an automatic profile-ladder that rotates fingerprints on WAF blocks — with an automatic browser fallback (CDP) when a challenge appears anyway.
+goIsekai is a single static Go binary that serves a chi + Lua template engine + Alpine.js SPA with Tailwind CSS. Manga sources are plugins executed in isolated sandboxes, so a crashing or malicious plugin can never take down the host. Five plugin backends — Lua, JS, Yaegi, WASM, and native Go (.so) — all share one ABI. All network traffic goes through a Chrome-fingerprinted TLS client with an automatic profile-ladder that rotates fingerprints on WAF blocks — with an automatic browser fallback (CDP) when a challenge appears anyway.
 
 ![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)
 
@@ -25,6 +25,7 @@ flowchart TD
             Lua[lunar<br/>Lua 5.4]
             JS[goja<br/>ES5.1]
             YG[yaegi<br/>interpreted Go]
+            WASM[wazero<br/>TinyGo wasip1]
             GO[plugin.Load<br/>`.so`]
         end
         HostNet[TLS fingerprint<br/>profile ladder]
@@ -46,10 +47,12 @@ flowchart TD
     PM --> Lua
     PM --> JS
     PM --> YG
+    PM --> WASM
     PM --> GO
     Lua --> HostNet
     JS --> HostNet
     YG --> HostNet
+    WASM --> HostNet
     GO --> HostNet
     HostNet --> Sites
     HostNet -.->|WAF block| CDP
@@ -105,17 +108,20 @@ graph TD
     D -->|yes| E[goja VM]
     A --> F{main.go?}
     F -->|yes| G[yaegi interpreter]
-    A --> H{plugin.so?}
-    H -->|yes| I[plugin.Load]
+    A --> H{main.wasm / *.wasm?}
+    H -->|yes| I[wazero]
+    A --> J{plugin.so?}
+    J -->|yes| K[plugin.Load]
 
-    C --> J[host_http_request]
-    E --> J
-    G --> J
-    I --> J
+    C --> L[host_http_request]
+    E --> L
+    G --> L
+    I --> L
+    K --> L
 
-    J --> K[hostnet proxy]
-    K --> L[TLS fingerprint ladder]
-    K --> M[CDP browser<br/>if WAF blocks]
+    L --> M[hostnet proxy]
+    M --> N[TLS fingerprint ladder]
+    M --> O[CDP browser<br/>if WAF blocks]
 ```
 
 ### HTTP route groups
@@ -183,7 +189,7 @@ graph TD
 
 ## Features
 
-- **Three source runtimes** — **Lua** (lunar, plain text, no toolchain), **JS** (goja, ES5.1, JSON native), and **Yaegi** (interpreted Go, stdlib + `hostnet` sandbox). Native **Go** (.so) plugins remain supported. All share one ABI; plugins are lazy-loaded on first use
+- **Five plugin backends** — **Lua** (lunar, plain text, no toolchain), **JS** (goja, ES5.1, JSON native), **Yaegi** (interpreted Go, stdlib + `hostnet` sandbox), **WASM** (TinyGo/wasip1 on wazero), and native **Go** (.so). All share one ABI; plugins are lazy-loaded on first use
 - **API-first** — every feature has a JSON endpoint under `/api` with constant-time API-key auth; the HTML UI and any future client consume the same bridge
 - **TLS profile ladder** — `bogdanfinn/tls-client` with a rotation ladder of 7+ browser profiles (Chrome, Firefox, Safari, Edge, Brave); WAF block on one profile triggers escalation to the next, first success is pinned per plugin and persisted to DB
 - **Automatic anti-bot fallback** — when a site returns a Cloudflare challenge, the host spawns a CDP browser (lightpanda or Chrome), solves it, harvests the cookies back into the jar, and retries the fast path — no manual paste
@@ -313,6 +319,18 @@ func Search(arg string) (string, error) {
 ```
 
 ABI functions take one string arg and return `(string, error)`; `Init` takes no arg. Networking goes through the synthetic `hostnet` package (`hostnet.Get`/`hostnet.Post`), which routes through the same TLS-fingerprinted per-plugin proxy. Sandbox: the Go stdlib is available, but any third-party (`github.com/...`) or `goisekai/...` import is rejected at load time. See `examples/plugins/yaegi/yaegidemo/` for a complete example.
+
+### WASM plugins (TinyGo, wasip1)
+
+One folder per site under `app_data/plugins/<id>/` with `main.wasm` (or a single `<id>.wasm` at the plugins root), plus a `plugin.json` for metadata since wasm has no `Init`/`PLUGIN` export. The host runs the module with **wazero**; it must export `contract_version`, `Search`, `GetMangaDetail`, `GetChapterList`, `GetPageList`, and a `malloc`/`free` pair. Networking and the shared helper library go through the single `env.host_call` import (`env.host_http_request` remains for the raw HTTP ABI). See `docs/plugin-wasm-helpers.md` and `examples/plugins/wasm/` for a full example.
+
+```sh
+tinygo build -o main.wasm -target wasm ./main.go
+```
+
+### Native Go plugins (.so)
+
+One `.so` per plugin at `app_data/plugins/<id>.so`, built with `go build -buildmode=plugin` against the same Go version and CGO setting as the host. Requires a CGO-enabled host build; the default `CGO_ENABLED=0` binary cannot load them.
 
 ```sh
 just install-lua kaliscan   # copies a Lua plugin → app_data/plugins/
