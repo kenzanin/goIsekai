@@ -118,43 +118,6 @@ func (s *AppService) collectCandidatesWithTitle(currentPluginID, title string) (
 	return candidates, failures, nil
 }
 
-// CollectMigrationCandidatesWithFallback tries the display title first, then
-// each alternative title from ListAltTitles when the first pass yields nothing.
-func (s *AppService) CollectMigrationCandidatesWithFallback(pluginID, mangaID string) ([]MigrationCandidate, []string, error) {
-	candidates, failures, err := s.CollectMigrationCandidates(pluginID, mangaID)
-	if err != nil {
-		return candidates, failures, err
-	}
-	if len(candidates) > 0 {
-		return candidates, failures, nil
-	}
-	// No candidate on display title: try alternative titles.
-	alts, _ := s.db.ListAltTitles(fmt.Sprintf("%d", mustResolveMangaID(s.db, pluginID, mangaID)))
-	// ListAltTitles expects manga_row_id string (TEXT id). Resolve via int id string.
-	for _, alt := range alts {
-		if strings.TrimSpace(alt.Title) == "" {
-			continue
-		}
-		more, moreFailures, _ := s.collectCandidatesWithTitle(pluginID, alt.Title)
-		if len(more) > 0 {
-			// Merge failures from both passes for reporting.
-			failures = append(failures, moreFailures...)
-			return more, failures, nil
-		}
-		failures = append(failures, moreFailures...)
-	}
-	return candidates, failures, nil
-}
-
-func mustResolveMangaID(db *database.DB, pluginID, mangaID string) int64 {
-	id, _ := db.ResolveMangaIntID(pluginID, mangaID)
-	return id
-}
-
-func (s *AppService) AutoSelectCandidate(candidates []MigrationCandidate) *MigrationCandidate {
-	return AutoSelectCandidate(candidates)
-}
-
 // AutoSelectCandidate returns the single exact match when there is exactly one,
 // otherwise nil (caller must present the list).
 func AutoSelectCandidate(candidates []MigrationCandidate) *MigrationCandidate {

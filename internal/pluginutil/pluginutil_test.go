@@ -178,6 +178,44 @@ func TestNormalizeTitle(t *testing.T) {
 	}
 }
 
+func TestLuaEscape(t *testing.T) {
+	tests := []struct {
+		in, want string
+	}{
+		{"simple", "simple"},
+		{"a.b", "a%.b"},
+		{"a-b", "a%-b"},
+		{"a+b", "a%+b"},
+		{"a[b]c", "a%[b%]c"},
+		{"a(b)c", "a%(b%)c"},
+		{"a$b^c%d?e*f", "a%$b%^c%%d%?e%*f"},
+		{"", ""},
+	}
+	for _, tc := range tests {
+		if got := LuaEscape(tc.in); got != tc.want {
+			t.Errorf("LuaEscape(%q) = %q, want %q", tc.in, got, tc.want)
+		}
+	}
+}
+
+func TestHTMLEntityUnescape(t *testing.T) {
+	tests := []struct {
+		in, want string
+	}{
+		{"&amp;", "&"},
+		{"&lt;b&gt;", "<b>"},
+		{"&#039;", "'"},
+		{"&#x27;", "'"},
+		{"plain", "plain"},
+		{"", ""},
+	}
+	for _, tc := range tests {
+		if got := HTMLEntityUnescape(tc.in); got != tc.want {
+			t.Errorf("HTMLEntityUnescape(%q) = %q, want %q", tc.in, got, tc.want)
+		}
+	}
+}
+
 func TestStripLinkBlocks(t *testing.T) {
 	tests := []struct {
 		in, want string
