@@ -94,6 +94,13 @@
           if (!main || !html) return;
           const match = html.match(/<main[^>]*id="content"[\s\S]*?>([\s\S]*?)<\/main>/i);
           main.innerHTML = match ? match[1] : html;
+          // innerHTML does not execute <script> — re-raise script nodes so
+          // page-specific inline scripts actually run.
+          main.querySelectorAll('script').forEach((old) => {
+            const s = document.createElement('script');
+            s.textContent = old.textContent;
+            old.replaceWith(s);
+          });
           if (window.Alpine && Alpine.initTree) {
             Alpine.initTree(main);
           }
@@ -658,6 +665,11 @@
               // in case the redirect returned a full page.
               const match = html.match(/<main[^>]*id="content"[\s\S]*?>([\s\S]*?)<\/main>/i);
               main.innerHTML = match ? match[1] : html;
+              main.querySelectorAll('script').forEach((old) => {
+                const s = document.createElement('script');
+                s.textContent = old.textContent;
+                old.replaceWith(s);
+              });
               if (window.Alpine && Alpine.initTree) {
                 Alpine.initTree(main);
               }
