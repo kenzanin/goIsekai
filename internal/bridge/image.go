@@ -104,16 +104,25 @@ func (s *AppService) GetImage(ctx context.Context, pluginID, url string, headers
 	// loaded: build it once and use that same value as the leader. Storing a
 	// throwaway here and then creating a second call to Store would leave any
 	// goroutine arriving in between holding a done channel nobody closes.
-	stored, loaded := s.imageFlight.LoadOrStore(url, &imageCall{done: make(chan struct{})})
-	if loaded {
+	var call *imageCall
+	for {
+		stored, loaded := s.imageFlight.LoadOrStore(url, &imageCall{done: make(chan struct{})})
+		if !loaded {
+			call = stored.(*imageCall)
+			break
+		}
 		shared := stored.(*imageCall)
 		<-shared.done
 		if shared.err == nil {
 			return shared.data, nil
 		}
-		// Leader failed; fall through and retry once ourselves.
+		// The leader failed. Drop its dead entry and loop round to try again
+		// ourselves as a fresh leader. Reusing `shared` here would close an
+		// already-closed channel; CompareAndDelete keeps us from evicting a
+		// retry another caller already installed.
+		s.imageFlight.CompareAndDelete(url, shared)
 	}
-	call := stored.(*imageCall)
+
 	wprio := workers.PriorityLow
 	if prio == PrioHigh {
 		wprio = workers.PriorityHigh
