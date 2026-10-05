@@ -78,10 +78,15 @@ return function(data)
 			local lastPageRead = p.LastPageRead or 0
 			local cachedPages = p.CachedPages or 0
 
+			-- The checkbox feeds the bulk mark read/unread action, so it has to
+			-- mirror the chapter's read state. It never did, which made a finished
+			-- chapter look unread on the very page that reports its progress.
 			local rowHTML = '<div class="flex items-center gap-3 py-3 px-2 -mx-2 rounded hover:bg-neutral-900 transition">'
 				.. '<input type="checkbox" name="chapterIDs" value="'
 				.. h(cID)
-				.. '" form="chapter-actions" class="size-4 accent-indigo-600 shrink-0">'
+				.. '" form="chapter-actions" class="size-4 accent-indigo-600 shrink-0"'
+				.. (isDone and ' checked' or '')
+				.. '>'
 				.. '<a href="/view/read/'
 				.. h(ue(pluginID))
 				.. "/"

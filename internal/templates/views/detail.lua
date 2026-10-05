@@ -314,6 +314,10 @@ return function(data)
 	-- Action buttons + enrichment panel (below info, still in right column)
 	body = body
 		.. detailAlt({
+			-- detailAlt renders 7 CSRF-protected forms and its own data table is a
+			-- literal, so the token has to be handed in explicitly. Without it
+			-- every one of those forms posts an empty token.
+			csrf_token = data.csrf_token or "",
 			PluginID = pluginID,
 			MangaID = mangaID,
 			CurrentTitle = currentTitle,
@@ -331,6 +335,9 @@ return function(data)
 	-- Chapters section
 	body = body
 		.. detailChapters({
+			-- 5 CSRF-protected forms per chapter row (mark read, reset progress,
+			-- CBZ export, ...); same reason as detailAlt above.
+			csrf_token = data.csrf_token or "",
 			PluginID = pluginID,
 			MangaID = mangaID,
 			Manga = manga,

@@ -178,7 +178,13 @@ func (s *Server) continueFromHistory(pluginID, mangaID string, chapters []types.
 	for i, c := range chapters {
 		if c.ID == lastChID {
 			p, hasProgress := progress[c.ID]
-			if !hasProgress || p.LastPageRead < p.TotalPages {
+			// TotalPages == 0 means the page count was never recorded, not that the
+			// chapter is finished. computeContinue already treats that case as
+			// in-progress; this used to read it as fully read and skip ahead to a
+			// newer, unread chapter, which is why Continue could land somewhere the
+			// reader had never opened.
+			unfinished := !hasProgress || p.TotalPages == 0 || p.LastPageRead < p.TotalPages
+			if unfinished {
 				return &ContinuePoint{ChapterID: c.ID, ChapterN: c.ChapterNum, Page: lastPage, Started: true}
 			}
 			// Fully read — advance to the next chapter (higher number = earlier in the slice).

@@ -9,7 +9,9 @@ local pluginCards = require("partials.plugin_cards")
 return function(data)
 	local plugins = data.Plugins or {}
 
-	local cardsHTML = pluginCards({ Plugins = plugins })
+	-- plugin_cards renders 2 CSRF-protected forms and takes a literal table,
+	-- so the token must be handed in explicitly.
+	local cardsHTML = pluginCards({ Plugins = plugins, csrf_token = data.csrf_token or "" })
 
 	local activeCount = 0
 	for _, p in ipairs(plugins) do
