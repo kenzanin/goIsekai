@@ -469,3 +469,68 @@ func TestReaderPagePublishesCSRFToken(t *testing.T) {
 		t.Errorf("reader page does not carry %s\n\ngot head:\n%s", want, firstLines(body, 25))
 	}
 }
+
+// A helper call that lands inside a Lua long-bracket string is not a syntax
+// error — it compiles fine and silently ships the call's own source text into
+// the HTML. That is exactly what happened in views/settings.lua, where the forms
+// live inside one [[...]] block: the hidden field never rendered, so the settings
+// POST carried no token and was refused. luacheck cannot see it (the text is a
+// string), and a test that only renders /view/library misses it.
+//
+// So assert on the rendered output of every view: the literal must never appear.
+func TestNoTemplateLeaksTheCSRFHelperSource(t *testing.T) {
+	views := []struct {
+		route string
+		view  string
+	}{
+		{"/view/library", "views/library"},
+		{"/view/settings", "views/settings"},
+		{"/view/logs", "views/logs"},
+		{"/view/plugins", "views/plugins"},
+		{"/view/about", "views/about"},
+		{"/view/updates", "views/updates"},
+		{"/view/history", "views/history"},
+	}
+	s := testServerFull(t, "", true)
+	for _, v := range views {
+		rec := httptest.NewRecorder()
+		s.Router.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, v.route, nil))
+		if rec.Code != http.StatusOK {
+			t.Errorf("GET %s: status = %d, want 200", v.route, rec.Code)
+			continue
+		}
+		if body := rec.Body.String(); strings.Contains(body, "csrfInput") {
+			t.Errorf("GET %s renders the csrfInput call as literal text; a form in %s "+
+				"has no hidden token and every submit from it will be refused",
+				v.route, v.view)
+		}
+	}
+}
+
+// The settings page posts with a native form navigation (Sec-Fetch-Mode:
+// navigate), so the hidden field is the only thing carrying the token there.
+func TestSettingsFormsCarryHiddenToken(t *testing.T) {
+	s := testServerFull(t, "", true)
+	rec := httptest.NewRecorder()
+	s.Router.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/view/settings", nil))
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200", rec.Code)
+	}
+	body := rec.Body.String()
+	hidden := `<input type="hidden" name="csrf_token" value="` + s.csrfToken + `">`
+
+	for _, action := range []string{"/action/save-settings", "/action/clear-cache-all"} {
+		i := strings.Index(body, `action="`+action+`"`)
+		if i < 0 {
+			t.Errorf("%s form not found on the settings page", action)
+			continue
+		}
+		rest := body[i:]
+		if end := strings.Index(rest, "</form>"); end >= 0 {
+			rest = rest[:end]
+		}
+		if !strings.Contains(rest, hidden) {
+			t.Errorf("the %s form has no hidden csrf_token input", action)
+		}
+	}
+}

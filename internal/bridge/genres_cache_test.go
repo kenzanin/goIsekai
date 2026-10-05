@@ -55,6 +55,7 @@ func writeGenreFixture(t *testing.T, id, body string) (*database.DB, *pluginmana
 func TestListGenresFirstCallNormalizesAndPersists(t *testing.T) {
 	db, mgr := writeGenreFixture(t, "genretest", genreFixture)
 	s := NewAppService(db, mgr, hostnet.NewProxy(), "", "", nil)
+	t.Cleanup(s.Shutdown)
 
 	got, err := s.ListGenres("genretest")
 	if err != nil {
@@ -92,6 +93,7 @@ func TestListGenresCacheHitSkipsPluginManager(t *testing.T) {
 		t.Fatalf("seed cache: %v", err)
 	}
 	s := NewAppService(db, nil, hostnet.NewProxy(), "", "", nil)
+	t.Cleanup(s.Shutdown)
 
 	got, err := s.ListGenres("genretest")
 	if err != nil {
@@ -113,6 +115,7 @@ function get_chapter_list(arg) return "[]" end
 function get_page_list(arg) return "[]" end
 `)
 	s := NewAppService(db, mgr, hostnet.NewProxy(), "", "", nil)
+	t.Cleanup(s.Shutdown)
 
 	got, err := s.ListGenres("nogenre")
 	if err != nil {
@@ -127,6 +130,7 @@ function get_page_list(arg) return "[]" end
 	}
 
 	s2 := NewAppService(db, nil, hostnet.NewProxy(), "", "", nil)
+	t.Cleanup(s2.Shutdown)
 	got2, err := s2.ListGenres("nogenre")
 	if err != nil {
 		t.Fatalf("second ListGenres: %v", err)

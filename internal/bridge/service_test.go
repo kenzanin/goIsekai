@@ -49,6 +49,7 @@ func TestGetMangaDetailsNilManagerFallback(t *testing.T) {
 
 	// Build a service with nil manager — simulates plugin-unreachable state.
 	s := NewAppService(db, nil, hostnet.NewProxy(), "", "", nil)
+	t.Cleanup(s.Shutdown)
 
 	manga, mangaChapters, err := s.GetMangaDetails("offline-plugin", "src-99")
 	if err != nil {
@@ -86,6 +87,7 @@ func TestGetMangaDetailsCacheMiss(t *testing.T) {
 	defer func() { _ = db.Close() }()
 
 	s := NewAppService(db, nil, hostnet.NewProxy(), "", "", nil)
+	t.Cleanup(s.Shutdown)
 
 	_, _, err = s.GetMangaDetails("ghost-plugin", "ghost-src")
 	if err == nil {
@@ -103,7 +105,9 @@ func newTestService(t *testing.T) *AppService {
 		t.Fatalf("open db: %v", err)
 	}
 	t.Cleanup(func() { _ = db.Close() })
-	return NewAppService(db, nil, hostnet.NewProxy(), "", "", nil)
+	s := NewAppService(db, nil, hostnet.NewProxy(), "", "", nil)
+	t.Cleanup(s.Shutdown)
+	return s
 }
 
 // TestGetPageListCachedEmptyFallback verifies that a plugin returning an empty
@@ -159,6 +163,7 @@ func TestGetPageListCachedEmptyFallback(t *testing.T) {
 	defer func() { _ = mgr.Close() }()
 
 	s := NewAppService(db, mgr, hostnet.NewProxy(), "", "", nil)
+	t.Cleanup(s.Shutdown)
 	pages, err := s.GetPageListCached("luaemptypages", "ch-1")
 	if err != nil {
 		t.Fatalf("GetPageListCached: %v", err)

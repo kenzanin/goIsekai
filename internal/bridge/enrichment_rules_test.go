@@ -27,7 +27,9 @@ func newEnrichService(t *testing.T, provider *enrichMockProvider) *AppService {
 	t.Cleanup(func() { _ = db.Close() })
 	reg := enrich.NewRegistry()
 	reg.Register(provider)
-	return NewAppService(db, nil, hostnet.NewProxy(), "", "", reg)
+	s := NewAppService(db, nil, hostnet.NewProxy(), "", "", reg)
+	t.Cleanup(s.Shutdown)
+	return s
 }
 
 func seedMangaRow(t *testing.T, s *AppService, id, pluginID, sourceID, title, desc string) {

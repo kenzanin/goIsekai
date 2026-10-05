@@ -16,7 +16,9 @@ func newGenreTestService(t *testing.T) *AppService {
 		t.Fatalf("open db: %v", err)
 	}
 	t.Cleanup(func() { _ = db.Close() })
-	return NewAppService(db, nil, hostnet.NewProxy(), "", t.TempDir(), nil)
+	s := NewAppService(db, nil, hostnet.NewProxy(), "", t.TempDir(), nil)
+	t.Cleanup(s.Shutdown)
+	return s
 }
 
 func seedManga(t *testing.T, s *AppService, pluginID, mangaID string) int64 {

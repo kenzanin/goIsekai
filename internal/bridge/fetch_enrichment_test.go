@@ -69,6 +69,7 @@ func TestFetchEnrichmentStoresAllKinds(t *testing.T) {
 		},
 	})
 	s := NewAppService(db, nil, hostnet.NewProxy(), "", "", reg)
+	t.Cleanup(s.Shutdown)
 
 	if err := s.FetchEnrichment("p1", "m1", "Title", []string{"p1"}); err != nil {
 		t.Fatalf("FetchEnrichment: %v", err)
@@ -138,6 +139,7 @@ func TestFetchEnrichmentPrefersTheFirstSource(t *testing.T) {
 	reg.Register(primary)
 	reg.Register(fallback)
 	s := NewAppService(db, nil, hostnet.NewProxy(), "", "", reg)
+	t.Cleanup(s.Shutdown)
 
 	if err := s.FetchEnrichment("p1", "m1", "Title", []string{"mangadex", "mangaupdates"}); err != nil {
 		t.Fatalf("FetchEnrichment: %v", err)
@@ -189,6 +191,7 @@ func TestGetEnrichmentReturnsEveryStoredSection(t *testing.T) {
 	}
 
 	s := NewAppService(db, nil, hostnet.NewProxy(), "", "", nil)
+	t.Cleanup(s.Shutdown)
 	got, err := s.GetEnrichment("p1", "m1")
 	if err != nil {
 		t.Fatalf("GetEnrichment: %v", err)
@@ -247,6 +250,7 @@ func TestFetchEnrichmentMultiSource(t *testing.T) {
 	reg.Register(primary)
 	reg.Register(fallback)
 	s := NewAppService(db, nil, hostnet.NewProxy(), "", "", reg)
+	t.Cleanup(s.Shutdown)
 
 	// Multi-source fetch (empty sources slice)
 	if err := s.FetchEnrichment("p1", "m1", "Title", nil); err != nil {
@@ -303,6 +307,7 @@ func TestFetchEnrichmentNormalizesCategories(t *testing.T) {
 	reg.Register(primary)
 	reg.Register(fallback)
 	s := NewAppService(db, nil, hostnet.NewProxy(), "", "", reg)
+	t.Cleanup(s.Shutdown)
 
 	// Multi-source fetch (empty sources slice)
 	if err := s.FetchEnrichment("p1", "m1", "Title", nil); err != nil {
@@ -354,6 +359,7 @@ func TestFetchEnrichmentStoresAuthorOnRightManga(t *testing.T) {
 	})
 
 	s := NewAppService(db, nil, hostnet.NewProxy(), "", "", reg)
+	t.Cleanup(s.Shutdown)
 	if err := s.FetchEnrichment("p1", "m1", "", []string{"p1"}); err != nil {
 		t.Fatalf("fetch enrichment: %v", err)
 	}
