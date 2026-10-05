@@ -39,6 +39,12 @@ type Config struct {
 	FrontendDir  string
 	TemplatesDir string
 
+	// [app] hot_reload re-reads and recompiles changed .lua files on render so
+	// a template edit shows on refresh. Off by default: the startup bytecode
+	// cache is then authoritative and renders never touch disk. Turn it on while
+	// editing templates, turn it off for normal running.
+	HotReload bool
+
 	// InfoDir holds the enrichment scripts (one folder per source, each with a
 	// main.lua). Separate from the plugin directory because these fetch manga
 	// metadata rather than scrape a manga site. Defaults to <DataDir>/info.
@@ -153,6 +159,7 @@ func (c *Config) Save(path string) error {
 		"cache_dir", c.CacheDir,
 		"frontend_dir", c.FrontendDir,
 		"templates_dir", c.TemplatesDir,
+		"hot_reload", strconv.FormatBool(c.HotReload),
 		"info_dir", c.InfoDir,
 		"host", c.Host,
 		"port", strconv.Itoa(c.Port),

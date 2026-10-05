@@ -48,6 +48,7 @@ return function(data)
 		.. "/"
 		.. h(mangaID)
 		.. '">'
+		.. csrfInput(data.csrf_token or "")
 		.. '<input type="hidden" name="manga_title" value="'
 		.. h(data.CurrentTitle or manga.Title or "")
 		.. '">'
@@ -61,6 +62,7 @@ return function(data)
 		.. "/"
 		.. h(mangaID)
 		.. '">'
+		.. csrfInput(data.csrf_token or "")
 		.. '<button type="submit" class="border border-red-600/50 text-red-400 hover:bg-red-500/10 rounded-md px-3 py-1.5 text-xs font-medium" data-confirm="Reset all enrichment data to original plugin values?">Reset to Original</button>'
 		.. "</form>"
 		.. "</div>"
@@ -92,6 +94,7 @@ return function(data)
 				.. "/"
 				.. h(mangaID)
 				.. '" class="inline">'
+				.. csrfInput(data.csrf_token or "")
 				.. '<input type="hidden" name="title" value="'
 				.. h(t.Title or "")
 				.. '">'
@@ -108,6 +111,7 @@ return function(data)
 				.. "/"
 				.. h(mangaID)
 				.. '" class="inline-flex">'
+				.. csrfInput(data.csrf_token or "")
 				.. '<input type="hidden" name="title" value="'
 				.. h(t.Title or "")
 				.. '">'
@@ -134,6 +138,7 @@ return function(data)
 				.. "/"
 				.. h(mangaID)
 				.. '" class="flex-1 min-w-0 group">'
+				.. csrfInput(data.csrf_token or "")
 				.. '<input type="hidden" name="description" value="'
 				.. h(a.Description or "")
 				.. '">'
@@ -150,6 +155,7 @@ return function(data)
 				.. "/"
 				.. h(mangaID)
 				.. '" class="inline-flex">'
+				.. csrfInput(data.csrf_token or "")
 				.. '<input type="hidden" name="description" value="'
 				.. h(a.Description or "")
 				.. '">'
@@ -182,6 +188,7 @@ return function(data)
 				.. "/"
 				.. h(mangaID)
 				.. '" class="inline">'
+				.. csrfInput(data.csrf_token or "")
 				.. '<input type="hidden" name="category" value="'
 				.. h(c.Value)
 				.. '">'

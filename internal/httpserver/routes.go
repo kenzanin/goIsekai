@@ -64,6 +64,11 @@ func (s *Server) renderPage(w http.ResponseWriter, r *http.Request, name, active
 		m = map[string]any{}
 	}
 	m["active"] = active
+	// Every rendered page carries the CSRF token. Partials do not repeat the
+	// meta tag — the SPA swaps partial HTML into a live <main> that already has
+	// it — but the value is injected for both so a partial-rendered template can
+	// still emit it.
+	m[csrfField] = s.csrfToken
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	var err error
 	if r != nil && r.Header.Get("X-Partial") == "true" {

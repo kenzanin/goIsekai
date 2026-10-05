@@ -162,6 +162,7 @@ return function(data)
 				.. '" data-confirm="'
 				.. (isActive and "Deactivate" or "Activate")
 				.. ' this plugin?">'
+				.. csrfInput(data.csrf_token or "")
 				.. '<button type="submit" class="border border-neutral-700 text-neutral-400 hover:text-neutral-200 rounded-md px-3 py-1.5 text-sm">'
 				.. (isActive and "Deactivate" or "Activate")
 				.. "</button></form></div></div>"
@@ -178,6 +179,7 @@ return function(data)
 					.. '<form method="post" action="/action/save-verify/'
 					.. h(id)
 					.. '" class="space-y-2">'
+					.. csrfInput(data.csrf_token or "")
 					.. '<textarea name="cookies" rows="3" placeholder="cf_clearance=... or the full cookie header" class="w-full bg-neutral-800 border border-neutral-700 rounded-md px-3 py-2 text-sm font-mono">'
 					.. h(verifyCookies)
 					.. "</textarea>"

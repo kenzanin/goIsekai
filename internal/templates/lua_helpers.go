@@ -19,6 +19,7 @@ func luaHelpers(S *lua.State) map[string]lua.NativeFunc {
 		"formatBytes":      formatBytesHelper(S),
 		"pageWindow":       pageWindowHelper(S),
 		"pageURL":          pageURLHelper(S),
+		"csrfInput":        csrfInputHelper(S),
 	}
 }
 
@@ -66,5 +67,23 @@ func ueHelper(S *lua.State) lua.NativeFunc {
 			s = arg.String()
 		}
 		return frame.ReturnString(url.PathEscape(s))
+	}
+}
+
+// csrfInputHelper emits the hidden field that carries the CSRF token on a plain
+// form post. Call it as csrfInput(data.csrf_token). Script-driven posts send the
+// same value in the X-CSRF-Token header, read from the page's meta tag.
+func csrfInputHelper(S *lua.State) lua.NativeFunc {
+	return func(frame lua.Frame) lua.Outcome {
+		arg, ok := frame.Argument(0)
+		if !ok {
+			return frame.ReturnString("")
+		}
+		tok, err := frame.ToString(arg)
+		if err != nil {
+			tok = arg.String()
+		}
+		return frame.ReturnString(`<input type="hidden" name="csrf_token" value="` +
+			html.EscapeString(tok) + `">`)
 	}
 }

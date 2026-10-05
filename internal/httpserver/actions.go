@@ -7,6 +7,8 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/go-chi/chi/v5"
+
 	"goisekai/internal/config"
 )
 
@@ -14,40 +16,52 @@ import (
 // state then redirect to the owning view with hxRedirect, so a plain browser
 // form post reloads that view and the client-side action layer can swap the
 // response into the page (no fragment templates to keep in sync).
+//
+// Every action lives under /action, which carries requireCSRFToken. Mounting
+// them one by one on the root router is what previously left them ungated; a
+// new action added here cannot escape the guard.
 func (s *Server) registerActionRoutes() {
-	s.Router.Post("/action/install-plugin", s.handleInstallPlugin)
-	s.Router.Post("/action/toggle-plugin/{pluginID}", s.handleTogglePlugin)
-	s.Router.Post("/action/toggle-library/{pluginID}/{mangaID}", s.handleToggleLibrary)
-	s.Router.Post("/action/sync", s.handleSync)
-	s.Router.Post("/action/sync-manga/{pluginID}/{mangaID}", s.handleSyncManga)
-	s.Router.Post("/action/set-title/{pluginID}/{mangaID}", s.handleSetTitle)
-	s.Router.Post("/action/remove-alt-title/{pluginID}/{mangaID}", s.handleRemoveAltTitle)
-	s.Router.Post("/action/remove-alt-summary/{pluginID}/{mangaID}", s.handleRemoveAltSummary)
-	s.Router.Post("/action/set-summary/{pluginID}/{mangaID}", s.handleSetSummary)
-	s.Router.Post("/action/fetch-enrichment/{pluginID}/{mangaID}", s.handleFetchEnrichment)
-	s.Router.Post("/action/remove-genre/{pluginID}/{mangaID}", s.handleRemoveGenre)
-	s.Router.Post("/action/remove-related/{pluginID}/{mangaID}", s.handleRemoveRelated)
-	s.Router.Post("/action/remove-category/{pluginID}/{mangaID}", s.handleRemoveCategory)
-	s.Router.Post("/action/add-category/{pluginID}/{mangaID}", s.handleAddCategory)
-	s.Router.Post("/action/add-genre/{pluginID}/{mangaID}", s.handleAddGenre)
-	s.Router.Post("/action/reset-enrichment/{pluginID}/{mangaID}", s.handleResetEnrichment)
-	s.Router.Post("/action/set-chapter-progress", s.handleSetChapterProgress)
-	s.Router.Post("/action/mark-read/{pluginID}/{mangaID}/{chapterID}", s.handleMarkChapterRead)
-	s.Router.Post("/action/reset-progress/{pluginID}/{mangaID}/{chapterID}", s.handleResetChapterProgress)
-	s.Router.Post("/action/toggle-skip/{pluginID}/{mangaID}/{chapterID}", s.handleToggleChapterSkip)
-	s.Router.Post("/action/toggle-cover-dim/{pluginID}/{mangaID}", s.handleToggleCoverDim)
-	s.Router.Post("/action/refetch-cover/{pluginID}/{mangaID}", s.handleRefetchCover)
-	s.Router.Post("/action/chapter-actions", s.handleChapterActions)
-	s.Router.Post("/action/save-settings", s.handleSaveSettings)
-	s.Router.Post("/action/save-verify/{pluginID}", s.handleSaveVerify)
-	s.Router.Post("/action/export-cbz/{pluginID}/{mangaID}/{chapterID}", s.handleExportCBZ)
-	s.Router.Post("/action/clear-logs", s.handleClearLogs)
-	s.Router.Post("/action/clear-cache-all", s.handleClearAllCache)
-	s.Router.Post("/action/test-profile/{pluginID}", s.handleTestProfile)
-	s.Router.Post("/action/migrate-source/{pluginID}/{mangaID}", s.handleMigrateSource)
-	s.Router.Post("/action/reset-profile/{pluginID}", s.handleResetProfile)
-	// Restart the application process via syscall.Exec (true re-exec).
-	s.Router.Post("/action/restart", s.handleRestart)
+	s.Router.Route("/action", func(r chi.Router) {
+		r.Use(s.requireCSRFToken)
+		s.registerActionPostRoutes(r)
+	})
+}
+
+// registerActionPostRoutes declares the mutating action endpoints. r is the
+// CSRF-guarded /action sub-router.
+func (s *Server) registerActionPostRoutes(r chi.Router) {
+	r.Post("/install-plugin", s.handleInstallPlugin)
+	r.Post("/toggle-plugin/{pluginID}", s.handleTogglePlugin)
+	r.Post("/toggle-library/{pluginID}/{mangaID}", s.handleToggleLibrary)
+	r.Post("/sync", s.handleSync)
+	r.Post("/sync-manga/{pluginID}/{mangaID}", s.handleSyncManga)
+	r.Post("/set-title/{pluginID}/{mangaID}", s.handleSetTitle)
+	r.Post("/remove-alt-title/{pluginID}/{mangaID}", s.handleRemoveAltTitle)
+	r.Post("/remove-alt-summary/{pluginID}/{mangaID}", s.handleRemoveAltSummary)
+	r.Post("/set-summary/{pluginID}/{mangaID}", s.handleSetSummary)
+	r.Post("/fetch-enrichment/{pluginID}/{mangaID}", s.handleFetchEnrichment)
+	r.Post("/remove-genre/{pluginID}/{mangaID}", s.handleRemoveGenre)
+	r.Post("/remove-related/{pluginID}/{mangaID}", s.handleRemoveRelated)
+	r.Post("/remove-category/{pluginID}/{mangaID}", s.handleRemoveCategory)
+	r.Post("/add-category/{pluginID}/{mangaID}", s.handleAddCategory)
+	r.Post("/add-genre/{pluginID}/{mangaID}", s.handleAddGenre)
+	r.Post("/reset-enrichment/{pluginID}/{mangaID}", s.handleResetEnrichment)
+	r.Post("/set-chapter-progress", s.handleSetChapterProgress)
+	r.Post("/mark-read/{pluginID}/{mangaID}/{chapterID}", s.handleMarkChapterRead)
+	r.Post("/reset-progress/{pluginID}/{mangaID}/{chapterID}", s.handleResetChapterProgress)
+	r.Post("/toggle-skip/{pluginID}/{mangaID}/{chapterID}", s.handleToggleChapterSkip)
+	r.Post("/toggle-cover-dim/{pluginID}/{mangaID}", s.handleToggleCoverDim)
+	r.Post("/refetch-cover/{pluginID}/{mangaID}", s.handleRefetchCover)
+	r.Post("/chapter-actions", s.handleChapterActions)
+	r.Post("/save-settings", s.handleSaveSettings)
+	r.Post("/save-verify/{pluginID}", s.handleSaveVerify)
+	r.Post("/export-cbz/{pluginID}/{mangaID}/{chapterID}", s.handleExportCBZ)
+	r.Post("/clear-logs", s.handleClearLogs)
+	r.Post("/clear-cache-all", s.handleClearAllCache)
+	r.Post("/test-profile/{pluginID}", s.handleTestProfile)
+	r.Post("/migrate-source/{pluginID}/{mangaID}", s.handleMigrateSource)
+	r.Post("/reset-profile/{pluginID}", s.handleResetProfile)
+	r.Post("/restart", s.handleRestart)
 }
 
 // hxRedirect answers a successful action with a 303 See Other redirect —

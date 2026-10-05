@@ -36,10 +36,11 @@ func testServerFullDB(t *testing.T, apiKey string, registerViews bool) (*Server,
 	logger := slog.New(slog.NewTextHandler(&bytes.Buffer{}, nil))
 
 	s := &Server{
-		Router:  r,
-		logger:  logger,
-		service: svc,
-		apiKey:  apiKey,
+		Router:    r,
+		logger:    logger,
+		service:   svc,
+		apiKey:    apiKey,
+		csrfToken: mintTestCSRF(t),
 	}
 	if registerViews {
 		engine, engErr := templates.New(os.DirFS("../templates"), false)

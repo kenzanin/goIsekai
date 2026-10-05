@@ -1,6 +1,8 @@
 package httpserver
 
 import (
+	"io"
+	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
@@ -11,7 +13,7 @@ import (
 func TestActionToggleLibrary(t *testing.T) {
 	s := testServerFull(t, "", true)
 	// Route: /action/toggle-library/{pluginID}/{mangaID}
-	req := httptest.NewRequest("POST", "/action/toggle-library/dummy/manga1", nil)
+	req := csrfPost(s, "/action/toggle-library/dummy/manga1", nil)
 	rec := httptest.NewRecorder()
 	s.Router.ServeHTTP(rec, req)
 	// Should redirect (303) or handle gracefully.
@@ -22,7 +24,7 @@ func TestActionToggleLibrary(t *testing.T) {
 
 func TestActionSync(t *testing.T) {
 	s := testServerFull(t, "", true)
-	req := httptest.NewRequest("POST", "/action/sync", nil)
+	req := csrfPost(s, "/action/sync", nil)
 	rec := httptest.NewRecorder()
 	s.Router.ServeHTTP(rec, req)
 	// Sync enqueues a fetch-lane job and returns a job reference immediately.
@@ -38,7 +40,7 @@ func TestActionSync(t *testing.T) {
 func TestActionSaveSettings(t *testing.T) {
 	s := testServerFull(t, "", true)
 	form := "data_dir=/tmp/test&cache_dir=/tmp/cache"
-	req := httptest.NewRequest("POST", "/action/save-settings", strings.NewReader(form))
+	req := csrfPost(s, "/action/save-settings", strings.NewReader(form))
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	rec := httptest.NewRecorder()
 	s.Router.ServeHTTP(rec, req)
@@ -50,7 +52,7 @@ func TestActionSaveSettings(t *testing.T) {
 
 func TestActionClearAllCache(t *testing.T) {
 	s := testServerFull(t, "", true)
-	req := httptest.NewRequest("POST", "/action/clear-cache-all", nil)
+	req := csrfPost(s, "/action/clear-cache-all", nil)
 	rec := httptest.NewRecorder()
 	s.Router.ServeHTTP(rec, req)
 	if rec.Code != 303 && rec.Code != 302 {
@@ -67,7 +69,7 @@ func TestActionExportCBZNonexistent(t *testing.T) {
 			t.Logf("export-cbz panicked (expected in test with no data): %v", r)
 		}
 	}()
-	req := httptest.NewRequest("POST", "/action/export-cbz/dummy/manga1/chapter1", nil)
+	req := csrfPost(s, "/action/export-cbz/dummy/manga1/chapter1", nil)
 	rec := httptest.NewRecorder()
 	s.Router.ServeHTTP(rec, req)
 	// No data — should handle gracefully (redirect or error page).
@@ -79,7 +81,7 @@ func TestActionExportCBZNonexistent(t *testing.T) {
 func TestActionSetChapterProgress(t *testing.T) {
 	s := testServerFull(t, "", true)
 	form := "chapter_id=c1&last_page=5&total_pages=10"
-	req := httptest.NewRequest("POST", "/action/set-chapter-progress", strings.NewReader(form))
+	req := csrfPost(s, "/action/set-chapter-progress", strings.NewReader(form))
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	rec := httptest.NewRecorder()
 	s.Router.ServeHTTP(rec, req)
@@ -91,7 +93,7 @@ func TestActionSetChapterProgress(t *testing.T) {
 
 func TestActionClearLogs(t *testing.T) {
 	s := testServerFull(t, "", true)
-	req := httptest.NewRequest("POST", "/action/clear-logs", nil)
+	req := csrfPost(s, "/action/clear-logs", nil)
 	rec := httptest.NewRecorder()
 	s.Router.ServeHTTP(rec, req)
 	if rec.Code != 303 && rec.Code != 302 {
@@ -102,7 +104,7 @@ func TestActionClearLogs(t *testing.T) {
 func TestActionMarkRead(t *testing.T) {
 	s := testServerFull(t, "", true)
 	// Route: /action/mark-read/{pluginID}/{mangaID}/{chapterID}
-	req := httptest.NewRequest("POST", "/action/mark-read/dummy/manga1/chapter1", nil)
+	req := csrfPost(s, "/action/mark-read/dummy/manga1/chapter1", nil)
 	rec := httptest.NewRecorder()
 	s.Router.ServeHTTP(rec, req)
 	if rec.Code != 303 && rec.Code != 302 {
@@ -113,7 +115,7 @@ func TestActionMarkRead(t *testing.T) {
 func TestActionResetChapterProgress(t *testing.T) {
 	s := testServerFull(t, "", true)
 	// Route: /action/reset-progress/{pluginID}/{mangaID}/{chapterID}
-	req := httptest.NewRequest("POST", "/action/reset-progress/dummy/manga1/chapter1", nil)
+	req := csrfPost(s, "/action/reset-progress/dummy/manga1/chapter1", nil)
 	rec := httptest.NewRecorder()
 	s.Router.ServeHTTP(rec, req)
 	if rec.Code != 303 && rec.Code != 302 {
@@ -123,7 +125,7 @@ func TestActionResetChapterProgress(t *testing.T) {
 
 func postChapterAction(t *testing.T, s *Server, form string) int {
 	t.Helper()
-	req := httptest.NewRequest("POST", "/action/chapter-actions", strings.NewReader(form))
+	req := csrfPost(s, "/action/chapter-actions", strings.NewReader(form))
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	rec := httptest.NewRecorder()
 	s.Router.ServeHTTP(rec, req)
@@ -162,7 +164,7 @@ func TestActionChapterActions(t *testing.T) {
 func TestActionToggleChapterSkip(t *testing.T) {
 	s := testServerFull(t, "", true)
 	// Route: /action/toggle-skip/{pluginID}/{mangaID}/{chapterID}
-	req := httptest.NewRequest("POST", "/action/toggle-skip/dummy/manga1/chapter1", nil)
+	req := csrfPost(s, "/action/toggle-skip/dummy/manga1/chapter1", nil)
 	rec := httptest.NewRecorder()
 	s.Router.ServeHTTP(rec, req)
 	if rec.Code != 303 && rec.Code != 200 && rec.Code != 400 {
@@ -173,10 +175,19 @@ func TestActionToggleChapterSkip(t *testing.T) {
 func TestActionToggleCoverDim(t *testing.T) {
 	s := testServerFull(t, "", true)
 	// Route: /action/toggle-cover-dim/{pluginID}/{mangaID}
-	req := httptest.NewRequest("POST", "/action/toggle-cover-dim/dummy/manga1", nil)
+	req := csrfPost(s, "/action/toggle-cover-dim/dummy/manga1", nil)
 	rec := httptest.NewRecorder()
 	s.Router.ServeHTTP(rec, req)
 	if rec.Code != 303 && rec.Code != 200 && rec.Code != 400 {
 		t.Fatalf("status = %d, want 303 or 200", rec.Code)
 	}
+}
+
+// csrfPost builds a POST that carries the server's CSRF token. Every action
+// route is behind requireCSRFToken, so a request without one is refused before
+// the handler runs.
+func csrfPost(s *Server, target string, body io.Reader) *http.Request {
+	r := httptest.NewRequest("POST", target, body)
+	r.Header.Set(csrfHeader, s.csrfToken)
+	return r
 }

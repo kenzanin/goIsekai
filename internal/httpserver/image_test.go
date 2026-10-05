@@ -31,9 +31,10 @@ func testImageServer(t *testing.T) *Server {
 	r := chi.NewRouter()
 	logger := slog.New(slog.NewTextHandler(&bytes.Buffer{}, nil))
 	s := &Server{
-		Router:  r,
-		logger:  logger,
-		service: svc,
+		Router:    r,
+		logger:    logger,
+		service:   svc,
+		csrfToken: mintTestCSRF(t),
 	}
 	s.registerImageRoutes()
 	return s

@@ -53,5 +53,6 @@ func Default() *Config {
 	// frontend edits take effect without a rebuild.
 	c.FrontendDir = "cmd/goisekai/frontend"
 	c.TemplatesDir = "internal/templates"
+	c.HotReload = false
 	return c
 }

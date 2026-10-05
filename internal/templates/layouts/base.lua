@@ -13,6 +13,9 @@ return function(data, content)
 		"<head>",
 		'    <meta charset="utf-8">',
 		'    <meta name="viewport" content="width=device-width, initial-scale=1">',
+		-- CSRF token for script-driven POSTs. Plain forms carry the same value
+		-- in a hidden field; the frontend reads it from here.
+		'    <meta name="csrf-token" content="' .. h(data.csrf_token or "") .. '">',
 		"    <title>goIsekai</title>",
 		'    <link rel="icon" type="image/svg+xml" href="/static/favicon.svg">',
 		'    <link rel="stylesheet" href="/static/lib/tailwind.css">',

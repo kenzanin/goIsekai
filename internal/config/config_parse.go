@@ -135,6 +135,8 @@ func (c *Config) set(section, key, val string) {
 			c.FrontendDir = val
 		case "templates_dir":
 			c.TemplatesDir = val
+		case "hot_reload", "hotreload":
+			c.HotReload = val == "true" || val == "1" || val == "yes" || val == "on"
 		case "info_dir":
 			c.InfoDir = val
 		case "host":

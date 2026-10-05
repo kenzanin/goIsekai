@@ -160,9 +160,11 @@ func main() {
 	bridge.StartLibraryScheduler(svc, schedulerStop)
 	defer close(schedulerStop)
 
-	// devMode=true: re-read + recompile Lua templates per render, so a .lua
-	// edit takes effect on refresh with no rebuild or restart.
-	eng, err := templates.New(os.DirFS(cfg.TemplatesDir), true)
+	// cfg.HotReload re-reads + recompiles changed Lua templates per render, so
+	// a .lua edit takes effect on refresh with no rebuild or restart. Off by
+	// default: renders then execute the startup bytecode cache and never touch
+	// the template tree.
+	eng, err := templates.New(os.DirFS(cfg.TemplatesDir), cfg.HotReload)
 	if err != nil {
 		log.Fatalf("init templates: %v", err)
 	}

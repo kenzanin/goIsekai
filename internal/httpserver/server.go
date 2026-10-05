@@ -28,6 +28,9 @@ type Server struct {
 	engine  *templates.Engine
 	apiKey  string
 	enrich  *enrich.Registry
+	// csrfToken is minted once per process and presented to the browser by
+	// renderPage. See csrf.go.
+	csrfToken string
 }
 
 // New creates a new Server with Chi middleware and all routes registered.
@@ -57,6 +60,12 @@ func New(host string, port int, apiKey string, assets fs.FS, svc *bridge.AppServ
 		engine:  engine,
 		apiKey:  apiKey,
 		enrich:  enrichReg,
+	}
+	token, err := mintCSRFToken()
+	if err != nil {
+		logger.Error("csrf: mint token failed, action routes will refuse every mutation", "error", err)
+	} else {
+		s.csrfToken = token
 	}
 	warnIfOpenAPI(logger, host, apiKey)
 	s.routes()

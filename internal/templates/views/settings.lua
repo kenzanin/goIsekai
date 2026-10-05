@@ -12,6 +12,7 @@ return function(data)
 <p class="text-xs text-neutral-500 mb-6">Config: <code class="text-xs bg-neutral-800 rounded px-1.5 py-0.5">]] .. h(
 		path
 	) .. [[</code></p>]] .. (cfg and [[<form method="post" action="/action/save-settings" class="space-y-4 max-w-2xl mx-auto">
+	.. csrfInput(data.csrf_token or "")
     <div class="border border-neutral-800 rounded-lg p-4">
         <h2 class="text-sm font-medium text-neutral-300 mb-3">Server</h2>
         <div class="space-y-4">
@@ -91,6 +92,7 @@ return function(data)
     <h2 class="text-sm font-semibold mb-1">Image Cache</h2>
     <p class="text-xs text-neutral-400 mb-3">Cached images: ]] .. h(formatBytes(cacheBytes)) .. [["
     <form method="post" action="/action/clear-cache-all" data-confirm="Delete ALL cached images?">
+    .. csrfInput(data.csrf_token or "")
         <button type="submit" class="bg-neutral-700 hover:bg-red-600 text-white rounded-md px-4 py-2 text-sm font-medium">🗑 Clear all cached images</button>
     </form>
 </div>

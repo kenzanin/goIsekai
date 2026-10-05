@@ -27,6 +27,7 @@ return function(data)
 		-- pagination row via its Inner slot so the dropdown shares a line with the
 		-- page numbers instead of sitting in its own row above them.
 		local actionsInner = '<form id="chapter-actions" method="post" action="/action/chapter-actions" class="flex flex-wrap items-center gap-2" data-confirm-actions="mark-selected-unread,clear-up-to,mark-all-unread,clear-cache">'
+			.. csrfInput(data.csrf_token or "")
 			.. '<input type="hidden" name="pluginID" value="'
 			.. h(pluginID)
 			.. '">'
@@ -145,6 +146,7 @@ return function(data)
 				.. "/"
 				.. h(ue(cID))
 				.. '">'
+				.. csrfInput(data.csrf_token or "")
 				.. '<button type="submit" title="Mark read" class="size-7 inline-flex items-center justify-center rounded-md border border-neutral-700 hover:bg-neutral-800 text-sm" aria-label="Mark read"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="size-4"><polyline points="20 6 9 17 4 12"/></svg></button>'
 				.. "</form>"
 
@@ -157,6 +159,7 @@ return function(data)
 				.. "/"
 				.. h(ue(cID))
 				.. '">'
+				.. csrfInput(data.csrf_token or "")
 				.. '<button type="submit" title="Reset progress" class="size-7 inline-flex items-center justify-center rounded-md border border-neutral-700 hover:bg-neutral-800 text-sm" aria-label="Reset progress" data-confirm="Are you sure?"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="size-4"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg></button>'
 				.. "</form>"
 
@@ -169,6 +172,7 @@ return function(data)
 				.. "/"
 				.. h(ue(cID))
 				.. '">'
+				.. csrfInput(data.csrf_token or "")
 				.. '<input type="hidden" name="title" value="'
 				.. h(manga.Title or "")
 				.. " - Ch. "
@@ -186,6 +190,7 @@ return function(data)
 				.. "/"
 				.. h(ue(cID))
 				.. '">'
+				.. csrfInput(data.csrf_token or "")
 				.. '<button type="submit" title="'
 				.. (isSkipped and "Unskip this chapter" or "Skip this chapter")
 				.. '" class="size-7 inline-flex items-center justify-center rounded-md border transition text-sm '

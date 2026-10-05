@@ -121,6 +121,7 @@ return function(data)
 			.. '" class="inline genre-tag"'
 			.. hidden
 			.. ">"
+			.. csrfInput(data.csrf_token or "")
 			.. '<input type="hidden" name="genre" value="'
 			.. h(g)
 			.. '">'
@@ -155,6 +156,7 @@ return function(data)
 			.. "/"
 			.. h(mangaID)
 			.. '" class="inline">'
+			.. csrfInput(data.csrf_token or "")
 			.. '<input type="hidden" name="title" value="'
 			.. h(name)
 			.. '">'
@@ -186,6 +188,7 @@ return function(data)
 		.. "/"
 		.. h(mangaID)
 		.. '">'
+		.. csrfInput(data.csrf_token or "")
 		.. (inLibrary and '<button type="submit" class="border border-emerald-600/50 text-emerald-400 bg-emerald-500/10 hover:bg-emerald-500/20 rounded-md px-4 py-2 text-sm">✓ In Library</button>' or '<button type="submit" class="bg-indigo-600 hover:bg-indigo-500 text-white rounded-md px-4 py-2 text-sm font-medium">+ Add to Library</button>')
 		.. "</form>"
 	if inLibrary then
@@ -197,6 +200,7 @@ return function(data)
 				.. "/"
 				.. h(mangaID)
 				.. '" class="ml-auto inline-flex items-center gap-2" data-job-action="sync-manga">'
+				.. csrfInput(data.csrf_token or "")
 				.. '<span class="text-xs text-neutral-500 cursor-default" title="Last refresh check - click Update to refresh now">updated '
 				.. synced:sub(1, 10)
 				.. " "
@@ -210,6 +214,7 @@ return function(data)
 				.. "/"
 				.. h(mangaID)
 				.. '" class="ml-auto" data-job-action="sync-manga">'
+				.. csrfInput(data.csrf_token or "")
 				.. '<button type="submit" title="Refresh this manga now" class="border border-neutral-700 text-neutral-300 hover:bg-neutral-800 rounded-md px-4 py-2 text-sm cursor-pointer">⟳ Update</button>'
 				.. "</form>"
 		end

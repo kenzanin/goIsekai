@@ -4,6 +4,14 @@
   var ACCENT = { success: 'bg-emerald-500', error: 'bg-red-500', info: 'bg-indigo-400' };
   var DURATION = { success: 3500, info: 3500, error: 6000 };
 
+  // CSRF token minted by the server and emitted into the page's meta tag by
+  // layouts/base.lua. Plain forms carry it in a hidden field, but the fetches
+  // below build their own bodies, so they send it as a header.
+  function csrfToken() {
+    var el = document.querySelector('meta[name="csrf-token"]');
+    return el ? el.getAttribute('content') || '' : '';
+  }
+
   // Inject animation CSS once (matches old toast-visible / toast-leave behavior)
   var _style = document.createElement('style');
   _style.textContent =
@@ -77,7 +85,7 @@
     fetch(action, {
       method: 'POST',
       body: new URLSearchParams(new FormData(form)),
-      headers: { 'X-Partial': 'true' },
+      headers: { 'X-Partial': 'true', 'X-CSRF-Token': csrfToken() },
       credentials: 'same-origin',
     })
       .then((resp) => {
@@ -185,6 +193,7 @@
     fetch(action, {
       method: method,
       body: new URLSearchParams(new FormData(form)),
+      headers: method === 'POST' ? { 'X-CSRF-Token': csrfToken() } : {},
       credentials: 'same-origin',
     })
       .then((resp) => {
@@ -647,7 +656,7 @@
           // URL-encoded, not FormData: the action handlers call
           // r.ParseForm()+FormValue, which drops multipart bodies.
           body: new URLSearchParams(new FormData(form)),
-          headers: { 'X-Partial': 'true' },
+          headers: { 'X-Partial': 'true', 'X-CSRF-Token': csrfToken() },
           credentials: 'same-origin',
         })
           .then((resp) => {

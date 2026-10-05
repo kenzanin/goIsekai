@@ -42,6 +42,7 @@ func postAction(t *testing.T, s *Server, path string, form url.Values) *httptest
 	t.Helper()
 	req := httptest.NewRequest("POST", path, strings.NewReader(form.Encode()))
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req.Header.Set(csrfHeader, s.csrfToken)
 	rec := httptest.NewRecorder()
 	s.Router.ServeHTTP(rec, req)
 	return rec

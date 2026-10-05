@@ -47,10 +47,11 @@ func testServerFull(t *testing.T, apiKey string, registerViews bool) *Server {
 	logger := slog.New(slog.NewTextHandler(&bytes.Buffer{}, nil))
 
 	s := &Server{
-		Router:  r,
-		logger:  logger,
-		service: svc,
-		apiKey:  apiKey,
+		Router:    r,
+		logger:    logger,
+		service:   svc,
+		apiKey:    apiKey,
+		csrfToken: mintTestCSRF(t),
 	}
 	if registerViews {
 		engine, engErr := templates.New(os.DirFS("../templates"), false)
@@ -448,7 +449,7 @@ func testServerSized(t *testing.T) *Server {
 	t.Cleanup(svc.Shutdown)
 	r := chi.NewRouter()
 	logger := slog.New(slog.NewTextHandler(&bytes.Buffer{}, nil))
-	s := &Server{Router: r, logger: logger, service: svc}
+	s := &Server{Router: r, logger: logger, service: svc, csrfToken: mintTestCSRF(t)}
 	s.Router.Route("/api", func(sub chi.Router) {
 		sub.Use(s.requireAPIKey)
 		s.registerAPIRoutes(sub)

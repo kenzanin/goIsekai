@@ -195,3 +195,63 @@ func TestWatchDetectsFileChange(t *testing.T) {
 		t.Fatal("watcher did not fire within timeout")
 	}
 }
+
+// Task 1.1: hot_reload defaults off. If it ever defaulted on, every render
+// would walk the template tree again and the startup bytecode cache would be
+// pointless.
+func TestHotReloadDefaultsOff(t *testing.T) {
+	if Default().HotReload {
+		t.Error("Default().HotReload = true, want false")
+	}
+	path := filepath.Join(t.TempDir(), "nokey.ini")
+	if err := os.WriteFile(path, []byte("[app]\ntitle = t\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	got, err := Load(path)
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	if got.HotReload {
+		t.Error("hot_reload absent from the file left it true, want false")
+	}
+}
+
+func TestHotReloadRoundTrips(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "hotreload.ini")
+	c := Default()
+	c.HotReload = true
+	if err := c.Save(path); err != nil {
+		t.Fatalf("Save: %v", err)
+	}
+	got, err := Load(path)
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	if !got.HotReload {
+		t.Error("hot_reload = true did not survive a save/load round trip")
+	}
+}
+
+// An absent or unrecognised value stays off rather than silently enabling
+// template re-reading on a production run.
+func TestHotReloadOnlyTruthyValuesEnable(t *testing.T) {
+	for _, tc := range []struct {
+		val  string
+		want bool
+	}{
+		{"true", true}, {"1", true}, {"yes", true}, {"on", true},
+		{"false", false}, {"0", false}, {"", false}, {"maybe", false},
+	} {
+		path := filepath.Join(t.TempDir(), "hr.ini")
+		if err := os.WriteFile(path, []byte("[app]\nhot_reload = "+tc.val+"\n"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		got, err := Load(path)
+		if err != nil {
+			t.Fatalf("Load(%q): %v", tc.val, err)
+		}
+		if got.HotReload != tc.want {
+			t.Errorf("hot_reload=%q: got %v want %v", tc.val, got.HotReload, tc.want)
+		}
+	}
+}

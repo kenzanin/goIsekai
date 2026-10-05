@@ -166,6 +166,7 @@ return function(data)
 				.. "/"
 				.. h(mangaID)
 				.. '" class="mt-auto">'
+				.. csrfInput(data.csrf_token or "")
 			body = body .. '<input type="hidden" name="targetPluginID" value="' .. h(c.PluginID) .. '">'
 			body = body .. '<input type="hidden" name="targetMangaID" value="' .. h(c.SourceMangaID) .. '">'
 			body = body

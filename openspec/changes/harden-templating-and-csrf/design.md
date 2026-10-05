@@ -31,11 +31,21 @@ Rejected: keeping hot reload always on and adding a file-hash check on every ren
 
 Rejected: an explicit compile-at-first-use cache. It trades a per-render walk for a first-render-per-template walk and adds a second cache to reason about; the startup walk is already paid once.
 
+Rejected: a Memcached-style external cache (e.g. `bradfitz/gomemcache`). A compiled `*lua.Prototype` holds bytecode pointers into the runtime and cannot be serialised, so it could not be stored; and a TCP round trip costs more than reading a small `.lua` file that the OS page cache already holds. It would also add a daemon dependency to a single-binary local-first app. The existing on-disk image cache and the SQLite `plugin_cache` table already cover the two cases in this project that genuinely need serialisation.
+
+### The require path needs its own source cache
+
+`protos` alone is not the whole render. Views pull in partials with `require("partials.detail_chapters")`, and `newVM` installs `lua.FSLoader(e.templatesFS)`, so every render re-read and re-compiled each required partial — measured at four extra file reads per render of `views/library` before this change.
+
+lunar's `ScriptOpener` returns an `io.ReadCloser`, i.e. source text, not a `*lua.Prototype`. There is therefore no loader hook that can hand `require` a precompiled prototype. The engine keeps a `sources` map alongside `protos` and builds its VMs with `lua.FuncLoader` serving from it, which removes the disk read from the require path.
+
+The remaining per-render compilation of required partials is accepted for now. Removing it means either reusing one Lua state across requests (the `data` global and helpers would then be shared, so state could leak between requests) or preloading every module into every new state (which costs the same compile it tries to avoid). Neither is a good trade without profiling data, so the limitation is recorded in the spec delta rather than silently solved.
+
 ### Hot reload keys off a content hash, not a modification time
 
-The engine keeps `hashes map[string][32]byte` alongside `protos`. A refresh walks the tree once, hashes each `.lua`, and recompiles only the entries whose hash moved. Timestamps are not used: mtime granularity is unreliable across the deploy paths this app actually takes (bind-mounted filesystems and file copies preserve or reset mtime unpredictably), whereas content hashing cannot produce a false "unchanged".
+The engine keeps `hashes map[string][32]byte` alongside `protos` and `sources`. Under hot reload a refresh walks the tree once, hashes each `.lua`, and recompiles only the entries whose hash moved. Timestamps are not used: mtime granularity is unreliable across the deploy paths this app actually takes (bind-mounted filesystems and file copies preserve or reset mtime unpredictably), whereas content hashing cannot produce a false "unchanged".
 
-Concurrency: `protos` and `hashes` are swapped together under the existing `e.mu` write lock, and `render` reads the prototype under the read lock. A refresh therefore publishes both maps atomically and an in-flight render sees either the old pair or the new one.
+Concurrency: `protos`, `sources`, and `hashes` are swapped together under the existing `e.mu` write lock, and `render` reads the prototype under the read lock. A refresh therefore publishes all three maps atomically and an in-flight render sees either the old set or the new one.
 
 A template that fails to compile keeps its previous entry. `loadBytecodes` currently aborts the whole walk on the first compile error; under hot reload a single bad edit must not take every page down, so the refresh path logs and continues.
 

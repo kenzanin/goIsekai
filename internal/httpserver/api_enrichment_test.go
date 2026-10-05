@@ -118,6 +118,7 @@ func TestActionSetTitleParsesFormField(t *testing.T) {
 	body := strings.NewReader(url.Values{"title": {"Some Alt Title"}}.Encode())
 	req := httptest.NewRequest("POST", "/action/set-title/p1/m1", body)
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req.Header.Set(csrfHeader, s.csrfToken)
 	rec := httptest.NewRecorder()
 	s.Router.ServeHTTP(rec, req)
 	if rec.Code != 200 {

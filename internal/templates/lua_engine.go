@@ -1,6 +1,7 @@
 package templates
 
 import (
+	"crypto/sha256"
 	"fmt"
 	"io"
 	"io/fs"
@@ -18,16 +19,25 @@ import (
 type LuaEngine struct {
 	templatesFS fs.FS
 	protos      map[string]*lua.Prototype // compiled cache keyed by name w/o extension
-	devMode     bool
-	mu          sync.RWMutex
+	// sources backs the require path. Views pull partials in with
+	// require("partials.x"); lunar's ScriptOpener yields source text rather
+	// than a prototype, so serving require from disk would cost a read and a
+	// compile per partial per render. Serving it from here keeps the render path
+	// off the filesystem entirely.
+	sources map[string]string
+	hashes  map[string][32]byte
+	devMode bool
+	mu      sync.RWMutex
 }
 
 // NewLuaEngine walks templatesFS, compiles all .lua files to bytecode, and
-// prepares helpers. devMode re-reads from disk on every Render call.
+// prepares helpers. devMode re-checks changed templates from disk on render.
 func NewLuaEngine(templatesFS fs.FS, devMode bool) (*LuaEngine, error) {
 	e := &LuaEngine{
 		templatesFS: templatesFS,
 		protos:      make(map[string]*lua.Prototype),
+		sources:     make(map[string]string),
+		hashes:      make(map[string][32]byte),
 		devMode:     devMode,
 	}
 	if err := e.loadBytecodes(); err != nil {
@@ -36,10 +46,10 @@ func NewLuaEngine(templatesFS fs.FS, devMode bool) (*LuaEngine, error) {
 	return e, nil
 }
 
-// loadBytecodes compiles every .lua file in templatesFS into the bytecode cache.
+// loadBytecodes compiles every .lua file in templatesFS into the caches. A
+// compile failure here is fatal: the tree is broken at startup and there is no
+// previous entry to fall back to.
 func (e *LuaEngine) loadBytecodes() error {
-	e.mu.Lock()
-	defer e.mu.Unlock()
 	return fs.WalkDir(e.templatesFS, ".", func(path string, d fs.DirEntry, err error) error {
 		if err != nil || d.IsDir() {
 			return err
@@ -51,21 +61,25 @@ func (e *LuaEngine) loadBytecodes() error {
 		if err != nil {
 			return fmt.Errorf("read %s: %w", path, err)
 		}
+		// Key is path without extension (e.g. "views/library")
+		name := strings.TrimSuffix(path, ".lua")
 		proto, err := lua.Compile(path, string(src))
 		if err != nil {
 			return fmt.Errorf("compile %s: %w", path, err)
 		}
-		// Key is path without extension (e.g. "views/library")
-		name := strings.TrimSuffix(path, ".lua")
+		e.mu.Lock()
 		e.protos[name] = proto
+		e.sources[name] = string(src)
+		e.hashes[name] = sha256.Sum256(src)
+		e.mu.Unlock()
 		return nil
 	})
 }
 
-// newVM creates a fresh lunar VM with standard libraries, FS-based require,
-// and all Go helpers registered.
+// newVM creates a fresh lunar VM with standard libraries, an in-memory require
+// path, and all Go helpers registered.
 func (e *LuaEngine) newVM() (*lua.State, error) {
-	scriptLoader := lua.FSLoader(e.templatesFS).WithPackagePath("?.lua")
+	scriptLoader := lua.FuncLoader(e.openSource).WithPackagePath("?.lua")
 	S, err := lua.New(lua.Options{
 		Libraries:    lua.FullLibraries(),
 		ScriptLoader: scriptLoader,

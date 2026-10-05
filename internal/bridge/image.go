@@ -99,16 +99,21 @@ func (s *AppService) GetImage(ctx context.Context, pluginID, url string, headers
 
 	// Singleflight: another caller may already be fetching this URL (draw +
 	// prefetch race). Join its call instead of queueing a duplicate fetch.
-	if existing, loaded := s.imageFlight.LoadOrStore(url, &imageCall{done: make(chan struct{})}); loaded {
-		call := existing.(*imageCall)
-		<-call.done
-		if call.err == nil {
-			return call.data, nil
+	//
+	// LoadOrStore's stored value is the call this goroutine owns when it is not
+	// loaded: build it once and use that same value as the leader. Storing a
+	// throwaway here and then creating a second call to Store would leave any
+	// goroutine arriving in between holding a done channel nobody closes.
+	stored, loaded := s.imageFlight.LoadOrStore(url, &imageCall{done: make(chan struct{})})
+	if loaded {
+		shared := stored.(*imageCall)
+		<-shared.done
+		if shared.err == nil {
+			return shared.data, nil
 		}
 		// Leader failed; fall through and retry once ourselves.
 	}
-	call := &imageCall{done: make(chan struct{})}
-	s.imageFlight.Store(url, call)
+	call := stored.(*imageCall)
 	wprio := workers.PriorityLow
 	if prio == PrioHigh {
 		wprio = workers.PriorityHigh

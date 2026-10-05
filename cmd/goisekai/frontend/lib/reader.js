@@ -51,6 +51,12 @@
   // handle, so read-ahead issues fetch() instead and is abandoned at the network
   // layer when the reader leaves the chapter — otherwise skipped chapters leave
   // orphaned requests holding image-lane worker slots.
+  // CSRF token from the page meta tag. This progress write builds its own body
+  // with no form to carry a hidden field, so the header is the only channel.
+  var csrfToken = (() => {
+    const el = document.querySelector('meta[name="csrf-token"]');
+    return el ? el.getAttribute('content') || '' : '';
+  })();
   var warmCtrl = { next: null, prev: null };
   // key -> true while a read-ahead fetch is in flight. prefetch() runs on every
   // page turn, so without this the same page would be re-requested until its
@@ -275,7 +281,10 @@
     });
     fetch('/action/set-chapter-progress', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+        'X-CSRF-Token': csrfToken,
+      },
       body: body.toString(),
     }).catch(() => {});
   }

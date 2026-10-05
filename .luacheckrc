@@ -13,6 +13,7 @@ exclude_files = {
 read_globals = {
     "h",
     "ue",
+    "csrfInput",
     "host",
     "formatDate",
     "getInitials",

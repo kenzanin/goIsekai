@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"fmt"
 	"io"
-	"io/fs"
 
 	lua "github.com/mmcdole/lunar"
 )
@@ -21,25 +20,20 @@ func (e *LuaEngine) render(w io.Writer, name string, data map[string]any, partia
 		data["_partial"] = true
 	}
 
-	// In devMode, recompile from disk every time.
-	var proto *lua.Prototype
+	// Hot reload re-checks the tree once per render; cache mode touches no
+	// template file at all. Required partials come from the source cache via
+	// openSource, so they cost no disk read either way.
 	if e.devMode {
-		src, err := fs.ReadFile(e.templatesFS, name+".lua")
-		if err != nil {
-			return fmt.Errorf("read template %s: %w", name, err)
+		if err := e.refresh(); err != nil {
+			return fmt.Errorf("refresh templates: %w", err)
 		}
-		compiled, err := lua.Compile(name+".lua", string(src))
-		if err != nil {
-			return fmt.Errorf("compile template %s: %w", name, err)
-		}
-		proto = compiled
-	} else {
-		e.mu.RLock()
-		proto = e.protos[name]
-		e.mu.RUnlock()
-		if proto == nil {
-			return fmt.Errorf("template not found: %s", name)
-		}
+	}
+
+	e.mu.RLock()
+	proto := e.protos[name]
+	e.mu.RUnlock()
+	if proto == nil {
+		return fmt.Errorf("template not found: %s", name)
 	}
 
 	S, err := e.newVM()
@@ -94,23 +88,9 @@ func (e *LuaEngine) render(w io.Writer, name string, data map[string]any, partia
 		}
 	}
 	var layoutProto *lua.Prototype
-	if e.devMode {
-		src, rerr := fs.ReadFile(e.templatesFS, layoutName+".lua")
-		if rerr != nil {
-			// No Lua layout — return body as-is.
-			_, _ = io.Copy(w, bytes.NewBufferString(bodyStr))
-			return nil
-		}
-		compiled, cerr := lua.Compile(layoutName+".lua", string(src))
-		if cerr != nil {
-			return fmt.Errorf("compile layout %s: %w", layoutName, cerr)
-		}
-		layoutProto = compiled
-	} else {
-		e.mu.RLock()
-		layoutProto = e.protos[layoutName]
-		e.mu.RUnlock()
-	}
+	e.mu.RLock()
+	layoutProto = e.protos[layoutName]
+	e.mu.RUnlock()
 	if layoutProto == nil {
 		// No Lua layout — return body as-is.
 		_, _ = io.Copy(w, bytes.NewBufferString(bodyStr))

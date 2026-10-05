@@ -34,10 +34,11 @@ func TestRenderPageNavToken(t *testing.T) {
 
 	logger := slog.New(slog.NewTextHandler(&bytes.Buffer{}, nil))
 	s := &Server{
-		Router:  nil,
-		logger:  logger,
-		service: svc,
-		engine:  engine,
+		Router:    nil,
+		logger:    logger,
+		service:   svc,
+		engine:    engine,
+		csrfToken: mintTestCSRF(t),
 	}
 
 	// The nav only ships with a full page render, and `active` picks the
