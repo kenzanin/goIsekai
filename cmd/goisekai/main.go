@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"flag"
+	"fmt"
 	"log"
 	"log/slog"
 	"math"
@@ -21,6 +22,7 @@ import (
 	"goisekai/internal/logger"
 	"goisekai/internal/pluginmanager"
 	"goisekai/internal/templates"
+	"goisekai/internal/version"
 )
 
 func main() {
@@ -38,7 +40,13 @@ func main() {
 	cdpEngine := flag.String("cdpEngine", "", "CDP browser engine for anti-bot solving: off|lightpanda|obscura|chrome (overrides goisekai.ini cdp_engine)")
 	cdpPath := flag.String("cdpPath", "", "browser binary path (chrome) or CDP ws:// URL (lightpanda/obscura) (overrides goisekai.ini cdp_path)")
 	apiKey := flag.String("apiKey", "", "API key for /api/* endpoints (overrides goisekai.ini api_key)")
+	showVersion := flag.Bool("version", false, "print the version and exit")
 	flag.Parse()
+
+	if *showVersion {
+		fmt.Println(version.String())
+		return
+	}
 
 	// Config file: goisekai.ini in the working directory, overridable via
 	// GOISEKAI_CONFIG.

@@ -9,6 +9,7 @@ import (
 	"goisekai/internal/bridge"
 	"goisekai/internal/database"
 	"goisekai/internal/hostnet"
+	"goisekai/internal/version"
 	"goisekai/pkg/types"
 	"strings"
 )
@@ -127,6 +128,7 @@ func (s *Server) viewSearch(w http.ResponseWriter, r *http.Request) {
 func (s *Server) viewAbout(w http.ResponseWriter, r *http.Request) {
 	s.renderPage(w, r, "views/about", "about", map[string]any{
 		"Content": renderMarkdown(loadReadme()),
+		"Version": version.String(),
 	})
 }
 

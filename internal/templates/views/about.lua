@@ -4,6 +4,10 @@
 
 return function(data)
 	local body = [[<div class="max-w-3xl mx-auto about-doc">]]
+	-- Version badge, so "which build is this?" is answerable from the UI.
+	body = body .. [[<p style="color:#a3a3a3;font-size:0.875rem;margin:0 0 1rem;">
+		Version <span style="color:#818cf8;font-family:ui-monospace,monospace;">]]
+		.. h(data.Version or "unknown") .. [[</span></p>]]
 	body = body .. (data.Content or "")
 	body = body
 		.. [[<hr style="margin:2rem 0;border-color:#262626;">
