@@ -12,6 +12,35 @@
     return el ? el.getAttribute('content') || '' : '';
   }
 
+  // The server sets X-GoIsekai-Reload on a CSRF refusal when the token we sent
+  // was well formed but belongs to an earlier run — i.e. this page was rendered
+  // before a restart. Reloading is the whole fix, so do it instead of showing a
+  // dead error the user has to interpret.
+  //
+  // Guarded by sessionStorage: if the reloaded page still carries a stale token
+  // (a cached document, a proxy holding HTML) we must not loop, so the second
+  // refusal falls through to the normal error toast.
+  var RELOAD_FLAG = 'gi_csrf_reloaded';
+  function recoverFromStaleToken(resp) {
+    if (!resp.headers.get('X-GoIsekai-Reload')) return false;
+    try {
+      if (sessionStorage.getItem(RELOAD_FLAG)) return false;
+      sessionStorage.setItem(RELOAD_FLAG, '1');
+    } catch {
+      return false; // storage blocked: fall through to the error toast
+    }
+    location.reload();
+    return true;
+  }
+
+  // A page that carries a token at all was rendered by a live server, so the
+  // reload guard has done its job and can be cleared for the next stale page.
+  (function clearStaleGuard() {
+    try {
+      if (document.querySelector('meta[name="csrf-token"]')) sessionStorage.removeItem(RELOAD_FLAG);
+    } catch {}
+  })();
+
   // Inject animation CSS once (matches old toast-visible / toast-leave behavior)
   var _style = document.createElement('style');
   _style.textContent =
@@ -89,6 +118,7 @@
       credentials: 'same-origin',
     })
       .then((resp) => {
+        if (!resp.ok && recoverFromStaleToken(resp)) return;
         return resp.text().then((html) => {
           if (!resp.ok) {
             let m = html?.trim() || `Request failed (${resp.status})`;
@@ -197,6 +227,7 @@
       credentials: 'same-origin',
     })
       .then((resp) => {
+        if (!resp.ok && method === 'POST' && recoverFromStaleToken(resp)) return;
         if (!resp.ok) {
           return resp.text().then((t) => {
             var m = (t || '').trim() || `Request failed (${resp.status})`;
@@ -660,6 +691,7 @@
           credentials: 'same-origin',
         })
           .then((resp) => {
+            if (!resp.ok && recoverFromStaleToken(resp)) return;
             return resp.text().then((html) => {
               if (!resp.ok) {
                 let m = html?.trim() || `Request failed (${resp.status})`;

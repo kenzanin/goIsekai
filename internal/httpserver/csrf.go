@@ -21,6 +21,17 @@ const (
 	csrfField  = "csrf_token"
 )
 
+// csrfTokenLen is the byte length of the HMAC-SHA256 the token is derived from;
+// mintCSRFToken hex-encodes it, so the wire form is twice this.
+const csrfTokenLen = 32
+
+// csrfStaleHeader marks a rejection the client can recover from by reloading.
+// It is set only when the caller presented a well-formed token that simply does
+// not belong to this process, which in practice means the page was rendered
+// before a restart. There is no htmx in this app, so the header is read by our
+// own fetch wrapper rather than by a library.
+const csrfStaleHeader = "X-GoIsekai-Reload"
+
 // mintCSRFToken derives a token from a freshly generated secret. It is called
 // once per process, at startup: the secret never leaves the server, so a token
 // captured from one run is useless against the next. Deriving the value once
@@ -54,6 +65,22 @@ func csrfCandidate(r *http.Request) string {
 // by timing repeated attempts.
 func csrfTokenMatches(got, want string) bool {
 	return subtle.ConstantTimeCompare([]byte(got), []byte(want)) == 1
+}
+
+// looksLikeToken reports whether a candidate has the shape of a minted token.
+// It exists to tell "the page is stale" apart from "this request never had a
+// token": the first is recoverable with a reload, the second is a real refusal
+// and reloading would only hide it.
+func looksLikeToken(candidate string) bool {
+	if len(candidate) != csrfTokenLen*2 {
+		return false
+	}
+	for _, r := range candidate {
+		if (r < '0' || r > '9') && (r < 'a' || r > 'f') {
+			return false
+		}
+	}
+	return true
 }
 
 // unsafeMethods are the methods requireCSRFToken guards. A GET is treated as

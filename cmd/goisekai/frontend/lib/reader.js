@@ -287,7 +287,24 @@
         'X-CSRF-Token': csrfToken,
       },
       body: body.toString(),
-    }).catch(() => {});
+    })
+      .then((resp) => {
+        // A stale token (page rendered before a restart) is refused with
+        // X-GoIsekai-Reload. This post is fire-and-forget, so without the reload
+        // the progress write is silently dropped and the chapter never looks read.
+        if (resp && !resp.ok && resp.headers.get('X-GoIsekai-Reload')) {
+          // Same one-shot guard as alpine-components.js; duplicated because both
+          // files are standalone IIFEs with no shared module.
+          try {
+            if (sessionStorage.getItem('gi_csrf_reloaded')) return;
+            sessionStorage.setItem('gi_csrf_reloaded', '1');
+          } catch {
+            return;
+          }
+          location.reload();
+        }
+      })
+      .catch(() => {});
   }
 
   function prefetch() {

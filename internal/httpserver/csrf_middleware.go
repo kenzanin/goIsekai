@@ -26,14 +26,27 @@ func (s *Server) requireCSRFToken(next http.Handler) http.Handler {
 			http.Error(w, csrfRejection(r, "the server could not mint a CSRF token"), http.StatusForbidden)
 			return
 		}
-		if csrfTokenMatches(csrfCandidate(r), s.csrfToken) {
+		candidate := csrfCandidate(r)
+		if csrfTokenMatches(candidate, s.csrfToken) {
 			next.ServeHTTP(w, r)
 			return
 		}
+		// A well-formed token that belongs to a previous process is the one
+		// failure the client can fix by reloading, so say so in a header the
+		// fetch wrapper understands. A missing or malformed token gets no header:
+		// that is a genuine refusal, and a reload would only paper over it.
+		stale := looksLikeToken(candidate)
+		if stale {
+			w.Header().Set(csrfStaleHeader, "1")
+		}
+		reason := "the CSRF token was missing or did not match"
+		if stale {
+			reason = "the CSRF token belongs to an earlier run of the server"
+		}
 		s.logger.Warn("csrf: refused a state-changing request with a missing or invalid token",
-			"method", r.Method, "path", r.URL.Path,
+			"method", r.Method, "path", r.URL.Path, "stale", stale,
 			"origin", r.Header.Get("Origin"), "referer", r.Header.Get("Referer"))
-		http.Error(w, csrfRejection(r, "the CSRF token was missing or did not match"), http.StatusForbidden)
+		http.Error(w, csrfRejection(r, reason), http.StatusForbidden)
 	})
 }
 
