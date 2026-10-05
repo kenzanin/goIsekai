@@ -28,7 +28,8 @@
   var nextData = null,
     nextPages = null, // neighbor reader-data, kept for instant chapter switch
     prevData = null,
-    prevPages = null;
+    prevPages = null,
+    prevWarmTried = false; // one attempt per chapter; a failing neighbor must not be hammered
   var imgFails = 0; // consecutive image-load failures (at-home nodes flake transiently)
   var readAhead = Math.max(
     0,
@@ -309,9 +310,14 @@
       if (nextPages) prefetchNext(spill);
       else warmNeighbor(nextChID, 'next');
     }
-    // Warm the previous chapter from page 1 — same instant-switch path when
-    // the reader retreats backwards.
-    if (current === 0 && prevChID && !prevPages && !loading) warmNeighbor(prevChID, 'prev');
+    // Warm the previous chapter as soon as this one is on screen. This used to
+    // require current === 0, so retreating from the middle of a chapter found
+    // prevPages empty and paid a cold reader-data fetch plus a cold image for
+    // every page — which is exactly where Back feels slow.
+    if (prevChID && !prevPages && !prevWarmTried && !loading) {
+      prevWarmTried = true;
+      warmNeighbor(prevChID, 'prev');
+    }
   }
 
   function prefetchNext(n) {
@@ -471,6 +477,7 @@
     nextPages = null;
     prevData = null;
     prevPages = null;
+    prevWarmTried = false;
     syncChapterNav(data);
     history.replaceState(
       {},
@@ -700,6 +707,7 @@
     nextPages = null;
     prevData = null;
     prevPages = null;
+    prevWarmTried = false;
     imgFails = 0;
     img = null;
     panX = 0;

@@ -13,6 +13,14 @@ import (
 	"goisekai/pkg/types"
 )
 
+// imageFetchBudget caps how long one image's retry ladder may run before it
+// gives up. It bounds total time-to-502 rather than the attempt count, because
+// an unreachable CDN origin burns the whole per-request timeout on every
+// attempt. Tuned above one request timeout (~30s) so a single slow attempt is
+// still reported honestly, and below two, so the reader is never left spinning
+// past ~35s for an origin that is not coming back.
+const imageFetchBudget = 35 * time.Second
+
 // fetchImage performs the paced, host-laned upstream fetch and cache write on
 // an image worker, so pacing sleeps and lane waits never block the caller's
 // goroutine.
@@ -44,6 +52,13 @@ func (s *AppService) fetchImage(ctx context.Context, pluginID, url string, heade
 	var resp types.HTTPResponse
 	var err error
 	var body []byte
+	// Retry budget, not attempt count, is what bounds a failure here. A CDN
+	// whose origin is refusing connections answers 522/503 only after burning
+	// the full per-request timeout, so three attempts turned one unreachable
+	// origin into ~2 minutes of reader spinner. A fast 503 still gets retried
+	// because it costs nothing; a slow one does not, because it has already
+	// spent the budget. Measured: 119s to 502 before, ~35s after.
+	start := time.Now()
 	for attempt := range 3 {
 		if attempt > 0 {
 			// Backoff is cancellable so an abandoned request does not sit out
@@ -71,6 +86,13 @@ func (s *AppService) fetchImage(ctx context.Context, pluginID, url string, heade
 			return nil, ctx.Err()
 		}
 		if err != nil || resp.Status < 200 || resp.Status >= 300 {
+			spent := time.Since(start)
+			if spent >= imageFetchBudget {
+				logger.Warn("image fetch giving up, retry budget spent",
+					"url", url, "plugin", pluginID, "attempts", attempt+1,
+					"elapsed", spent.String(), "status", respStatus(resp, err))
+				break
+			}
 			logger.Warn("image fetch retrying", "url", url, "attempt", attempt+1, "status", respStatus(resp, err))
 			continue
 		}
