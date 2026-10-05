@@ -544,8 +544,10 @@ func TestInteractiveStalledPluginDoesNotBlockOthers(t *testing.T) {
 			Lane:      LaneInteractive,
 			PluginKey: "plugin-a",
 			Run: func(ctx context.Context) error {
-				pluginMu.Lock() // blocks until A releases
-				pluginMu.Unlock()
+				// Blocking on the mutex is the point: A holds it until this
+				// job runs, so the lane looks busy while A is stalled.
+				pluginMu.Lock()
+				defer pluginMu.Unlock()
 				return nil
 			},
 		}); err != nil {

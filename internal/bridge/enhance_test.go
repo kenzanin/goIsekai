@@ -118,10 +118,10 @@ func TestSoftLevelsKeepsMidtones(t *testing.T) {
 	got := softLevels(src, 60, 190)
 	var black, white, mid int
 	for x := range 256 {
-		switch v := got.GrayAt(x, 0).Y; {
-		case v == 0:
+		switch got.GrayAt(x, 0).Y {
+		case 0:
 			black++
-		case v == 255:
+		case 255:
 			white++
 		default:
 			mid++

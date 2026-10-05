@@ -14,12 +14,6 @@ import (
 	"github.com/gen2brain/webp"
 )
 
-// imageOpts returns the codec settings a test needs.
-type imageOpts struct {
-	format ImageFormat
-	maxDim int
-}
-
 func validJPEG(t *testing.T, w, h int) []byte {
 	t.Helper()
 	img := image.NewRGBA(image.Rect(0, 0, w, h))

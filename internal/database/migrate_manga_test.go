@@ -11,7 +11,7 @@ func TestRepointManga(t *testing.T) {
 	if err != nil {
 		t.Fatalf("open: %v", err)
 	}
-	defer db.Close()
+	t.Cleanup(func() { _ = db.Close() })
 
 	id, err := db.UpsertManga(Manga{PluginID: "old", SourceMangaID: "src1", Title: "Old Title", CoverURL: "http://old/cover.jpg", Description: "old desc", Status: "Ongoing", InLibrary: true})
 	if err != nil {
@@ -63,7 +63,7 @@ func TestDeleteChaptersNotIn(t *testing.T) {
 	if err != nil {
 		t.Fatalf("open: %v", err)
 	}
-	defer db.Close()
+	t.Cleanup(func() { _ = db.Close() })
 	mangaID, _ := db.UpsertManga(Manga{PluginID: "p", SourceMangaID: "m1", Title: "T", InLibrary: true})
 	chIDs := []string{"ch1", "ch2", "ch3"}
 	for _, sid := range chIDs {

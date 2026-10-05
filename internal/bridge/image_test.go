@@ -309,7 +309,9 @@ func TestSamePriorityFIFO(t *testing.T) {
 		mu.Unlock()
 
 		w.Header().Set("Content-Type", "image/png")
-		png.Encode(w, image.NewRGBA(image.Rect(0, 0, 10, 10)))
+		if err := png.Encode(w, image.NewRGBA(image.Rect(0, 0, 10, 10))); err != nil {
+			t.Errorf("encode png: %v", err)
+		}
 	}))
 	defer srv.Close()
 
@@ -358,7 +360,9 @@ func TestLowLaneDoesNotBlockHigh(t *testing.T) {
 		mu.Unlock()
 
 		w.Header().Set("Content-Type", "image/png")
-		png.Encode(w, image.NewRGBA(image.Rect(0, 0, 10, 10)))
+		if err := png.Encode(w, image.NewRGBA(image.Rect(0, 0, 10, 10))); err != nil {
+			t.Errorf("encode png: %v", err)
+		}
 	}))
 	defer srv.Close()
 
@@ -420,7 +424,9 @@ func TestHighPriorityRunsWithLow(t *testing.T) {
 		mu.Unlock()
 
 		w.Header().Set("Content-Type", "image/png")
-		png.Encode(w, image.NewRGBA(image.Rect(0, 0, 10, 10)))
+		if err := png.Encode(w, image.NewRGBA(image.Rect(0, 0, 10, 10))); err != nil {
+			t.Errorf("encode png: %v", err)
+		}
 	}))
 	defer srv.Close()
 

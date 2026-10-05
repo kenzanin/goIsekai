@@ -3,6 +3,8 @@ module goisekai
 go 1.27.1
 
 require (
+	fyne.io/systray v1.11.0
+	github.com/andybalholm/brotli v1.2.0
 	github.com/andybalholm/cascadia v1.3.4
 	github.com/antchfx/htmlquery v1.3.6
 	github.com/anthonynsimon/bild v0.17.1
@@ -28,8 +30,6 @@ require (
 )
 
 require (
-	fyne.io/systray v1.11.0 // indirect
-	github.com/andybalholm/brotli v1.2.0 // indirect
 	github.com/antchfx/xpath v1.3.8 // indirect
 	github.com/bdandy/go-errors v1.2.2 // indirect
 	github.com/bdandy/go-socks4 v1.2.3 // indirect
