@@ -421,3 +421,51 @@ func TestFrontendSendsCSRFHeaderOnEveryActionFetch(t *testing.T) {
 		t.Error("reader.js has no CSRF header on its progress write")
 	}
 }
+
+// Every layout must publish the token, not just the default one. The reader uses
+// layouts/blank and reader.js posts chapter progress with no form to carry a
+// hidden field, so a missing meta tag there silently 403s every progress write
+// while the default pages keep working.
+func TestEveryLayoutPublishesCSRFToken(t *testing.T) {
+	entries, err := os.ReadDir(filepath.Join("..", "templates", "layouts"))
+	if err != nil {
+		t.Fatalf("read layouts dir: %v", err)
+	}
+	var names []string
+	for _, e := range entries {
+		if !e.IsDir() && strings.HasSuffix(e.Name(), ".lua") {
+			names = append(names, e.Name())
+		}
+	}
+	if len(names) == 0 {
+		t.Fatal("no layouts found")
+	}
+	for _, name := range names {
+		data, err := os.ReadFile(filepath.Join("..", "templates", "layouts", name))
+		if err != nil {
+			t.Fatalf("read %s: %v", name, err)
+		}
+		if !strings.Contains(string(data), `name="csrf-token"`) {
+			t.Errorf("layouts/%s does not emit the csrf-token meta tag; any view using "+
+				"it cannot authenticate its script-driven posts", name)
+		}
+	}
+}
+
+// A view that opts out of the default layout still has to ship the token.
+func TestReaderPagePublishesCSRFToken(t *testing.T) {
+	s := testServerFull(t, "", true)
+	req := httptest.NewRequest(http.MethodGet, "/view/read/p/m/c", nil)
+	rec := httptest.NewRecorder()
+	s.renderPage(rec, req, "views/reader", "", map[string]any{
+		"_layout": "blank",
+	})
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200", rec.Code)
+	}
+	body := rec.Body.String()
+	want := `<meta name="csrf-token" content="` + s.csrfToken + `">`
+	if !strings.Contains(body, want) {
+		t.Errorf("reader page does not carry %s\n\ngot head:\n%s", want, firstLines(body, 25))
+	}
+}

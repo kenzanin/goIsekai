@@ -10,6 +10,9 @@ return function(data, content)
 		"<head>",
 		'    <meta charset="utf-8">',
 		'    <meta name="viewport" content="width=device-width, initial-scale=1">',
+		-- reader.js posts chapter progress with no form to carry a hidden field,
+		-- so the token has to be readable from this layout too.
+		'    <meta name="csrf-token" content="' .. h(data.csrf_token or "") .. '">',
 		"    <title>goIsekai</title>",
 		'    <link rel="icon" type="image/svg+xml" href="/static/favicon.svg">',
 		'    <link rel="stylesheet" href="/static/lib/tailwind.css">',
