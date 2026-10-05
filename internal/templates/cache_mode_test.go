@@ -3,6 +3,7 @@ package templates
 import (
 	"crypto/sha256"
 	"io/fs"
+	"maps"
 	"os"
 	"path/filepath"
 	"strings"
@@ -38,9 +39,7 @@ func (c *countingFS) snapshot() map[string]int {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	out := make(map[string]int, len(c.counts))
-	for k, v := range c.counts {
-		out[k] = v
-	}
+	maps.Copy(out, c.counts)
 	return out
 }
 
