@@ -1,6 +1,7 @@
 package hostnet
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"github.com/goccy/go-json"
@@ -23,6 +24,15 @@ import (
 //     ladder, pinning the first profile that clears the block. The CDP engine is
 //     the last resort when the ladder is exhausted.
 func (p *Proxy) Request(pluginID string, req types.HTTPRequest) (types.HTTPResponse, error) {
+	return p.RequestContext(context.Background(), pluginID, req)
+}
+
+// RequestContext is Request with a caller context. Cancelling ctx tears down the
+// in-flight upstream call — including the TLS-profile ladder retries — instead
+// of letting it run to the client timeout. Plugin ABI calls have no request
+// context and use Request; the reader's per-page image fetches use this so a
+// chapter switch releases the work.
+func (p *Proxy) RequestContext(ctx context.Context, pluginID string, req types.HTTPRequest) (types.HTTPResponse, error) {
 	// needs_js: preemptively solve + seed cookies via the browser engine so the
 	// client-side site is already cleared when the fast path runs.
 	if p.needsJSHint(pluginID) && p.CDPConfig().enabled() {
@@ -32,10 +42,10 @@ func (p *Proxy) Request(pluginID string, req types.HTTPRequest) (types.HTTPRespo
 	// Stdlib h2 path: pinned plugins skip tls-client entirely (WAF blocks the
 	// utls fingerprint but allows Go's stock TLS + h2).
 	if p.stdlibPrefers(pluginID) {
-		return p.doRequestStd(pluginID, req)
+		return p.doRequestStd(ctx, pluginID, req)
 	}
 
-	resp, err := p.doRequest(pluginID, req)
+	resp, err := p.doRequest(ctx, pluginID, req)
 	if err != nil {
 		return types.HTTPResponse{}, err
 	}
@@ -49,7 +59,7 @@ func (p *Proxy) Request(pluginID string, req types.HTTPRequest) (types.HTTPRespo
 		if err := p.solveAndSeed(pluginID, req.URL); err != nil {
 			return types.HTTPResponse{}, &ChallengeError{VerifyURL: req.URL}
 		}
-		retried, rerr := p.doRequest(pluginID, req)
+		retried, rerr := p.doRequest(ctx, pluginID, req)
 		// A solve that seeds cookies but does not clear the challenge (chained
 		// challenge, stale clearance) must NOT surface as success: the plugin
 		// relies on ChallengeError to show "source requires verification".
@@ -67,14 +77,14 @@ func (p *Proxy) Request(pluginID string, req types.HTTPRequest) (types.HTTPRespo
 	if isWafBlock(resp) {
 		htmlBlock := strings.Contains(resp.Headers["Content-Type"], "text/html")
 		if !htmlBlock {
-			if retried, ok := p.tryLadder(pluginID, req); ok {
+			if retried, ok := p.tryLadder(ctx, pluginID, req); ok {
 				return retried, nil
 			}
 		}
 		// Ladder exhausted (or HTML block). Last resort: solve via the engine,
 		// seed cookies, and retry once.
 		if p.CDPConfig().enabled() && p.solveAndSeed(pluginID, req.URL) == nil {
-			if retried, rerr := p.doRequest(pluginID, req); rerr == nil && !isWafBlock(retried) && !isChallengeResponse(retried) {
+			if retried, rerr := p.doRequest(ctx, pluginID, req); rerr == nil && !isWafBlock(retried) && !isChallengeResponse(retried) {
 				return retried, nil
 			}
 		}

@@ -1,6 +1,7 @@
 package bridge
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -55,7 +56,10 @@ func (s *AppService) ExportCBZ(pluginID, mangaID, chapterID, title string) (stri
 	images := make([][]byte, 0, len(pages))
 	failed := 0
 	for _, p := range pages {
-		data, imgErr := s.GetImage(pluginID, p.URL, p.Headers, mangaID, chapterID, PrioLow)
+		// Export is bulk background work, not the reader's per-page path: a cancelled
+		// request must not abort a half-written archive, so this keeps a background
+		// context.
+		data, imgErr := s.GetImage(context.Background(), pluginID, p.URL, p.Headers, mangaID, chapterID, PrioLow)
 		if imgErr != nil {
 			logger.Warn("export cbz: skip page", "error", imgErr)
 			failed++

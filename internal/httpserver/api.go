@@ -99,6 +99,7 @@ func (s *Server) registerAPIRoutes(r chi.Router) {
 	r.Get("/history", s.apiHistory)
 	r.Get("/plugins", s.apiPlugins)
 	r.Get("/stats", s.apiStats)
+	r.Get("/workers", s.apiWorkers)
 	r.Post("/library/toggle/{pluginID}/{mangaID}", s.apiToggleLibrary)
 	r.Post("/chapters/read/{pluginID}/{mangaID}/{chapterID}", s.apiMarkChapterRead)
 	r.Post("/progress/{pluginID}/{mangaID}/{chapterID}", s.apiSetProgress)

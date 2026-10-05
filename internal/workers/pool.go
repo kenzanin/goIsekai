@@ -276,6 +276,9 @@ type Pool struct {
 	dedupe   map[string]string // DedupeKey -> in-flight job ID (design 3.2)
 	regMu    sync.Mutex
 
+	// stats is one block per Lane, indexed by the Lane constant. See stats.go.
+	stats [4]laneStat
+
 	nInteractive atomic.Int64
 	nFetch       atomic.Int64
 	nImage       atomic.Int64
@@ -505,8 +508,10 @@ func (p *Pool) Enqueue(ctx context.Context, job *Job) (*Future, error) {
 		return err
 	}
 
-	// Store wrapped on the handle so the worker calls it.
-	h.run = wrapped
+	// Store wrapped on the handle so the worker calls it. track() records the
+	// lane's running count and duration; it sits outside the retry wrapper so
+	// the duration measured is wall-clock including retries.
+	h.run = p.track(h, wrapped)
 
 	if job.Lane == LaneInteractive {
 		// Block until queued or ctx deadline (task 1.3).

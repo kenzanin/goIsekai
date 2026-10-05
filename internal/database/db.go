@@ -2,6 +2,7 @@ package database
 
 import (
 	"database/sql"
+	"strconv"
 	"time"
 
 	_ "modernc.org/sqlite"
@@ -64,10 +65,35 @@ const (
 
 type DB struct{ db *sql.DB }
 
+// defaultBusyTimeoutMS is busy_timeout for a freshly opened handle, in
+// milliseconds. dsn() sets it; tests that need a shorter wait override it per
+// connection and restore it afterwards.
+const defaultBusyTimeoutMS = 5000
+
+// dsn builds the SQLite connection string.
+//
+// _txlock=immediate makes every transaction take the write lock at BEGIN
+// instead of at its first write. Without it a deferred transaction that reads
+// before writing can collide with a concurrent writer and fail with
+// SQLITE_BUSY *after* doing work; with it the loser waits at BEGIN and
+// busy_timeout retries it. The driver applies this per connection, so it also
+// covers the paths that call d.db.Begin() directly.
+//
+// It applies to read-only transactions too. If a read-heavy path ever shows up
+// taking a write lock it does not need, open it with an explicit
+// "BEGIN; DEFERRED" on a dedicated handle rather than removing this flag —
+// per-transaction locking is not selectable on a pooled handle.
+func dsn(path string) string {
+	return path + "?_foreign_keys=1&_journal_mode=WAL" +
+		"&_busy_timeout=" + strconv.Itoa(defaultBusyTimeoutMS) +
+		"&_txlock=immediate" +
+		"&_pragma=cache_size=-64000&_pragma=mmap_size=268435456&_pragma=synchronous=1"
+}
+
 // Open opens the SQLite database at path, enables foreign keys so cascade
 // deletes work, and applies pending migrations.
 func Open(path string) (*DB, error) {
-	db, err := sql.Open("sqlite", path+"?_foreign_keys=1&_journal_mode=WAL&_busy_timeout=5000&_pragma=cache_size=-64000&_pragma=mmap_size=268435456&_pragma=synchronous=1")
+	db, err := sql.Open("sqlite", dsn(path))
 	if err != nil {
 		return nil, err
 	}
@@ -87,7 +113,9 @@ func Open(path string) (*DB, error) {
 // Close closes the underlying database handle.
 func (d *DB) Close() error { return d.db.Close() }
 
-// Begin starts a transaction.
+// Begin starts a write transaction. The lock is taken here, at BEGIN, not at
+// the first write — see dsn. Errors if the write lock is held past
+// busy_timeout.
 func (d *DB) Begin() (*sql.Tx, error) { return d.db.Begin() }
 
 // Exec executes a statement against the underlying database.

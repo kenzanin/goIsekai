@@ -1,6 +1,7 @@
 package hostnet
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"strings"
@@ -16,7 +17,7 @@ import (
 // profile only when that response is a clean 2xx/3xx (a 429/5xx from a rung is
 // a real origin answer, not a fingerprint win — it must not become permanent).
 // ok is false when every candidate fails.
-func (p *Proxy) tryLadder(pluginID string, req types.HTTPRequest) (types.HTTPResponse, bool) {
+func (p *Proxy) tryLadder(ctx context.Context, pluginID string, req types.HTTPRequest) (types.HTTPResponse, bool) {
 	tried := p.pin(pluginID)
 	if tried == "" {
 		tried = defaultProfileName
@@ -31,13 +32,18 @@ func (p *Proxy) tryLadder(pluginID string, req types.HTTPRequest) (types.HTTPRes
 	candidates := p.ladderFor(pluginID)
 
 	for _, name := range candidates {
+		// Cancelled caller: stop probing profiles rather than burning the rest
+		// of the ladder on a request nobody is waiting for.
+		if ctx.Err() != nil {
+			break
+		}
 		if seen[name] {
 			continue
 		}
 		seen[name] = true
 
 		if name == stdlibProfileName {
-			retried, rerr := p.doRequestStd(pluginID, req)
+			retried, rerr := p.doRequestStd(ctx, pluginID, req)
 			if rerr == nil && !isChallengeResponse(retried) && !isWafBlock(retried) {
 				if retried.Status < 400 {
 					p.markStdlib(pluginID)
@@ -47,7 +53,7 @@ func (p *Proxy) tryLadder(pluginID string, req types.HTTPRequest) (types.HTTPRes
 			continue
 		}
 
-		retried, rerr := p.doRequestProfile(pluginID, name, req)
+		retried, rerr := p.doRequestProfile(ctx, pluginID, name, req)
 		if rerr == nil && !isChallengeResponse(retried) && !isWafBlock(retried) {
 			if retried.Status < 400 {
 				p.setPin(pluginID, name)
@@ -79,24 +85,24 @@ func (p *Proxy) ladderFor(pluginID string) []string {
 
 // doRequest executes a single fast-path request with no challenge handling,
 // using the plugin's pinned profile (or the default when unpinned).
-func (p *Proxy) doRequest(pluginID string, req types.HTTPRequest) (types.HTTPResponse, error) {
+func (p *Proxy) doRequest(ctx context.Context, pluginID string, req types.HTTPRequest) (types.HTTPResponse, error) {
 	prof := p.pin(pluginID)
 	if prof == "" || prof == stdlibProfileName {
 		prof = defaultProfileName
 	}
-	return p.doRequestProfile(pluginID, prof, req)
+	return p.doRequestProfile(ctx, pluginID, prof, req)
 }
 
 // doRequestProfile executes a single fast-path request using an explicit TLS
 // profile, with no challenge handling.
-func (p *Proxy) doRequestProfile(pluginID, profileName string, req types.HTTPRequest) (types.HTTPResponse, error) {
+func (p *Proxy) doRequestProfile(ctx context.Context, pluginID, profileName string, req types.HTTPRequest) (types.HTTPResponse, error) {
 	method := req.Method
 	if method == "" {
 		method = http.MethodGet
 	}
 
 	body := strings.NewReader(req.Body)
-	httpReq, err := http.NewRequest(method, req.URL, body)
+	httpReq, err := http.NewRequestWithContext(ctx, method, req.URL, body)
 	if err != nil {
 		return types.HTTPResponse{}, fmt.Errorf("hostnet: build request: %w", err)
 	}

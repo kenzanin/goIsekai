@@ -43,8 +43,17 @@ func (s *Server) handleImage(w http.ResponseWriter, r *http.Request) {
 	}
 
 	s.logger.Debug("image request", "pluginID", pluginID, "url", url, "mangaID", mangaID, "chapterID", chapterID)
-	data, err := s.service.GetImage(pluginID, url, headers, mangaID, chapterID, prio)
+	// r.Context() so a reader that navigates away mid-page tears down the
+	// upstream fetch instead of holding an image-lane slot until the client
+	// timeout. A client that disconnects has nowhere to receive the bytes, so
+	// this is the caller's own cancellation, not an upstream failure.
+	data, err := s.service.GetImage(r.Context(), pluginID, url, headers, mangaID, chapterID, prio)
 	if err != nil {
+		if r.Context().Err() != nil {
+			// Abandoned, not failed: the client is gone. Nothing to write.
+			s.logger.Debug("image fetch abandoned", "url", url, "pluginID", pluginID, "reason", err)
+			return
+		}
 		s.logger.Error("image fetch", "url", url, "pluginID", pluginID, "error", err)
 		http.Error(w, err.Error(), http.StatusBadGateway)
 		return

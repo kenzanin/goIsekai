@@ -3,6 +3,7 @@ package bridge
 import (
 	"archive/zip"
 	"bytes"
+	"context"
 	"os"
 	"path/filepath"
 	"testing"
@@ -116,7 +117,7 @@ func TestGetImageReturnsConvertedBytes(t *testing.T) {
 	url := serveImage(t, "image/png", validPNG(t))
 	s := newTestServiceWithFormat(t, FormatWebP)
 
-	got, err := s.GetImage("p", url, nil, "m", "c", PrioLow)
+	got, err := s.GetImage(context.Background(), "p", url, nil, "m", "c", PrioLow)
 	if err != nil {
 		t.Fatalf("GetImage: %v", err)
 	}
@@ -125,7 +126,7 @@ func TestGetImageReturnsConvertedBytes(t *testing.T) {
 	}
 
 	// L1 hit must serve the same converted bytes as the cold fetch.
-	got2, err := s.GetImage("p", url, nil, "m", "c", PrioLow)
+	got2, err := s.GetImage(context.Background(), "p", url, nil, "m", "c", PrioLow)
 	if err != nil {
 		t.Fatalf("GetImage (L1): %v", err)
 	}
@@ -138,7 +139,7 @@ func TestGetImageReturnsConvertedBytes(t *testing.T) {
 func TestReadCachedImageDiskOnly(t *testing.T) {
 	s := newTestServiceWithCache(t)
 	url := serveImage(t, "image/png", validPNG(t))
-	if _, err := s.GetImage("p", url, nil, "m", "c", PrioLow); err != nil {
+	if _, err := s.GetImage(context.Background(), "p", url, nil, "m", "c", PrioLow); err != nil {
 		t.Fatalf("GetImage: %v", err)
 	}
 
@@ -159,7 +160,7 @@ func TestReadCachedImageDiskOnly(t *testing.T) {
 func TestReadCachedImageAVIF(t *testing.T) {
 	s := newTestServiceWithFormat(t, FormatAVIF)
 	url := serveImage(t, "image/png", validPNG(t))
-	if _, err := s.GetImage("p", url, nil, "m", "c", PrioLow); err != nil {
+	if _, err := s.GetImage(context.Background(), "p", url, nil, "m", "c", PrioLow); err != nil {
 		t.Fatalf("GetImage: %v", err)
 	}
 
@@ -175,7 +176,7 @@ func TestReadCachedImageAVIF(t *testing.T) {
 func TestReadCachedImageJXL(t *testing.T) {
 	s := newTestServiceWithFormat(t, FormatJXL)
 	url := serveImage(t, "image/png", validPNG(t))
-	if _, err := s.GetImage("p", url, nil, "m", "c", PrioLow); err != nil {
+	if _, err := s.GetImage(context.Background(), "p", url, nil, "m", "c", PrioLow); err != nil {
 		t.Fatalf("GetImage: %v", err)
 	}
 

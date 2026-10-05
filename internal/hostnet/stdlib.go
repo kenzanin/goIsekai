@@ -1,6 +1,7 @@
 package hostnet
 
 import (
+	"context"
 	"fmt"
 	"io"
 	nethttp "net/http"
@@ -31,12 +32,12 @@ func (p *Proxy) markStdlib(pluginID string) {
 
 // doRequestStd executes a single request over the stdlib client (HTTP/2 via
 // ALPN). No challenge handling; headers mirror the tls-client build.
-func (p *Proxy) doRequestStd(pluginID string, req types.HTTPRequest) (types.HTTPResponse, error) {
+func (p *Proxy) doRequestStd(ctx context.Context, pluginID string, req types.HTTPRequest) (types.HTTPResponse, error) {
 	method := req.Method
 	if method == "" {
 		method = nethttp.MethodGet
 	}
-	sreq, err := nethttp.NewRequest(method, req.URL, strings.NewReader(req.Body))
+	sreq, err := nethttp.NewRequestWithContext(ctx, method, req.URL, strings.NewReader(req.Body))
 	if err != nil {
 		return types.HTTPResponse{}, fmt.Errorf("hostnet: build stdlib request: %w", err)
 	}

@@ -47,6 +47,15 @@
 
   // Abort controller for cancelable fetches
   var loadAbortController = null;
+  // One controller per read-ahead direction. `new Image()` has no cancellation
+  // handle, so read-ahead issues fetch() instead and is abandoned at the network
+  // layer when the reader leaves the chapter — otherwise skipped chapters leave
+  // orphaned requests holding image-lane worker slots.
+  var warmCtrl = { next: null, prev: null };
+  // key -> true while a read-ahead fetch is in flight. prefetch() runs on every
+  // page turn, so without this the same page would be re-requested until its
+  // first fetch lands.
+  var warming = {};
   // Bars stay visible only until the first page renders — after that the
   // immersive default (hidden until tapped) resumes.
   var initialLoad = true;
@@ -165,6 +174,50 @@
     }
   }
 
+  // Drop in-flight read-ahead for one direction (or both). The fetch rejects with
+  // an AbortError, which warmImage swallows — abandonment is not a failure.
+  function abortWarm(dir) {
+    var c = warmCtrl[dir];
+    if (c) {
+      c.abort();
+      warmCtrl[dir] = null;
+    }
+  }
+
+  function abortAllWarm() {
+    abortWarm('next');
+    abortWarm('prev');
+    warming = {};
+  }
+
+  // Read-ahead for one page. Fetching (rather than assigning an Image.src)
+  // makes the request abortable; once the bytes are in the browser cache the
+  // display path gets an Image built from the same URL, which resolves from
+  // cache instead of re-requesting. The URL is identical to the display URL on
+  // purpose — the browser cache keys on the full URL.
+  function warmImage(store, key, url, dir) {
+    if (store[key] || warming[key]) return;
+    warming[key] = true;
+    if (!warmCtrl[dir]) warmCtrl[dir] = new AbortController();
+    var signal = warmCtrl[dir].signal;
+    fetch(url, { signal: signal, credentials: 'same-origin' })
+      .then((r) => {
+        if (!r.ok) throw new Error(`HTTP ${r.status}`);
+        return r.arrayBuffer();
+      })
+      .then(() => {
+        const im = new Image();
+        im.src = url;
+        store[key] = im;
+      })
+      .catch(() => {
+        /* abandoned or failed: the display path fetches on demand */
+      })
+      .finally(() => {
+        delete warming[key];
+      });
+  }
+
   function showReaderError(msg) {
     var p = errPanel.querySelector('p');
     p.textContent = msg;
@@ -235,11 +288,7 @@
     var budget = Math.min(readAhead, remaining);
     for (let k = 1; k <= budget; k++) {
       const idx = current + k;
-      if (!preloaded[idx]) {
-        const im = new Image();
-        im.src = imageUrl(pages[idx], undefined, 'high');
-        preloaded[idx] = im;
-      }
+      warmImage(preloaded, idx, imageUrl(pages[idx], undefined, 'high'), 'next');
     }
     var spill = readAhead - budget;
     // Evict bookkeeping for pages far behind the reading position; the
@@ -258,21 +307,13 @@
 
   function prefetchNext(n) {
     for (let k = 0; k < Math.min(n, nextPages.length); k++) {
-      if (!preloaded[`n${k}`]) {
-        const im = new Image();
-        im.src = imageUrl(nextPages[k], nextChID, 'high');
-        preloaded[`n${k}`] = im;
-      }
+      warmImage(preloaded, `n${k}`, imageUrl(nextPages[k], nextChID, 'high'), 'next');
     }
   }
 
   function prefetchPrev(n) {
     for (let k = 0; k < Math.min(n, prevPages.length); k++) {
-      if (!preloaded[`p${k}`]) {
-        const im = new Image();
-        im.src = imageUrl(prevPages[k], prevChID, 'high');
-        preloaded[`p${k}`] = im;
-      }
+      warmImage(preloaded, `p${k}`, imageUrl(prevPages[k], prevChID, 'high'), 'prev');
     }
   }
 
@@ -281,7 +322,13 @@
   // spilling into the browser cache).
   function warmNeighbor(chID, dir) {
     if (!chID || chID === cid) return;
-    fetch(`/api/reader-data/${[pid, mid, chID].map(encodeURIComponent).join('/')}`)
+    // Same controller as the neighbour's page read-ahead, so leaving the chapter
+    // abandons the reader-data fetch too, not just the images.
+    if (!warmCtrl[dir]) warmCtrl[dir] = new AbortController();
+    fetch(`/api/reader-data/${[pid, mid, chID].map(encodeURIComponent).join('/')}`, {
+      signal: warmCtrl[dir].signal,
+      credentials: 'same-origin',
+    })
       .then((r) => r.json())
       .then((d) => {
         if (!d || d.error) return;
@@ -632,6 +679,9 @@
 
   // Commit a chapter's fetched-or-warmed state and draw the target page.
   function commitChapter(data, targetCID, targetPage) {
+    // Leaving the old chapter: drop its in-flight read-ahead before the page
+    // bookkeeping is reset, so nothing keeps warming bytes nobody will read.
+    abortAllWarm();
     cid = targetCID;
     pages = data.pages;
     nextChID = data.nextChapterID || '';

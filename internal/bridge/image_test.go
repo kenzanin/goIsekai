@@ -2,6 +2,7 @@ package bridge
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"image"
 	"image/color"
@@ -70,7 +71,7 @@ func TestImageCacheConvertsJPEGToWebP(t *testing.T) {
 	url := serveImage(t, "image/jpeg", jpg.Bytes())
 
 	s := newTestServiceWithCache(t)
-	if _, err := s.GetImage("plugin-x", url, nil, "", "", PrioLow); err != nil {
+	if _, err := s.GetImage(context.Background(), "plugin-x", url, nil, "", "", PrioLow); err != nil {
 		t.Fatalf("GetImage: %v", err)
 	}
 
@@ -96,7 +97,7 @@ func TestImageCacheGIFPassthrough(t *testing.T) {
 	url := serveImage(t, "image/gif", payload)
 
 	s := newTestServiceWithCache(t)
-	if _, err := s.GetImage("plugin-x", url, nil, "", "", PrioLow); err != nil {
+	if _, err := s.GetImage(context.Background(), "plugin-x", url, nil, "", "", PrioLow); err != nil {
 		t.Fatalf("GetImage: %v", err)
 	}
 
@@ -121,7 +122,7 @@ func TestImageCacheInvalidBytesRejected(t *testing.T) {
 		url := serveImage(t, "application/octet-stream", payload)
 
 		s := newTestServiceWithCache(t)
-		if _, err := s.GetImage("plugin-x", url, nil, "", "", PrioLow); err == nil {
+		if _, err := s.GetImage(context.Background(), "plugin-x", url, nil, "", "", PrioLow); err == nil {
 			t.Fatalf("GetImage: expected error for invalid bytes")
 		}
 
@@ -161,7 +162,7 @@ func TestImageCacheHealsCorruptEntry(t *testing.T) {
 	}
 
 	// Reading must heal: corrupt file deleted, valid image fetched and cached.
-	if _, err := s.GetImage("plugin-x", validURL, nil, "", "", PrioLow); err != nil {
+	if _, err := s.GetImage(context.Background(), "plugin-x", validURL, nil, "", "", PrioLow); err != nil {
 		t.Fatalf("GetImage: %v", err)
 	}
 	data, err := os.ReadFile(base + ".webp")
@@ -196,7 +197,7 @@ func TestImageCacheWritesConfiguredFormat(t *testing.T) {
 		t.Run(string(tc.format), func(t *testing.T) {
 			url := serveImage(t, "image/jpeg", validJPEG(t, 900, 1400))
 			s := newTestServiceWithFormat(t, tc.format)
-			if _, err := s.GetImage("plugin-x", url, nil, "", "", PrioLow); err != nil {
+			if _, err := s.GetImage(context.Background(), "plugin-x", url, nil, "", "", PrioLow); err != nil {
 				t.Fatalf("GetImage: %v", err)
 			}
 
@@ -224,7 +225,7 @@ func TestImageCacheOriginalFormatStoresSourceBytes(t *testing.T) {
 	payload := validJPEG(t, 64, 64)
 	url := serveImage(t, "image/jpeg", payload)
 	s := newTestServiceWithFormat(t, FormatOriginal)
-	if _, err := s.GetImage("plugin-x", url, nil, "", "", PrioLow); err != nil {
+	if _, err := s.GetImage(context.Background(), "plugin-x", url, nil, "", "", PrioLow); err != nil {
 		t.Fatalf("GetImage: %v", err)
 	}
 
@@ -275,7 +276,7 @@ func TestImageCacheEnhanceScope(t *testing.T) {
 
 			s := newTestServiceWithFormat(t, FormatWebP)
 			s.enhance = tc.enhance
-			if _, err := s.GetImage(tc.pluginID, url, nil, tc.mangaID, tc.chapterID, PrioLow); err != nil {
+			if _, err := s.GetImage(context.Background(), tc.pluginID, url, nil, tc.mangaID, tc.chapterID, PrioLow); err != nil {
 				t.Fatalf("GetImage: %v", err)
 			}
 
@@ -317,7 +318,7 @@ func TestSamePriorityFIFO(t *testing.T) {
 	var wg sync.WaitGroup
 	for k := range 3 {
 		wg.Go(func() {
-			_, err := s.GetImage("test", fmt.Sprintf("%s/img?n=%d", srv.URL, k), nil, "", "", PrioLow)
+			_, err := s.GetImage(context.Background(), "test", fmt.Sprintf("%s/img?n=%d", srv.URL, k), nil, "", "", PrioLow)
 			if err != nil {
 				t.Errorf("low priority GetImage failed: %v", err)
 			}
@@ -364,7 +365,7 @@ func TestLowLaneDoesNotBlockHigh(t *testing.T) {
 	// Start a low-priority request that will occupy the low lane
 	lowDone := make(chan struct{})
 	go func() {
-		_, err := s.GetImage("test", srv.URL+"/img", nil, "", "", PrioLow)
+		_, err := s.GetImage(context.Background(), "test", srv.URL+"/img", nil, "", "", PrioLow)
 		if err != nil {
 			t.Errorf("low priority GetImage failed: %v", err)
 		}
@@ -375,7 +376,7 @@ func TestLowLaneDoesNotBlockHigh(t *testing.T) {
 	time.Sleep(5 * time.Millisecond)
 
 	// High-priority request should run concurrently (not wait for low)
-	_, err := s.GetImage("test", srv.URL+"/img", nil, "", "", PrioHigh)
+	_, err := s.GetImage(context.Background(), "test", srv.URL+"/img", nil, "", "", PrioHigh)
 	if err != nil {
 		t.Fatalf("high priority GetImage failed: %v", err)
 	}
@@ -426,7 +427,7 @@ func TestHighPriorityRunsWithLow(t *testing.T) {
 	// Start a low-priority request - occupies low lane (capacity 1)
 	var lowDone sync.WaitGroup
 	lowDone.Go(func() {
-		_, err := s.GetImage("test", srv.URL+"/img?prio=low", nil, "", "", PrioLow)
+		_, err := s.GetImage(context.Background(), "test", srv.URL+"/img?prio=low", nil, "", "", PrioLow)
 		if err != nil {
 			t.Errorf("low priority GetImage failed: %v", err)
 		}
@@ -438,7 +439,7 @@ func TestHighPriorityRunsWithLow(t *testing.T) {
 	// Start a high-priority request - should run concurrently
 	highDone := make(chan struct{})
 	go func() {
-		_, err := s.GetImage("test", srv.URL+"/img2", nil, "", "", PrioHigh)
+		_, err := s.GetImage(context.Background(), "test", srv.URL+"/img2", nil, "", "", PrioHigh)
 		if err != nil {
 			t.Errorf("high priority GetImage failed: %v", err)
 		}
@@ -481,7 +482,7 @@ func TestConcurrentGetImageSharesFetch(t *testing.T) {
 	results := make([][]byte, n)
 	for i := range n {
 		wg.Go(func() {
-			data, err := s.GetImage("p", srv.URL+"/img", nil, "m", "c", PrioLow)
+			data, err := s.GetImage(context.Background(), "p", srv.URL+"/img", nil, "m", "c", PrioLow)
 			if err != nil {
 				t.Errorf("get image: %v", err)
 				return
@@ -560,7 +561,7 @@ func TestImageBurstKeepsHostLanes2Plus1(t *testing.T) {
 	var wg sync.WaitGroup
 	for i, req := range reqs {
 		wg.Go(func() {
-			results[i], errs[i] = s.GetImage("p", req.url, nil, "m", "c", req.prio)
+			results[i], errs[i] = s.GetImage(context.Background(), "p", req.url, nil, "m", "c", req.prio)
 		})
 	}
 

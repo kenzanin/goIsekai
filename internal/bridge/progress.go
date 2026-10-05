@@ -151,7 +151,9 @@ func (s *AppService) refetchCover(pluginID, mangaID string) error {
 			cached.CoverURL = detail.CoverURL
 		}
 	}
-	if _, err := s.GetImage(pluginID, cached.CoverURL, nil, "", "", PrioHigh); err != nil {
+	// Cover refetch is a one-shot background download, not the reader's per-page
+	// path, so it keeps a background context.
+	if _, err := s.GetImage(context.Background(), pluginID, cached.CoverURL, nil, "", "", PrioHigh); err != nil {
 		return fmt.Errorf("bridge: refetch cover download: %w", err)
 	}
 	return nil

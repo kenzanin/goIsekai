@@ -1,6 +1,10 @@
 package hostnet
 
-import "goisekai/pkg/types"
+import (
+	"context"
+
+	"goisekai/pkg/types"
+)
 
 // SetHTTPProfiles stores a plugin-declared ordered profile ladder. Only
 // recognized profile names (or "stdlib") are kept. An empty (or all-filtered)
@@ -82,13 +86,13 @@ func (p *Proxy) PinnedProfile(pluginID string) string {
 func (p *Proxy) TestProfile(pluginID, profileName, url string) (int, error) {
 	req := types.HTTPRequest{Method: "GET", URL: url}
 	if profileName == stdlibProfileName {
-		resp, err := p.doRequestStd(pluginID, req)
+		resp, err := p.doRequestStd(context.Background(), pluginID, req)
 		if err != nil {
 			return 0, err
 		}
 		return resp.Status, nil
 	}
-	resp, err := p.doRequestProfile(pluginID, profileName, req)
+	resp, err := p.doRequestProfile(context.Background(), pluginID, profileName, req)
 	if err != nil {
 		return 0, err
 	}

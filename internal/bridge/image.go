@@ -4,16 +4,12 @@ import (
 	"context"
 	"fmt"
 	"maps"
-	"net/http"
-	neturl "net/url"
 	"os"
-	"path/filepath"
 	"strings"
 	"time"
 
 	"goisekai/internal/logger"
 	"goisekai/internal/workers"
-	"goisekai/pkg/types"
 )
 
 // withDefaultReferer returns headers with siteURL filled in as Referer when
@@ -41,13 +37,33 @@ func withDefaultReferer(headers map[string]string, siteURL string) map[string]st
 // and thumbnails (empty mangaID) under images/<pluginID>/library/.
 // imageCall lets concurrent GetImage callers for the same URL share one
 // network fetch instead of each queuing on the host lane separately.
+// imageAbandonGrace bounds how long a caller that has already given up waits
+// for the shared fetch it started. Generous enough for a normal completion,
+// short enough that a wedged lane cannot park the request goroutine.
+const imageAbandonGrace = 30 * time.Second
+
 type imageCall struct {
 	done chan struct{}
 	data []byte
 	err  error
 }
 
-func (s *AppService) GetImage(pluginID, url string, headers map[string]string, mangaID, chapterID string, prio Prio) ([]byte, error) {
+// GetImage returns the bytes for one image URL, from cache when possible and
+// otherwise via the image lane. ctx is the caller's request context: cancelling
+// it abandons the queued job and tears down the in-flight upstream call, which
+// is what lets a chapter switch release page fetches instead of leaving them
+// holding a lane slot until the client timeout.
+//
+// Singleflight caveat: concurrent callers for the same URL share one fetch. If
+// the caller that started that fetch cancels, the shared fetch is abandoned and
+// the other callers see its cancellation error rather than the bytes.
+func (s *AppService) GetImage(ctx context.Context, pluginID, url string, headers map[string]string, mangaID, chapterID string, prio Prio) ([]byte, error) {
+	// Dead caller: do not touch singleflight or the lane. Enqueue's select can
+	// still choose the queue-send branch when both it and ctx.Done are ready,
+	// which would leave this goroutine waiting on a job nobody needs.
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
 	// L1: in-memory cache.
 	s.imageMu.RLock()
 	if cached, ok := s.imageCache[url]; ok {
@@ -97,126 +113,37 @@ func (s *AppService) GetImage(pluginID, url string, headers map[string]string, m
 	if prio == PrioHigh {
 		wprio = workers.PriorityHigh
 	}
-	if _, err := s.pool.Enqueue(context.Background(), &workers.Job{
+	fut, err := s.pool.Enqueue(ctx, &workers.Job{
 		Lane:        workers.LaneImage,
 		Priority:    wprio,
 		MaxAttempts: 1,
-		Run: func(context.Context) error {
+		Run: func(jctx context.Context) error {
 			defer func() {
 				s.imageFlight.Delete(url)
 				close(call.done)
 			}()
-			call.data, call.err = s.fetchImage(pluginID, url, headers, mangaID, chapterID, prio)
+			call.data, call.err = s.fetchImage(jctx, pluginID, url, headers, mangaID, chapterID, prio)
 			return call.err
 		},
-	}); err != nil {
+	})
+	if err != nil {
 		s.imageFlight.Delete(url)
 		call.err = fmt.Errorf("bridge: get image %s: %w", url, err)
 		close(call.done)
+		<-call.done
+		return call.data, call.err
 	}
-	<-call.done
+	// Await rather than blocking on call.done: a cancelled request returns now
+	// and Await cancels the job, which closes call.done via the job's defer.
+	if err := fut.Await(ctx); err != nil && call.err == nil {
+		call.err = err
+	}
+	// Bound the wait for the shared fetch. Normally the job has already closed
+	// call.done by the time Await returns; a caller that gave up mid-flight
+	// must not stay parked waiting for work it no longer wants.
+	select {
+	case <-call.done:
+	case <-time.After(imageAbandonGrace):
+	}
 	return call.data, call.err
-}
-
-// fetchImage performs the paced, host-laned upstream fetch and cache write on
-// an image worker, so pacing sleeps and lane waits never block the caller's
-// goroutine.
-func (s *AppService) fetchImage(pluginID, url string, headers map[string]string, mangaID, chapterID string, prio Prio) ([]byte, error) {
-	logger.Debug("fetching image", "url", url, "plugin", pluginID)
-	// At-home image nodes 404 bursts: a browser's draw+prefetch fires several
-	// fetches at once. Serialize per host and pace requests ~1s apart (the
-	// upstream convention for MD@Home), retrying with backoff before giving
-	// up. The lanes are per host, so covers from site A never queue behind
-	// pages from site B.
-	host := func() string {
-		if u, err := neturl.Parse(url); err == nil && u.Host != "" {
-			return u.Host
-		}
-		return url
-	}()
-	s.hostAcquire(host, prio)
-	defer s.hostRelease(host, prio)
-	// Gated image CDNs (rx.resmk.org) 403 without a same-site Referer. When the
-	// caller set none (reader ?referer= / Page.Headers always win), fall back to
-	// the plugin's site_url — what a browser sends on a normal page load.
-	headers = withDefaultReferer(headers, s.mgr.SiteURL(pluginID))
-	var resp types.HTTPResponse
-	var err error
-	var body []byte
-	for attempt := range 3 {
-		if attempt > 0 {
-			time.Sleep(time.Duration(attempt*attempt) * 2500 * time.Millisecond)
-		}
-		s.paceImage(host)
-		resp, err = s.proxy.Request(pluginID, types.HTTPRequest{
-			Method:  http.MethodGet,
-			URL:     url,
-			Headers: headers,
-		})
-		if err != nil || resp.Status < 200 || resp.Status >= 300 {
-			logger.Warn("image fetch retrying", "url", url, "attempt", attempt+1, "status", respStatus(resp, err))
-			continue
-		}
-		body = []byte(resp.Body)
-		if !validateImageFull(body) {
-			logger.Warn("image corrupt", "url", url, "attempt", attempt+1)
-			// Treat as failure to trigger retry.
-			err = fmt.Errorf("invalid image data")
-			continue
-		}
-		// successful fetch and validation
-		err = nil
-		break
-	}
-	if err != nil {
-		logger.Error("image fetch failed", "url", url, "error", err)
-		return nil, fmt.Errorf("bridge: get image %s: %w", url, err)
-	}
-	if resp.Status < 200 || resp.Status >= 300 {
-		logger.Error("image bad status", "url", url, "status", resp.Status)
-
-		return nil, fmt.Errorf("bridge: get image %s: unexpected status %d", url, resp.Status)
-	}
-	// body already set in loop after validation.
-	//
-	// Convert BEFORE caching and return the converted bytes: storing raw in
-	// L1 while disk holds the converted copy means a cold URL serves the
-	// reader/export the original source (JPEG, unenhanced) and the next
-	// request a different image. encodeForCache fails open, so a conversion
-	// error hands back the source unchanged.
-	enhance := mangaID != "" && chapterID != "" && s.enhance.modeFor(pluginID) == EnhanceAuto
-	var stats encodeStats
-	data, converted := encodeForCache(body, s.imgFormat, mangaID == "", s.coverMaxDim, enhance, &stats)
-	ext := ".img"
-	if converted {
-		ext = s.imgFormat.extension()
-	}
-	if stats.resized {
-		logger.Debug("cover resized",
-			"url", url, "from", stats.resizeFrom, "to", stats.resizeTo,
-			"max_dim", s.coverMaxDim)
-	}
-
-	// L1 cache: the same bytes L2 holds.
-	s.imageMu.Lock()
-	s.imageCache[url] = data
-	s.imageMu.Unlock()
-
-	// L2 cache: write to disk, converting to the configured format. Covers
-	// (mangaID empty) are also downscaled. Only a real page is ever enhanced:
-	// requiring both ids excludes covers, library thumbnails, and anything else
-	// that is not a chapter image. Fail-open: unconvertible bytes are stored
-	// as-is under .img.
-	if base := s.diskCachePath(pluginID, mangaID, chapterID, url); base != "" {
-		if err := os.MkdirAll(filepath.Dir(base), 0o755); err == nil {
-			logger.Debug("image cache: write",
-				"url", url, "plugin", pluginID, "enhance", enhance,
-				"enhance_ms", stats.enhance.Milliseconds(),
-				"convert_ms", stats.encode.Milliseconds(),
-				"in_bytes", len(body), "out_bytes", len(data), "ext", ext)
-			_ = os.WriteFile(base+ext, data, 0o644)
-		}
-	}
-
-	return data, nil
 }

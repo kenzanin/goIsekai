@@ -180,8 +180,14 @@ func (s *Server) apiImage(w http.ResponseWriter, r *http.Request) {
 	}
 
 	s.logger.Debug("api image", "pluginID", pluginID, "url", urlStr, "mangaID", mangaID, "chapterID", chapterID)
-	data, err := s.service.GetImage(pluginID, urlStr, headers, mangaID, chapterID, bridge.PrioLow)
+	data, err := s.service.GetImage(r.Context(), pluginID, urlStr, headers, mangaID, chapterID, bridge.PrioLow)
 	if err != nil {
+		if r.Context().Err() != nil {
+			// Abandoned, not failed: the client is gone, so this is not an
+			// upstream fault and must not be logged as one.
+			s.logger.Debug("api image fetch abandoned", "url", urlStr, "pluginID", pluginID, "reason", err)
+			return
+		}
 		s.logger.Error("api image fetch", "url", urlStr, "pluginID", pluginID, "error", err)
 		writeErr(w, http.StatusBadGateway, "image fetch failed")
 		return

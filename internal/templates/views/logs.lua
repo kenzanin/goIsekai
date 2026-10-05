@@ -51,6 +51,10 @@ return function(data)
     </div>
 </div>
 
+<div id="worker-lanes" class="grid grid-cols-2 md:grid-cols-4 gap-2 mb-4 text-xs">
+  <div class="bg-neutral-900 border border-neutral-700 rounded-md px-3 py-2">loading lanes…</div>
+</div>
+
 <div id="logview" class="bg-neutral-900 border border-neutral-700 rounded-md px-3 py-2 mb-6 overflow-y-auto max-h-[70vh] font-mono text-sm">
 ]] .. logLines .. [[</div>
 
@@ -122,6 +126,44 @@ return function(data)
     if (!intervalId) { intervalId = setInterval(refresh, 2000); }
   }
   startWebSocket();
+
+  var lanesEl = document.getElementById("worker-lanes");
+  function fmtMs(ms) { return ms >= 1000 ? (ms / 1000).toFixed(2) + "s" : ms + "ms"; }
+  function renderLanes(data) {
+    if (!lanesEl || !data || !data.lanes) return;
+    lanesEl.textContent = "";
+    data.lanes.forEach(function (l) {
+      var card = document.createElement("div");
+      card.className = "bg-neutral-900 border border-neutral-700 rounded-md px-3 py-2";
+      var head = document.createElement("div");
+      head.className = "font-semibold text-neutral-200 mb-1";
+      head.textContent = l.lane;
+      var stats = document.createElement("div");
+      stats.className = "text-neutral-400";
+      stats.textContent =
+        "waiting " + l.waiting + " · running " + l.running + "/" + l.capacity +
+        " · ok " + l.completed + " · fail " + l.failed + " · abandoned " + l.abandoned;
+      var dur = document.createElement("div");
+      dur.className = "text-neutral-500";
+      dur.textContent = l.has_durations
+        ? "p50 " + fmtMs(l.median_ms) + " · p99 " + fmtMs(l.p99_ms) + " (n=" + l.duration_samples + ")"
+        : "no completed jobs yet";
+      card.appendChild(head);
+      card.appendChild(stats);
+      card.appendChild(dur);
+      lanesEl.appendChild(card);
+    });
+  }
+  function refreshLanes() {
+    // No API-key header: same-origin /api calls rely on the key being unset,
+    // the same assumption the reader's /api/reader-data fetches already make.
+    fetch("/api/workers")
+      .then(function (r) { return r.json(); })
+      .then(renderLanes)
+      .catch(function () {});
+  }
+  refreshLanes();
+  setInterval(refreshLanes, 2000);
 
   document.getElementById("log-copy").addEventListener("click", function() {
     var text = view.innerText;
