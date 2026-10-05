@@ -146,8 +146,12 @@ func TestActionChapterActions(t *testing.T) {
 		{"mark all read", "pluginID=dummy&mangaID=manga1&action=mark-all-read", 303},
 		{"mark all unread", "pluginID=dummy&mangaID=manga1&action=mark-all-unread", 303},
 		{"mark up to unknown chapter", "pluginID=dummy&mangaID=manga1&action=mark-up-to&chapterIDs=nope", 400},
-		{"mark selected show", "pluginID=dummy&mangaID=manga1&action=mark-selected-show&chapterIDs=cs1", 303},
-		{"mark selected hide", "pluginID=dummy&mangaID=manga1&action=mark-selected-hide&chapterIDs=cs1", 303},
+		{"skip selected", "pluginID=dummy&mangaID=manga1&action=skip-selected&chapterIDs=cs1", 303},
+		{"unskip selected", "pluginID=dummy&mangaID=manga1&action=unskip-selected&chapterIDs=cs1", 303},
+		// The old names selected the same is_skipped flag; keeping them live would
+		// leave two vocabularies for one flag, which is what this rename removed.
+		{"legacy mark-selected-show rejected", "pluginID=dummy&mangaID=manga1&action=mark-selected-show&chapterIDs=cs1", 400},
+		{"legacy mark-selected-hide rejected", "pluginID=dummy&mangaID=manga1&action=mark-selected-hide&chapterIDs=cs1", 400},
 		{"selection required", "pluginID=dummy&mangaID=manga1&action=mark-selected-read", 400},
 		{"unknown action", "pluginID=dummy&mangaID=manga1&action=bogus", 400},
 		{"missing manga", "pluginID=dummy&action=mark-all-read", 400},

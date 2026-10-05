@@ -26,7 +26,7 @@ return function(data)
 		-- Action dropdown (bulk progress + cache). Rendered inside the top
 		-- pagination row via its Inner slot so the dropdown shares a line with the
 		-- page numbers instead of sitting in its own row above them.
-		local actionsInner = '<form id="chapter-actions" method="post" action="/action/chapter-actions" class="flex flex-wrap items-center gap-2" data-confirm-actions="mark-selected-unread,clear-up-to,mark-all-unread,clear-cache">'
+		local actionsInner = '<form id="chapter-actions" method="post" action="/action/chapter-actions" class="flex flex-wrap items-center gap-2" data-confirm-actions="mark-selected-unread,mark-up-to,clear-up-to,mark-all-unread,clear-cache">'
 			.. csrfInput(data.csrf_token or "")
 			.. '<input type="hidden" name="pluginID" value="'
 			.. h(pluginID)
@@ -35,15 +35,27 @@ return function(data)
 			.. h(mangaID)
 			.. '">'
 			.. '<select name="action" class="bg-neutral-900 border border-neutral-700 text-neutral-200 rounded-md px-3 py-1.5 text-sm">'
-			.. '<option value="mark-selected-read">Mark selected as read</option>'
-			.. '<option value="mark-selected-unread">Mark selected as unread</option>'
-			.. '<option value="mark-selected-show">Mark selected as show</option>'
-			.. '<option value="mark-selected-hide">Mark selected as hide</option>'
-			.. '<option value="mark-up-to">Mark up to selected</option>'
-			.. '<option value="clear-up-to">Clear up to selected</option>'
+			-- Grouped, because these write three unrelated flags (is_read,
+			-- is_skipped, and the page-image cache) and a flat list of nine read as
+			-- one operation. Labels name the flag and the scope, since the row
+			-- buttons already call is_skipped "Skip".
+			.. '<optgroup label="Ticked chapters">'
+			.. '<option value="mark-selected-read">Mark ticked as read</option>'
+			.. '<option value="mark-selected-unread">Mark ticked as unread</option>'
+			.. '<option value="skip-selected">Skip ticked (ignore when continuing)</option>'
+			.. '<option value="unskip-selected">Unskip ticked</option>'
+			.. "</optgroup>"
+			.. '<optgroup label="Ticked chapters and everything before them">'
+			.. '<option value="mark-up-to">Mark ticked and earlier as read</option>'
+			.. '<option value="clear-up-to">Mark ticked and earlier as unread</option>'
+			.. "</optgroup>"
+			.. '<optgroup label="Whole manga (ticked chapters ignored)">'
 			.. '<option value="mark-all-read">Mark all as read</option>'
 			.. '<option value="mark-all-unread">Mark all as unread</option>'
-			.. '<option value="clear-cache">Clear cache</option>'
+			.. "</optgroup>"
+			.. '<optgroup label="Storage">'
+			.. '<option value="clear-cache">Clear this manga\'s cached page images</option>'
+			.. "</optgroup>"
 			.. "</select>"
 			.. '<button type="submit" class="bg-indigo-600 hover:bg-indigo-500 text-white rounded-md px-3 py-1.5 text-sm font-medium">GO</button>'
 			.. "</form>"

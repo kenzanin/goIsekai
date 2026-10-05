@@ -120,26 +120,34 @@ func (s *Server) handleChapterActions(w http.ResponseWriter, r *http.Request) {
 	var err error
 	switch action {
 	case "mark-selected-read", "mark-selected-unread":
+		// Note these write is_read only; they leave last_page_read alone, so a
+		// chapter read to the end stays "done" even after being marked unread.
 		if len(chapterIDs) == 0 {
 			http.Error(w, "no chapters selected", http.StatusBadRequest)
 			return
 		}
 		err = s.service.SetChaptersRead(pluginID, mangaID, chapterIDs, action == "mark-selected-read")
-	case "mark-selected-show", "mark-selected-hide":
+	case "skip-selected", "unskip-selected":
 		if len(chapterIDs) == 0 {
 			http.Error(w, "no chapters selected", http.StatusBadRequest)
 			return
 		}
-		err = s.service.SetChaptersSkip(pluginID, mangaID, chapterIDs, action == "mark-selected-hide")
+		// Same is_skipped flag the per-row Skip button toggles. It used to be
+		// called mark-selected-show/hide here while every row button called it
+		// Skip, so one flag had two names in the same screen.
+		err = s.service.SetChaptersSkip(pluginID, mangaID, chapterIDs, action == "skip-selected")
 	case "mark-up-to", "clear-up-to":
 		if len(chapterIDs) == 0 {
 			http.Error(w, "no chapters selected", http.StatusBadRequest)
 			return
 		}
+		// Bound is the highest chapter_num among the ticked rows, and the UPDATE
+		// is chapter_num <= bound, so "up to" means numerically at or before it.
 		err = s.service.SetChaptersUpTo(pluginID, mangaID, chapterIDs, action == "mark-up-to")
 	case "mark-all-read", "mark-all-unread":
 		err = s.service.SetMangaChaptersRead(pluginID, mangaID, action == "mark-all-read")
 	case "clear-cache":
+		// Per-manga page-image cache only, not the app-wide caches.
 		err = s.service.ClearMangaCache(pluginID, mangaID)
 	default:
 		http.Error(w, "invalid action", http.StatusBadRequest)
