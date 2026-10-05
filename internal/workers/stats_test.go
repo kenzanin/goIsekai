@@ -71,7 +71,7 @@ func TestLaneStatesShowsQueuedAndRunning(t *testing.T) {
 
 	// Fill the queue behind the busy worker.
 	const queued = 3
-	for i := 0; i < queued; i++ {
+	for range queued {
 		if _, err := p.Enqueue(context.Background(), &Job{
 			Lane: LaneMaintenance,
 			Run:  func(ctx context.Context) error { <-firstDone; return nil },
@@ -113,7 +113,7 @@ func TestLaneDurationSummary(t *testing.T) {
 
 	// One slow job and three fast ones, so median and p99 must differ and both
 	// must land inside [fast, slow].
-	for i := 0; i < 3; i++ {
+	for range 3 {
 		if _, err := p.Enqueue(context.Background(), &Job{
 			Lane: LaneInteractive,
 			Run: func(ctx context.Context) error {
@@ -174,7 +174,7 @@ func TestLaneDurationSummary(t *testing.T) {
 // without limit.
 func TestDurationRingIsBounded(t *testing.T) {
 	st := &laneStat{}
-	for i := 0; i < durationRingSize*3; i++ {
+	for i := range durationRingSize * 3 {
 		st.observe(time.Duration(i)*time.Millisecond, nil)
 	}
 	if len(st.durations) != durationRingSize {

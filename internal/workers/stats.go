@@ -3,7 +3,7 @@ package workers
 import (
 	"context"
 	"errors"
-	"sort"
+	"slices"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -68,7 +68,7 @@ func (s *laneStat) snapshot() DurationSummary {
 	if len(out) == 0 {
 		return DurationSummary{}
 	}
-	sort.Slice(out, func(i, j int) bool { return out[i] < out[j] })
+	slices.Sort(out)
 	return DurationSummary{
 		Samples: len(out),
 		Median:  percentile(out, 0.50),
