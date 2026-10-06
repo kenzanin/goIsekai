@@ -3,6 +3,7 @@ package httpserver
 import (
 	"goisekai/internal/database"
 	"net/http"
+	"slices"
 	"strconv"
 	"strings"
 )
@@ -47,8 +48,35 @@ func (s *Server) viewLibrary(w http.ResponseWriter, r *http.Request) {
 		}
 		mangas = kept
 	}
-	// Host-side pagination: slice the full library (newest-updated first)
-	// so the grid renders one page at a time.
+	// Sorting and the status/tag filters run over the whole library before it is
+	// sliced, otherwise they would only describe the 24 cards on this page.
+	// Progress stats and categories therefore have to be loaded here rather than
+	// next to the grid rendering.
+	libStats, err := s.service.ListLibraryWithProgress()
+	if err != nil {
+		s.logger.Warn("library stats", "error", err)
+	}
+	statsForSort := statsByManga(mangas, libStats)
+	categories, catErr := s.service.ListLibraryCategories()
+	if catErr != nil {
+		s.logger.Warn("library categories", "error", catErr)
+	}
+
+	sortKey := strings.TrimSpace(r.URL.Query().Get("sort"))
+	if !slices.Contains(librarySorts, sortKey) {
+		sortKey = "updated"
+	}
+	statusFilter := strings.TrimSpace(r.URL.Query().Get("status"))
+	if !slices.Contains(libraryStatuses, statusFilter) {
+		statusFilter = "all"
+	}
+	tagFilter := strings.TrimSpace(r.URL.Query().Get("tag"))
+
+	mangas = filterLibrary(mangas, statsForSort, categories, statusFilter, tagFilter)
+	sortLibrary(mangas, statsForSort, sortKey)
+
+	// Host-side pagination: slice the sorted/filtered library so the grid
+	// renders one page at a time.
 	const pageSize = 24
 	page, _ := strconv.Atoi(r.URL.Query().Get("page"))
 	if page < 1 {
@@ -61,11 +89,6 @@ func (s *Server) viewLibrary(w http.ResponseWriter, r *http.Request) {
 	metas := s.service.PluginMetas()
 	for id, m := range metas {
 		ratios[id] = m.ThumbRatio
-	}
-	// Enriched per-manga stats: read/total chapters + plugin name + hasNew
-	libStats, err := s.service.ListLibraryWithProgress()
-	if err != nil {
-		s.logger.Warn("library stats", "error", err)
 	}
 	mangaPluginMap := make(map[string]string) // mangaID -> pluginID (from DB)
 	// Display names + icons: DB rows as base, runtime metas overlay; wasm
@@ -155,6 +178,10 @@ func (s *Server) viewLibrary(w http.ResponseWriter, r *http.Request) {
 		"TotalPages":      max((total+pageSize-1)/pageSize, 1),
 		"HasNext":         end < total,
 		"HasPrev":         page > 1,
+		"Sort":            sortKey,
+		"Status":          statusFilter,
+		"Tag":             tagFilter,
+		"CategoryCounts":  s.service.LibraryCategoryCountsOrEmpty(),
 		"DuplicateCount":  duplicateCount,
 		"DuplicateGroups": duplicateGroups,
 		"PluginCounts":    pluginCounts,

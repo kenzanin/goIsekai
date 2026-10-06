@@ -152,3 +152,57 @@ func (d *DB) QueryMangaPluginIDs() ([]MangaPluginIDRow, error) {
 		Query(d.db, &out)
 	return out, err
 }
+
+// LibraryCategories returns the categories of every in-library manga, keyed by
+// the manga row-ID. One query for the whole library: ListEnrichment answers the
+// same question for a single manga, which would mean a query per card.
+//
+// Categories double as the library's tag set - they are what enrichment writes
+// (genres, sources the user tagged) and what a "show me only Isekai" filter has
+// to match against.
+func (d *DB) LibraryCategories() (map[string][]string, error) {
+	rows, err := d.db.Query(`
+		SELECT c.manga_row_id, c.category
+		FROM manga_categories c
+		JOIN mangas m ON m.id = c.manga_row_id
+		WHERE m.in_library = 1
+		ORDER BY c.manga_row_id, c.category`)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = rows.Close() }()
+	out := make(map[string][]string)
+	for rows.Next() {
+		var rowID, category string
+		if err := rows.Scan(&rowID, &category); err != nil {
+			return nil, err
+		}
+		out[rowID] = append(out[rowID], category)
+	}
+	return out, rows.Err()
+}
+
+// LibraryCategoryCounts returns how many in-library manga carry each category,
+// most common first, so the filter can offer tags in a useful order.
+func (d *DB) LibraryCategoryCounts() (map[string]int, error) {
+	rows, err := d.db.Query(`
+		SELECT c.category, COUNT(*) AS n
+		FROM manga_categories c
+		JOIN mangas m ON m.id = c.manga_row_id
+		WHERE m.in_library = 1
+		GROUP BY c.category`)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = rows.Close() }()
+	out := make(map[string]int)
+	for rows.Next() {
+		var category string
+		var n int
+		if err := rows.Scan(&category, &n); err != nil {
+			return nil, err
+		}
+		out[category] = n
+	}
+	return out, rows.Err()
+}

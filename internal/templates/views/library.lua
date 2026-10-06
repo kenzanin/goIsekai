@@ -58,7 +58,90 @@ return function(data)
 	if pluginID ~= "" then
 		query = query .. (query == "" and "?" or "&") .. "pluginID=" .. h(pluginID)
 	end
+	local sortKey = data.Sort or "updated"
+	local statusFilter = data.Status or "all"
+	local tagFilter = data.Tag or ""
+	if sortKey ~= "updated" then
+		query = query .. (query == "" and "?" or "&") .. "sort=" .. h(sortKey)
+	end
+	if statusFilter ~= "all" then
+		query = query .. (query == "" and "?" or "&") .. "status=" .. h(statusFilter)
+	end
+	if tagFilter ~= "" then
+		query = query .. (query == "" and "?" or "&") .. "tag=" .. h(tagFilter)
+	end
 	local pagBase = "/view/library" .. query
+
+	-- Status filter and tag chips. Hidden inputs carry the other controls so a
+	-- change here does not reset the search text or the source filter.
+	local carried = ""
+	carried = carried .. (q ~= "" and '<input type="hidden" name="q" value="' .. h(q) .. '">' or "")
+	carried = carried
+		.. (pluginID ~= "" and '<input type="hidden" name="pluginID" value="' .. h(pluginID) .. '">' or "")
+	carried = carried
+		.. (sortKey ~= "updated" and '<input type="hidden" name="sort" value="' .. h(sortKey) .. '">' or "")
+	carried = carried
+		.. (statusFilter ~= "all" and '<input type="hidden" name="status" value="' .. h(statusFilter) .. '">' or "")
+	carried = carried
+		.. (tagFilter ~= "" and '<input type="hidden" name="tag" value="' .. h(tagFilter) .. '">' or "")
+
+	local statusOpts = {
+		{ "all", "All" },
+		{ "reading", "In progress" },
+		{ "unread", "Unread" },
+		{ "done", "Finished" },
+	}
+	local statusChips = ""
+	for _, o in ipairs(statusOpts) do
+		local on = o[1] == statusFilter
+		statusChips = statusChips
+			.. '<a href="'
+			.. pagBase
+			.. (query == "" and "?" or "&")
+			.. "status="
+			.. h(o[1])
+			.. '" class="inline-flex items-center gap-1 rounded-md border px-2.5 py-1 text-xs '
+			.. (on and "border-indigo-500 bg-indigo-500/15 text-indigo-200" or "border-neutral-700 text-neutral-400 hover:bg-neutral-800")
+			.. '">'
+			.. h(o[2])
+			.. "</a>"
+	end
+
+	-- Tag chips: the categories already attached to library entries, most common
+	-- first. Empty when nothing is tagged, rather than an empty bar.
+	local catCounts = data.CategoryCounts or {}
+	local catsSorted = {}
+	for name, n in pairs(catCounts) do
+		catsSorted[#catsSorted + 1] = { name, n }
+	end
+	table.sort(catsSorted, function(a, b)
+		if a[2] ~= b[2] then
+			return a[2] > b[2]
+		end
+		return a[1] < b[1]
+	end)
+	local tagBar = ""
+	if #catsSorted > 0 then
+		tagBar = '<div class="flex items-center gap-1.5 flex-wrap mt-2">'
+			.. '<span class="text-xs text-neutral-500">Tag:</span>'
+		for _, c in ipairs(catsSorted) do
+			local on = c[1] == tagFilter
+			tagBar = tagBar
+				.. '<a href="'
+				.. pagBase
+				.. (query == "" and "?" or "&")
+				.. "tag="
+				.. h(c[1])
+				.. '" class="inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-xs '
+				.. (on and "border-emerald-500 bg-emerald-500/15 text-emerald-200" or "border-neutral-700 text-neutral-400 hover:bg-neutral-800")
+				.. '">'
+				.. h(c[1])
+				.. '<span class="text-neutral-500">'
+				.. tostring(c[2])
+				.. "</span></a>"
+		end
+		tagBar = tagBar .. "</div>"
+	end
 
 	-- Source filter chip: clears pluginID, keeps q.
 	local chip = ""
@@ -98,6 +181,25 @@ return function(data)
 		.. "</div>"
 		.. '<button type="submit" class="bg-indigo-600 hover:bg-indigo-500 text-white rounded-md px-3 py-1.5 text-sm font-medium">Search</button>'
 		.. "</div></form>"
+		.. '<div class="flex items-center gap-1.5 flex-wrap">' .. statusChips .. "</div>"
+		.. '<form method="get" action="/view/library" class="flex items-center">'
+		.. carried
+		.. '<select name="sort" onchange="this.form.submit()" class="bg-neutral-900 border border-neutral-700 rounded-md px-2 py-1.5 text-xs text-neutral-300">'
+		.. '<option value="updated"'
+		.. (sortKey == "updated" and " selected" or "")
+		.. ">Recently updated</option>"
+		.. '<option value="title"'
+		.. (sortKey == "title" and " selected" or "")
+		.. ">Title A-Z</option>"
+		.. '<option value="read"'
+		.. (sortKey == "read" and " selected" or "")
+		.. ">Chapters read</option>"
+		.. '<option value="progress"'
+		.. (sortKey == "progress" and " selected" or "")
+		.. ">Progress</option>"
+		.. "</select>"
+		.. "</form>"
+		.. tagBar
 		.. topPagination
 		.. '<div class="view-mode-toggle shrink-0 flex items-center gap-1" role="group" aria-label="View mode" data-view-mode="grid">'
 		.. '<button type="button" id="view-grid-btn" aria-pressed="true" class="p-1.5 rounded-md hover:bg-neutral-800 transition" title="Grid view">'
