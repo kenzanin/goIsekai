@@ -1,6 +1,8 @@
 package httpserver
 
 import (
+	"encoding/json"
+	"mime"
 	"net/http"
 )
 
@@ -32,7 +34,16 @@ func (s *Server) handleExportCBZ(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	writeJobRef(w, jobID)
+	// The client needs the link now, before the job has written the file: the
+	// filename is deterministic, so the URL can be handed over immediately and
+	// used once the job reports done. Without it the browser only ever saw a
+	// filesystem path in a toast and had nothing to click.
+	w.Header().Set("Content-Type", "application/json")
+	_ = json.NewEncoder(w).Encode(jobRef{
+		Status: "ok",
+		JobID:  jobID,
+		URL:    s.service.ExportURL(pluginID, mangaID, title),
+	})
 }
 
 // handleClearAllCache removes the entire image cache directory.
@@ -43,4 +54,19 @@ func (s *Server) handleClearAllCache(w http.ResponseWriter, _ *http.Request) {
 		return
 	}
 	s.hxRedirect(w, "/view/settings")
+}
+
+// handleDownloadExport serves a finished .cbz. It exists because ExportCBZ writes
+// to disk and the enqueue response had no way to point a browser at the result.
+func (s *Server) handleDownloadExport(w http.ResponseWriter, r *http.Request) {
+	f, info, err := s.service.OpenExport(param(r, "pluginID"), param(r, "mangaID"), r.PathValue("name"))
+	if err != nil {
+		s.logger.Error("download export", "error", err)
+		http.Error(w, "export not found", http.StatusNotFound)
+		return
+	}
+	defer func() { _ = f.Close() }()
+	w.Header().Set("Content-Type", "application/vnd.comicbook+zip")
+	w.Header().Set("Content-Disposition", mime.FormatMediaType("attachment", map[string]string{"filename": info.Name()}))
+	http.ServeContent(w, r, info.Name(), info.ModTime(), f)
 }

@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"encoding/csv"
 	"fmt"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -44,6 +45,44 @@ func sanitizeFilename(name string) string {
 // images/ so ClearAllCache (which removes images/) never deletes exports.
 func (s *AppService) exportDir() string {
 	return filepath.Join(s.cacheDir, "exports")
+}
+
+// ExportURL is the browser-facing download URL for the archive ExportCBZ will
+// write for this title. It is derived before the job runs because the filename
+// is deterministic, so the client can hold the link while the job runs.
+func (s *AppService) ExportURL(pluginID, mangaID, title string) string {
+	return "/exports/" + url.PathEscape(pluginID) + "/" + url.PathEscape(mangaID) + "/" +
+		url.PathEscape(sanitizeFilename(title)+".cbz")
+}
+
+// OpenExport opens a finished export for download. The name comes back from the
+// browser, so it is sanitized again here and the resolved path must still land
+// inside the export directory - a download endpoint is a file-disclosure hole if
+// it is not contained.
+func (s *AppService) OpenExport(pluginID, mangaID, name string) (*os.File, os.FileInfo, error) {
+	root := s.exportDir()
+	path := filepath.Join(root, pluginID, mangaID, sanitizeFilename(name))
+	rel, err := filepath.Rel(root, path)
+	if err != nil || rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
+		return nil, nil, fmt.Errorf("bridge: export download: %q escapes the export directory", name)
+	}
+	f, err := os.Open(path)
+	if err != nil {
+		return nil, nil, err
+	}
+	info, err := f.Stat()
+	if err != nil {
+		_ = f.Close()
+		return nil, nil, err
+	}
+	// ".." survives sanitizeFilename - it contains no separator to replace - and
+	// lands on the parent directory, which os.Open happily opens. Only regular
+	// files are downloadable.
+	if !info.Mode().IsRegular() {
+		_ = f.Close()
+		return nil, nil, fmt.Errorf("bridge: export download: %q is not a regular file", name)
+	}
+	return f, info, nil
 }
 
 // completeCSVName is the marker file written into a chapter's cache dir once

@@ -11,6 +11,9 @@ import (
 type jobRef struct {
 	Status string `json:"status"`
 	JobID  string `json:"job_id"`
+	// URL is set only by actions whose result the browser can fetch. Omitted
+	// elsewhere so every other job response keeps the shape design.md fixes.
+	URL string `json:"url,omitempty"`
 }
 
 func writeJobRef(w http.ResponseWriter, jobID string) {

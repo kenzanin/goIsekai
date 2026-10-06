@@ -240,6 +240,9 @@
       .then((data) => {
         var jobID = data?.job_id;
         if (!jobID) throw new Error('Bad response: missing job_id');
+        // export-cbz hands back the download link up front; the file itself only
+        // exists once the job reports done.
+        var resultURL = data?.url || '';
         jobToast(queuedMsg, 'info');
         var scheme = window.location.protocol === 'https:' ? 'wss://' : 'ws://';
         var ws = new WebSocket(`${scheme}${window.location.host}/jobs/ws`);
@@ -257,8 +260,25 @@
           if (msg.status === 'running') {
             jobToast(runningMsg, 'info');
           } else if (msg.status === 'done') {
-            if (kind === 'export-cbz' && msg.path) {
-              jobToast(`${doneMsg}: ${msg.path}`, 'success');
+            if (kind === 'export-cbz') {
+              // Fetch the archive instead of only naming it. Previously this
+              // branch toasted msg.path, which is a filesystem path like
+              // app_data/cache/exports/... - nothing a browser can open, so the
+              // button looked like it had done nothing at all.
+              if (resultURL) {
+                const link = document.createElement('a');
+                link.href = resultURL;
+                link.download = '';
+                link.rel = 'noopener';
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                jobToast(doneMsg, 'success');
+              } else if (msg.path) {
+                jobToast(`${doneMsg}: ${msg.path}`, 'success');
+              } else {
+                jobToast(failedMsg, 'error');
+              }
             } else {
               jobToast(doneMsg, 'success');
             }

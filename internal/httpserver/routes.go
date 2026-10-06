@@ -40,6 +40,7 @@ func (s *Server) registerStaticRoutes() {
 func (s *Server) registerViewRoutes() {
 	s.Router.Get("/", s.viewLibrary)
 	s.Router.Get("/view/library", s.viewLibrary)
+	s.Router.Get("/exports/{pluginID}/{mangaID}/{name}", s.handleDownloadExport)
 	s.Router.Get("/view/search", s.viewSearch)
 	s.Router.Get("/view/manga/{pluginID}/{mangaID}", s.viewMangaDetail)
 	s.Router.Get("/view/migrate/{pluginID}/{mangaID}", s.viewMigrate)
