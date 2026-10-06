@@ -51,6 +51,7 @@ func registerHostNatives(state *lua.State, m *Manager, id string) {
 	_ = crypto.RawSetString("xor", luaStr2Err(state, pluginutil.XORHex))
 	_ = crypto.RawSetString("utf8_hex", luaStr1(state, pluginutil.UTF8Hex))
 	_ = crypto.RawSetString("vrf_sign", luaVrfSign(state))
+	_ = crypto.RawSetString("aes_gcm_decrypt", luaStr4Err(state, pluginutil.AESGCMDecryptB64))
 
 	jsonTbl, _ := state.NewTable()
 	_ = jsonTbl.RawSetString("decode", luaJSONDecode(state))

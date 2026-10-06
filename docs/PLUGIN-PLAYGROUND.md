@@ -149,7 +149,11 @@ sandbox responses.
   error text match.
 - `host.text.*` — url/html decode, strip html/markdown, titlecase, trim, and more
 - `host.codecs.*` — base64, base64url and hex encode/decode
-- `host.crypto.*` — sha256, md5, hmac-sha256, xor, utf8 hex
+- `host.crypto.*` — sha256, md5, hmac-sha256, xor, utf8 hex, vrf_sign, and
+  `aes_gcm_decrypt(key, iv, tag, ciphertext)` (AES-256-GCM; all four arguments
+  base64url, returns the plaintext, throws/returns nil plus a message on a bad
+  key or tag). The tag is a separate argument, so callers porting from
+  WebCrypto or node split it off the ciphertext themselves.
 - `host.http.get(url, headers?)` / `host.http.post(url, headers?, body)` — same
   transport as `http_request`
 

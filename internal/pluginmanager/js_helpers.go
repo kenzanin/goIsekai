@@ -36,6 +36,23 @@ func jsFloat1(vm *goja.Runtime, fn func(string) float64) func(goja.FunctionCall)
 	}
 }
 
+// jsStr4Err wraps a (string,string,string,string)->(string,error) helper,
+// panicking on error.
+func jsStr4Err(vm *goja.Runtime, fn func(string, string, string, string) (string, error)) func(goja.FunctionCall) goja.Value {
+	return func(call goja.FunctionCall) goja.Value {
+		out, err := fn(
+			call.Arguments[0].String(),
+			call.Arguments[1].String(),
+			call.Arguments[2].String(),
+			call.Arguments[3].String(),
+		)
+		if err != nil {
+			panic(vm.NewGoError(err))
+		}
+		return vm.ToValue(out)
+	}
+}
+
 // jsStr2Err wraps a (string,string)->(string,error) helper, panicking on error.
 func jsStr2Err(vm *goja.Runtime, fn func(string, string) (string, error)) func(goja.FunctionCall) goja.Value {
 	return func(call goja.FunctionCall) goja.Value {

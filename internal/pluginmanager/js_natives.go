@@ -46,6 +46,7 @@ func registerJSHostNatives(vm *goja.Runtime, m *Manager, id string) error {
 			"xor":             jsStr2Err(vm, pluginutil.XORHex),
 			"utf8_hex":        jsStr1(vm, pluginutil.UTF8Hex),
 			"vrf_sign":        jsVrfSign(vm),
+			"aes_gcm_decrypt": jsStr4Err(vm, pluginutil.AESGCMDecryptB64),
 		}},
 		{"json", map[string]any{
 			"decode": jsJSONDecode(vm),

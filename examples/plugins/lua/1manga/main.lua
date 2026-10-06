@@ -61,6 +61,82 @@ local function escape_gql(s)
 	return (s:gsub("\\", "\\\\"):gsub('"', '\\"'))
 end
 
+-- MangaHub encrypts the chapter's page list and hands the key out separately:
+--   pages  = "enc:v1:<keyId>:<iv>:<tag>:<ciphertext>"   (all base64url)
+--   key    = GET /api/chapter-crypto -> {keyId, key, expiresAt}
+--   plain  = AES-256-GCM(key, iv, ciphertext+tag) -> {"p":"<prefix>","i":["1a.jpg",...]}
+-- Decryption runs in the host (host.crypto.aes_gcm_decrypt) because this Lua VM
+-- has no bitwise operators at all, so AES is not writable plugin-side.
+--
+-- The key and the message rotate independently, so a keyId mismatch is retried
+-- once with a fresh key rather than treated as a failure.
+local function encrypted_page_list(blob, slug, number)
+	local function material()
+		local key = cachedKey
+		if not key then
+			key = fetch_access_key()
+			if key then
+				cachedKey = key
+			end
+		end
+		if not key then
+			return nil
+		end
+		-- This endpoint authenticates on the cookie, not the x-mhub-access
+		-- header the GraphQL call uses: the header alone answers 403.
+		local resp = host.http.get(SITE_URL .. "/api/chapter-crypto", {
+			["Cookie"] = "mhub_access=" .. key,
+			["Accept"] = "application/json",
+			["Referer"] = SITE_URL .. "/chapter/" .. slug .. "/chapter-" .. number,
+		})
+		if not resp or resp.status ~= 200 then
+			return nil
+		end
+		return host.json.decode(resp.body)
+	end
+
+	local parts = {}
+	for part in string.gmatch(blob .. ":", "([^:]*):") do
+		parts[#parts + 1] = part
+	end
+	if #parts ~= 6 or parts[1] ~= "enc" or parts[2] ~= "v1" then
+		log.error("1manga: unrecognised pages envelope")
+		return nil
+	end
+	local _, _, keyId, iv, tag, ciphertext = parts[1], parts[2], parts[3], parts[4], parts[5], parts[6]
+
+	local mat = material()
+	if mat and mat.keyId ~= keyId then
+		cachedKey = nil
+		mat = material()
+	end
+	if not mat then
+		log.error("1manga: chapter-crypto unavailable")
+		return nil
+	end
+	if mat.keyId ~= keyId then
+		log.error("1manga: keyId mismatch, blob " .. keyId .. " vs crypto " .. tostring(mat.keyId))
+		return nil
+	end
+
+	local plain, err = host.crypto.aes_gcm_decrypt(mat.key, iv, tag, ciphertext)
+	if not plain then
+		log.error("1manga: pages decrypt failed: " .. tostring(err))
+		return nil
+	end
+	local decoded = host.json.decode(plain)
+	if not decoded or type(decoded.p) ~= "string" or type(decoded.i) ~= "table" then
+		log.error("1manga: unexpected pages plaintext")
+		return nil
+	end
+
+	local out = {}
+	for idx, name in ipairs(decoded.i) do
+		out[idx] = { index = idx - 1, url = IMG_CDN .. decoded.p .. name }
+	end
+	return out
+end
+
 -- Run a GraphQL query, dropping the cached key and retrying once when the API
 -- refuses. MangaHub reports both expired keys and its "API rate limit
 -- excessed" refusal as HTTP 200 with an errors array and a null payload, so the
@@ -317,17 +393,24 @@ function get_page_list(arg)
 		return host.json.encode({})
 	end
 
-	-- The GraphQL pages field now returns an encrypted blob ("enc:v1:...")
-	-- that only the site's reader JS can decode. The site's own frontend
-	-- ignores it too: its page images live at the fixed pattern below, as
-	-- captured from a real chapter load.
-	-- ponytail: if MangaHub ever moves off the slug/number CDN pattern, the
-	-- next step is replicating the reader's AES decrypt of the pages blob.
-	-- Find the page count: page N exists (200) and N+1 404s. Binary search
-	-- keeps it to ~9 cheap requests; the list lands in chapters_pages cache
-	-- afterward, so the cost is paid once per chapter.
-	-- ponytail: the GraphQL pages field used to carry the list in plaintext;
-	-- if the encrypted blob ever becomes readable again, drop this probing.
+	-- Authoritative path: the encrypted page list the API hands back. It names
+	-- every file exactly, which the CDN pattern below cannot do - chapter 59 of
+	-- this manga is "1a.jpg 2a.jpg 3a.jpg 4.jpg ... 9a.jpg ...", so both the
+	-- extension probe and the binary search both fail on it.
+	if type(chapter.pages) == "string" and string.sub(chapter.pages, 1, 7) == "enc:v1:" then
+		local pages = encrypted_page_list(chapter.pages, slug, number)
+		if pages then
+			log.info("1manga pages: found " .. tostring(#pages) .. " pages for " .. chapterID .. " (decrypted)")
+			return host.json.encode(pages)
+		end
+		-- Decrypt failed; fall through to probing rather than showing nothing.
+	end
+
+	-- Fallback for a plaintext or undecryptable pages field: find the page count
+	-- by probing (page N exists with 200, N+1 404s). Binary search keeps it to
+	-- ~9 cheap requests; the list lands in chapters_pages cache afterward, so the
+	-- cost is paid once per chapter. This assumes contiguous page numbers, which
+	-- is exactly what the encrypted path above exists to avoid.
 	-- The extension varies per chapter (older chapters are .jpg, newer ones
 	-- .jpeg), so probe candidates once on page 1 instead of hardcoding one.
 	local ext

@@ -48,6 +48,22 @@ func luaFloat1(state *lua.State, fn func(string) float64) lua.Value {
 	return v.Value()
 }
 
+// luaStr4Err wraps a (string,string,string,string)->(string,error) helper.
+func luaStr4Err(state *lua.State, fn func(string, string, string, string) (string, error)) lua.Value {
+	v, _ := state.NewNativeFunction(func(frame lua.Frame) lua.Outcome {
+		a, _ := frame.CoerceString(0)
+		b, _ := frame.CoerceString(1)
+		c, _ := frame.CoerceString(2)
+		d, _ := frame.CoerceString(3)
+		out, err := fn(a, b, c, d)
+		if err != nil {
+			return frame.ReturnValues(lua.Nil(), lua.String(err.Error()))
+		}
+		return frame.ReturnValue(lua.String(out))
+	})
+	return v.Value()
+}
+
 // luaStr2Err wraps a (string,string)->(string,error) helper.
 func luaStr2Err(state *lua.State, fn func(string, string) (string, error)) lua.Value {
 	v, _ := state.NewNativeFunction(func(frame lua.Frame) lua.Outcome {
