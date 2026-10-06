@@ -2,7 +2,7 @@
 
 Provides structured HTTP request logging for diagnosing slow requests, error rates, and traffic patterns.
 
-## ADDED Requirements
+## Requirements
 
 ### Requirement: Request logging middleware
 Every HTTP request SHALL be logged with: method, path, status code, response size, and latency (ms). Logs SHALL use structured slog format.

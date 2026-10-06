@@ -2,7 +2,7 @@
 
 Add automated test coverage for all httpserver handlers, views, actions, and API endpoints to prevent regressions and catch bugs before manual testing.
 
-## ADDED Requirements
+## Requirements
 
 ### Requirement: Handler test infrastructure
 A test helper SHALL provide `httptest.NewServer` with a chi router wired to mock bridge service implementations. The mock SHALL implement the bridge service interface used by all handlers.

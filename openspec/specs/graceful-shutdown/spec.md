@@ -2,7 +2,7 @@
 
 Enable clean server shutdown via SIGTERM/SIGINT with request draining, resource cleanup, and optional PID file for management scripts.
 
-## ADDED Requirements
+## Requirements
 
 ### Requirement: Signal-driven shutdown
 The host SHALL listen for SIGTERM and SIGINT signals. On receipt, it SHALL initiate a graceful shutdown sequence: stop accepting new connections, drain in-flight requests (with configurable timeout), close DB connections, close plugin runtimes, and flush logs.

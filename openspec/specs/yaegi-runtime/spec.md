@@ -74,5 +74,26 @@ Yaegi plugins SHALL be sandboxed: imports are validated at load time — only th
 - **THEN** it receives a handle parsed from that literal text and no host file is read
 
 ### Requirement: Yaegi plugin networking
+ The bridge SHALL return the response body as a string and SHALL NOT surface the HTTP status code, so a plugin distinguishes a failed request from an error page by inspecting the body.
 
+#### Scenario: Plugin GET is issued under its own plugin identity
+- **WHEN** a Yaegi plugin calls `hostnet.Get(url)`
+- **THEN** the host issues the request through the per-plugin proxy client for that plugin id
+- **AND** the request therefore uses the plugin's cached TLS profile and its default headers
+- **AND** the plugin receives the response body as a string
+
+#### Scenario: Plugin POST sends the supplied body
+- **WHEN** a Yaegi plugin calls `hostnet.Post(url, body)`
+- **THEN** the host issues a POST with that body through the same per-plugin proxy client
+- **AND** the plugin receives the response body as a string
+
+#### Scenario: Transport failure surfaces as a Go error
+- **WHEN** the proxied request fails at the transport level
+- **THEN** the bridge returns an empty string and a non-nil error
+- **AND** the plugin observes the error rather than a body
+
+#### Scenario: A non-2xx status is not a transport error
+- **WHEN** the upstream responds with a 4xx or 5xx status and a body
+- **THEN** the bridge returns that body with a nil error
+- **AND** the plugin is responsible for recognising the error page
 Yaegi plugins SHALL perform HTTP requests via the host-provided `hostnet.Get`/`hostnet.Post` bridge, which routes through the same TLS-fingerprinted per-plugin proxy as other runtimes. The bridge exposes only stdlib-compatible types because Yaegi cannot parse bogdanfinn/fhttp source.

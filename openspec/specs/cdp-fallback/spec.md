@@ -2,7 +2,7 @@
 
 Automatically detect challenge-blocked HTTP responses and fall back to CDP engine to solve challenges, injecting cookies back into the jar for retry — transparent to plugins.
 
-## ADDED Requirements
+## Requirements
 
 ### Requirement: Challenge detection
 The host HTTP layer SHALL detect challenge responses by checking for HTTP 403/503 status codes combined with Cloudflare/Turnstile markers in the response body (e.g., "cf-challenge", "turnstile", "Just a moment...").

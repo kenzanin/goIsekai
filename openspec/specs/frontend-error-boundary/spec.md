@@ -2,7 +2,7 @@
 
 Provides user-facing error feedback when the reader canvas or HTMX views encounter network, parse, or plugin errors, instead of showing blank/broken UI.
 
-## ADDED Requirements
+## Requirements
 
 ### Requirement: Reader fetch error handling
 All fetch calls in reader.js SHALL be wrapped in try-catch. On network error, parse error, or plugin error response, the reader canvas SHALL display a visible error overlay with the error type and a retry button.

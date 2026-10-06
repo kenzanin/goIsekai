@@ -2,7 +2,7 @@
 
 Provide a single-command build for all WASM plugins that integrates with the host build, preventing stale plugin binaries.
 
-## ADDED Requirements
+## Requirements
 
 ### Requirement: Unified plugin build target
 A `make build-plugins` target at the repo root SHALL build all WASM plugins by invoking each plugin's Makefile. The target SHALL exit non-zero if any plugin build fails.

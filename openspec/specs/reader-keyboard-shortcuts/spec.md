@@ -2,7 +2,7 @@
 
 Add standard keyboard navigation to the manga reader for efficient page-by-page reading without mouse interaction.
 
-## ADDED Requirements
+## Requirements
 
 ### Requirement: Page navigation via keyboard
 The reader SHALL support keyboard shortcuts for page navigation: ArrowLeft (previous page), ArrowRight (next page), Space (next page). Shortcuts SHALL be active when the reader canvas is visible and no input element is focused.

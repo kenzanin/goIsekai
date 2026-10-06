@@ -2,7 +2,7 @@
 
 Provides Lua-based server-side template rendering, replacing CloudyKit/jet rendering HTML views, enabling plugin contributors modify frontend templates using same Lua language already know from plugin development.
 
-## ADDED Requirements
+## Requirements
 
 ### Requirement: Lua template rendering
 The system SHALL execute Lua template files and return HTML strings, replacing jet's `tmpl.Execute()` calls. Lua template SHALL accept a function that receives data and returns HTML string. Engine SHALL create lightweight Lua VM per render call, precompile template bytecodes at startup for fast execution.

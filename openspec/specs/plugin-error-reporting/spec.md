@@ -2,7 +2,7 @@
 
 Surfaces plugin errors to the user with clear error messages, retry buttons, and per-plugin health indicators instead of silently showing empty results.
 
-## ADDED Requirements
+## Requirements
 
 ### Requirement: Per-plugin error state in views
 When a plugin call fails, the affected view (search results, manga detail) SHALL display the error message with the plugin name and a retry button instead of showing empty or misleading content.

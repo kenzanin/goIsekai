@@ -2,7 +2,7 @@
 
 Expose shared text utility functions from the host to Lua and JS plugins so plugins stop reimplementing common string transformations and produce consistent, canonical results across sources.
 
-## ADDED Requirements
+## Requirements
 
 ### Requirement: Status normalization native
 

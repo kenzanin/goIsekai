@@ -2,7 +2,7 @@
 
 Persist application settings to a config file so they survive restarts, with CLI flags taking precedence over file values.
 
-## ADDED Requirements
+## Requirements
 
 ### Requirement: Config file read on startup
 The host SHALL read `goisekai.ini` from the data directory on startup if it exists. CLI flags SHALL override file values; file values SHALL override defaults. Precedence: flag > file > default.
