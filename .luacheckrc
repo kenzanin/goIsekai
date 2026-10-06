@@ -14,6 +14,8 @@ read_globals = {
     "h",
     "ue",
     "csrfInput",
+    "urlQuery",
+    "link",
     "host",
     "formatDate",
     "getInitials",
