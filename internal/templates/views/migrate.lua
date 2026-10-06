@@ -45,6 +45,12 @@ return function(data)
 	body = body .. '<div class="flex-1 min-w-0">'
 	body = body .. '<div class="text-xs text-neutral-500 mb-1">Migrating from</div>'
 	body = body .. '<h1 class="text-lg font-semibold mb-1 leading-tight">' .. h(manga.Title or "") .. "</h1>"
+	local srcCh = data.SourceChapterCount or 0
+	body = body
+		.. '<div class="text-xs text-neutral-400 mt-1">'
+		.. tostring(srcCh)
+		.. (srcCh == 1 and " chapter in this entry" or " chapters in this entry")
+		.. "</div>"
 	body = body .. origBadge
 	body = body .. "</div></div>"
 	body = body
@@ -159,6 +165,25 @@ return function(data)
 				.. '">'
 				.. h(c.Title or "")
 				.. "</div>"
+			-- A target with fewer chapters than the entry being moved loses the
+			-- surplus on migration, and the surplus cannot be recovered, so the
+			-- comparison belongs on the card and not after the fact.
+			local chLine
+			if c.ChapterCount == nil or c.ChapterCount < 0 then
+				chLine = '<span class="text-xs text-neutral-600">chapter count unavailable</span>'
+			elseif srcCh > 0 and c.ChapterCount < srcCh then
+				chLine = '<span class="text-xs text-red-400 font-semibold">'
+					.. tostring(c.ChapterCount)
+					.. " / "
+					.. tostring(srcCh)
+					.. " — fewer, the surplus is lost</span>"
+			else
+				chLine = '<span class="text-xs text-neutral-400">'
+					.. tostring(c.ChapterCount)
+					.. (c.ChapterCount == 1 and " chapter" or " chapters")
+					.. "</span>"
+			end
+			body = body .. '<div class="mb-1">' .. chLine .. "</div>"
 			body = body .. '<div class="mb-2">' .. badge .. "</div>"
 			body = body
 				.. '<form method="post" action="/action/migrate-source/'

@@ -24,14 +24,22 @@ func (s *Server) viewMigrate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	manga, _, err := s.service.GetMangaDetails(pluginID, mangaID)
-	if err != nil {
-		manga, _, err = s.service.CachedMangaAndChapters(pluginID, mangaID)
+	manga, sourceChapters, err := s.service.GetMangaDetails(pluginID, mangaID)
+	// An empty chapter list is as unhelpful as an error here: this page exists to
+	// compare chapter counts, and a dead source returns success with nothing. The
+	// DB copy is the truth for an entry we already know is in the library.
+	if err != nil || len(sourceChapters) == 0 {
+		cachedManga, cachedChapters, cerr := s.service.CachedMangaAndChapters(pluginID, mangaID)
+		if cerr == nil && (err != nil || len(cachedChapters) > len(sourceChapters)) {
+			manga, sourceChapters = cachedManga, cachedChapters
+			err = nil
+		}
 		if err != nil {
 			http.Error(w, "failed to load manga", http.StatusBadGateway)
 			return
 		}
 	}
+	sourceChapterCount := len(sourceChapters)
 
 	q := r.URL.Query().Get("q")
 	// Prefill with title but don't auto-search: input shows title, results only after Search click.
@@ -59,6 +67,9 @@ func (s *Server) viewMigrate(w http.ResponseWriter, r *http.Request) {
 		Title         string
 		CoverURL      string
 		IsExactMatch  bool
+		// ChapterCount is -1 when the source could not be asked, so the card can
+		// say "unknown" instead of claiming zero chapters.
+		ChapterCount int
 	}
 	var cands []cand
 	var failures []string
@@ -79,7 +90,7 @@ func (s *Server) viewMigrate(w http.ResponseWriter, r *http.Request) {
 		} else {
 			name := pluginName(plugins, targetPluginID)
 			for _, r := range results {
-				cands = append(cands, cand{PluginID: targetPluginID, PluginName: name, SourceMangaID: r.ID, Title: r.Title, CoverURL: r.CoverURL, IsExactMatch: pluginutil.NormalizeTitle(r.Title) == normalizedQ})
+				cands = append(cands, cand{PluginID: targetPluginID, PluginName: name, SourceMangaID: r.ID, Title: r.Title, CoverURL: r.CoverURL, IsExactMatch: pluginutil.NormalizeTitle(r.Title) == normalizedQ, ChapterCount: -1})
 			}
 		}
 	} else {
@@ -109,7 +120,7 @@ func (s *Server) viewMigrate(w http.ResponseWriter, r *http.Request) {
 					}
 					var local []cand
 					for _, r := range results {
-						local = append(local, cand{PluginID: id, PluginName: name, SourceMangaID: r.ID, Title: r.Title, CoverURL: r.CoverURL, IsExactMatch: pluginutil.NormalizeTitle(r.Title) == normalizedQ})
+						local = append(local, cand{PluginID: id, PluginName: name, SourceMangaID: r.ID, Title: r.Title, CoverURL: r.CoverURL, IsExactMatch: pluginutil.NormalizeTitle(r.Title) == normalizedQ, ChapterCount: -1})
 					}
 					mu.Lock()
 					cands = append(cands, local...)
@@ -140,25 +151,54 @@ func (s *Server) viewMigrate(w http.ResponseWriter, r *http.Request) {
 	hasNext := end < total
 	cands = cands[start:end]
 
+	// A search result carries no chapter count, so the counts have to be asked
+	// for - one call per card - to make "will this migration lose chapters?"
+	// answerable before the button is pressed rather than after. Only the
+	// visible page is asked about, and the plugin cache holds a chapter list for
+	// 168h, so revisiting the picker is cheap. A source that cannot be reached
+	// keeps -1 and its card says "unknown" rather than lying about having none.
+	var wg sync.WaitGroup
+	sem := make(chan struct{}, 6)
+	for i := range cands {
+		wg.Add(1)
+		go func(idx int) {
+			defer wg.Done()
+			sem <- struct{}{}
+			defer func() { <-sem }()
+			chapters, err := s.service.GetChapterList(cands[idx].PluginID, cands[idx].SourceMangaID)
+			if err != nil {
+				logger.Warn("migrate chapter count failed", "plugin", cands[idx].PluginID, "manga", cands[idx].SourceMangaID, "error", err)
+				return
+			}
+			cands[idx].ChapterCount = len(chapters)
+		}(i)
+	}
+	wg.Wait()
+
 	var candidates []any
 	for _, c := range cands {
 		candidates = append(candidates, map[string]any{
 			"PluginID": c.PluginID, "PluginName": c.PluginName, "SourceMangaID": c.SourceMangaID, "Title": c.Title, "CoverURL": c.CoverURL, "IsExactMatch": c.IsExactMatch,
+			"ChapterCount": c.ChapterCount, "SourceChapterCount": sourceChapterCount,
+			// Fewer chapters than the entry being moved is the trap this
+			// comparison exists to catch: the migration discards the surplus.
+			"Fewer": c.ChapterCount >= 0 && sourceChapterCount > 0 && c.ChapterCount < sourceChapterCount,
 		})
 	}
 
 	data := map[string]any{
-		"PluginID":       pluginID,
-		"MangaID":        mangaID,
-		"Manga":          manga,
-		"Plugins":        plugins,
-		"Q":              displayQ,
-		"TargetPluginID": targetPluginID,
-		"Candidates":     candidates,
-		"Page":           page,
-		"HasNext":        hasNext,
-		"Failures":       failures,
-		"SearchError":    "",
+		"PluginID":           pluginID,
+		"MangaID":            mangaID,
+		"Manga":              manga,
+		"Plugins":            plugins,
+		"Q":                  displayQ,
+		"SourceChapterCount": sourceChapterCount,
+		"TargetPluginID":     targetPluginID,
+		"Candidates":         candidates,
+		"Page":               page,
+		"HasNext":            hasNext,
+		"Failures":           failures,
+		"SearchError":        "",
 	}
 	if searchErr != nil {
 		data["SearchError"] = searchErr.Error()
