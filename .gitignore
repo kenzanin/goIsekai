@@ -54,3 +54,6 @@ cmd/goisekai/goisekai
 ai.sh
 # Tray wrapper binary
 /goisekai-tray
+
+# Browser HAR captures: local reference material, carry session cookies
+*.har
