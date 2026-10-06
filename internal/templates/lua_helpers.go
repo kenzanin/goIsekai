@@ -20,6 +20,8 @@ func luaHelpers(S *lua.State) map[string]lua.NativeFunc {
 		"pageWindow":       pageWindowHelper(S),
 		"pageURL":          pageURLHelper(S),
 		"csrfInput":        csrfInputHelper(S),
+		"urlQuery":         urlQueryHelper(S),
+		"link":             linkHelper(S),
 	}
 }
 

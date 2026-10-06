@@ -52,38 +52,35 @@ return function(data)
 		.. (totalPages > 1 and "s" or "")
 
 	local query = ""
-	if q ~= "" then
-		query = query .. "?q=" .. h(q)
-	end
-	if pluginID ~= "" then
-		query = query .. (query == "" and "?" or "&") .. "pluginID=" .. h(pluginID)
-	end
 	local sortKey = data.Sort or "updated"
 	local statusFilter = data.Status or "all"
 	local tagFilter = data.Tag or ""
-	if sortKey ~= "updated" then
-		query = query .. (query == "" and "?" or "&") .. "sort=" .. h(sortKey)
-	end
-	if statusFilter ~= "all" then
-		query = query .. (query == "" and "?" or "&") .. "status=" .. h(statusFilter)
-	end
-	if tagFilter ~= "" then
-		query = query .. (query == "" and "?" or "&") .. "tag=" .. h(tagFilter)
-	end
-	local pagBase = "/view/library" .. query
 
-	-- Status filter and tag chips. Hidden inputs carry the other controls so a
-	-- change here does not reset the search text or the source filter.
-	local carried = ""
-	carried = carried .. (q ~= "" and '<input type="hidden" name="q" value="' .. h(q) .. '">' or "")
-	carried = carried
-		.. (pluginID ~= "" and '<input type="hidden" name="pluginID" value="' .. h(pluginID) .. '">' or "")
-	carried = carried
-		.. (sortKey ~= "updated" and '<input type="hidden" name="sort" value="' .. h(sortKey) .. '">' or "")
-	carried = carried
-		.. (statusFilter ~= "all" and '<input type="hidden" name="status" value="' .. h(statusFilter) .. '">' or "")
-	carried = carried
-		.. (tagFilter ~= "" and '<input type="hidden" name="tag" value="' .. h(tagFilter) .. '">' or "")
+	-- Every control on this page changes one parameter and keeps the rest. That
+	-- cannot be done by appending to a base URL: the base already carries the
+	-- parameter being changed, so "?status=reading&status=done" comes out and
+	-- the server reads the first - the link looks right and does nothing.
+	-- Instead each link rebuilds the whole query from the current parameters with
+	-- one key replaced, so a parameter can never appear twice.
+	local function libraryLink(overrides)
+		local params = {
+			q = (q ~= "" and q or nil),
+			pluginID = (pluginID ~= "" and pluginID or nil),
+			sort = (sortKey ~= "updated" and sortKey or nil),
+			status = (statusFilter ~= "all" and statusFilter or nil),
+			tag = (tagFilter ~= "" and tagFilter or nil),
+		}
+		for key, val in pairs(overrides or {}) do
+			if val == nil or val == "" or val == "all" or val == "updated" then
+				params[key] = nil
+			else
+				params[key] = val
+			end
+		end
+		return link("/view/library", urlQuery(params))
+	end
+
+	local pagBase = libraryLink({})
 
 	local statusOpts = {
 		{ "all", "All" },
@@ -96,10 +93,7 @@ return function(data)
 		local on = o[1] == statusFilter
 		statusChips = statusChips
 			.. '<a href="'
-			.. pagBase
-			.. (query == "" and "?" or "&")
-			.. "status="
-			.. h(o[1])
+			.. libraryLink({ status = o[1] })
 			.. '" class="inline-flex items-center gap-1 rounded-md border px-2.5 py-1 text-xs '
 			.. (on and "border-indigo-500 bg-indigo-500/15 text-indigo-200" or "border-neutral-700 text-neutral-400 hover:bg-neutral-800")
 			.. '">'
@@ -128,10 +122,7 @@ return function(data)
 			local on = c[1] == tagFilter
 			tagBar = tagBar
 				.. '<a href="'
-				.. pagBase
-				.. (query == "" and "?" or "&")
-				.. "tag="
-				.. h(c[1])
+				.. libraryLink({ tag = c[1] })
 				.. '" class="inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-xs '
 				.. (on and "border-emerald-500 bg-emerald-500/15 text-emerald-200" or "border-neutral-700 text-neutral-400 hover:bg-neutral-800")
 				.. '">'
@@ -142,6 +133,31 @@ return function(data)
 		end
 		tagBar = tagBar .. "</div>"
 	end
+
+	-- The sort control submits only the parameters that are not its own, so it
+	-- can never collide with a stale hidden input carrying the same key.
+	-- Each form carries the parameters it does not itself submit. A hidden input
+	-- for a key the form also submits would appear twice, and the server would
+	-- read the first and ignore what the user just picked - so the search form
+	-- carries everything except q, which its own input supplies.
+	local searchCarried = ""
+	searchCarried = searchCarried
+		.. (pluginID ~= "" and '<input type="hidden" name="pluginID" value="' .. h(pluginID) .. '">' or "")
+	searchCarried = searchCarried
+		.. (sortKey ~= "updated" and '<input type="hidden" name="sort" value="' .. h(sortKey) .. '">' or "")
+	searchCarried = searchCarried
+		.. (statusFilter ~= "all" and '<input type="hidden" name="status" value="' .. h(statusFilter) .. '">' or "")
+	searchCarried = searchCarried
+		.. (tagFilter ~= "" and '<input type="hidden" name="tag" value="' .. h(tagFilter) .. '">' or "")
+
+	local sortCarried = ""
+	sortCarried = sortCarried .. (q ~= "" and '<input type="hidden" name="q" value="' .. h(q) .. '">' or "")
+	sortCarried = sortCarried
+		.. (pluginID ~= "" and '<input type="hidden" name="pluginID" value="' .. h(pluginID) .. '">' or "")
+	sortCarried = sortCarried
+		.. (statusFilter ~= "all" and '<input type="hidden" name="status" value="' .. h(statusFilter) .. '">' or "")
+	sortCarried = sortCarried
+		.. (tagFilter ~= "" and '<input type="hidden" name="tag" value="' .. h(tagFilter) .. '">' or "")
 
 	-- Source filter chip: clears pluginID, keeps q.
 	local chip = ""
@@ -171,7 +187,7 @@ return function(data)
 		.. "</div></div>"
 		.. chip
 		.. '<form method="get" action="/view/library" class="flex-1 min-w-[180px] max-w-md" role="search">'
-		.. (pluginID ~= "" and '<input type="hidden" name="pluginID" value="' .. h(pluginID) .. '">' or "")
+		.. searchCarried
 		.. '<div class="flex gap-2">'
 		.. '<div class="relative flex-1">'
 		.. '<svg class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-500 pointer-events-none" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path stroke-linecap="round" d="m21 21-4.35-4.35"/></svg>'
@@ -183,7 +199,7 @@ return function(data)
 		.. "</div></form>"
 		.. '<div class="flex items-center gap-1.5 flex-wrap">' .. statusChips .. "</div>"
 		.. '<form method="get" action="/view/library" class="flex items-center">'
-		.. carried
+		.. sortCarried
 		.. '<select name="sort" onchange="this.form.submit()" class="bg-neutral-900 border border-neutral-700 rounded-md px-2 py-1.5 text-xs text-neutral-300">'
 		.. '<option value="updated"'
 		.. (sortKey == "updated" and " selected" or "")
