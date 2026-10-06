@@ -258,6 +258,36 @@
     return m;
   }
 
+  // The server answers a failed reader-data request with a plain-text reason,
+  // and that reason is the whole point: it carries the plugin's own message,
+  // which is what says a page list could not be decrypted or which upstream
+  // refused. Collapsing it to "Server error (502)" hid every one of those, so
+  // the reader just looked broken with no explanation. Strip the transport
+  // prefix the handler adds and show what is underneath.
+  function readerDataFailure(r) {
+    return r
+      .text()
+      .then((body) => {
+        var m = (body || '').trim();
+        return m.replace(/^failed to load pages:\s*/i, '');
+      })
+      .catch(() => '')
+      .then((detail) => {
+        if (!detail || detail.charAt(0) === '<') return `Server error (${r.status})`;
+        // Peel the host's plumbing so what is left is the part the user can act
+        // on. The plugin's own sentence is the reason; the rest is the call stack
+        // between here and it - the handler's prefix, the bridge, the runtime, and
+        // the Lua chunk position - none of which a reader can do anything about.
+        return detail
+          .replace(/^failed to load pages:\s*/i, '')
+          .replace(/^bridge:\s*/i, '')
+          .replace(/^get page list:\s*/i, '')
+          .replace(/^(lua|js|yaegi|wasm) plugin \S+\s+\w+:\s*/i, '')
+          .replace(/\[string "[^"]+"\]:\d+:\s*/, '')
+          .trim();
+      });
+  }
+
   function showNotice(msg) {
     errPanel.querySelector('p').textContent = msg;
     errPanel.style.display = 'flex';
@@ -688,7 +718,7 @@
     };
     fetch(`/api/reader-data/${[pid, mid, targetCID].map(encodeURIComponent).join('/')}`)
       .then((r) => {
-        if (!r.ok) throw new Error(`HTTP ${r.status}`);
+        if (!r.ok) return readerDataFailure(r).then((msg) => Promise.reject(new Error(msg)));
         return r.json();
       })
       .then((data) => {
@@ -698,7 +728,10 @@
           return;
         }
         if (!(data.pages || []).length) {
-          showReaderError('Empty chapter (plugin failed to fetch pages) — try Retry');
+          showReaderError(
+            'This chapter has no pages. The plugin returned an empty page list — ' +
+              'the site may have changed how it names them. Check the log for the reason.',
+          );
           showSpinner(false);
           return;
         }

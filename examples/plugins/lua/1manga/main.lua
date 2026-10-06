@@ -80,7 +80,7 @@ local function encrypted_page_list(blob, slug, number)
 			end
 		end
 		if not key then
-			return nil
+			return nil, "no mhub_access key available"
 		end
 		-- This endpoint authenticates on the cookie, not the x-mhub-access
 		-- header the GraphQL call uses: the header alone answers 403.
@@ -90,9 +90,13 @@ local function encrypted_page_list(blob, slug, number)
 			["Referer"] = SITE_URL .. "/chapter/" .. slug .. "/chapter-" .. number,
 		})
 		if not resp or resp.status ~= 200 then
-			return nil
+			return nil, "/api/chapter-crypto returned " .. tostring(resp and resp.status or 0)
 		end
-		return host.json.decode(resp.body)
+		local parsed = host.json.decode(resp.body)
+		if not parsed or not parsed.key or not parsed.keyId then
+			return nil, "/api/chapter-crypto returned no usable key"
+		end
+		return parsed
 	end
 
 	local parts = {}
@@ -101,33 +105,40 @@ local function encrypted_page_list(blob, slug, number)
 	end
 	if #parts ~= 6 or parts[1] ~= "enc" or parts[2] ~= "v1" then
 		log.error("1manga: unrecognised pages envelope")
-		return nil
+		return nil, "unrecognised envelope"
 	end
 	local _, _, keyId, iv, tag, ciphertext = parts[1], parts[2], parts[3], parts[4], parts[5], parts[6]
 
-	local mat = material()
+	local mat, why = material()
 	if mat and mat.keyId ~= keyId then
+		-- The key is served per session, so a stale cookie yields a key the
+		-- message was not encrypted under. Drop it and ask again once.
 		cachedKey = nil
-		mat = material()
+		mat, why = material()
 	end
 	if not mat then
-		log.error("1manga: chapter-crypto unavailable")
-		return nil
+		log.error("1manga: chapter-crypto unavailable: " .. tostring(why))
+		return nil, why or "chapter-crypto unavailable"
 	end
 	if mat.keyId ~= keyId then
 		log.error("1manga: keyId mismatch, blob " .. keyId .. " vs crypto " .. tostring(mat.keyId))
-		return nil
+		return nil,
+			"the page list is encrypted with a key this session was not served (blob "
+			.. keyId
+			.. ", served "
+			.. tostring(mat.keyId)
+			.. ") - the site rotates keys per session, so reload and retry"
 	end
 
 	local plain, err = host.crypto.aes_gcm_decrypt(mat.key, iv, tag, ciphertext)
 	if not plain then
 		log.error("1manga: pages decrypt failed: " .. tostring(err))
-		return nil
+		return nil, tostring(err)
 	end
 	local decoded = host.json.decode(plain)
 	if not decoded or type(decoded.p) ~= "string" or type(decoded.i) ~= "table" then
 		log.error("1manga: unexpected pages plaintext")
-		return nil
+		return nil, "decrypted payload had no {p, i} shape"
 	end
 
 	local out = {}
@@ -398,15 +409,21 @@ function get_page_list(arg)
 	-- this manga is "1a.jpg 2a.jpg 3a.jpg 4.jpg ... 9a.jpg ...", so both the
 	-- extension probe and the binary search both fail on it.
 	if type(chapter.pages) == "string" and string.sub(chapter.pages, 1, 7) == "enc:v1:" then
-		local pages = encrypted_page_list(chapter.pages, slug, number)
+		local pages, why = encrypted_page_list(chapter.pages, slug, number)
 		if pages then
 			log.info("1manga pages: found " .. tostring(#pages) .. " pages for " .. chapterID .. " (decrypted)")
 			return host.json.encode(pages)
 		end
-		-- Decrypt failed; fall through to probing rather than showing nothing.
+		-- Fail loudly instead of probing. An encrypted pages field means this
+		-- chapter is served from the authoritative list, so the CDN pattern is
+		-- already known to be wrong for it: probing then produced a list that
+		-- looked plausible and silently dropped pages (observed on chapter 58,
+		-- which reported 18 pages it had only guessed at). An empty chapter with
+		-- a stated cause beats a wrong chapter that reads as complete.
+		error("1manga: cannot decrypt the page list for " .. chapterID .. ": " .. tostring(why))
 	end
 
-	-- Fallback for a plaintext or undecryptable pages field: find the page count
+	-- Fallback for a plaintext or unreadable pages field: find the page count
 	-- by probing (page N exists with 200, N+1 404s). Binary search keeps it to
 	-- ~9 cheap requests; the list lands in chapters_pages cache afterward, so the
 	-- cost is paid once per chapter. This assumes contiguous page numbers, which
