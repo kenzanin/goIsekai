@@ -26,7 +26,7 @@ return function(data)
 		-- Action dropdown (bulk progress + cache). Rendered inside the top
 		-- pagination row via its Inner slot so the dropdown shares a line with the
 		-- page numbers instead of sitting in its own row above them.
-		local actionsInner = '<form id="chapter-actions" method="post" action="/action/chapter-actions" class="flex flex-wrap items-center gap-2" data-confirm-actions="mark-selected-unread,mark-up-to,clear-up-to,mark-all-unread,clear-cache">'
+		local actionsInner = '<form id="chapter-actions" method="post" action="/action/chapter-actions" class="flex flex-wrap items-center gap-2" data-confirm-actions="mark-selected-unread,set-up-to-read,set-up-to-unread,set-down-to-read,set-down-to-unread,mark-all-unread,clear-cache">'
 			.. csrfInput(data.csrf_token or "")
 			.. '<input type="hidden" name="pluginID" value="'
 			.. h(pluginID)
@@ -45,9 +45,13 @@ return function(data)
 			.. '<option value="skip-selected">Skip ticked (ignore when continuing)</option>'
 			.. '<option value="unskip-selected">Unskip ticked</option>'
 			.. "</optgroup>"
-			.. '<optgroup label="Ticked chapters and everything before them">'
-			.. '<option value="mark-up-to">Mark ticked and earlier as read</option>'
-			.. '<option value="clear-up-to">Mark ticked and earlier as unread</option>'
+			.. '<optgroup label="Ticked chapter and everything before it">'
+			.. '<option value="set-up-to-read">Set up to as read</option>'
+			.. '<option value="set-up-to-unread">Set up to as unread</option>'
+			.. "</optgroup>"
+			.. '<optgroup label="Ticked chapter and everything after it">'
+			.. '<option value="set-down-to-read">Set down to as read</option>'
+			.. '<option value="set-down-to-unread">Set down to as unread</option>'
 			.. "</optgroup>"
 			.. '<optgroup label="Whole manga (ticked chapters ignored)">'
 			.. '<option value="mark-all-read">Mark all as read</option>'
@@ -90,15 +94,16 @@ return function(data)
 			local lastPageRead = p.LastPageRead or 0
 			local cachedPages = p.CachedPages or 0
 
-			-- The checkbox feeds the bulk mark read/unread action, so it has to
-			-- mirror the chapter's read state. It never did, which made a finished
-			-- chapter look unread on the very page that reports its progress.
+			-- The checkbox is a selection, never a read indicator: it renders
+			-- empty on every load, so it is always empty again after an action.
+			-- It used to mirror the read state, which silently widened the range
+			-- actions - "set up to" takes an extreme of the ticked rows, so every
+			-- already-read chapter widened the range the user thought they picked.
+			-- Read state is still on the row: struck-through title plus a green tick.
 			local rowHTML = '<div class="flex items-center gap-3 py-3 px-2 -mx-2 rounded hover:bg-neutral-900 transition">'
 				.. '<input type="checkbox" name="chapterIDs" value="'
 				.. h(cID)
-				.. '" form="chapter-actions" class="size-4 accent-indigo-600 shrink-0"'
-				.. (isDone and ' checked' or '')
-				.. '>'
+				.. '" form="chapter-actions" class="size-4 accent-indigo-600 shrink-0">'
 				.. '<a href="/view/read/'
 				.. h(ue(pluginID))
 				.. "/"

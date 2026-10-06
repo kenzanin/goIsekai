@@ -475,6 +475,60 @@ func TestSetChaptersBulkRead(t *testing.T) {
 		t.Fatal("unknown chapter should error")
 	}
 
+	// "Down to" is the mirror: the boundary is the LOWEST chapter_num of the
+	// selection, and everything at or after it flips. This is the case that
+	// would silently regress to up-to if the two shared one comparison.
+	if err := db.SetMangaChaptersRead(mangaID, false); err != nil {
+		t.Fatalf("reset for down-to: %v", err)
+	}
+	if err := db.SetChaptersDownTo(mangaID, []string{"cs3"}, true); err != nil {
+		t.Fatalf("SetChaptersDownTo: %v", err)
+	}
+	p = chapterProgressBySource(t, db, mangaID)
+	for _, src := range []string{"cs3", "cs4"} {
+		if !p[src].IsRead {
+			t.Fatalf("%s should be read by down-to cs3: %+v", src, p[src])
+		}
+	}
+	for _, src := range []string{"cs1", "cs2"} {
+		if p[src].IsRead {
+			t.Fatalf("%s is before the boundary: %+v", src, p[src])
+		}
+	}
+
+	// A multi-selection uses its MINIMUM as the boundary (cs2,cs4 -> 2), which is
+	// the opposite of up-to.
+	if err := db.SetMangaChaptersRead(mangaID, false); err != nil {
+		t.Fatalf("reset before the multi-selection case: %v", err)
+	}
+	if err := db.SetChaptersDownTo(mangaID, []string{"cs2", "cs4"}, true); err != nil {
+		t.Fatalf("SetChaptersDownTo multi: %v", err)
+	}
+	p = chapterProgressBySource(t, db, mangaID)
+	if p["cs1"].IsRead {
+		t.Fatalf("cs1 is before the lowest ticked chapter: %+v", p["cs1"])
+	}
+	for _, src := range []string{"cs2", "cs3", "cs4"} {
+		if !p[src].IsRead {
+			t.Fatalf("%s should be read by down-to cs2: %+v", src, p[src])
+		}
+	}
+
+	// The unread direction clears the same range.
+	if err := db.SetChaptersDownTo(mangaID, []string{"cs3"}, false); err != nil {
+		t.Fatalf("SetChaptersDownTo unread: %v", err)
+	}
+	p = chapterProgressBySource(t, db, mangaID)
+	if p["cs3"].IsRead || p["cs4"].IsRead {
+		t.Fatalf("cs3 and cs4 should be cleared by down-to cs3: %+v", p)
+	}
+	if !p["cs2"].IsRead {
+		t.Fatalf("cs2 is before the boundary and must stay read: %+v", p["cs2"])
+	}
+	if err := db.SetChaptersDownTo(mangaID, []string{"cs9"}, true); err == nil {
+		t.Fatal("unknown chapter should error for down-to too")
+	}
+
 	// Whole-manga toggle.
 	if err := db.SetMangaChaptersRead(mangaID, true); err != nil {
 		t.Fatalf("SetMangaChaptersRead: %v", err)

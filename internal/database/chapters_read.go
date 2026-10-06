@@ -58,8 +58,27 @@ func (d *DB) SetChaptersRead(mangaIntID int64, sourceIDs []string, read bool) er
 // SetChaptersUpTo marks (or unmarks) every chapter of a manga whose chapter_num
 // is <= the highest chapter_num among the given source chapters.
 func (d *DB) SetChaptersUpTo(mangaIntID int64, sourceIDs []string, read bool) error {
+	return d.setChaptersToBound(mangaIntID, sourceIDs, read, false)
+}
+
+// SetChaptersDownTo marks (or unmarks) every chapter of a manga whose chapter_num
+// is >= the lowest chapter_num among the given source chapters. It is the mirror
+// of SetChaptersUpTo for catching up on a newer end of the list.
+func (d *DB) SetChaptersDownTo(mangaIntID int64, sourceIDs []string, read bool) error {
+	return d.setChaptersToBound(mangaIntID, sourceIDs, read, true)
+}
+
+// setChaptersToBound applies one read flag to a contiguous range of a manga,
+// anchored on the ticked chapters. Upward takes the highest ticked chapter_num
+// and covers everything at or before it; downward takes the lowest and covers
+// everything at or after it.
+func (d *DB) setChaptersToBound(mangaIntID int64, sourceIDs []string, read, down bool) error {
+	dir := "up to"
+	if down {
+		dir = "down to"
+	}
 	if len(sourceIDs) == 0 {
-		return fmt.Errorf("set chapters up to: no chapters given")
+		return fmt.Errorf("set chapters %s: no chapters given", dir)
 	}
 	ids := make([]Expression, 0, len(sourceIDs))
 	for _, id := range sourceIDs {
@@ -74,17 +93,21 @@ func (d *DB) SetChaptersUpTo(mangaIntID int64, sourceIDs []string, read bool) er
 		return err
 	}
 	if len(nums) == 0 {
-		return fmt.Errorf("set chapters up to: no matching chapters")
+		return fmt.Errorf("set chapters %s: no matching chapters", dir)
 	}
 	bound := nums[0].ChapterNum
 	for _, n := range nums[1:] {
-		if n.ChapterNum > bound {
+		if (down && n.ChapterNum < bound) || (!down && n.ChapterNum > bound) {
 			bound = n.ChapterNum
 		}
 	}
+	range_ := Chapters.ChapterNum.LT_EQ(Float(bound))
+	if down {
+		range_ = Chapters.ChapterNum.GT_EQ(Float(bound))
+	}
 	_, err = Chapters.UPDATE().
 		SET(Chapters.IsRead.SET(Int(readFlag(read)))).
-		WHERE(Chapters.MangaID.EQ(Int(mangaIntID)).AND(Chapters.ChapterNum.LT_EQ(Float(bound)))).
+		WHERE(Chapters.MangaID.EQ(Int(mangaIntID)).AND(range_)).
 		Exec(d.db)
 	return err
 }

@@ -45,8 +45,14 @@ func TestDropdownActionsAreAllHandled(t *testing.T) {
 		if !strings.Contains(src, `"`+value+`"`) {
 			t.Errorf("dropdown offers %q but actions_progress.go has no case for it", value)
 		}
-		// Destructive actions must stay behind the confirm dialog.
-		if !confirmed[value] && (strings.Contains(value, "unread") || strings.Contains(value, "clear")) {
+		// Destructive actions must stay behind the confirm dialog. "to-read"
+		// counts: a range action marks every chapter on one side of the ticked
+		// row, which is exactly as hard to undo as clearing the read flag. The
+		// original rule missed mark-up-to for that reason.
+		destructive := strings.Contains(value, "unread") ||
+			strings.Contains(value, "clear") ||
+			strings.HasSuffix(value, "-to-read")
+		if !confirmed[value] && destructive {
 			t.Errorf("%q is destructive but missing from data-confirm-actions", value)
 		}
 	}

@@ -48,6 +48,53 @@ type imageCall struct {
 	err  error
 }
 
+// cachedImage returns the bytes for url from the in-memory or disk cache.
+//
+// It is a function rather than inline code because GetImage has to run it twice:
+// once before joining the singleflight, and once after winning it. The second
+// probe closes a window that is otherwise a duplicate upstream fetch - see the
+// comment at that call site.
+func (s *AppService) cachedImage(pluginID, mangaID, chapterID, url string) ([]byte, bool) {
+	// L1: in-memory cache.
+	s.imageMu.RLock()
+	cached, ok := s.imageCache[url]
+	s.imageMu.RUnlock()
+	if ok {
+		logger.Debug("image cache: L1 hit", "url", url)
+		return cached, true
+	}
+
+	// L2: disk cache. Converted images are stored as <key>.<format>, anything
+	// that kept its original bytes (gif passthrough, undecodable, "original"
+	// mode) as <key>.img. Older builds used ".webp"/".img" only, so every
+	// format we can write is tried before declaring a miss. JXL comes last:
+	// when a format switch left several copies behind, the renderable one wins.
+	base := s.diskCachePath(pluginID, mangaID, chapterID, url)
+	if base == "" {
+		return nil, false
+	}
+	for _, ext := range []string{
+		"." + string(FormatAVIF), "." + string(FormatWebP), ".img",
+		"." + string(FormatJXL),
+	} {
+		data, err := os.ReadFile(base + ext)
+		if err != nil {
+			continue
+		}
+		if !validateImageFast(data) {
+			// Invalid cached image: delete stale file and treat as miss.
+			_ = os.Remove(base + ext)
+			continue
+		}
+		s.imageMu.Lock()
+		s.imageCache[url] = data
+		s.imageMu.Unlock()
+		logger.Debug("image cache: L2 hit", "url", url, "ext", ext)
+		return data, true
+	}
+	return nil, false
+}
+
 // GetImage returns the bytes for one image URL, from cache when possible and
 // otherwise via the image lane. ctx is the caller's request context: cancelling
 // it abandons the queued job and tears down the in-flight upstream call, which
@@ -64,37 +111,8 @@ func (s *AppService) GetImage(ctx context.Context, pluginID, url string, headers
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
-	// L1: in-memory cache.
-	s.imageMu.RLock()
-	if cached, ok := s.imageCache[url]; ok {
-		s.imageMu.RUnlock()
-		logger.Debug("image cache: L1 hit", "url", url)
-		return cached, nil
-	}
-	s.imageMu.RUnlock()
-
-	// L2: disk cache. Converted images are stored as <key>.<format>, anything
-	// that kept its original bytes (gif passthrough, undecodable, "original"
-	// mode) as <key>.img. Older builds used ".webp"/".img" only, so every
-	// format we can write is tried before declaring a miss. JXL comes last:
-	// when a format switch left several copies behind, the renderable one wins.
-	if base := s.diskCachePath(pluginID, mangaID, chapterID, url); base != "" {
-		for _, ext := range []string{
-			"." + string(FormatAVIF), "." + string(FormatWebP), ".img",
-			"." + string(FormatJXL),
-		} {
-			if data, err := os.ReadFile(base + ext); err == nil {
-				if validateImageFast(data) {
-					s.imageMu.Lock()
-					s.imageCache[url] = data
-					s.imageMu.Unlock()
-					logger.Debug("image cache: L2 hit", "url", url, "ext", ext)
-					return data, nil
-				}
-				// Invalid cached image: delete stale file and treat as miss.
-				_ = os.Remove(base + ext)
-			}
-		}
+	if data, ok := s.cachedImage(pluginID, mangaID, chapterID, url); ok {
+		return data, nil
 	}
 
 	// Singleflight: another caller may already be fetching this URL (draw +
@@ -109,6 +127,18 @@ func (s *AppService) GetImage(ctx context.Context, pluginID, url string, headers
 		stored, loaded := s.imageFlight.LoadOrStore(url, &imageCall{done: make(chan struct{})})
 		if !loaded {
 			call = stored.(*imageCall)
+			// The cache probe is not atomic with this LoadOrStore. A previous
+			// leader can miss the cache, finish its fetch, write the file and
+			// delete the singleflight entry while this goroutine is between the
+			// two calls - leaving us to become a second leader for a page that is
+			// already on disk. Probing again here, with the entry definitively
+			// ours, closes that window: no duplicate upstream fetch for one page.
+			if data, ok := s.cachedImage(pluginID, mangaID, chapterID, url); ok {
+				call.data = data
+				close(call.done)
+				s.imageFlight.Delete(url)
+				return data, nil
+			}
 			break
 		}
 		shared := stored.(*imageCall)

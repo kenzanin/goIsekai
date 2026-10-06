@@ -30,12 +30,26 @@ func (s *AppService) SetChaptersRead(pluginID, mangaID string, chapterIDs []stri
 // SetChaptersUpTo marks (or unmarks) every chapter up to the highest of the
 // given chapters.
 func (s *AppService) SetChaptersUpTo(pluginID, mangaID string, chapterIDs []string, read bool) error {
+	return s.setChaptersTo(pluginID, mangaID, chapterIDs, read, false)
+}
+
+// SetChaptersDownTo marks (or unmarks) every chapter from the lowest of the given
+// chapters onward.
+func (s *AppService) SetChaptersDownTo(pluginID, mangaID string, chapterIDs []string, read bool) error {
+	return s.setChaptersTo(pluginID, mangaID, chapterIDs, read, true)
+}
+
+func (s *AppService) setChaptersTo(pluginID, mangaID string, chapterIDs []string, read, down bool) error {
 	mangaIntID, err := s.db.ResolveMangaIntID(pluginID, mangaID)
 	if err != nil {
 		return fmt.Errorf("bridge: resolve manga: %w", err)
 	}
-	if err := s.db.SetChaptersUpTo(mangaIntID, chapterIDs, read); err != nil {
-		return fmt.Errorf("bridge: set chapters up to: %w", err)
+	dir, set := "up to", s.db.SetChaptersUpTo
+	if down {
+		dir, set = "down to", s.db.SetChaptersDownTo
+	}
+	if err := set(mangaIntID, chapterIDs, read); err != nil {
+		return fmt.Errorf("bridge: set chapters %s: %w", dir, err)
 	}
 	return nil
 }

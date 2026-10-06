@@ -136,14 +136,20 @@ func (s *Server) handleChapterActions(w http.ResponseWriter, r *http.Request) {
 		// called mark-selected-show/hide here while every row button called it
 		// Skip, so one flag had two names in the same screen.
 		err = s.service.SetChaptersSkip(pluginID, mangaID, chapterIDs, action == "skip-selected")
-	case "mark-up-to", "clear-up-to":
+	case "set-up-to-read", "set-up-to-unread", "set-down-to-read", "set-down-to-unread":
 		if len(chapterIDs) == 0 {
 			http.Error(w, "no chapters selected", http.StatusBadRequest)
 			return
 		}
-		// Bound is the highest chapter_num among the ticked rows, and the UPDATE
-		// is chapter_num <= bound, so "up to" means numerically at or before it.
-		err = s.service.SetChaptersUpTo(pluginID, mangaID, chapterIDs, action == "mark-up-to")
+		// The bound is an extreme of the ticked rows' chapter_num, not the ticked
+		// rows themselves: "up to" takes the highest and applies chapter_num <=
+		// bound, "down to" takes the lowest and applies chapter_num >= bound.
+		read := action == "set-up-to-read" || action == "set-down-to-read"
+		if action == "set-down-to-read" || action == "set-down-to-unread" {
+			err = s.service.SetChaptersDownTo(pluginID, mangaID, chapterIDs, read)
+		} else {
+			err = s.service.SetChaptersUpTo(pluginID, mangaID, chapterIDs, read)
+		}
 	case "mark-all-read", "mark-all-unread":
 		err = s.service.SetMangaChaptersRead(pluginID, mangaID, action == "mark-all-read")
 	case "clear-cache":
