@@ -522,8 +522,10 @@ func (p *Pool) Enqueue(ctx context.Context, job *Job) (*Future, error) {
 			cancel()
 			p.deregister(job.ID)
 			if errors.Is(ctx.Err(), context.DeadlineExceeded) {
+				h.failQueued(ErrEnqueueTimeout)
 				return nil, ErrEnqueueTimeout
 			}
+			h.failQueued(ctx.Err())
 			return nil, ctx.Err()
 		}
 	}
@@ -537,12 +539,34 @@ func (p *Pool) Enqueue(ctx context.Context, job *Job) (*Future, error) {
 	case <-timer.C:
 		cancel()
 		p.deregister(job.ID)
+		h.failQueued(ErrBusy)
 		return nil, ErrBusy
 	case <-ctx.Done():
 		cancel()
 		p.deregister(job.ID)
+		h.failQueued(ctx.Err())
 		return nil, ctx.Err()
 	}
+}
+
+// failQueued completes a job's future after it was published to the registry and
+// the dedupe map but never reached a lane queue.
+//
+// Enqueue publishes p.registry[job.ID] and p.dedupe[key] before pushing onto the
+// lane, so a concurrent Enqueue with the same DedupeKey can be handed this
+// future in that window. If the push then fails, deregister removes the entry and
+// nothing will ever close the future's done channel - a follower would park in
+// Await until its own context expired, or forever if it had no deadline.
+// Completing the future turns that park into an error the caller can act on.
+func (h *jobHandle) failQueued(err error) {
+	h.setStatus(StatusDead)
+	h.setErr(err)
+	h.fut.once.Do(func() {
+		h.fut.mu.Lock()
+		h.fut.result = err
+		h.fut.mu.Unlock()
+		close(h.fut.done)
+	})
 }
 
 // takeKey implements per-plugin fairness for one lane: at most one in-flight

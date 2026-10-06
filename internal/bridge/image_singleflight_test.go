@@ -26,32 +26,37 @@ import (
 // server that delays, so the leader is reliably still in flight while the
 // followers arrive. Every caller must return; one that does not is the bug.
 func TestGetImageSingleflightNeverParksACaller(t *testing.T) {
-	var hits atomic.Int32
 	var buf bytes.Buffer
 	if err := png.Encode(&buf, image.NewRGBA(image.Rect(0, 0, 4, 4))); err != nil {
 		t.Fatalf("png.Encode: %v", err)
 	}
 	payload := buf.Bytes()
 
-	// Delay keeps the leader in flight while followers pile in, which is exactly
-	// the window the race lived in.
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		hits.Add(1)
-		time.Sleep(5 * time.Millisecond)
-		w.Header().Set("Content-Type", "image/png")
-		_, _ = w.Write(payload)
-	}))
-	t.Cleanup(srv.Close)
-
 	s := newTestServiceWithCache(t)
 
-	// A distinct PATH per round keeps every round a genuine cache miss. The
-	// disk cache keys on the path component alone (query strings vary on signed
-	// CDN URLs), so varying only the query would be served from round 0.
 	const rounds = 40
 	const callers = 16
 
 	for round := range rounds {
+		// A fresh server per round, not just a fresh path. Image pacing and the
+		// per-host admission gate are both keyed by host (paceImage, hostAcquire),
+		// so one shared server serialises every round at the 1.1s upstream
+		// convention and this test took 43s instead of well under a second.
+		//
+		// The delay keeps the leader in flight while followers pile in, which is
+		// exactly the window the race lived in.
+		var hits atomic.Int32
+		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			hits.Add(1)
+			time.Sleep(5 * time.Millisecond)
+			w.Header().Set("Content-Type", "image/png")
+			_, _ = w.Write(payload)
+		}))
+		t.Cleanup(srv.Close)
+
+		// A distinct host per round also makes every round a genuine cache miss:
+		// the disk cache keys on the path component alone (query strings vary on
+		// signed CDN URLs), so varying only the query would be served from round 0.
 		url := srv.URL + "/img/round/" + strconv.Itoa(round)
 		before := hits.Load()
 
