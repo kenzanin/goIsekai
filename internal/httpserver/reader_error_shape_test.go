@@ -1,6 +1,9 @@
 package httpserver
 
 import (
+	"encoding/json"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"strings"
@@ -27,13 +30,21 @@ func TestReaderSurfacesThePluginsOwnReason(t *testing.T) {
 	}
 	// The one path that must stay: a body that is not text (an HTML error page
 	// from a proxy, say) must not be dumped into the panel.
-	if !strings.Contains(js, "Server error (${r.status})") {
-		t.Error("non-text bodies must still fall back to the bare status")
+	if !strings.Contains(js, "Server error (${status})") {
+		t.Error("a body with no error field must still fall back to the bare status")
+	}
+
+	// The envelope is the contract; scraping text is not. /api/reader-data
+	// answers writeErr's {"error": ...} like every other /api route.
+	if !strings.Contains(js, "JSON.parse(raw)") {
+		t.Error("the error envelope is not parsed")
+	}
+	if strings.Contains(js, "failed to load pages:") {
+		t.Error("still stripping a transport prefix the server no longer sends")
 	}
 
 	// The host's plumbing is peeled so the reader sees the reason, not the stack.
 	for _, want := range []string{
-		"failed to load pages:",
 		"get page list:",
 		`\[string "`,
 	} {
@@ -54,5 +65,29 @@ func TestReaderExplainsAnEmptyPageList(t *testing.T) {
 	js := string(src)
 	if !strings.Contains(js, "no pages") || !strings.Contains(js, "plugin") {
 		t.Error("the empty-page-list message does not say the plugin returned nothing")
+	}
+}
+
+// The server side of the same contract. /api/reader-data used http.Error, so it
+// answered a failure with plain text while every other /api route answers with
+// {"error": ...}; that is what forced reader.js into scraping the body.
+func TestReaderDataAnswersWithTheErrorEnvelope(t *testing.T) {
+	srv := testServer(t, "")
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/api/reader-data/1manga/m/ch", nil)
+	srv.Router.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusBadRequest && rec.Code != http.StatusBadGateway {
+		t.Fatalf("expected a failure status for an unknown chapter, got %d", rec.Code)
+	}
+	if ct := rec.Header().Get("Content-Type"); !strings.HasPrefix(ct, "application/json") {
+		t.Fatalf("content-type = %q, want application/json: the envelope is the contract", ct)
+	}
+	var body map[string]string
+	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
+		t.Fatalf("body is not the JSON envelope (%v): %q", err, rec.Body.String())
+	}
+	if body["error"] == "" {
+		t.Error("the envelope carries no error message")
 	}
 }

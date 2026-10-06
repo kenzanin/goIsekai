@@ -258,34 +258,40 @@
     return m;
   }
 
-  // The server answers a failed reader-data request with a plain-text reason,
-  // and that reason is the whole point: it carries the plugin's own message,
-  // which is what says a page list could not be decrypted or which upstream
-  // refused. Collapsing it to "Server error (502)" hid every one of those, so
-  // the reader just looked broken with no explanation. Strip the transport
-  // prefix the handler adds and show what is underneath.
+  // The server answers a failed reader-data request with the standard JSON error
+  // envelope, and its "error" field carries the plugin's own message - the part
+  // that says a page list could not be decrypted, or which upstream refused.
+  // Collapsing that to "Server error (502)" hid every one of them, so the reader
+  // just looked broken with nothing to act on.
+  function errorFromBody(raw, status) {
+    if (!raw) return `Server error (${status})`;
+    var parsed = null;
+    try {
+      parsed = JSON.parse(raw);
+    } catch {
+      // Not the envelope. An HTML page here came from something between here and
+      // the app, so show the status rather than dump markup into the panel.
+      return raw.charAt(0) === '<' ? `Server error (${status})` : raw;
+    }
+    return parsed?.error ? String(parsed.error) : `Server error (${status})`;
+  }
+
   function readerDataFailure(r) {
     return r
       .text()
-      .then((body) => {
-        var m = (body || '').trim();
-        return m.replace(/^failed to load pages:\s*/i, '');
-      })
       .catch(() => '')
-      .then((detail) => {
-        if (!detail || detail.charAt(0) === '<') return `Server error (${r.status})`;
-        // Peel the host's plumbing so what is left is the part the user can act
-        // on. The plugin's own sentence is the reason; the rest is the call stack
-        // between here and it - the handler's prefix, the bridge, the runtime, and
-        // the Lua chunk position - none of which a reader can do anything about.
-        return detail
-          .replace(/^failed to load pages:\s*/i, '')
+      .then((body) => errorFromBody((body || '').trim(), r.status))
+      .then((detail) =>
+        // Peel the plumbing the host still adds, so what is left is the part a
+        // reader can act on: the bridge, the runtime, and the plugin chunk
+        // position say nothing they can do anything about.
+        detail
           .replace(/^bridge:\s*/i, '')
           .replace(/^get page list:\s*/i, '')
           .replace(/^(lua|js|yaegi|wasm) plugin \S+\s+\w+:\s*/i, '')
           .replace(/\[string "[^"]+"\]:\d+:\s*/, '')
-          .trim();
-      });
+          .trim(),
+      );
   }
 
   function showNotice(msg) {

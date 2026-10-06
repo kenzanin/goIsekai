@@ -125,8 +125,11 @@ func (s *Server) readerData(w http.ResponseWriter, r *http.Request) {
 	pluginID := param(r, "pluginID")
 	mangaID := param(r, "mangaID")
 	chapterID := param(r, "chapterID")
+	// This is an /api route, so it answers with the JSON error envelope like the
+	// rest of them. It used to http.Error plain text, which is why reader.js had
+	// to scrape the body: the plugin's reason was there, just not as JSON.
 	if pluginID == "" || mangaID == "" || chapterID == "" {
-		http.Error(w, "missing route params", http.StatusBadRequest)
+		writeErr(w, http.StatusBadRequest, "missing route params")
 		return
 	}
 	pages, err := s.service.GetPageListCached(pluginID, chapterID)
@@ -135,7 +138,7 @@ func (s *Server) readerData(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		s.logger.Error("reader page list", "error", err, "plugin", pluginID, "chapter", chapterID)
-		http.Error(w, "failed to load pages: "+err.Error(), http.StatusBadGateway)
+		writeErr(w, http.StatusBadGateway, err.Error())
 		return
 	}
 	// Record the chapter's page count so the detail-page progress badges can
