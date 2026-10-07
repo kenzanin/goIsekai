@@ -28,18 +28,32 @@ end
 -- ─── search_manga ──────────────────────────────────────────────────────────
 -- GET https://fanfox.net/search?title={query}&page={N} — desktop site only;
 -- the mobile search endpoint is a JS shell that returns nothing.
+-- Genre browsing passes an empty title plus &genres=<id>, so an empty query is
+-- only rejected when no genre was asked for either.
 
 function search_manga(arg)
 	local a = host.json.decode(arg)
 	if type(a) == "string" then
 		a = { query = a, page = 1 }
 	end
-	local query = a and (a.query or a.q)
-	if query == nil or query == "" then
+	local query = a and (a.query or a.q) or ""
+	local genres = (a and a.genres) or {}
+	local page = tonumber(a and a.page) or 1
+	if query == "" and #genres == 0 then
 		return host.json.encode({}), nil
 	end
-	local page = tonumber(a.page) or 1
+
 	local url = "https://fanfox.net/search?title=" .. host.text.url_encode(query) .. "&page=" .. tostring(page)
+	if #genres > 0 then
+		-- The site takes a comma-separated list of numeric genre ids, not slugs:
+		-- &genres=1 is Action, &genres=5 is Fantasy.
+		local ids = {}
+		for _, g in ipairs(genres) do
+			if g ~= "" then ids[#ids + 1] = host.text.url_encode(g) end
+		end
+		if #ids > 0 then url = url .. "&genres=" .. table.concat(ids, ",") end
+	end
+
 	local html = host.http.get_body(url)
 	if html == "" then
 		return host.json.encode({}), nil
@@ -112,4 +126,55 @@ function get_page_list(arg)
 		end
 	end
 	return host.json.encode(pages), nil
+end
+
+-- ─── get_genres (optional export) ──────────────────────────────────────────
+-- MangaFox has no genre archive page and no genre query endpoint: the only way
+-- to learn the list is the canonical one the Mihon extension ships
+-- (extension-source/src/en/mangafox/.../Filters.kt: getGenreList). Those ids are
+-- what the site's own /search accepts in &genres=, so they are used verbatim as
+-- the slug rather than a name that would have to be mapped back to an id.
+
+local GENRES = {
+	{ name = "Action", slug = "1" },
+	{ name = "Adventure", slug = "2" },
+	{ name = "Comedy", slug = "3" },
+	{ name = "Drama", slug = "4" },
+	{ name = "Fantasy", slug = "5" },
+	{ name = "Martial Arts", slug = "6" },
+	{ name = "Shounen", slug = "7" },
+	{ name = "Horror", slug = "8" },
+	{ name = "Supernatural", slug = "9" },
+	{ name = "Harem", slug = "10" },
+	{ name = "Psychological", slug = "11" },
+	{ name = "Romance", slug = "12" },
+	{ name = "School Life", slug = "13" },
+	{ name = "Shoujo", slug = "14" },
+	{ name = "Mystery", slug = "15" },
+	{ name = "Sci-fi", slug = "16" },
+	{ name = "Seinen", slug = "17" },
+	{ name = "Tragedy", slug = "18" },
+	{ name = "Ecchi", slug = "19" },
+	{ name = "Sports", slug = "20" },
+	{ name = "Slice of Life", slug = "21" },
+	{ name = "Mature", slug = "22" },
+	{ name = "Shoujo Ai", slug = "23" },
+	{ name = "Webtoons", slug = "24" },
+	{ name = "Doujinshi", slug = "25" },
+	{ name = "One Shot", slug = "26" },
+	{ name = "Smut", slug = "27" },
+	{ name = "Yaoi", slug = "28" },
+	{ name = "Josei", slug = "29" },
+	{ name = "Historical", slug = "30" },
+	{ name = "Shounen Ai", slug = "31" },
+	{ name = "Gender Bender", slug = "32" },
+	{ name = "Adult", slug = "33" },
+	{ name = "Yuri", slug = "34" },
+	{ name = "Mecha", slug = "35" },
+	{ name = "Lolicon", slug = "36" },
+	{ name = "Shotacon", slug = "37" },
+}
+
+function get_genres()
+	return host.json.encode(GENRES)
 end
