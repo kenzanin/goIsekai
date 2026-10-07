@@ -168,7 +168,7 @@ Plugin network calls route through `hostnet.Proxy` which handles TLS fingerprint
 - **Image cache**: On-disk under `<cache_dir>/images/`. Pages are keyed by a deterministic hash.
 - **PID file**: Written to `<data_dir>/goisekai.pid`, removed on shutdown.
 - **Database maintenance**: Automatic orphan pruning at startup, periodic DB backups to `<data_dir>/backups/`.
-- **Plugin static files**: `plugin_static.go` serves plugin assets (images, etc.) under `/plugin_static/`.
+- **Plugin static files**: `plugin_static.go` serves plugin assets (logos, images) under `/plugin-static/{pluginID}/{file}` — hyphen, not underscore.
 - **Biome** is used for frontend formatting/linting (not ESLint/Prettier). **Stylua** for Lua templates. **Luacheck** for Lua linting.
 
 ---
