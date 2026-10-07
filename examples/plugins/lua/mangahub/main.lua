@@ -53,10 +53,80 @@ local function fetch_access_key()
     return key
 end
 
--- Escape a string for embedding in a GraphQL string literal.
-local function escape_gql(s)
-    return (s:gsub("\\", "\\\\"):gsub('"', '\\"'))
-end
+  -- Escape a string for embedding in a GraphQL string literal.
+  local function escape_gql(s)
+      return (s:gsub("\\", "\\\\"):gsub('"', '\\"'))
+  end
+
+  -- MangaHub encrypts the chapter page list and hands the key out separately:
+  --   pages = "enc:v1:<keyId>:<iv>:<tag>:<ciphertext>"   (all base64url)
+  --   key   = GET /api/chapter-crypto -> {keyId, key, expiresAt}
+  --   plain = AES-256-GCM(key, iv, ciphertext+tag) -> {"p":"<prefix>","i":["1.jpg",...]}
+  -- Decryption runs in the host (host.crypto.aes_gcm_decrypt) because this Lua VM
+  -- has no bitwise operators, so AES is not writable plugin-side. Same envelope
+  -- and same endpoint the 1manga plugin handles; the two share the MangaHub API.
+  --
+  -- The key and the message rotate independently, so a keyId mismatch is retried
+  -- once with a freshly minted key instead of being treated as a failure.
+  local function encrypted_page_list(blob, slug, number)
+      local function material()
+          local key = cachedKey
+          if not key then
+              key = fetch_access_key()
+              if key then cachedKey = key end
+          end
+          if not key then return nil, "no mhub_access key available" end
+          -- This endpoint authenticates on the cookie, not the x-mhub-access header
+          -- the GraphQL call uses: the header alone answers 403.
+          local resp = host.http.get(SITE_URL .. "/api/chapter-crypto", {
+              ["Cookie"] = "mhub_access=" .. key,
+              ["Accept"] = "application/json",
+              ["Referer"] = SITE_URL .. "/chapter/" .. slug .. "/chapter-" .. number,
+          })
+          if not resp or resp.status ~= 200 then
+              return nil, "/api/chapter-crypto returned " .. tostring(resp and resp.status or 0)
+          end
+          local parsed = host.json.decode(resp.body)
+          if not parsed or not parsed.key or not parsed.keyId then
+              return nil, "/api/chapter-crypto returned no usable key"
+          end
+          return parsed
+      end
+
+      local parts = {}
+      for part in string.gmatch(blob .. ":", "([^:]*):") do
+          parts[#parts + 1] = part
+      end
+      if #parts ~= 6 or parts[1] ~= "enc" or parts[2] ~= "v1" then
+          return nil, "unrecognised pages envelope"
+      end
+      local keyId, iv, tag, ciphertext = parts[3], parts[4], parts[5], parts[6]
+
+      local mat, why = material()
+      if mat and mat.keyId ~= keyId then
+          cachedKey = nil
+          mat, why = material()
+      end
+      if not mat then return nil, why or "chapter-crypto unavailable" end
+      if mat.keyId ~= keyId then
+          return nil, "encrypted with a key this session was not served (blob "
+              .. keyId .. ", served " .. tostring(mat.keyId)
+              .. ") - keys rotate per session, so reload and retry"
+      end
+
+      local plain, err = host.crypto.aes_gcm_decrypt(mat.key, iv, tag, ciphertext)
+      if not plain then return nil, tostring(err) end
+      local decoded = host.json.decode(plain)
+      if not decoded or type(decoded.p) ~= "string" or type(decoded.i) ~= "table" then
+          return nil, "decrypted payload had no {p, i} shape"
+      end
+
+      local out = {}
+      for idx, name in ipairs(decoded.i) do
+          out[idx] = { index = idx - 1, url = IMG_CDN .. decoded.p .. name }
+      end
+      return out
+  end
 
 -- Run a GraphQL query, dropping the cached key and retrying once when the API
 -- refuses. MangaHub reports both expired keys and its "API rate limit
@@ -267,9 +337,26 @@ function get_page_list(arg)
         return host.json.encode({})
     end
 
-    local pagesJSON = host.json.decode(chapter.pages)
+    local raw = chapter.pages
+    local pagesJSON
+    if type(raw) == "string" and string.sub(raw, 1, 7) == "enc:v1:" then
+        -- Authoritative list, named file by file. Fail loudly rather than falling
+        -- back: an encrypted field means this chapter is served from that list, so
+        -- guessing a CDN pattern would produce a plausible list that silently drops
+        -- pages. An empty chapter with a stated cause beats a wrong chapter that
+        -- reads as complete.
+        local pages, why = encrypted_page_list(raw, slug, number)
+        if not pages then
+            log.error("mangahub pages: cannot decrypt: " .. tostring(why))
+            error("mangahub: cannot decrypt the page list for " .. chapterID .. ": " .. tostring(why))
+        end
+        log.info("mangahub pages: found " .. tostring(#pages) .. " pages for " .. chapterID .. " (decrypted)")
+        return host.json.encode(pages)
+    end
+
+    pagesJSON = host.json.decode(raw)
     if not pagesJSON then
-        log.error("mangahub pages: unparseable pages JSON")
+        log.error("mangahub pages: unparseable pages JSON raw=" .. string.sub(tostring(raw), 1, 220))
         return host.json.encode({})
     end
 
