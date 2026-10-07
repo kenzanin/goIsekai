@@ -178,16 +178,18 @@ function get_page_list(arg)
 end
 
 -- ─── get_genres (optional export) ──────────────────────────────────────────
--- Read from the site's own tag navigation rather than hardcoded, so the list
--- cannot drift from what the archive URLs actually accept.
+-- Read from the site's own /tags index rather than hardcoded, so the list cannot
+-- drift from what the archive URLs actually accept. The homepage carries no tag
+-- links at all - they only appear on a series page - so the index page is the
+-- only global source. Links there are relative and unslashed: <a href="/tags/action">.
 
 function get_genres()
-    local body = host.http.get_body(BASE .. "/")
+    local body = host.http.get_body(BASE .. "/tags")
     local genres = {}
     if not body or body == "" then return host.json.encode(genres) end
 
     local seen = {}
-    for slug, name in host.regex.gmatch(body, [[href="https://dynasty%-scans%.com/tags/([a-z0-9_%-]+)/"[^>]*>([^<]+)</]]) do
+    for slug, name in host.regex.gmatch(body, [[href="/tags/([a-z0-9_%-]+)"[^>]*>([^<]+)</]]) do
         local label = host.text.unescape(trim(name))
         if slug ~= "" and label ~= "" and not seen[slug] then
             seen[slug] = true

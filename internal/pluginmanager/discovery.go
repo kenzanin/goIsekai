@@ -41,9 +41,12 @@ func isInfoPlugin(id string) bool {
 }
 
 // Discover scans pluginsDir and registers every folder containing main.lua,
-// main.js, or main.go, WITHOUT instantiating any runtime. Plugins are lazily
-// instantiated on first use via ensureLoaded. A folder that collides with an
-// already-registered id is logged and skipped rather than aborting discovery.
+// main.js, main.wasm or main.go, WITHOUT instantiating any runtime. Plugins are
+// lazily instantiated on first use via ensureLoaded. A folder that collides with
+// an already-registered id is logged and skipped rather than aborting discovery,
+// so the order of the passes decides which runtime wins a folder claiming more
+// than one entry point: wasm is scanned before yaegi because a wasm plugin
+// folder also carries the main.go it was built from.
 // It then scans infoDir for enrichment scripts, which are registered the same
 // way but serve metadata rather than a manga source.
 func (m *Manager) Discover() error {
@@ -112,6 +115,17 @@ func (m *Manager) Discover() error {
 		logger.Info("js plugin registered", "id", id, "path", path)
 	}
 
+	// Wasm plugins: one folder with main.wasm, or a single *.wasm file.
+	//
+	// This runs BEFORE the yaegi glob below on purpose. A wasm plugin folder
+	// ships both main.wasm and the main.go it was built from, so the more general
+	// */main.go pattern would claim the id first and the plugin would silently run
+	// under the Yaegi interpreter instead of wazero - which is how every wasm
+	// plugin in examples/plugins/wasm was being loaded.
+	if err := m.discoverWasm(); err != nil {
+		return err
+	}
+
 	// Yaegi plugins: one folder per plugin, main.go entry, folder name = id.
 	yaegiMatches, err := filepath.Glob(filepath.Join(m.pluginsDir, "*", "main.go"))
 	if err != nil {
@@ -133,11 +147,6 @@ func (m *Manager) Discover() error {
 
 	// Go native plugins: one .so file per plugin, filename (minus .so) = id.
 	if err := m.discoverGo(); err != nil {
-		return err
-	}
-
-	// Wasm plugins: one folder with main.wasm, or a single *.wasm file.
-	if err := m.discoverWasm(); err != nil {
 		return err
 	}
 	return nil
