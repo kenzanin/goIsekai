@@ -96,14 +96,24 @@ func encodeForCache(data []byte, format ImageFormat, cover bool, maxDim int, enh
 	if format == FormatOriginal || bytes.HasPrefix(data, []byte("GIF8")) {
 		return data, false
 	}
-	// Already in the target format headroom check: re-encoding AVIF/WebP/JXL
-	// loses quality for no size win, so bytes that need no downscale pass
-	// straight through. That covers every page image and every cover already
-	// under the cap, which is the common case.
-	if isAVIF(data) || isJXL(data) {
+	// Already in the target format: re-encoding AVIF/WebP/JXL loses quality for
+	// no size win, so bytes that need no pixel change pass straight through.
+	// That covers every page image and every cover already under the cap, which
+	// is the common case.
+	//
+	// enhance is excluded on purpose: it rewrites greyscale pages, so those must
+	// fall through to the pipeline below even when they are already WebP.
+	if !enhance && (isAVIF(data) || isJXL(data)) {
 		return data, false
 	}
-	if isWebP(data) {
+	if !enhance && isWebP(data) {
+		// maxDim is the cover cap and covers are the only thing downscaled, so a
+		// page image never needs the round trip however tall it is. Without this
+		// a 1500x2125 page was decoded and re-encoded to a larger file for no
+		// reason at all.
+		if !cover {
+			return data, false
+		}
 		cfg, err := webp.DecodeConfig(bytes.NewReader(data))
 		if err == nil && !needsDownscale(cfg.Width, cfg.Height, maxDim) {
 			return data, false
@@ -114,8 +124,10 @@ func encodeForCache(data []byte, format ImageFormat, cover bool, maxDim int, enh
 	if err != nil {
 		return data, false
 	}
+	changed := false
 	if b := src.Bounds(); cover && needsDownscale(b.Dx(), b.Dy(), maxDim) {
 		src = fitWithin(src, maxDim)
+		changed = true
 		if stats != nil {
 			stats.resized = true
 			stats.resizeFrom = [2]int{b.Dx(), b.Dy()}
@@ -127,9 +139,18 @@ func encodeForCache(data []byte, format ImageFormat, cover bool, maxDim int, enh
 	if enhance && !isColourPage(src) {
 		mark := time.Now()
 		src = enhanceScan(src)
+		changed = true
 		if stats != nil {
 			stats.enhance = time.Since(mark)
 		}
+	}
+	// Nothing about the pixels changed and the bytes are already in the target
+	// format, so re-encoding would only add a generation of loss - in practice
+	// it made files larger: a 1500x2125 WebP page came back 29% bigger. Decoding
+	// was unavoidable to reach this point under enhance, but encoding is the
+	// expensive half and it is the one that gets skipped.
+	if !changed && isTargetFormat(data, format) {
+		return data, false
 	}
 
 	var buf bytes.Buffer
@@ -153,6 +174,21 @@ func encodeForCache(data []byte, format ImageFormat, cover bool, maxDim int, enh
 		stats.encode = time.Since(started) - stats.enhance
 	}
 	return buf.Bytes(), true
+}
+
+// isTargetFormat reports whether data is already encoded in format, so a
+// conversion that would change nothing can be skipped.
+func isTargetFormat(data []byte, format ImageFormat) bool {
+	switch format {
+	case FormatAVIF:
+		return isAVIF(data)
+	case FormatJXL:
+		return isJXL(data)
+	case FormatWebP:
+		return isWebP(data)
+	default:
+		return false
+	}
 }
 
 // fitWithin scales the image down so neither side exceeds maxDim, keeping the

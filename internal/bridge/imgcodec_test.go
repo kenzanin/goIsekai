@@ -22,6 +22,11 @@ func validJPEG(t *testing.T, w, h int) []byte {
 			img.Set(x, y, color.RGBA{uint8(x % 256), uint8(y % 256), 128, 255})
 		}
 	}
+	return jpegOf(t, img)
+}
+
+func jpegOf(t *testing.T, img image.Image) []byte {
+	t.Helper()
 	var buf bytes.Buffer
 	if err := jpeg.Encode(&buf, img, nil); err != nil {
 		t.Fatalf("encode jpeg: %v", err)
@@ -166,6 +171,87 @@ func TestEncodeForCacheDoesNotReEncodeSameFormat(t *testing.T) {
 	avifTwice, converted := encodeForCache(avifOnce, FormatAVIF, true, 0, false, nil)
 	if converted || !bytes.Equal(avifOnce, avifTwice) {
 		t.Error("avif input under avif format should pass through unchanged")
+	}
+}
+
+// maxDim is the cover cap and covers are the only thing downscaled, so a page
+// image taller than that cap must not be decoded and re-encoded: the round trip
+// produces a larger file at lower quality for identical pixels.
+func TestEncodeForCacheKeepsPageOverTheCoverCap(t *testing.T) {
+	page, converted := encodeForCache(validJPEG(t, 1500, 2125), FormatWebP, false, 720, false, nil)
+	if !converted {
+		t.Fatal("setup: expected the page to be converted to webp")
+	}
+	cfg, err := webp.DecodeConfig(bytes.NewReader(page))
+	if err != nil {
+		t.Fatalf("setup: produced bytes are not webp: %v", err)
+	}
+	if cfg.Width <= 720 && cfg.Height <= 720 {
+		t.Fatalf("setup: page %dx%d is under the cap, it cannot exercise this", cfg.Width, cfg.Height)
+	}
+
+	got, converted := encodeForCache(page, FormatWebP, false, 720, false, nil)
+	if converted {
+		t.Error("a page webp over the cover cap was re-encoded")
+	}
+	if !bytes.Equal(got, page) {
+		t.Errorf("page bytes changed for nothing: %d -> %d", len(page), len(got))
+	}
+}
+
+// The other half of the same guard: a cover still gets fitted under the cap even
+// when it is already in the target format.
+func TestEncodeForCacheStillFitsAnOversizedCover(t *testing.T) {
+	big, converted := encodeForCache(validJPEG(t, 1800, 2800), FormatWebP, false, 720, false, nil)
+	if !converted {
+		t.Fatal("setup: expected the oversized cover to be converted to webp")
+	}
+	got, converted := encodeForCache(big, FormatWebP, true, 720, false, nil)
+	if !converted {
+		t.Error("an oversized cover must still be re-encoded so it can be fitted")
+	}
+	cfg, err := webp.DecodeConfig(bytes.NewReader(got))
+	if err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if cfg.Width > 720 || cfg.Height > 720 {
+		t.Errorf("cover %dx%d was not fitted under the 720 cap", cfg.Width, cfg.Height)
+	}
+}
+
+// enhance rewrites pixels, so a same-format page must still go through the
+// pipeline instead of riding the pass-through added for plain pages.
+func TestEncodeForCacheStillEnhancesASameFormatPage(t *testing.T) {
+	grey, converted := encodeForCache(jpegOf(t, greyPage(900, 1400)), FormatWebP, false, 720, false, nil)
+	if !converted {
+		t.Fatal("setup: expected the greyscale page to be converted to webp")
+	}
+
+	got, converted := encodeForCache(grey, FormatWebP, false, 720, true, nil)
+	if !converted {
+		t.Error("enhance was requested but the page passed straight through")
+	}
+	if bytes.Equal(got, grey) {
+		t.Error("enhance ran but produced identical bytes")
+	}
+}
+
+// enhance defaults to auto, so this is the common path: a colour page already
+// in the target format. isColourPage skips the cleanup, which means nothing about
+// the pixels changed, so the encode must be skipped too - otherwise every colour
+// page pays a generation of loss and comes out larger than it arrived.
+func TestEncodeForCacheKeepsAColourPageUnderEnhance(t *testing.T) {
+	colour, converted := encodeForCache(validJPEG(t, 1500, 2125), FormatWebP, false, 720, false, nil)
+	if !converted {
+		t.Fatal("setup: expected the page to be converted to webp")
+	}
+
+	got, converted := encodeForCache(colour, FormatWebP, false, 720, true, nil)
+	if converted {
+		t.Error("a colour page under enhance was re-encoded for nothing")
+	}
+	if !bytes.Equal(got, colour) {
+		t.Errorf("colour page bytes changed: %d -> %d", len(colour), len(got))
 	}
 }
 
