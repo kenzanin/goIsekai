@@ -172,9 +172,20 @@ return function(data)
 	-- Synopsis with read-more toggle (only when > 10 lines)
 	local synopsisHTML = ""
 	if manga.Description and manga.Description ~= "" then
-		local lineCount = 0
-		for _ in string.gmatch(manga.Description, "\n") do
-			lineCount = lineCount + 1
+		-- Count lines robustly: split on newlines AND <br> tags
+		local lineCount = 1
+		local pos = 1
+		while true do
+			local nl = string.find(manga.Description, "\n", pos, true)
+			local br = string.find(manga.Description, "<br", pos, true)
+			if not nl and not br then break end
+			if nl and (not br or nl < br) then
+				lineCount = lineCount + 1
+				pos = nl + 1
+			else
+				lineCount = lineCount + 1
+				pos = br + 3
+			end
 		end
 		local needsToggle = lineCount > 10
 		local cls = 'text-sm text-neutral-400 mt-1.5'
