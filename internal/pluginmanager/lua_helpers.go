@@ -77,3 +77,19 @@ func luaStr2Err(state *lua.State, fn func(string, string) (string, error)) lua.V
 	})
 	return v.Value()
 }
+
+// luaStr3Err is luaStr2Err for the few helpers that take a third argument, such
+// as substitute_cipher's direction.
+func luaStr3Err(state *lua.State, fn func(string, string, string) (string, error)) lua.Value {
+	v, _ := state.NewNativeFunction(func(frame lua.Frame) lua.Outcome {
+		a, _ := frame.CoerceString(0)
+		b, _ := frame.CoerceString(1)
+		c, _ := frame.CoerceString(2)
+		out, err := fn(a, b, c)
+		if err != nil {
+			return frame.ReturnValues(lua.Nil(), lua.String(err.Error()))
+		}
+		return frame.ReturnValue(lua.String(out))
+	})
+	return v.Value()
+}

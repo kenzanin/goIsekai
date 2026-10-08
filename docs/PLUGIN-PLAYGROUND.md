@@ -154,6 +154,18 @@ sandbox responses.
   base64url, returns the plaintext, throws/returns nil plus a message on a bad
   key or tag). The tag is a separate argument, so callers porting from
   WebCrypto or node split it off the ciphertext themselves.
+- `host.crypto.substitute_cipher(data, material, direction)` — byte-wise
+  substitution cipher, `direction` being `"encrypt"` or `"decrypt"` (exact
+  inverses, so `decrypt(encrypt(x)) == x`). Each byte goes through
+  `sbox[data[i] ^ key[i % len(key)] ^ prev]`, with the substituted byte carried
+  forward as `prev` for the next position, applied over `rounds` rounds.
+  `material` is JSON: `{"sboxes": [[256 ints], ...], "keys": [[ints], ...],
+  "previous": [ints]}`, one entry per round. Ships in the host because neither
+  runtime can express it — Lunar Lua has no bitwise operators at all, and sites
+  that sign their API this way put the tables in their own front-end bundle, so
+  the plugin is the only layer that has read them. Store the material in a
+  sibling data file; a sbox that is not a permutation is rejected with a message
+  rather than producing a token the site answers with a bare `invalid_token`.
 - `host.http.get(url, headers?)` / `host.http.post(url, headers?, body)` — same
   transport as `http_request`
 

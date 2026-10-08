@@ -63,3 +63,14 @@ func jsStr2Err(vm *goja.Runtime, fn func(string, string) (string, error)) func(g
 		return vm.ToValue(out)
 	}
 }
+
+// jsStr3Err is jsStr2Err for helpers that take a third argument.
+func jsStr3Err(vm *goja.Runtime, fn func(string, string, string) (string, error)) func(goja.FunctionCall) goja.Value {
+	return func(call goja.FunctionCall) goja.Value {
+		out, err := fn(call.Arguments[0].String(), call.Arguments[1].String(), call.Arguments[2].String())
+		if err != nil {
+			panic(vm.NewGoError(err))
+		}
+		return vm.ToValue(out)
+	}
+}
