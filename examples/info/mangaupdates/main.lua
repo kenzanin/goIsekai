@@ -11,6 +11,7 @@
 --   categories  genres
 --   authors     author/artist names
 --   related     the site's "Recommendations" block, each linked to its page
+--   covers      the series cover image URL
 --
 -- MangaUpdates answers a search with the series id only, so one title costs two
 -- requests (search, then detail). The detail response carries every field, so it
@@ -24,7 +25,7 @@ PLUGIN = {
 		{
 			id = "mangaupdates",
 			name = "MangaUpdates",
-			kinds = { "titles", "summaries", "categories", "authors", "related" },
+			kinds = { "titles", "summaries", "categories", "authors", "related", "covers" },
 		},
 	},
 }
@@ -216,12 +217,24 @@ local function related(data)
 	end)
 end
 
+-- covers returns the series cover image; MangaUpdates carries exactly one
+-- image per series (image.url.original).
+local function covers(data)
+	local image = data.image or {}
+	local url = image.url and image.url.original or ""
+	if url == "" then
+		return items({})
+	end
+	return items({ { value = url, url = data.url } })
+end
+
 local BY_KIND = {
 	titles = titles,
 	summaries = summaries,
 	categories = categories,
 	authors = authors,
 	related = related,
+	covers = covers,
 }
 
 -- getEnrichment(arg) — arg is {"title":..., "kind":..., "source":...}.

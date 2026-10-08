@@ -68,6 +68,7 @@ func (s *Server) buildMangaDetailData(r *http.Request, pluginID, mangaID string)
 	altSummaries, _ := s.service.ListAltSummaries(pluginID, mangaID)
 	cats, _ := s.service.ListCategories(pluginID, mangaID)
 	rels, _ := s.service.ListRelated(pluginID, mangaID)
+	altCovers, _ := s.service.ListAltCovers(pluginID, mangaID)
 	s.logger.Debug("enrichment cache", "plugin", pluginID, "manga", mangaID, "categories", len(cats), "related", len(rels))
 	overrideGenres, _, _ := s.service.GetMangaGenres(pluginID, mangaID)
 
@@ -101,6 +102,7 @@ func (s *Server) buildMangaDetailData(r *http.Request, pluginID, mangaID string)
 		"ChHasPrev":      chPage > 1,
 		"Categories":     cats,
 		"Related":        rels,
+		"AltCovers":      altCovers,
 		"PluginGenres":   manga.RawGenres,
 		"OverrideGenres": overrideGenres,
 		"Genres":         manga.Genres,

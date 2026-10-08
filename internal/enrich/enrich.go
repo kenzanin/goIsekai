@@ -33,6 +33,8 @@ const (
 	KindCategories Kind = "categories"
 	KindRelated    Kind = "related"
 	KindAuthors    Kind = "authors"
+	// KindCovers carries alternative cover image URLs as Item.Value.
+	KindCovers Kind = "covers"
 )
 
 // Item is one enrichment record. Every kind shares this shape because they

@@ -171,4 +171,14 @@ var migrations = []string{
 	// Index 25: cached normalized genre list per plugin (JSON [{name,slug}]).
 	// NULL = not fetched yet, "[]" = no genre export (never re-invoke).
 	`ALTER TABLE plugins ADD COLUMN genres TEXT;`,
+	// Index 27: alternative cover candidates gathered from enrichment sources;
+	// the user picks one on the detail page to become the manga's cover.
+	`CREATE TABLE IF NOT EXISTS alt_covers (
+		id INTEGER PRIMARY KEY AUTOINCREMENT,
+		manga_row_id TEXT NOT NULL,
+		url TEXT NOT NULL,
+		source TEXT NOT NULL DEFAULT '',
+		created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+		UNIQUE(manga_row_id, url)
+	);`,
 }

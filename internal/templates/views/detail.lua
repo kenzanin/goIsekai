@@ -31,6 +31,7 @@ return function(data)
 	local chTotalPages = data.ChTotalPages or 1
 	local cats = data.Categories or {}
 	local rels = data.Related or {}
+	local altCovers = data.AltCovers or {}
 
 	-- Back button
 	local body = [[<div class="mb-4">
@@ -79,17 +80,43 @@ return function(data)
 			.. (data.CoverDim == 1 and "Show cover" or "Hide cover")
 			.. "</button>"
 			.. "</form>"
+			.. '<form action="/action/fetch-covers/'
+			.. h(pluginID)
+			.. "/"
+			.. h(data.MangaID)
+			.. '" method="POST" style="display:inline">'
+			.. csrfInput(data.csrf_token or "")
+			.. '<input type="hidden" name="manga_title" value="'
+			.. h(currentTitle)
+			.. '">'
+			.. '<button type="submit" title="Fetch alternative cover candidates from enrichment sources" class="inline-flex items-center text-neutral-400 hover:text-neutral-200 transition cursor-pointer">Find covers</button>'
+			.. "</form>"
 			.. '<form action="/action/refetch-cover/'
 			.. h(pluginID)
 			.. "/"
 			.. h(data.MangaID)
 			.. '" method="POST" style="display:inline">'
-			.. '<button type="submit" title="Re-download the cover from the source" class="inline-flex items-center text-neutral-400 hover:text-neutral-200 transition cursor-pointer">Get cover</button>'
+			.. '<button type="submit" title="Re-download the cover from the source" class="inline-flex items-center text-neutral-400 hover:text-neutral-200 transition cursor-pointer">Refetch</button>'
 			.. "</form>"
+			.. '<button type="button" onclick="document.getElementById(\'cover-modal\').classList.remove(\'hidden\')" title="Pick a cover from the fetched candidates" class="inline-flex items-center text-neutral-400 hover:text-neutral-200 transition cursor-pointer">Get cover</button>'
 			.. "</div>"
 	else
 		coverHTML = '<div class="w-full aspect-[2/3] bg-neutral-800 rounded-xl flex items-center justify-center text-neutral-500 text-4xl font-semibold">'
 			.. h(getInitials(manga.Title or ""))
+			.. "</div>"
+			.. '<div class="mt-2 flex items-center gap-3 text-xs">'
+			.. '<form action="/action/fetch-covers/'
+			.. h(pluginID)
+			.. "/"
+			.. h(data.MangaID)
+			.. '" method="POST" style="display:inline">'
+			.. csrfInput(data.csrf_token or "")
+			.. '<input type="hidden" name="manga_title" value="'
+			.. h(currentTitle)
+			.. '">'
+			.. '<button type="submit" title="Fetch alternative cover candidates from enrichment sources" class="inline-flex items-center text-neutral-400 hover:text-neutral-200 transition cursor-pointer">Find covers</button>'
+			.. "</form>"
+			.. '<button type="button" onclick="document.getElementById(\'cover-modal\').classList.remove(\'hidden\')" title="Pick a cover from the fetched candidates" class="inline-flex items-center text-neutral-400 hover:text-neutral-200 transition cursor-pointer">Get cover</button>'
 			.. "</div>"
 	end
 
@@ -178,7 +205,9 @@ return function(data)
 		while true do
 			local nl = string.find(manga.Description, "\n", pos, true)
 			local br = string.find(manga.Description, "<br", pos, true)
-			if not nl and not br then break end
+			if not nl and not br then
+				break
+			end
 			if nl and (not br or nl < br) then
 				lineCount = lineCount + 1
 				pos = nl + 1
@@ -188,19 +217,23 @@ return function(data)
 			end
 		end
 		local needsToggle = lineCount > 10
-		local cls = 'text-sm text-neutral-400 mt-1.5'
+		local cls = "text-sm text-neutral-400 mt-1.5"
 		if needsToggle then
-			cls = cls .. ' max-h-[4.5rem] overflow-hidden transition-all duration-300 relative'
+			cls = cls .. " max-h-[4.5rem] overflow-hidden transition-all duration-300 relative"
 		end
 		synopsisHTML = '<div class="mb-3">'
 			.. '<span class="text-xs font-semibold text-neutral-300 uppercase tracking-wide">Synopsis</span>'
-			.. '<div id="synopsis-text" class="' .. cls .. '">' .. h(manga.Description) .. '</div>'
+			.. '<div id="synopsis-text" class="'
+			.. cls
+			.. '">'
+			.. h(manga.Description)
+			.. "</div>"
 		if needsToggle then
 			synopsisHTML = synopsisHTML
 				.. '<span id="synopsis-fade" class="absolute inset-x-0 bottom-0 h-8 bg-gradient-to-t from-neutral-950 to-transparent pointer-events-none"></span>'
-				.. '<button type="button" id="synopsis-toggle" onclick="var t=document.getElementById(\'synopsis-text\');var f=document.getElementById(\'synopsis-fade\');var b=document.getElementById(\'synopsis-toggle\');t.classList.toggle(\'max-h-[4.5rem]\');t.classList.toggle(\'max-h-none\');f.style.display=t.classList.contains(\'max-h-none\')?\'none\':\'block\';b.textContent=t.classList.contains(\'max-h-none\')?\'Show less\':\'Read more\';" class="text-xs text-indigo-400 hover:text-indigo-300 transition mt-1 cursor-pointer">Read more</button>'
+				.. "<button type=\"button\" id=\"synopsis-toggle\" onclick=\"var t=document.getElementById('synopsis-text');var f=document.getElementById('synopsis-fade');var b=document.getElementById('synopsis-toggle');t.classList.toggle('max-h-[4.5rem]');t.classList.toggle('max-h-none');f.style.display=t.classList.contains('max-h-none')?'none':'block';b.textContent=t.classList.contains('max-h-none')?'Show less':'Read more';\" class=\"text-xs text-indigo-400 hover:text-indigo-300 transition mt-1 cursor-pointer\">Read more</button>"
 		end
-		synopsisHTML = synopsisHTML .. '</div>'
+		synopsisHTML = synopsisHTML .. "</div>"
 	end
 
 	-- Action buttons; syncedHTML carries the far-right Update button
@@ -369,6 +402,61 @@ return function(data)
 			ChPage = chPage,
 			ChTotalPages = chTotalPages,
 		})
+
+	-- Cover picker modal: all fetched alternative covers + the current one.
+	local coverItems = {
+		{ url = manga.CoverURL or "", source = "current", current = true },
+	}
+	local seenCovers = {}
+	if manga.CoverURL and manga.CoverURL ~= "" then
+		seenCovers[manga.CoverURL] = true
+	end
+	for _, c in ipairs(altCovers) do
+		local u = c.URL or ""
+		if u ~= "" and not seenCovers[u] then
+			seenCovers[u] = true
+			coverItems[#coverItems + 1] = { url = u, source = c.Source or "" }
+		end
+	end
+	local coverGrid = ""
+	for _, c in ipairs(coverItems) do
+		if c.url ~= "" then
+			coverGrid = coverGrid
+				.. '<form action="/action/set-cover/'
+				.. h(pluginID)
+				.. "/"
+				.. h(mangaID)
+				.. '" method="POST" class="group relative w-32">'
+				.. csrfInput(data.csrf_token or "")
+				.. '<input type="hidden" name="url" value="'
+				.. h(c.url)
+				.. '">'
+				.. '<img src="/image?pluginID='
+				.. h(pluginID)
+				.. "&url="
+				.. h(c.url)
+				.. '&prio=high" alt="cover" loading="lazy" class="w-32 aspect-[2/3] rounded-lg object-cover border-2 transition cursor-pointer '
+				.. (c.current and "border-emerald-500" or "border-transparent group-hover:border-blue-400")
+				.. '">'
+				.. '<div class="text-[10px] text-neutral-400 text-center mt-1 truncate">'
+				.. h(c.current and "current" or c.source)
+				.. "</div>"
+				.. "</form>"
+		end
+	end
+	body = body
+		.. [[<div id="cover-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center" style="display:none">
+    <div class="absolute inset-0 bg-black/70" onclick="this.parentElement.classList.add('hidden')"></div>
+    <div class="relative bg-neutral-900 border border-neutral-700 rounded-xl p-4 max-w-3xl max-h-[80vh] overflow-y-auto">
+        <div class="flex items-center justify-between mb-3">
+            <h3 class="text-sm font-semibold text-neutral-200">Pick a cover</h3>
+            <button onclick="this.closest('#cover-modal').classList.add('hidden')" class="text-neutral-400 hover:text-neutral-200 text-lg leading-none" aria-label="Close">&times;</button>
+        </div>
+        <div class="flex flex-wrap gap-3">]]
+		.. coverGrid
+		.. [[</div>
+    </div>
+</div>]]
 
 	return body
 end

@@ -55,6 +55,7 @@ func (s *AppService) fetchEnrichment(pluginID, mangaID, title string, sources []
 		items = s.enrich.FetchAll(context.Background(), &http.Client{}, title, []enrich.Kind{
 			enrich.KindTitles, enrich.KindSummaries,
 			enrich.KindCategories, enrich.KindRelated, enrich.KindAuthors,
+			enrich.KindCovers,
 		})
 	} else if len(sources) == 1 {
 		items = s.enrich.FetchFirst(context.Background(), &http.Client{}, title, sources)
@@ -184,6 +185,20 @@ func (s *AppService) storeEnrichment(pluginID, mangaID, rowID string, items map[
 	authorStored:
 	} else {
 		logger.Debug("enrich authors: none found")
+	}
+
+	// Store alternative cover candidates per source.
+	if covers, ok := items[enrich.KindCovers]; ok && len(covers) > 0 {
+		rows := make([]database.AltCoverRow, 0, len(covers))
+		for _, c := range covers {
+			rows = append(rows, database.AltCoverRow{URL: c.Value, Source: c.Source})
+		}
+		n, err := s.db.AddAltCovers(rowID, rows)
+		if err != nil {
+			logger.Warn("store alt covers", "error", err)
+		} else {
+			logger.Info("enrich covers stored", "count", len(covers), "inserted", n)
+		}
 	}
 
 	// Store related manga per source

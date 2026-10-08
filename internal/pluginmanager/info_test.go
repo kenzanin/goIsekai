@@ -120,8 +120,8 @@ func TestInfoScriptUnknownKindIsEmpty(t *testing.T) {
 	}
 }
 
-// The shipped MangaDex info script must parse and declare the five field kinds
-// the detail page stores.
+// The shipped MangaDex info script must parse and declare the field kinds
+// the detail page stores, including the alternative-cover candidates.
 func TestShippedMangaDexInfoScriptDeclaresKinds(t *testing.T) {
 	infoDir := t.TempDir()
 	if err := copyDir(filepath.Join("..", "..", "examples", "info"), infoDir); err != nil {
@@ -147,6 +147,7 @@ func TestShippedMangaDexInfoScriptDeclaresKinds(t *testing.T) {
 		enrich.KindCategories,
 		enrich.KindAuthors,
 		enrich.KindRelated,
+		enrich.KindCovers,
 	} {
 		if !reg.SupportsKind("mangadex", kind) {
 			t.Fatalf("mangadex provider does not declare kind %q", kind)

@@ -13,6 +13,7 @@
 --   categories  genres
 --   authors     author
 --   related     recommended manga (what the site's Recommendations tab lists)
+--   covers      alternative cover image URLs
 --
 -- One title maps to two upstream requests (search, then detail). The detail
 -- response carries every field, so it is memoized in the VM and reused by the
@@ -27,7 +28,7 @@ PLUGIN = {
 		{
 			id = "mangadex",
 			name = "MangaDex",
-			kinds = { "titles", "summaries", "categories", "authors", "related" },
+			kinds = { "titles", "summaries", "categories", "authors", "related", "covers" },
 		},
 	},
 }
@@ -347,12 +348,32 @@ local function related(data)
 	return items(out)
 end
 
+-- covers queries MangaDex's /cover catalogue, which lists every uploaded
+-- cover per volume/edition (the manga payload itself carries only the primary
+-- cover_art). URL shape: uploads.mangadex.org/covers/{manga}/{file}.
+local function covers(data)
+	local page = get(API .. "/cover?manga%5B%5D=" .. data.id .. "&limit=50")
+	local out, seen = {}, {}
+	for _, item in ipairs(page and page.data or {}) do
+		local file = item.attributes and item.attributes.fileName or ""
+		if file ~= "" then
+			local url = "https://uploads.mangadex.org/covers/" .. data.id .. "/" .. file
+			if not seen[url] then
+				seen[url] = true
+				out[#out + 1] = { value = url, url = SITE .. "/title/" .. data.id }
+			end
+		end
+	end
+	return items(out)
+end
+
 local BY_KIND = {
 	titles = altTitles,
 	summaries = summaries,
 	categories = categories,
 	authors = authors,
 	related = related,
+	covers = covers,
 }
 
 -- getEnrichment(arg) — arg is {"title":..., "kind":..., "source":...}.

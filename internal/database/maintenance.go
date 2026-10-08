@@ -80,6 +80,7 @@ func (d *DB) PruneOrphans() (string, error) {
 	run("duplicate_read_history", `DELETE FROM read_history WHERE id NOT IN (SELECT MAX(id) FROM read_history GROUP BY chapter_id)`)
 
 	run("orphan_alt_titles", `DELETE FROM alt_titles WHERE manga_row_id NOT IN (SELECT id FROM mangas)`)
+	run("orphan_alt_covers", `DELETE FROM alt_covers WHERE manga_row_id NOT IN (SELECT id FROM mangas)`)
 	run("non_library_no_chapters", `DELETE FROM mangas WHERE in_library = 0 AND id NOT IN (SELECT DISTINCT manga_id FROM chapters)`)
 	run("orphan_fts", `DELETE FROM library_fts WHERE CAST(manga_row_id AS TEXT) NOT IN (SELECT CAST(id AS TEXT) FROM mangas)`)
 

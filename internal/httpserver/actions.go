@@ -54,6 +54,8 @@ func (s *Server) registerActionPostRoutes(r chi.Router) {
 	r.Post("/toggle-skip/{pluginID}/{mangaID}/{chapterID}", s.handleToggleChapterSkip)
 	r.Post("/toggle-cover-dim/{pluginID}/{mangaID}", s.handleToggleCoverDim)
 	r.Post("/refetch-cover/{pluginID}/{mangaID}", s.handleRefetchCover)
+	r.Post("/fetch-covers/{pluginID}/{mangaID}", s.handleFetchCovers)
+	r.Post("/set-cover/{pluginID}/{mangaID}", s.handleSetCover)
 	r.Post("/chapter-actions", s.handleChapterActions)
 	r.Post("/save-settings", s.handleSaveSettings)
 	r.Post("/save-verify/{pluginID}", s.handleSaveVerify)

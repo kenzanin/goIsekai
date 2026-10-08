@@ -179,6 +179,9 @@ func (d *DB) ResetEnrichment(mangaRowID string) error {
 	if _, err := d.db.Exec(`DELETE FROM manga_related WHERE manga_row_id = ?`, mangaRowID); err != nil {
 		return err
 	}
+	if err := d.RemoveAltCovers(mangaRowID); err != nil {
+		return err
+	}
 	if _, err := d.db.Exec(`DELETE FROM read_history WHERE chapter_id IN (SELECT id FROM chapters WHERE manga_id = ?)`, mangaRowID); err != nil {
 		return err
 	}
