@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"slices"
 )
 
 // SubstituteCipherMaterial is the data a byte-wise substitution cipher needs.
@@ -93,8 +94,8 @@ func SubstituteCipher(data, materialJSON, direction string) (string, error) {
 			in = substitute(in, m.SBoxes[r], m.Keys[r], m.Previous[r])
 		}
 	case "decrypt":
-		for r := len(m.SBoxes) - 1; r >= 0; r-- {
-			in = substituteInverse(in, m.SBoxes[r], m.Keys[r], m.Previous[r])
+		for r, v := range slices.Backward(m.SBoxes) {
+			in = substituteInverse(in, v, m.Keys[r], m.Previous[r])
 		}
 	default:
 		return "", fmt.Errorf("substitute_cipher: direction must be \"encrypt\" or \"decrypt\", got %q", direction)

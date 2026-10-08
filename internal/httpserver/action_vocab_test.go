@@ -30,7 +30,7 @@ func TestDropdownActionsAreAllHandled(t *testing.T) {
 	confirm := regexp.MustCompile(`data-confirm-actions="([^"]*)"`).FindStringSubmatch(string(body))
 	confirmed := map[string]bool{}
 	if len(confirm) == 2 {
-		for _, a := range strings.Split(confirm[1], ",") {
+		for a := range strings.SplitSeq(confirm[1], ",") {
 			confirmed[a] = true
 		}
 	}

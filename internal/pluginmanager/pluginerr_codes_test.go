@@ -45,16 +45,16 @@ func TestPluginsReportCodedErrors(t *testing.T) {
 			}
 			for i, line := range strings.Split(string(src), "\n") {
 				const marker = `return nil, "`
-				j := strings.Index(line, marker)
-				if j < 0 {
+				_, after, ok := strings.Cut(line, marker)
+				if !ok {
 					continue
 				}
-				rest := line[j+len(marker):]
-				k := strings.Index(rest, `"`)
-				if k < 0 {
+				rest := after
+				before0, _, ok0 := strings.Cut(rest, `"`)
+				if !ok0 {
 					continue
 				}
-				reason := rest[:k]
+				reason := before0
 				code, _, _ := strings.Cut(reason, ":")
 				if !known[code] {
 					t.Errorf("%s:%d returns an uncoded plugin error %q - plugins must return a code "+

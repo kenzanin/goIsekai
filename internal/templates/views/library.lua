@@ -197,7 +197,9 @@ return function(data)
 		.. "</div>"
 		.. '<button type="submit" class="bg-indigo-600 hover:bg-indigo-500 text-white rounded-md px-3 py-1.5 text-sm font-medium">Search</button>'
 		.. "</div></form>"
-		.. '<div class="flex items-center gap-1.5 flex-wrap">' .. statusChips .. "</div>"
+		.. '<div class="flex items-center gap-1.5 flex-wrap">'
+		.. statusChips
+		.. "</div>"
 		.. '<form method="get" action="/view/library" class="flex items-center">'
 		.. sortCarried
 		.. '<select name="sort" onchange="this.form.submit()" class="bg-neutral-900 border border-neutral-700 rounded-md px-2 py-1.5 text-xs text-neutral-300">'
