@@ -108,6 +108,19 @@ func registerJSHostNatives(vm *goja.Runtime, m *Manager, id string) error {
 		return err
 	}
 
+	// host.browser — fetch pages through a real browser (CDP) so
+	// client-side JavaScript runs.
+	browserObj := vm.NewObject()
+	if err := browserObj.Set("fetch", jsBrowserFetch(vm, m, id)); err != nil {
+		return err
+	}
+	if err := browserObj.Set("evaluate", jsBrowserEvaluate(vm, m, id)); err != nil {
+		return err
+	}
+	if err := host.Set("browser", browserObj); err != nil {
+		return err
+	}
+
 	return vm.Set("host", host)
 }
 
@@ -206,4 +219,34 @@ func jsHTTPGetBody(vm *goja.Runtime, m *Manager, id string) func(goja.FunctionCa
 // on a failed request or a non-200 response.
 func jsHTTPPostBody(vm *goja.Runtime, m *Manager, id string) func(goja.FunctionCall) goja.Value {
 	return jsHTTPFn(vm, m, id, "POST", true)
+}
+
+// jsBrowserFetch wraps host.browser.fetch(url) → rendered HTML, or null when
+// the browser is unavailable or the fetch failed.
+func jsBrowserFetch(vm *goja.Runtime, m *Manager, id string) func(goja.FunctionCall) goja.Value {
+	return func(call goja.FunctionCall) goja.Value {
+		url := call.Arguments[0].String()
+		html, err := m.proxy.BrowserFetch(id, url)
+		if err != nil {
+			return goja.Null()
+		}
+		return vm.ToValue(html)
+	}
+}
+
+// jsBrowserEvaluate wraps host.browser.evaluate(url, js) → result string, or
+// null when the browser is unavailable or the evaluation failed.
+func jsBrowserEvaluate(vm *goja.Runtime, m *Manager, id string) func(goja.FunctionCall) goja.Value {
+	return func(call goja.FunctionCall) goja.Value {
+		url := call.Arguments[0].String()
+		js := ""
+		if len(call.Arguments) > 1 {
+			js = call.Arguments[1].String()
+		}
+		out, err := m.proxy.BrowserEvaluate(id, url, js)
+		if err != nil {
+			return goja.Null()
+		}
+		return vm.ToValue(out)
+	}
 }

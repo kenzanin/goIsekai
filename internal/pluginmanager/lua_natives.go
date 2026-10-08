@@ -81,6 +81,14 @@ func registerHostNatives(state *lua.State, m *Manager, id string) {
 	_ = http.RawSetString("post_body", luaHTTPPostBody(state, m, id))
 
 	_ = host.RawSetString("http", http.Value())
+
+	// host.browser — fetch pages through a real browser (CDP) so
+	// client-side JavaScript runs. For sites whose API is signed by their
+	// own front-end code, this is the only way to get a valid response.
+	browser, _ := state.NewTable()
+	_ = browser.RawSetString("fetch", luaBrowserFetch(state, m, id))
+	_ = browser.RawSetString("evaluate", luaBrowserEvaluate(state, m, id))
+	_ = host.RawSetString("browser", browser.Value())
 	_ = state.RawSetGlobal("host", host.Value())
 }
 
@@ -189,4 +197,33 @@ func luaHTTPGetBody(state *lua.State, m *Manager, id string) lua.Value {
 // on a failed request or a non-200 response.
 func luaHTTPPostBody(state *lua.State, m *Manager, id string) lua.Value {
 	return luaHTTPFn(state, m, id, "POST", true)
+}
+
+// luaBrowserFetch wraps host.browser.fetch(url) → rendered HTML, or nil when
+// the browser is unavailable or the fetch failed.
+func luaBrowserFetch(state *lua.State, m *Manager, id string) lua.Value {
+	fn, _ := state.NewNativeFunction(func(frame lua.Frame) lua.Outcome {
+		url, _ := frame.CoerceString(0)
+		html, err := m.proxy.BrowserFetch(id, url)
+		if err != nil {
+			return frame.ReturnValue(lua.Nil())
+		}
+		return frame.ReturnValue(lua.String(html))
+	})
+	return fn.Value()
+}
+
+// luaBrowserEvaluate wraps host.browser.evaluate(url, js) → result string, or
+// nil when the browser is unavailable or the evaluation failed.
+func luaBrowserEvaluate(state *lua.State, m *Manager, id string) lua.Value {
+	fn, _ := state.NewNativeFunction(func(frame lua.Frame) lua.Outcome {
+		url, _ := frame.CoerceString(0)
+		js, _ := frame.CoerceString(1)
+		out, err := m.proxy.BrowserEvaluate(id, url, js)
+		if err != nil {
+			return frame.ReturnValue(lua.Nil())
+		}
+		return frame.ReturnValue(lua.String(out))
+	})
+	return fn.Value()
 }

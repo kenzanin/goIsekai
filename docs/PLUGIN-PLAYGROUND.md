@@ -168,6 +168,15 @@ sandbox responses.
   rather than producing a token the site answers with a bare `invalid_token`.
 - `host.http.get(url, headers?)` / `host.http.post(url, headers?, body)` — same
   transport as `http_request`
+- `host.browser.fetch(url)` — navigates to `url` in a real browser (CDP engine),
+  waits for client-side JavaScript to run and any anti-bot challenge to clear,
+  and returns the rendered HTML, or nil/null when no engine is configured.
+  For sites whose API is signed by their own front-end code, this is the only
+  way to reach data that never appears in static HTML.
+- `host.browser.evaluate(url, js)` — navigates to `url`, runs `js` (a function
+  expression like `() => document.title`) in the page context, and returns the
+  result as a string. Use it to call the site's own functions or to extract
+  data from the live DOM.
 
 ### Lua-specific
 

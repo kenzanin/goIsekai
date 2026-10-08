@@ -1,7 +1,6 @@
 package hostnet
 
 import (
-	"context"
 	"fmt"
 	"net"
 	"strings"
@@ -9,7 +8,7 @@ import (
 	"time"
 
 	http "github.com/bogdanfinn/fhttp"
-	"github.com/chromedp/chromedp"
+	"github.com/go-rod/rod"
 
 	"goisekai/internal/logger"
 )
@@ -89,17 +88,13 @@ func cookieMatchesHost(domain, host string) bool {
 	return host == domain || strings.HasSuffix(host, "."+domain)
 }
 
-// waitChallengeCleared polls the tab until the challenge interstitial clears or
-// ctx times out. It returns nil once the marker is gone so the caller can
-// harvest cookies.
-func waitChallengeCleared(ctx context.Context, timeout time.Duration) error {
+// waitChallengeClearedRod polls a rod page until the Cloudflare interstitial
+// clears or the timeout fires.
+func waitChallengeClearedRod(page *rod.Page, timeout time.Duration) error {
 	deadline := time.Now().Add(timeout)
 	for {
-		var body string
-		// Fetching document.body.innerText is cheaper than a full screenshot
-		// and is enough to detect the Cloudflare "Just a moment" interstitial.
-		if err := chromedp.Run(ctx, chromedp.Evaluate(`document.body ? document.body.innerText : ""`, &body)); err == nil {
-			lower := strings.ToLower(body)
+		if v, err := page.Eval(`() => document.body ? document.body.innerText : ""`); err == nil {
+			lower := strings.ToLower(v.Value.String())
 			if !strings.Contains(lower, "just a moment") && !strings.Contains(lower, "challenge-platform") {
 				return nil
 			}
@@ -107,11 +102,7 @@ func waitChallengeCleared(ctx context.Context, timeout time.Duration) error {
 		if time.Now().After(deadline) {
 			return fmt.Errorf("hostnet: challenge solve timed out after %s", timeout)
 		}
-		select {
-		case <-ctx.Done():
-			return fmt.Errorf("hostnet: challenge solve aborted: %w", ctx.Err())
-		case <-time.After(750 * time.Millisecond):
-		}
+		time.Sleep(750 * time.Millisecond)
 	}
 }
 
