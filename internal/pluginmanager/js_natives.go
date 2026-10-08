@@ -117,6 +117,9 @@ func registerJSHostNatives(vm *goja.Runtime, m *Manager, id string) error {
 	if err := browserObj.Set("evaluate", jsBrowserEvaluate(vm, m, id)); err != nil {
 		return err
 	}
+	if err := browserObj.Set("evaluate_with_init", jsBrowserEvaluateWithInit(vm, m, id)); err != nil {
+		return err
+	}
 	if err := host.Set("browser", browserObj); err != nil {
 		return err
 	}
@@ -244,6 +247,27 @@ func jsBrowserEvaluate(vm *goja.Runtime, m *Manager, id string) func(goja.Functi
 			js = call.Arguments[1].String()
 		}
 		out, err := m.proxy.BrowserEvaluate(id, url, js)
+		if err != nil {
+			return goja.Null()
+		}
+		return vm.ToValue(out)
+	}
+}
+
+// jsBrowserEvaluateWithInit wraps host.browser.evaluate_with_init(url, initJS,
+// js) → result string. initJS runs before any page script.
+func jsBrowserEvaluateWithInit(vm *goja.Runtime, m *Manager, id string) func(goja.FunctionCall) goja.Value {
+	return func(call goja.FunctionCall) goja.Value {
+		url := call.Arguments[0].String()
+		initJS := ""
+		js := ""
+		if len(call.Arguments) > 1 {
+			initJS = call.Arguments[1].String()
+		}
+		if len(call.Arguments) > 2 {
+			js = call.Arguments[2].String()
+		}
+		out, err := m.proxy.BrowserEvaluateWithInit(id, url, initJS, js)
 		if err != nil {
 			return goja.Null()
 		}

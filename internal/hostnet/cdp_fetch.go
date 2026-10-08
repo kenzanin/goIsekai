@@ -54,6 +54,17 @@ func (p *Proxy) BrowserFetch(pluginID, url string) (string, error) {
 // result as a string. The script should return a JSON string; complex values
 // are stringified by the page before crossing the CDP boundary.
 func (p *Proxy) BrowserEvaluate(pluginID, url, js string) (string, error) {
+	return p.browserEvaluateWithInit(pluginID, url, "", js)
+}
+
+// BrowserEvaluateWithInit is BrowserEvaluate with an init script that runs
+// via EvalOnNewDocument before any page script. Use it to install fetch/XHR
+// hooks so the plugin can capture API responses the site's own JS fetches.
+func (p *Proxy) BrowserEvaluateWithInit(pluginID, url, initJS, js string) (string, error) {
+	return p.browserEvaluateWithInit(pluginID, url, initJS, js)
+}
+
+func (p *Proxy) browserEvaluateWithInit(pluginID, url, initJS, js string) (string, error) {
 	if !p.cdp.enabled() {
 		return "", fmt.Errorf("hostnet: browser evaluate requires a CDP engine (cdp_engine is off)")
 	}
@@ -71,9 +82,19 @@ func (p *Proxy) BrowserEvaluate(pluginID, url, js string) (string, error) {
 	}
 	defer browser.MustClose()
 
-	page, err := browser.Page(proto.TargetCreateTarget{URL: url})
+	page, err := browser.Page(proto.TargetCreateTarget{})
 	if err != nil {
-		return "", fmt.Errorf("hostnet: rod new page %s: %w", url, err)
+		return "", fmt.Errorf("hostnet: rod new page: %w", err)
+	}
+	// Install the init script before any page script runs, so fetch/XHR
+	// hooks capture the site's own API calls from the first request.
+	if initJS != "" {
+		if _, err := page.EvalOnNewDocument(initJS); err != nil {
+			return "", fmt.Errorf("hostnet: init script: %w", err)
+		}
+	}
+	if err := page.Navigate(url); err != nil {
+		return "", fmt.Errorf("hostnet: browser navigate %s: %w", url, err)
 	}
 	_ = page.WaitStable(time.Second)
 	if err := waitChallengeClearedRod(page, timeout); err != nil {

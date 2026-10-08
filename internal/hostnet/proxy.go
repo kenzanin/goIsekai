@@ -44,7 +44,7 @@ type Proxy struct {
 	persistPin      func(pluginID, profile string)   // persists pin to DB; nil-safe
 	cdp             CDPConfig
 
-	// solveChallenge is swappable for tests; nil means the real chromedp solver.
+	// solveChallenge is swappable for tests; nil means the real rod solver.
 	solveChallenge func(cfg CDPConfig, url string) ([]*http.Cookie, string, error)
 	// stdlibTransport is shared by all stdlib requests for connection pooling.
 	stdlibTransport *nethttp.Transport

@@ -88,6 +88,7 @@ func registerHostNatives(state *lua.State, m *Manager, id string) {
 	browser, _ := state.NewTable()
 	_ = browser.RawSetString("fetch", luaBrowserFetch(state, m, id))
 	_ = browser.RawSetString("evaluate", luaBrowserEvaluate(state, m, id))
+	_ = browser.RawSetString("evaluate_with_init", luaBrowserEvaluateWithInit(state, m, id))
 	_ = host.RawSetString("browser", browser.Value())
 	_ = state.RawSetGlobal("host", host.Value())
 }
@@ -220,6 +221,23 @@ func luaBrowserEvaluate(state *lua.State, m *Manager, id string) lua.Value {
 		url, _ := frame.CoerceString(0)
 		js, _ := frame.CoerceString(1)
 		out, err := m.proxy.BrowserEvaluate(id, url, js)
+		if err != nil {
+			return frame.ReturnValue(lua.Nil())
+		}
+		return frame.ReturnValue(lua.String(out))
+	})
+	return fn.Value()
+}
+
+// luaBrowserEvaluateWithInit wraps host.browser.evaluate_with_init(url,
+// initJS, js) → result string. initJS runs before any page script, so fetch
+// hooks capture the site's own API calls.
+func luaBrowserEvaluateWithInit(state *lua.State, m *Manager, id string) lua.Value {
+	fn, _ := state.NewNativeFunction(func(frame lua.Frame) lua.Outcome {
+		url, _ := frame.CoerceString(0)
+		initJS, _ := frame.CoerceString(1)
+		js, _ := frame.CoerceString(2)
+		out, err := m.proxy.BrowserEvaluateWithInit(id, url, initJS, js)
 		if err != nil {
 			return frame.ReturnValue(lua.Nil())
 		}
