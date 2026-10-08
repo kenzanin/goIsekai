@@ -250,7 +250,19 @@ function get_page_list(arg)
         pos = e + 1
     end
 
-    log.debug("madaradex pages " .. path .. " count=" .. tostring(#pages))
+    log.debug("madaradex pages " .. path .. " count=" .. tostring(#pages) .. " scanned=" .. tostring(scanned))
+
+    -- A chapter the site serves without any <img class="wp-manga-chapter-img"> is
+    -- broken upstream, not an empty result: chapter-1 of
+    -- isekai-glory-hole-it-feels-too-good-inside-this-hole-uncensored renders an
+    -- empty read-container while chapter-2..5 carry 24 images each. Returning {}
+    -- silently makes the reader look like a plugin failure, so name the cause
+    -- instead. scanned > 0 with count == 0 means the page parsed but the reader
+    -- markup was absent, which is the broken-chapter signature.
+    if #pages == 0 and scanned > 0 then
+        return nil, "no_pages: " .. cslug
+    end
+
     return host.json.encode(pages)
 end
 

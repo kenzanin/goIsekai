@@ -75,7 +75,7 @@ end
               key = fetch_access_key()
               if key then cachedKey = key end
           end
-          if not key then return nil, "no mhub_access key available" end
+          if not key then return nil, "upstream_auth_failed" end
           -- This endpoint authenticates on the cookie, not the x-mhub-access header
           -- the GraphQL call uses: the header alone answers 403.
           local resp = host.http.get(SITE_URL .. "/api/chapter-crypto", {
@@ -84,11 +84,11 @@ end
               ["Referer"] = SITE_URL .. "/chapter/" .. slug .. "/chapter-" .. number,
           })
           if not resp or resp.status ~= 200 then
-              return nil, "/api/chapter-crypto returned " .. tostring(resp and resp.status or 0)
+              return nil, "upstream_auth_failed: crypto endpoint status " .. tostring(resp and resp.status or 0)
           end
           local parsed = host.json.decode(resp.body)
           if not parsed or not parsed.key or not parsed.keyId then
-              return nil, "/api/chapter-crypto returned no usable key"
+              return nil, "upstream_auth_failed: crypto endpoint returned no usable key"
           end
           return parsed
       end
@@ -98,7 +98,7 @@ end
           parts[#parts + 1] = part
       end
       if #parts ~= 6 or parts[1] ~= "enc" or parts[2] ~= "v1" then
-          return nil, "unrecognised pages envelope"
+          return nil, "envelope_unrecognised"
       end
       local keyId, iv, tag, ciphertext = parts[3], parts[4], parts[5], parts[6]
 
@@ -107,18 +107,25 @@ end
           cachedKey = nil
           mat, why = material()
       end
-      if not mat then return nil, why or "chapter-crypto unavailable" end
-      if mat.keyId ~= keyId then
-          return nil, "encrypted with a key this session was not served (blob "
-              .. keyId .. ", served " .. tostring(mat.keyId)
-              .. ") - keys rotate per session, so reload and retry"
-      end
+      if not mat then
+            log.error("mangahub: chapter-crypto unavailable: " .. tostring(why))
+            return nil, "upstream_auth_failed"
+        end
+if mat.keyId ~= keyId then
+            -- Key ids go to the log for diagnosis, never to the reader.
+            log.error("mangahub: keyId mismatch, blob " .. keyId .. " vs crypto " .. tostring(mat.keyId))
+            return nil, "decrypt_key_mismatch"
+        end
 
       local plain, err = host.crypto.aes_gcm_decrypt(mat.key, iv, tag, ciphertext)
-      if not plain then return nil, tostring(err) end
+      if not plain then
+            log.error("mangahub: pages decrypt failed: " .. tostring(err))
+            return nil, "decrypt_failed"
+        end
       local decoded = host.json.decode(plain)
       if not decoded or type(decoded.p) ~= "string" or type(decoded.i) ~= "table" then
-          return nil, "decrypted payload had no {p, i} shape"
+          log.error("mangahub: unexpected pages plaintext")
+            return nil, "decrypt_failed"
       end
 
       local out = {}
@@ -333,7 +340,10 @@ function get_page_list(arg)
     if not chapter then
         -- A refusal (rate limit, expired key) must fail loudly: returning an
         -- empty list renders a blank chapter with no explanation.
-        if gqlError then error("mangahub: " .. gqlError) end
+        if gqlError then
+              log.error("mangahub: graphql refused: " .. gqlError)
+              return nil, "upstream_auth_failed"
+          end
         return host.json.encode({})
     end
 
@@ -345,11 +355,12 @@ function get_page_list(arg)
         -- guessing a CDN pattern would produce a plausible list that silently drops
         -- pages. An empty chapter with a stated cause beats a wrong chapter that
         -- reads as complete.
-        local pages, why = encrypted_page_list(raw, slug, number)
-        if not pages then
-            log.error("mangahub pages: cannot decrypt: " .. tostring(why))
-            error("mangahub: cannot decrypt the page list for " .. chapterID .. ": " .. tostring(why))
-        end
+local pages, why = encrypted_page_list(raw, slug, number)
+          if not pages then
+              log.error("mangahub pages: cannot decrypt: " .. tostring(why))
+              -- why is already a code; the specifics stay in the log.
+              return nil, why or "decrypt_failed"
+          end
         log.info("mangahub pages: found " .. tostring(#pages) .. " pages for " .. chapterID .. " (decrypted)")
         return host.json.encode(pages)
     end

@@ -80,7 +80,7 @@ local function encrypted_page_list(blob, slug, number)
 			end
 		end
 		if not key then
-			return nil, "no mhub_access key available"
+			return nil, "upstream_auth_failed"
 		end
 		-- This endpoint authenticates on the cookie, not the x-mhub-access
 		-- header the GraphQL call uses: the header alone answers 403.
@@ -90,11 +90,11 @@ local function encrypted_page_list(blob, slug, number)
 			["Referer"] = SITE_URL .. "/chapter/" .. slug .. "/chapter-" .. number,
 		})
 		if not resp or resp.status ~= 200 then
-			return nil, "/api/chapter-crypto returned " .. tostring(resp and resp.status or 0)
+			return nil, "upstream_auth_failed: crypto endpoint status " .. tostring(resp and resp.status or 0)
 		end
 		local parsed = host.json.decode(resp.body)
 		if not parsed or not parsed.key or not parsed.keyId then
-			return nil, "/api/chapter-crypto returned no usable key"
+			return nil, "upstream_auth_failed: crypto endpoint returned no usable key"
 		end
 		return parsed
 	end
@@ -105,7 +105,7 @@ local function encrypted_page_list(blob, slug, number)
 	end
 	if #parts ~= 6 or parts[1] ~= "enc" or parts[2] ~= "v1" then
 		log.error("1manga: unrecognised pages envelope")
-		return nil, "unrecognised envelope"
+		return nil, "envelope_unrecognised"
 	end
 	local _, _, keyId, iv, tag, ciphertext = parts[1], parts[2], parts[3], parts[4], parts[5], parts[6]
 
@@ -118,27 +118,24 @@ local function encrypted_page_list(blob, slug, number)
 	end
 	if not mat then
 		log.error("1manga: chapter-crypto unavailable: " .. tostring(why))
-		return nil, why or "chapter-crypto unavailable"
+		return nil, "upstream_auth_failed"
 	end
 	if mat.keyId ~= keyId then
+		-- The key ids are logged for diagnosis but deliberately not returned to
+		-- the reader: the user-facing text is the host's.
 		log.error("1manga: keyId mismatch, blob " .. keyId .. " vs crypto " .. tostring(mat.keyId))
-		return nil,
-			"the page list is encrypted with a key this session was not served (blob "
-			.. keyId
-			.. ", served "
-			.. tostring(mat.keyId)
-			.. ") - the site rotates keys per session, so reload and retry"
+		return nil, "decrypt_key_mismatch"
 	end
 
 	local plain, err = host.crypto.aes_gcm_decrypt(mat.key, iv, tag, ciphertext)
 	if not plain then
 		log.error("1manga: pages decrypt failed: " .. tostring(err))
-		return nil, tostring(err)
+		return nil, "decrypt_failed"
 	end
 	local decoded = host.json.decode(plain)
 	if not decoded or type(decoded.p) ~= "string" or type(decoded.i) ~= "table" then
 		log.error("1manga: unexpected pages plaintext")
-		return nil, "decrypted payload had no {p, i} shape"
+		return nil, "decrypt_failed"
 	end
 
 	local out = {}
@@ -395,14 +392,15 @@ function get_page_list(arg)
 
 	local data = graphql_query(gql)
 	local chapter = data and data.data and data.data.chapter
-	if not chapter then
-		-- A refusal (rate limit, expired key) must fail loudly: returning an
-		-- empty list renders a blank chapter with no explanation.
-		if gqlError then
-			error("1manga: " .. gqlError)
-		end
-		return host.json.encode({})
-	end
+if not chapter then
+    		-- A refusal (rate limit, expired key) must fail loudly: returning an
+    		-- empty list renders a blank chapter with no explanation.
+    		if gqlError then
+    			log.error("1manga: graphql refused: " .. gqlError)
+    			return nil, "upstream_auth_failed"
+    		end
+    		return host.json.encode({})
+    	end
 
 	-- Authoritative path: the encrypted page list the API hands back. It names
 	-- every file exactly, which the CDN pattern below cannot do - chapter 59 of
@@ -414,13 +412,15 @@ function get_page_list(arg)
 			log.info("1manga pages: found " .. tostring(#pages) .. " pages for " .. chapterID .. " (decrypted)")
 			return host.json.encode(pages)
 		end
-		-- Fail loudly instead of probing. An encrypted pages field means this
-		-- chapter is served from the authoritative list, so the CDN pattern is
-		-- already known to be wrong for it: probing then produced a list that
-		-- looked plausible and silently dropped pages (observed on chapter 58,
-		-- which reported 18 pages it had only guessed at). An empty chapter with
-		-- a stated cause beats a wrong chapter that reads as complete.
-		error("1manga: cannot decrypt the page list for " .. chapterID .. ": " .. tostring(why))
+-- Fail loudly instead of probing. An encrypted pages field means this
+    		-- chapter is served from the authoritative list, so the CDN pattern is
+    		-- already known to be wrong for it: probing then produced a list that
+    		-- looked plausible and silently dropped pages (observed on chapter 58,
+    		-- which reported 18 pages it had only guessed at). An empty chapter with
+    		-- a stated cause beats a wrong chapter that reads as complete.
+    		-- why is already a code from encrypted_page_list; the details it logged
+    		-- stay in the log rather than travelling to the reader.
+    		return nil, why or "decrypt_failed"
 	end
 
 	-- Fallback for a plaintext or unreadable pages field: find the page count

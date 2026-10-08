@@ -236,6 +236,21 @@ Host/port come from CLI flags or `goisekai.ini` (flags win):
 
 Plugins implement a small ABI (`Init`, plus `Search`, `GetMangaDetail`, `GetChapterList`, `GetPageList`, `GetGenres`, `GetEnrichment`) and call the host function `http_request` for all networking. Lua plugins use snake_case (`search_manga`, `get_manga_detail`, ...), JS plugins use camelCase (`searchManga`, `getMangaDetail`, ...), WASM uses the PascalCase names. All runtimes are interchangeable — pick Lua for quick ones, JS for JSON-heavy ones, Yaegi when Go stdlib matters.
 
+### Reporting failures
+
+A plugin that cannot do its job returns `nil, "<code>"` (or `nil, "<code>: <detail>"` in Lua) instead of an empty result. The **host owns the wording**, so the same failure reads identically no matter which plugin raised it, and internal detail (key ids, upstream paths) stays in the log rather than the reader's face.
+
+| Code | Reader sees |
+| ---- | ---------- |
+| `no_pages` | this chapter has no images on the site |
+| `upstream_unavailable` | the source site could not be reached |
+| `upstream_auth_failed` | the source site refused the request (auth or block) |
+| `decrypt_key_mismatch` | the page list is encrypted under an unknown key; try again in a new session |
+| `decrypt_failed` | the page list could not be decrypted |
+| `envelope_unrecognised` | the source site changed its response format |
+
+Returning `host.json.encode({})` still means "genuinely no results". An empty list is a valid answer; a failure is not. An unrecognised reason passes through as-is, so a plugin that has not migrated to codes keeps working. `internal/pluginmanager/pluginerr.go` holds the registry and `TestPluginsReportCodedErrors` fails the build when a plugin invents its own message.
+
 ### Lua plugins (no toolchain needed)
 
 One folder per site under `app_data/plugins/<id>/`, with `main.lua` as the entry point; sibling modules are pre-loaded and loadable via `require("module")` (sandboxed to the plugin folder). Example plugins live in `examples/plugins/lua/<id>/` for reference.

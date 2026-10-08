@@ -57,8 +57,24 @@ func callLua(p *loadedPlugin, fnName, inputJSON string) (string, error) {
 		return "", fmt.Errorf("lua plugin %s %s: returned no values", p.id, fnName)
 	}
 	res := vals[0]
+	// Plugins signal failure the Lua way: return nil, "<code>" (optionally
+	// "<code>: <detail>"). The host owns the wording — see pluginerr.go — so
+	// the same failure reads identically no matter which plugin raised it.
+	pluginReason := func() string {
+		if len(vals) < 2 || vals[1].IsNil() {
+			return ""
+		}
+		s, ok := vals[1].AsString()
+		if !ok {
+			return ""
+		}
+		return PluginError(s)
+	}
 	switch {
 	case res.IsNil():
+		if reason := pluginReason(); reason != "" {
+			return "", fmt.Errorf("lua plugin %s %s: %s", p.id, fnName, reason)
+		}
 		return "", fmt.Errorf("lua plugin %s %s: returned nil", p.id, fnName)
 	case res.Kind() == lua.BoolKind:
 		return "", fmt.Errorf("lua plugin %s %s: returned bool, want string or table", p.id, fnName)

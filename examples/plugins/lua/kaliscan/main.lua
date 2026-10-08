@@ -42,7 +42,10 @@ function search_manga(arg)
 		end
 		body = host.http.get_body(gurl)
 		if not body then
-			return host.json.encode({})
+			-- kaliscan.me stopped resolving, so every search page is unreachable.
+			-- An empty list here reads as "no matches" and hides that; report it.
+			log.error("kaliscan: search backend unreachable: " .. BASE)
+			return nil, "upstream_unavailable"
 		end
 		return host.json.encode(util.parse_search(body).results)
 	end
@@ -54,7 +57,8 @@ function search_manga(arg)
 	-- page 1, so an unbroken walk would loop forever on the first page).
 	body = host.http.get_body(BASE .. "/service/backend/search/?q=" .. host.text.url_encode(query) .. "&page=1")
 	if not body then
-		return host.json.encode({})
+		log.error("kaliscan: search backend unreachable: " .. BASE)
+		return nil, "upstream_unavailable"
 	end
 	local all = {}
 	local seen = {}
