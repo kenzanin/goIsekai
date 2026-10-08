@@ -27,7 +27,7 @@ func (s *Server) handleSetChapterProgress(w http.ResponseWriter, r *http.Request
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	s.hxRedirect(w, "/view/manga/"+pluginID+"/"+mangaID)
+	s.hxRedirect(w, r, "/view/manga/"+pluginID+"/"+mangaID)
 }
 
 // handleMarkChapterRead marks a single chapter as read.
@@ -40,7 +40,7 @@ func (s *Server) handleMarkChapterRead(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	s.hxRedirect(w, "/view/manga/"+pluginID+"/"+mangaID)
+	s.hxRedirect(w, r, "/view/manga/"+pluginID+"/"+mangaID)
 }
 
 // handleResetChapterProgress clears a single chapter's read progress.
@@ -53,7 +53,7 @@ func (s *Server) handleResetChapterProgress(w http.ResponseWriter, r *http.Reque
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	s.hxRedirect(w, "/view/manga/"+pluginID+"/"+mangaID)
+	s.hxRedirect(w, r, "/view/manga/"+pluginID+"/"+mangaID)
 }
 
 // handleToggleChapterSkip toggles the skip flag on a single chapter.
@@ -66,7 +66,7 @@ func (s *Server) handleToggleChapterSkip(w http.ResponseWriter, r *http.Request)
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	s.hxRedirect(w, "/view/manga/"+pluginID+"/"+mangaID)
+	s.hxRedirect(w, r, "/view/manga/"+pluginID+"/"+mangaID)
 }
 
 // handleRefetchCover re-downloads a manga's cover, busting the caches.
@@ -84,7 +84,7 @@ func (s *Server) handleRefetchCover(w http.ResponseWriter, r *http.Request) {
 // toastRedirect behaves like hxRedirect but carries a success toast message
 // in X-Toast; the SPA fetch layer shows it after swapping the page in.
 func (s *Server) toastRedirect(w http.ResponseWriter, r *http.Request, location, msg string) {
-	w.Header().Set("Location", location+"?toast="+neturl.QueryEscape(msg))
+	w.Header().Set("Location", carryQuery(r, location+"?toast="+neturl.QueryEscape(msg)))
 	w.WriteHeader(http.StatusSeeOther)
 }
 
@@ -97,7 +97,7 @@ func (s *Server) handleToggleCoverDim(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	s.hxRedirect(w, "/view/manga/"+pluginID+"/"+mangaID)
+	s.hxRedirect(w, r, "/view/manga/"+pluginID+"/"+mangaID)
 }
 
 // handleChapterActions dispatches the chapter-list action dropdown onto the
@@ -164,5 +164,5 @@ func (s *Server) handleChapterActions(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	s.hxRedirect(w, "/view/manga/"+pluginID+"/"+mangaID)
+	s.hxRedirect(w, r, "/view/manga/"+pluginID+"/"+mangaID)
 }

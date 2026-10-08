@@ -2,6 +2,7 @@ package httpserver
 
 import (
 	"net/http"
+	"net/url"
 	"os"
 	"strconv"
 	"syscall"
@@ -68,9 +69,45 @@ func (s *Server) registerActionPostRoutes(r chi.Router) {
 // hxRedirect answers a successful action with a 303 See Other redirect —
 // the browser (and fetch) follows it natively, landing on the target page.
 // 303 forces GET after POST. The name is a leftover from the old HTMX layer.
-func (s *Server) hxRedirect(w http.ResponseWriter, location string) {
-	w.Header().Set("Location", location)
+//
+// The originating page's query string (e.g. ?ChPage=2) is carried over when
+// the redirect returns to the same path, so an in-place action does not reset
+// pagination or drop filters.
+func (s *Server) hxRedirect(w http.ResponseWriter, r *http.Request, location string) {
+	w.Header().Set("Location", carryQuery(r, location))
 	w.WriteHeader(http.StatusSeeOther)
+}
+
+// carryQuery merges the referer's query string into location when both point
+// at the same path. Location's own params win; a referer toast= is dropped
+// (re-showing a stale toast on every later action would be a bug).
+func carryQuery(r *http.Request, location string) string {
+	ref := r.Referer()
+	if ref == "" {
+		return location
+	}
+	u, err := url.Parse(ref)
+	if err != nil {
+		return location
+	}
+	loc, err := url.Parse(location)
+	if err != nil || loc.Path != u.Path || u.RawQuery == "" {
+		return location
+	}
+	q := loc.Query()
+	for k, vs := range u.Query() {
+		if k == "toast" {
+			continue
+		}
+		if _, dup := q[k]; dup {
+			continue
+		}
+		for _, v := range vs {
+			q.Add(k, v)
+		}
+	}
+	loc.RawQuery = q.Encode()
+	return loc.String()
 }
 
 // handleSaveSettings applies only the settings keys present in the form and
@@ -126,14 +163,14 @@ func (s *Server) handleSaveSettings(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	s.hxRedirect(w, "/view/settings")
+	s.hxRedirect(w, r, "/view/settings")
 }
 
 // handleRestart re-executes the current binary with its original arguments,
 // giving a true in-place restart that works under nohup, a shell loop, or a
 // supervisor. The response is flushed first so the client sees the 303.
 func (s *Server) handleRestart(w http.ResponseWriter, r *http.Request) {
-	s.hxRedirect(w, "/view/settings")
+	s.hxRedirect(w, r, "/view/settings")
 	if f, ok := w.(http.Flusher); ok {
 		f.Flush()
 	}

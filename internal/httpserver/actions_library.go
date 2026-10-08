@@ -30,7 +30,7 @@ func (s *Server) handleToggleLibrary(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	s.hxRedirect(w, "/view/manga/"+pluginID+"/"+mangaID)
+	s.hxRedirect(w, r, "/view/manga/"+pluginID+"/"+mangaID)
 }
 
 // handleSyncManga re-fetches one library manga on demand. Always allowed; the

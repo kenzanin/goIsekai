@@ -47,13 +47,13 @@ func (s *Server) handleExportCBZ(w http.ResponseWriter, r *http.Request) {
 }
 
 // handleClearAllCache removes the entire image cache directory.
-func (s *Server) handleClearAllCache(w http.ResponseWriter, _ *http.Request) {
+func (s *Server) handleClearAllCache(w http.ResponseWriter, r *http.Request) {
 	if err := s.service.ClearAllCache(); err != nil {
 		s.logger.Error("clear all cache", "error", err)
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	s.hxRedirect(w, "/view/settings")
+	s.hxRedirect(w, r, "/view/settings")
 }
 
 // handleDownloadExport serves a finished .cbz. It exists because ExportCBZ writes

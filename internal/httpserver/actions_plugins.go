@@ -135,7 +135,7 @@ func (s *Server) handleInstallPlugin(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	s.hxRedirect(w, "/view/plugins")
+	s.hxRedirect(w, r, "/view/plugins")
 }
 
 // handleTogglePlugin flips a plugin's active flag.
@@ -146,7 +146,7 @@ func (s *Server) handleTogglePlugin(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	s.hxRedirect(w, "/view/plugins")
+	s.hxRedirect(w, r, "/view/plugins")
 }
 
 // handleRefreshPlugins re-syncs the plugin table with the plugins directory:
@@ -159,7 +159,7 @@ func (s *Server) handleRefreshPlugins(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	s.hxRedirect(w, fmt.Sprintf("/view/plugins?refreshed=%d-%d-%d-%d", sum.Added, sum.Deactivated, sum.Updated, sum.Purged))
+	s.hxRedirect(w, r, fmt.Sprintf("/view/plugins?refreshed=%d-%d-%d-%d", sum.Added, sum.Deactivated, sum.Updated, sum.Purged))
 }
 
 // handleSaveVerify stores pasted verification cookies/UA for a plugin.
@@ -175,7 +175,7 @@ func (s *Server) handleSaveVerify(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	s.hxRedirect(w, "/view/plugins")
+	s.hxRedirect(w, r, "/view/plugins")
 }
 
 // bytesBuffer wraps a byte slice to satisfy io.ReaderAt.

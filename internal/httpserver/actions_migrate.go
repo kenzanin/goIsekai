@@ -24,5 +24,5 @@ func (s *Server) handleMigrateSource(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	// Redirect to the new location.
-	s.hxRedirect(w, "/view/manga/"+targetPluginID+"/"+targetMangaID)
+	s.hxRedirect(w, r, "/view/manga/"+targetPluginID+"/"+targetMangaID)
 }
