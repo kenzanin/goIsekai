@@ -150,4 +150,117 @@ function util.parse_page_image(html)
 	return src
 end
 
+-- ─── Desktop chapterfun path (batched, 2 images per request) ───────────────
+-- The mobile path costs one request PER page (0.9 s each; a 49-page chapter
+-- is ~45 s, far over the 15 s invoke default). The desktop reader
+-- (fanfox.net, same DM5 stack as mangahere) exposes var chapterid /
+-- var imagecount and chapterfun.ashx returns a Dean-Edwards packed JS with
+-- pix (folder, decimal-truncated: "02-008." serves "02-008.0") plus 2
+-- token-stamped filenames per call; replies overlap ([K,K+1]), so dedupe
+-- by filename. An empty key works (curl-verified).
+
+-- Dean-Edwards unpacker for the p,a,c,k,e,d payload chapterfun returns.
+local function unpack_packer(js)
+	-- Full packer tail: }('PAYLOAD',BASE,COUNT,'w|w'.split('|'),0,{})
+	local payload, base, words = host.regex.find(js, [[(?s)\}\('(.*)',(\d+),\d+,'(.*)'\.split\('\|'\),0,\{\}\)]])
+	if payload == nil then
+		return nil
+	end
+	local n = tonumber(base)
+	local list = {}
+	local start = 1
+	while true do
+		local pipe = words:find("|", start, true)
+		if pipe == nil then
+			list[#list + 1] = words:sub(start)
+			break
+		end
+		list[#list + 1] = words:sub(start, pipe - 1)
+		start = pipe + 1
+	end
+	local function enc(x)
+		local digits = ""
+		while true do
+			local r = x % n
+			local c
+			if r < 10 then
+				c = tostring(r)
+			elseif r < 36 then
+				c = string.char(87 + r)
+			else
+				c = string.char(29 + r)
+			end
+			digits = c .. digits
+			x = math.floor(x / n)
+			if x == 0 then
+				break
+			end
+		end
+		return digits
+	end
+	local dict = {}
+	for i, w in ipairs(list) do
+		dict[enc(i - 1)] = w
+	end
+	return payload:gsub("%w+", dict)
+end
+
+local function chapter_num_suffix(chapter_id)
+	-- "slug/c008" → "0"; "slug/v02/c008.5" → "5"
+	local num = host.regex.find(chapter_id, [[c([0-9][0-9.]*)$]]) or ""
+	if host.regex.find(num, [[\.([0-9]+)$]]) ~= nil then
+		return host.regex.find(num, [[([0-9]+)$]])
+	end
+	return "0"
+end
+
+function util.get_page_urls(get_body, chapter_id)
+	local base = "https://fanfox.net/manga/" .. chapter_id .. "/"
+	local first = get_body(base .. "1.html")
+	if first == "" or first == nil then
+		return nil
+	end
+	local cid = host.regex.find(first, [[var chapterid\s*=\s*([0-9]+);]])
+	local total = tonumber(host.regex.find(first, [[var imagecount\s*=\s*(\d+);]]) or "")
+	if cid == nil then
+		return nil
+	end
+	if total == nil or total < 1 then
+		total = 1000
+	end
+
+	local suffix = chapter_num_suffix(chapter_id)
+	local seen = {}
+	local urls = {}
+	local k = 1
+	while #urls < total and k <= total do
+		local packed = get_body(
+			"https://fanfox.net/chapterfun.ashx?cid=" .. cid .. "&page=" .. tostring(k) .. "&key=",
+			{ Referer = base .. tostring(math.ceil(k / 2)) .. ".html" }
+		)
+		if packed == "" or packed == nil then
+			break
+		end
+		local js = unpack_packer(packed)
+		if js == nil then
+			break
+		end
+		-- Re-insert the truncated decimal into the folder ("02-008." →
+		-- "02-008.5"); the /compressed tail stays after it.
+		local pix = (host.regex.find(js, [[pix="([^"]+)"]]) or ""):gsub("([0-9])%./", "%1." .. suffix .. "/", 1)
+		for fname in host.regex.gmatch(js, [["(/[^"]+\.jpg[^"]*)"]]) do
+			if not seen[fname] then
+				seen[fname] = true
+				urls[#urls + 1] = {
+					index = #urls,
+					url = "https:" .. pix .. fname,
+					headers = { Referer = "https://fanfox.net/" },
+				}
+			end
+		end
+		k = k + 2
+	end
+	return urls
+end
+
 return util

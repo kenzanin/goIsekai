@@ -9,11 +9,12 @@ PLUGIN = {
 	site_url = "https://m.fanfox.net",
 	logo = "logo.png",
 	thumb_ratio = 0.703,
+	-- Page lists batch 2 images per chapterfun request; a 50-page chapter
+	-- needs ~26 round-trips (~1.3 s each). Extend the 15 s invoke default.
+	timeout = 60,
 }
 
 local util = require("util")
-
-local IMAGE_HEADERS = { Referer = "https://m.fanfox.net/" }
 
 -- decode_id accepts the host's marshaled bare id ("blue_lock") or an object
 -- like {"id":"blue_lock"}; returns the id string, or nil.
@@ -28,21 +29,20 @@ end
 -- ─── search_manga ──────────────────────────────────────────────────────────
 -- GET https://fanfox.net/search?title={query}&page={N} — desktop site only;
 -- the mobile search endpoint is a JS shell that returns nothing.
--- Genre browsing passes an empty title plus &genres=<id>, so an empty query is
--- only rejected when no genre was asked for either.
 
 function search_manga(arg)
 	local a = host.json.decode(arg)
 	if type(a) == "string" then
 		a = { query = a, page = 1 }
 	end
-	local query = a and (a.query or a.q) or ""
+	local query = (a and (a.query or a.q)) or ""
 	local genres = (a and a.genres) or {}
-	local page = tonumber(a and a.page) or 1
+	-- Genre browsing passes an empty title plus &genres=<id>, so an empty query
+	-- is only rejected when no genre was asked for either.
 	if query == "" and #genres == 0 then
 		return host.json.encode({}), nil
 	end
-
+	local page = tonumber(a and a.page) or 1
 	local url = "https://fanfox.net/search?title=" .. host.text.url_encode(query) .. "&page=" .. tostring(page)
 	if #genres > 0 then
 		-- The site takes a comma-separated list of numeric genre ids, not slugs:
@@ -53,7 +53,6 @@ function search_manga(arg)
 		end
 		if #ids > 0 then url = url .. "&genres=" .. table.concat(ids, ",") end
 	end
-
 	local html = host.http.get_body(url)
 	if html == "" then
 		return host.json.encode({}), nil
@@ -95,38 +94,24 @@ function get_chapter_list(arg)
 end
 
 -- ─── get_page_list ─────────────────────────────────────────────────────────
--- GET https://m.fanfox.net/manga/{chapter_id}/{N}.html for N = 1..total.
--- Image URLs are per-request tokenized (token + ttl), so every page is
--- fetched at call time and the host caches the downloaded images, not URLs.
+-- chapter_id keeps the slug prefix ("slug/v02/c008"); util.get_page_urls
+-- resolves cid from the reader page and walks chapterfun.ashx in pairs.
+-- Chapter ids are marshaled with ":" between manga slug and chapter
+-- ("slug:c008") — restore the slash.
 
 function get_page_list(arg)
 	local chapter_id = decode_id(arg)
 	if chapter_id == nil or chapter_id == "" then
 		return host.json.encode({}), nil
 	end
-	local base = "https://m.fanfox.net/manga/" .. chapter_id .. "/"
-	local first = host.http.get_body(base .. "1.html")
-	if first == "" then
+	chapter_id = chapter_id:gsub(":", "/")
+	local urls = util.get_page_urls(host.http.get_body, chapter_id)
+	if urls == nil then
 		return host.json.encode({}), nil
 	end
-
-	local pages = {}
-	for n = 1, util.parse_page_count(first, chapter_id) do
-		local html = first
-		if n > 1 then
-			html = host.http.get_body(base .. tostring(n) .. ".html")
-		end
-		local src = util.parse_page_image(html)
-		if src ~= "" then
-			pages[#pages + 1] = {
-				index = n - 1,
-				url = src,
-				headers = IMAGE_HEADERS,
-			}
-		end
-	end
-	return host.json.encode(pages), nil
+	return host.json.encode(urls), nil
 end
+
 
 -- ─── get_genres (optional export) ──────────────────────────────────────────
 -- MangaFox has no genre archive page and no genre query endpoint: the only way
