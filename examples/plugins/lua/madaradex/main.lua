@@ -235,7 +235,17 @@ function get_page_list(arg)
         scanned = scanned + 1
         if match(tag, "wp-manga-chapter-img") then
             local src = img_src(tag)
-            if src ~= "" then pages[#pages + 1] = { index = #pages, url = src } end
+            if src ~= "" then
+                -- cdn.madaradex.org answers 403 without a same-site Referer
+                -- (curl-verified: no header 403/4546 bytes, with Referer
+                -- 200/973784). The headers field must stay populated — an empty
+                -- Lua table encodes as [] and the host decodes it as a map.
+                pages[#pages + 1] = {
+                    index = #pages,
+                    url = src,
+                    headers = { Referer = BASE .. "/" },
+                }
+            end
         end
         pos = e + 1
     end
