@@ -75,3 +75,28 @@ func (d *DB) TogglePluginActive(id string) error {
 		Exec(d.db)
 	return err
 }
+
+// SetPluginActive sets is_active explicitly. Refresh uses it to deactivate
+// plugins whose files are gone, without toggling (which would re-enable an
+// already-inactive row).
+func (d *DB) SetPluginActive(id string, active bool) error {
+	v := 0
+	if active {
+		v = 1
+	}
+	_, err := Plugins.UPDATE().
+		SET(Plugins.IsActive.SET(Int(int64(v)))).
+		WHERE(Plugins.ID.EQ(String(id))).
+		Exec(d.db)
+	return err
+}
+
+// DeletePlugin removes a plugin row entirely. Only for artifacts that were
+// never real plugins (e.g. *.bak.* backup dirs that discovery once picked
+// up). Real plugins are deactivated, not deleted, to preserve history.
+func (d *DB) DeletePlugin(id string) error {
+	_, err := Plugins.DELETE().
+		WHERE(Plugins.ID.EQ(String(id))).
+		Exec(d.db)
+	return err
+}

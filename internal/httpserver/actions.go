@@ -32,6 +32,7 @@ func (s *Server) registerActionRoutes() {
 func (s *Server) registerActionPostRoutes(r chi.Router) {
 	r.Post("/install-plugin", s.handleInstallPlugin)
 	r.Post("/toggle-plugin/{pluginID}", s.handleTogglePlugin)
+	r.Post("/refresh-plugins", s.handleRefreshPlugins)
 	r.Post("/toggle-library/{pluginID}/{mangaID}", s.handleToggleLibrary)
 	r.Post("/sync", s.handleSync)
 	r.Post("/sync-manga/{pluginID}/{mangaID}", s.handleSyncManga)

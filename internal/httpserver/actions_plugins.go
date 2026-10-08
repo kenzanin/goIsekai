@@ -2,6 +2,7 @@ package httpserver
 
 import (
 	"archive/zip"
+	"fmt"
 	"io"
 	"net/http"
 	"os"
@@ -146,6 +147,19 @@ func (s *Server) handleTogglePlugin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s.hxRedirect(w, "/view/plugins")
+}
+
+// handleRefreshPlugins re-syncs the plugin table with the plugins directory:
+// new files are registered, missing files are deactivated, backup artifacts
+// are purged. Redirects back with a summary in the toast.
+func (s *Server) handleRefreshPlugins(w http.ResponseWriter, r *http.Request) {
+	sum, err := s.service.RefreshPlugins()
+	if err != nil {
+		s.logger.Error("refresh plugins", "error", err)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	s.hxRedirect(w, fmt.Sprintf("/view/plugins?refreshed=%d-%d-%d-%d", sum.Added, sum.Deactivated, sum.Updated, sum.Purged))
 }
 
 // handleSaveVerify stores pasted verification cookies/UA for a plugin.
