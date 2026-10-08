@@ -169,15 +169,27 @@ return function(data)
 		::next::
 	end
 
-	-- Synopsis with read-more toggle
+	-- Synopsis with read-more toggle (only when > 10 lines)
 	local synopsisHTML = ""
 	if manga.Description and manga.Description ~= "" then
-		synopsisHTML = [[<div class="mb-3">
-			<span class="text-xs font-semibold text-neutral-300 uppercase tracking-wide">Synopsis</span>
-			<div id="synopsis-text" class="text-sm text-neutral-400 mt-1.5 max-h-[4.5rem] overflow-hidden transition-all duration-300 relative">]] .. h(
-			manga.Description
-		) .. [[<span id="synopsis-fade" class="absolute inset-x-0 bottom-0 h-8 bg-gradient-to-t from-neutral-950 to-transparent pointer-events-none"></span></div>
-			<button type="button" id="synopsis-toggle" onclick="var t=document.getElementById('synopsis-text');var f=document.getElementById('synopsis-fade');var b=document.getElementById('synopsis-toggle');t.classList.toggle('max-h-[4.5rem]');t.classList.toggle('max-h-none');f.style.display=t.classList.contains('max-h-none')?'none':'block';b.textContent=t.classList.contains('max-h-none')?'Show less':'Read more';" class="text-xs text-indigo-400 hover:text-indigo-300 transition mt-1 cursor-pointer">Read more</button></div>]]
+		local lineCount = 0
+		for _ in string.gmatch(manga.Description, "\n") do
+			lineCount = lineCount + 1
+		end
+		local needsToggle = lineCount > 10
+		local cls = 'text-sm text-neutral-400 mt-1.5'
+		if needsToggle then
+			cls = cls .. ' max-h-[4.5rem] overflow-hidden transition-all duration-300 relative'
+		end
+		synopsisHTML = '<div class="mb-3">'
+			.. '<span class="text-xs font-semibold text-neutral-300 uppercase tracking-wide">Synopsis</span>'
+			.. '<div id="synopsis-text" class="' .. cls .. '">' .. h(manga.Description) .. '</div>'
+		if needsToggle then
+			synopsisHTML = synopsisHTML
+				.. '<span id="synopsis-fade" class="absolute inset-x-0 bottom-0 h-8 bg-gradient-to-t from-neutral-950 to-transparent pointer-events-none"></span>'
+				.. '<button type="button" id="synopsis-toggle" onclick="var t=document.getElementById(\'synopsis-text\');var f=document.getElementById(\'synopsis-fade\');var b=document.getElementById(\'synopsis-toggle\');t.classList.toggle(\'max-h-[4.5rem]\');t.classList.toggle(\'max-h-none\');f.style.display=t.classList.contains(\'max-h-none\')?\'none\':\'block\';b.textContent=t.classList.contains(\'max-h-none\')?\'Show less\':\'Read more\';" class="text-xs text-indigo-400 hover:text-indigo-300 transition mt-1 cursor-pointer">Read more</button>'
+		end
+		synopsisHTML = synopsisHTML .. '</div>'
 	end
 
 	-- Action buttons; syncedHTML carries the far-right Update button

@@ -116,6 +116,9 @@ return function(data)
 		if q ~= "" then
 			noResults = noResults .. ' for "' .. h(q) .. '"'
 		end
+		if pluginName ~= "" then
+			noResults = noResults .. ' on ' .. h(pluginName)
+		end
 		noResults = noResults .. "</div>"
 	end
 

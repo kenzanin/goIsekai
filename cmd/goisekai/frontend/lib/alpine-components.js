@@ -860,12 +860,12 @@
     var tags = document.querySelectorAll('.genre-tag');
     var btn = document.getElementById(btnId);
     if (!btn) return;
-    var show = btn.dataset.show === '1';
+    var showing = btn.dataset.show === '1';
     for (let i = maxVisible; i < tags.length; i++) {
-      tags[i].style.display = show ? '' : 'none';
+      tags[i].style.display = showing ? 'none' : '';
     }
-    btn.dataset.show = show ? '0' : '1';
-    btn.textContent = show ? 'Show more' : 'Show less';
+    btn.dataset.show = showing ? '0' : '1';
+    btn.textContent = showing ? 'Show more' : 'Show less';
   };
 })();
 
