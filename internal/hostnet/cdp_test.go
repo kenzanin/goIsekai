@@ -175,3 +175,27 @@ func TestNeedsJSSkipsSolveWithSavedCookies(t *testing.T) {
 		t.Errorf("solve calls = %d, want 0 (verify cookies already seeded)", solver.calls)
 	}
 }
+
+// TestManualCookiesSkipsSolve verifies a manual_cookies plugin never calls the
+// browser engine: a challenge fails immediately with ErrChallenge so the
+// human-verify wizard re-opens for a cookie paste, instead of the invoke
+// budget burning on a solver that (on Cloudflare) never clears the page.
+func TestManualCookiesSkipsSolve(t *testing.T) {
+	srv := challengeServer(1) // first request: challenge body
+	defer srv.Close()
+
+	p := NewProxy()
+	p.ConfigureCDP(CDPConfig{Engine: "chrome", Path: "/usr/bin/chrome"})
+	p.SetNeedsJS("plugin-1", true)
+	p.SetManualCookies("plugin-1", true)
+	solver := &fakeSolver{}
+	p.solveChallenge = solver.solve
+
+	_, err := p.Request("plugin-1", types.HTTPRequest{Method: "GET", URL: srv.URL + "/page"})
+	if !errors.Is(err, ErrChallenge) {
+		t.Fatalf("err = %v, want ErrChallenge (manual cookies)", err)
+	}
+	if solver.calls != 0 {
+		t.Errorf("solve calls = %d, want 0 (manual_cookies skips the engine)", solver.calls)
+	}
+}

@@ -119,6 +119,12 @@ func isChallengeResponse(resp types.HTTPResponse) bool {
 // running; its result is dropped) and the challenge surfaces as a
 // ChallengeError so the wizard can re-prompt for fresh cookies.
 func (p *Proxy) solveAndSeed(ctx context.Context, pluginID, targetURL string) error {
+	// manual_cookies: the plugin declares its cookies are pasted by the user
+	// (wizard), never solved — fail fast so the challenge re-opens the wizard
+	// instead of burning the invoke budget on an engine that never clears it.
+	if p.manualCookiesHint(pluginID) {
+		return fmt.Errorf("hostnet: manual_cookies plugin %s: challenge left to the verify wizard", pluginID)
+	}
 	solver := p.solveChallenge
 	if solver == nil {
 		return errors.New("hostnet: no challenge solver installed")

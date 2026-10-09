@@ -81,6 +81,11 @@ type PluginMeta struct {
 	// routed through the browser engine (when configured) instead of the fast
 	// path. Analogous to NeedsHumanVerify but for JS-capable engines.
 	NeedsJS bool `json:"needs_js,omitempty"`
+	// ManualCookies reports that anti-bot cookies for this source are pasted
+	// by the user (human-verify wizard), never solved by the browser engine.
+	// Any challenge then fails immediately with ErrChallenge so the wizard
+	// re-opens instead of the invoke budget burning on a doomed solve.
+	ManualCookies bool `json:"manual_cookies,omitempty"`
 	// EnrichmentProviders declares custom enrichment sources this plugin offers.
 	// Each provider has a stable ID, display name, and list of supported kinds.
 	EnrichmentProviders []EnrichmentProvider `json:"enrichment_providers,omitempty"`

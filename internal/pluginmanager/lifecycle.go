@@ -53,6 +53,7 @@ func (m *Manager) ensureLoaded(id string) error {
 	p.meta = loaded.meta
 	p.loaded = true
 	m.proxy.SetNeedsJS(id, p.meta.NeedsJS)
+	m.proxy.SetManualCookies(id, p.meta.ManualCookies)
 	m.proxy.SetHTTPProfiles(id, p.meta.HTTPProfiles)
 	logger.Info("plugin loaded (lazy)", "id", id, "kind", p.kind, "version", p.contractVersion)
 
@@ -101,6 +102,7 @@ func (m *Manager) EnsureLoaded(id string) error {
 func (m *Manager) registerLoaded(id string, p *loadedPlugin) {
 	m.plugins[id] = p
 	m.proxy.SetNeedsJS(id, p.meta.NeedsJS)
+	m.proxy.SetManualCookies(id, p.meta.ManualCookies)
 	m.proxy.SetHTTPProfiles(id, p.meta.HTTPProfiles)
 	m.notifyLoaded(id)
 }

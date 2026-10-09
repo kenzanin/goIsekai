@@ -39,6 +39,7 @@ type Proxy struct {
 	secCHUAExplicit string                           // config-set Sec-CH-UA hint ("" = derive from UA)
 	pendingVerify   map[string]verifySeed            // cookie jar seeds awaiting client creation
 	needsJS         map[string]bool                  // per-plugin needs_js hint
+	manualCookies   map[string]bool                  // per-plugin manual_cookies hint
 	pins            map[string]string                // pluginID -> pinned profile ("stdlib" = use doRequestStd)
 	hints           map[string][]string              // pluginID -> ordered profile ladder from metadata
 	persistPin      func(pluginID, profile string)   // persists pin to DB; nil-safe
@@ -80,6 +81,7 @@ func NewProxy() *Proxy {
 		secCHUAExplicit: "",
 		pendingVerify:   make(map[string]verifySeed),
 		needsJS:         make(map[string]bool),
+		manualCookies:   make(map[string]bool),
 		pins:            make(map[string]string),
 		hints:           make(map[string][]string),
 		solveChallenge:  solveChallenge,
@@ -140,6 +142,22 @@ func (p *Proxy) needsJSHint(pluginID string) bool {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	return p.needsJS[pluginID]
+}
+
+// SetManualCookies records a plugin's manual_cookies hint: challenges for that
+// plugin are never solved by the engine — they fail immediately so the
+// human-verify wizard re-opens for a cookie paste.
+func (p *Proxy) SetManualCookies(pluginID string, manual bool) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.manualCookies[pluginID] = manual
+}
+
+// manualCookiesHint reports whether pluginID declared manual_cookies.
+func (p *Proxy) manualCookiesHint(pluginID string) bool {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	return p.manualCookies[pluginID]
 }
 
 // CDPConfig returns a copy of the current CDP settings.
