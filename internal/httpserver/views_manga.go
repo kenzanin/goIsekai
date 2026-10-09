@@ -16,22 +16,38 @@ import (
 func (s *Server) buildMangaDetailData(r *http.Request, pluginID, mangaID string) map[string]any {
 	// Opening the detail page clears the library card's [New] badge.
 	_ = s.service.ClearMangaNew(pluginID, mangaID)
-	manga, chapters, err := s.service.GetMangaDetails(pluginID, mangaID)
+	// Human-verify gate (mirrors viewSearch): when the plugin needs human
+	// verification and no cookies are saved yet, skip the fetch entirely — it
+	// would burn the CDP solve timeout on a request that cannot succeed — and
+	// let the wizard modal render over the page instead. PluginMeta self-loads
+	// the plugin so the flag is visible before any plugin call runs.
+	verifyRow, _, _ := s.service.GetPluginVerifyState(pluginID)
+	pluginMeta := s.service.PluginMeta(pluginID)
+	var manga types.Manga
+	var chapters []types.Chapter
+	var err error
 	challenge := false
 	cachedData := false
-	if err != nil {
-		if _, ok := errors.AsType[*hostnet.ChallengeError](err); ok {
-			challenge = true
-			s.logger.Warn("manga detail blocked by challenge", "plugin", pluginID, "manga", mangaID)
-		} else {
-			// Plugin unreachable (e.g. offline): the reader already prefers
-			// the persisted copy, so the detail page should too instead of
-			// blanking out. Serve it with a notice when a copy exists.
-			cachedData = true
-			manga, chapters, err = s.service.CachedMangaAndChapters(pluginID, mangaID)
-			if err != nil {
-				s.logger.Error("manga detail", "error", err, "plugin", pluginID, "manga", mangaID)
-				return nil
+	if pluginMeta.NeedsHumanVerify && verifyRow.Cookies == "" {
+		// Blocked: wizard renders via Challenge below; a reload after the
+		// cookies are saved re-runs the real fetch.
+		challenge = true
+	} else {
+		manga, chapters, err = s.service.GetMangaDetails(pluginID, mangaID)
+		if err != nil {
+			if _, ok := errors.AsType[*hostnet.ChallengeError](err); ok {
+				challenge = true
+				s.logger.Warn("manga detail blocked by challenge", "plugin", pluginID, "manga", mangaID)
+			} else {
+				// Plugin unreachable (e.g. offline): the reader already prefers
+				// the persisted copy, so the detail page should too instead of
+				// blanking out. Serve it with a notice when a copy exists.
+				cachedData = true
+				manga, chapters, err = s.service.CachedMangaAndChapters(pluginID, mangaID)
+				if err != nil {
+					s.logger.Error("manga detail", "error", err, "plugin", pluginID, "manga", mangaID)
+					return nil
+				}
 			}
 		}
 	}
@@ -71,11 +87,8 @@ func (s *Server) buildMangaDetailData(r *http.Request, pluginID, mangaID string)
 	altCovers, _ := s.service.ListAltCovers(pluginID, mangaID)
 	s.logger.Debug("enrichment cache", "plugin", pluginID, "manga", mangaID, "categories", len(cats), "related", len(rels))
 	overrideGenres, _, _ := s.service.GetMangaGenres(pluginID, mangaID)
-	// Human verification: when a plugin declared needs_human_verify=true, the
-	// challenge banner becomes an inline wizard (detail.lua / search.lua).
-	// Prefill with any cookies/UA already saved for this plugin.
-	verifyRow, _, _ := s.service.GetPluginVerifyState(pluginID)
-	pluginMeta, _ := s.service.PluginMetas()[pluginID]
+	// Human verification wizard data (verifyRow/pluginMeta hoisted to the top
+	// for the needs_human_verify fetch gate above).
 
 	const chapterPageSize = 50
 	chPage, _ := strconv.Atoi(r.URL.Query().Get("ChPage"))
@@ -87,37 +100,37 @@ func (s *Server) buildMangaDetailData(r *http.Request, pluginID, mangaID string)
 	chEnd := min(chStart+chapterPageSize, chTotal)
 
 	return map[string]any{
-		"PluginID":       pluginID,
-		"PluginName":     pluginName,
-		"PluginIcon":     pluginIcon,
-		"MangaID":        mangaID,
-		"Manga":          manga,
-		"AltTitles":      altTitles,
-		"AltSummaries":   altSummaries,
-		"CurrentTitle":   manga.Title,
-		"Chapters":       chapters[chStart:chEnd],
-		"Progress":       progress,
-		"Continue":       continueTo,
-		"InLibrary":      inLibrary,
-		"Challenge":      challenge,
-		"Verify":          verifyRow.Cookies,
-		"VerifyURL":       pluginMeta.VerifyURL,
-		"VerifyUserAgent": verifyRow.UserAgent,
+		"PluginID":         pluginID,
+		"PluginName":       pluginName,
+		"PluginIcon":       pluginIcon,
+		"MangaID":          mangaID,
+		"Manga":            manga,
+		"AltTitles":        altTitles,
+		"AltSummaries":     altSummaries,
+		"CurrentTitle":     manga.Title,
+		"Chapters":         chapters[chStart:chEnd],
+		"Progress":         progress,
+		"Continue":         continueTo,
+		"InLibrary":        inLibrary,
+		"Challenge":        challenge,
+		"Verify":           verifyRow.Cookies,
+		"VerifyURL":        pluginMeta.VerifyURL,
+		"VerifyUserAgent":  verifyRow.UserAgent,
 		"NeedsHumanVerify": pluginMeta.NeedsHumanVerify,
 		"VerifyCookies":    verifyRow.Cookies,
-		"CachedData":     cachedData,
-		"ChCurrentPage":  chPage,
-		"ChTotalPages":   max((chTotal+chapterPageSize-1)/chapterPageSize, 1),
-		"ChHasNext":      chEnd < chTotal,
-		"ChHasPrev":      chPage > 1,
-		"Categories":     cats,
-		"Related":        rels,
-		"AltCovers":      altCovers,
-		"PluginGenres":   manga.RawGenres,
-		"OverrideGenres": overrideGenres,
-		"Genres":         manga.Genres,
-		"CoverDim":       manga.CoverDim,
-		"LastSynced":     lastSynced,
+		"CachedData":       cachedData,
+		"ChCurrentPage":    chPage,
+		"ChTotalPages":     max((chTotal+chapterPageSize-1)/chapterPageSize, 1),
+		"ChHasNext":        chEnd < chTotal,
+		"ChHasPrev":        chPage > 1,
+		"Categories":       cats,
+		"Related":          rels,
+		"AltCovers":        altCovers,
+		"PluginGenres":     manga.RawGenres,
+		"OverrideGenres":   overrideGenres,
+		"Genres":           manga.Genres,
+		"CoverDim":         manga.CoverDim,
+		"LastSynced":       lastSynced,
 	}
 }
 

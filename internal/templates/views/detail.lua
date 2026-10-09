@@ -464,14 +464,17 @@ return function(data)
 </div>]]
 
 	-- Human verification wizard: plugin blocked a JS/cookie challenge.
+	-- Show only when actually blocked (challenge) or no cookies saved yet, so
+	-- saved cookies suppress the modal and the detail page can load normally.
 	local verifyHTML = ""
-	if needsHumanVerify and verifyURL ~= "" then
+	local showVerify = needsHumanVerify and verifyURL ~= "" and (challenge or verifyCookies == "")
+	if showVerify then
 		local placeholder = verifyCookies ~= "" and verifyCookies or 'cf_clearance=...; session=...'
 		local useragent = verifyUserAgent ~= "" and verifyUserAgent or "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
 		verifyHTML = [[<div class="space-y-4">]]
 			.. '<div class="bg-amber-500/10 border border-amber-600/50 rounded-lg p-3">'
 			.. '<h3 class="text-sm font-semibold text-amber-200 mb-2">⚠️ Plugin blocked by bot verification</h3>'
-			.. '<p class="text-xs text-amber-200/80 mb-2">This site requires manual verification. Open the link below in your browser (Chrome/Firefox recommended), solve the challenge (F12 → Application → Cookies or Application → Storage), then paste the cookies below.</p>'
+			.. '<p class="text-xs text-amber-200/80 mb-2">This site requires manual verification. Open the link below in your browser, solve the challenge, then paste cookies below — either as name=value pairs or a Cookie-Editor JSON export.</p>'
 			.. '<a href="' .. h(verifyURL) .. '" target="_blank" rel="noopener" class="text-xs text-amber-400 hover:text-amber-300 hover:underline break-all">' .. h(verifyURL) .. "</a>"
 			.. "</div>"
 			.. '<div class="space-y-2">'
@@ -487,8 +490,10 @@ return function(data)
 			.. "</div>"
 	end
 
-	-- Render wizard modal only when the plugin needs human verification
-	if needsHumanVerify then
+	-- Render wizard modal only when it should be visible (see showVerify above);
+	-- the inline script opens it right away (display:none default avoids the
+	-- first-paint flash, per the overlay convention).
+	if showVerify then
 		body = body
 			.. '<div id="verify-modal" class="fixed inset-0 z-50 flex items-center justify-center" style="display:none">'
 			.. '<div class="absolute inset-0 bg-black/70" onclick="this.parentElement.classList.add(\'hidden\')"></div>'
@@ -497,6 +502,7 @@ return function(data)
 			.. '</div></div>'
 		body = body
 			.. "<script>"
+			.. "document.getElementById('verify-modal').style.display='';"
 		.. "function saveVerify(pid, mid) {"
 		.. "  var cookies = document.getElementById('verify-cookies').value;"
 		.. "  var ua = document.getElementById('verify-useragent').value;"
@@ -511,8 +517,8 @@ return function(data)
 		.. "    },"
 		.. "    body: form.toString()"
 		.. "  }).then(r => {"
-		.. "    if (r.status === 303) {"
-		.. "      // redirect followed -> modal page refreshed"
+		.. "    if (r.status === 303 || r.ok) {"
+		.. "      // fetch follows the 303, so the final response is the redirected page"
 		.. "      document.getElementById('verify-modal').classList.add('hidden');"
 		.. "      document.getElementById('cover-modal').classList.add('hidden');"
 		.. "      location.reload();"

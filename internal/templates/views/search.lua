@@ -136,7 +136,10 @@ return function(data)
 	local verifyURL = data.VerifyURL or ""
 	local verifyCookies = data.VerifyCookies or ""
 	local verifyUserAgent = data.VerifyUserAgent or ""
-	if needsHumanVerify and verifyURL ~= "" then
+	-- Show the wizard only when the plugin is actually blocked: either the
+	-- search came back/stayed blocked (challenge) or no cookies are saved yet.
+	-- Saved cookies suppress the modal so the search can run with them.
+	if needsHumanVerify and verifyURL ~= "" and (challenge or verifyCookies == "") then
 		local placeholder = verifyCookies ~= "" and verifyCookies or 'cf_clearance=...; session=...'
 		local useragent = verifyUserAgent ~= "" and verifyUserAgent or "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
 		verifyHTML = '<div id="verify-modal" class="fixed inset-0 z-50 flex items-center justify-center">'
@@ -145,7 +148,7 @@ return function(data)
 			.. '<div class="space-y-4">'
 			.. '<div class="bg-amber-500/10 border border-amber-600/50 rounded-lg p-3">'
 			.. '<h3 class="text-sm font-semibold text-amber-200 mb-2">⚠️ Plugin blocked by bot verification</h3>'
-			.. '<p class="text-xs text-amber-200/80 mb-2">This site requires manual verification. Open the link below in your browser (Chrome/Firefox recommended), solve the challenge (F12 → Application → Cookies or Application → Storage), then paste the cookies below.</p>'
+			.. '<p class="text-xs text-amber-200/80 mb-2">This site requires manual verification. Open the link below in your browser, solve the challenge, then paste cookies below — either as name=value pairs or a Cookie-Editor JSON export.</p>'
 			.. '<a href="' .. h(verifyURL) .. '" target="_blank" rel="noopener" class="text-xs text-amber-400 hover:text-amber-300 hover:underline break-all">' .. h(verifyURL) .. "</a>"
 			.. "</div>"
 			.. '<div class="space-y-2">'
