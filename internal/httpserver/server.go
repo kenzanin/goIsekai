@@ -51,24 +51,24 @@ func New(host string, port int, apiKey string, assets fs.FS, svc *bridge.AppServ
 	})
 
 	addr := fmt.Sprintf("%s:%d", host, port)
-s := &Server{
-    Router:  r,
-    http:    &http.Server{Addr: addr, Handler: r},
-    logger:  logger,
-    assets:  assets,
-    service: svc,
-    engine:  engine,
-    apiKey:  apiKey,
-    enrich:  enrichReg,
-}
-// Set up the AppService shutdown callback so the HTTP API can trigger graceful shutdown.
-s.service.SetShutdownFn(func() {
-    logger.Info("triggering HTTP API shutdown")
-    if err := s.Shutdown(context.Background()); err != nil {
-        logger.Error("shutdown error", "error", err)
-    }
-})
-token, err := mintCSRFToken()
+	s := &Server{
+		Router:  r,
+		http:    &http.Server{Addr: addr, Handler: r},
+		logger:  logger,
+		assets:  assets,
+		service: svc,
+		engine:  engine,
+		apiKey:  apiKey,
+		enrich:  enrichReg,
+	}
+	// Set up the AppService shutdown callback so the HTTP API can trigger graceful shutdown.
+	s.service.SetShutdownFn(func() {
+		logger.Info("triggering HTTP API shutdown")
+		if err := s.Shutdown(context.Background()); err != nil {
+			logger.Error("shutdown error", "error", err)
+		}
+	})
+	token, err := mintCSRFToken()
 	if err != nil {
 		logger.Error("csrf: mint token failed, action routes will refuse every mutation", "error", err)
 	} else {

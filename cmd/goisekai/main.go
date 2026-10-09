@@ -2,11 +2,13 @@ package main
 
 import (
 	"context"
+	"errors"
 	"flag"
 	"fmt"
 	"log"
 	"log/slog"
 	"math"
+	"net/http"
 	"os"
 	"os/signal"
 	"path/filepath"
@@ -191,8 +193,14 @@ func main() {
 	case <-mainCtx.Done():
 		logger.Info("received shutdown signal", "signal", mainCtx.Err())
 	case err := <-errCh:
-		// Server exited on its own (port bind failure, etc.).
-		logger.Fatal("http server", "error", err)
+		// ErrServerClosed means the listener was closed on purpose — by the
+		// POST /api/shutdown endpoint — and falls through to the ordered
+		// shutdown below (logger.Fatal would os.Exit and skip it). Anything
+		// else (port bind failure, etc.) is fatal.
+		if !errors.Is(err, http.ErrServerClosed) {
+			logger.Fatal("http server", "error", err)
+		}
+		logger.Info("http server closed by shutdown request")
 	}
 
 	// Ordered shutdown: HTTP → worker pool → plugins → DB → logs → PID file (PID is deferred).

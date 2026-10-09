@@ -175,11 +175,15 @@ func (s *Server) apiStats(w http.ResponseWriter, r *http.Request) {
 		"total_entries": total,
 		"hit_count":     hits,
 		"hit_rate":      hitRate,
-		})
+	})
 }
 
 // apiShutdown triggers a graceful shutdown of the server via the AppService.
+// The response is written first and the trigger runs asynchronously:
+// http.Server.Shutdown waits for in-flight requests, so a synchronous trigger
+// would block this handler before it could flush the response — curl then sees
+// a connection reset instead of the 200.
 func (s *Server) apiShutdown(w http.ResponseWriter, r *http.Request) {
-	s.service.TriggerShutdown()
 	writeJSON(w, http.StatusOK, map[string]string{"status": "shutting down"})
+	go s.service.TriggerShutdown()
 }
