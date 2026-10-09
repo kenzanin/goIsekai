@@ -3,9 +3,11 @@ package pluginmanager
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	lua "github.com/mmcdole/lunar"
 
+	"goisekai/internal/hostnet"
 	"goisekai/pkg/types"
 )
 
@@ -51,6 +53,12 @@ func callLua(p *loadedPlugin, fnName, inputJSON string) (string, error) {
 
 	vals, err := state.Call(fnVal, lua.String(inputJSON))
 	if err != nil {
+		// The http natives throw the ErrChallenge marker when a dead anti-bot
+		// session aborts the call — map it back to the typed error the views
+		// check for, so the human-verify wizard re-opens.
+		if ce, ok := challengeFromVM(err.Error()); ok {
+			return "", ce
+		}
 		return "", fmt.Errorf("lua plugin %s %s: %w", p.id, fnName, err)
 	}
 	if len(vals) == 0 {
@@ -73,6 +81,11 @@ func callLua(p *loadedPlugin, fnName, inputJSON string) (string, error) {
 	switch {
 	case res.IsNil():
 		if reason := pluginReason(); reason != "" {
+			// A plugin that propagates the native's challenge text verbatim
+			// (nil, err) lands here — same typed-error mapping as above.
+			if ce, ok := challengeFromVM(reason); ok {
+				return "", ce
+			}
 			return "", fmt.Errorf("lua plugin %s %s: %s", p.id, fnName, reason)
 		}
 		return "", fmt.Errorf("lua plugin %s %s: returned nil", p.id, fnName)
@@ -89,4 +102,17 @@ func callLua(p *loadedPlugin, fnName, inputJSON string) (string, error) {
 		s, _ := res.AsString()
 		return s, nil
 	}
+}
+
+// challengeFromVM maps the marker thrown by the http natives (or propagated by
+// the plugin as its second return) back to a typed *hostnet.ChallengeError.
+// The marker is hostnet.ErrChallenge.Error() optionally followed by ": <url>".
+func challengeFromVM(msg string) (*hostnet.ChallengeError, bool) {
+	i := strings.Index(msg, hostnet.ErrChallenge.Error())
+	if i < 0 {
+		return nil, false
+	}
+	rest := msg[i+len(hostnet.ErrChallenge.Error()):]
+	url := strings.TrimSpace(strings.TrimPrefix(rest, ":"))
+	return &hostnet.ChallengeError{VerifyURL: url}, true
 }

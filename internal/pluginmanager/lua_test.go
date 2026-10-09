@@ -1,6 +1,7 @@
 package pluginmanager
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
@@ -305,5 +306,38 @@ func TestReloadPluginFiresLoadHook(t *testing.T) {
 		}
 	case <-time.After(5 * time.Second):
 		t.Fatal("ReloadPlugin skipped the load hook: metadata stays cached")
+	}
+}
+
+// TestChallengeFromVM pins the marker → typed-error mapping that lets the
+// human-verify wizard re-open: the http natives throw
+// ErrChallenge.Error() [+ ": <url>"], and callLua must turn it back into a
+// *hostnet.ChallengeError the views can errors.As.
+func TestChallengeFromVM(t *testing.T) {
+	cases := []struct {
+		msg     string
+		wantOK  bool
+		wantURL string
+	}{
+		{hostnet.ErrChallenge.Error() + ": https://onisaga.com/search/hero", true, "https://onisaga.com/search/hero"},
+		{"lunar: main.lua:34: " + hostnet.ErrChallenge.Error(), true, ""},
+		{"runtime error: attempt to index a nil value", false, ""},
+		{"", false, ""},
+	}
+	for _, c := range cases {
+		ce, ok := challengeFromVM(c.msg)
+		if ok != c.wantOK {
+			t.Errorf("challengeFromVM(%q) ok = %v, want %v", c.msg, ok, c.wantOK)
+			continue
+		}
+		if !ok {
+			continue
+		}
+		if ce.VerifyURL != c.wantURL {
+			t.Errorf("challengeFromVM(%q).VerifyURL = %q, want %q", c.msg, ce.VerifyURL, c.wantURL)
+		}
+		if !errors.Is(ce, hostnet.ErrChallenge) {
+			t.Errorf("challengeFromVM(%q) not matching ErrChallenge", c.msg)
+		}
 	}
 }

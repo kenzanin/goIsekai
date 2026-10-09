@@ -1,6 +1,8 @@
 package pluginmanager
 
 import (
+	"context"
+	"errors"
 	"fmt"
 	"strings"
 
@@ -8,6 +10,7 @@ import (
 
 	lua "github.com/mmcdole/lunar"
 
+	"goisekai/internal/hostnet"
 	"goisekai/internal/pluginutil"
 )
 
@@ -107,7 +110,9 @@ func luaHTTPArg(frame lua.Frame, index int) any {
 }
 
 // luaHTTPRequest runs one proxied request and decodes the response object.
-func luaHTTPRequest(m *Manager, id, method, url, body string, headers any) (map[string]any, error) {
+// ctx bounds the call: a challenge-solve cascade is capped by the caller's
+// deadline (the plugin invoke ctx from frame.Context).
+func luaHTTPRequest(ctx context.Context, m *Manager, id, method, url, body string, headers any) (map[string]any, error) {
 	req := map[string]any{"url": url, "method": method}
 	if body != "" {
 		req["body"] = body
@@ -119,7 +124,7 @@ func luaHTTPRequest(m *Manager, id, method, url, body string, headers any) (map[
 	if err != nil {
 		return nil, fmt.Errorf("http.%s marshal: %w", strings.ToLower(method), err)
 	}
-	respJSON, err := m.proxy.HandleRequest(id, string(reqJSON))
+	respJSON, err := m.proxy.HandleRequestContext(ctx, id, string(reqJSON))
 	if err != nil {
 		return nil, err
 	}
@@ -154,7 +159,15 @@ func luaHTTPFn(state *lua.State, m *Manager, id, method string, bodyOnly bool) l
 			body, _ = frame.CoerceString(1)
 			headersIndex = 2
 		}
-		resp, err := luaHTTPRequest(m, id, method, url, body, luaHTTPArg(frame, headersIndex))
+		resp, err := luaHTTPRequest(frame.Context(), m, id, method, url, body, luaHTTPArg(frame, headersIndex))
+		if err != nil && errors.Is(err, hostnet.ErrChallenge) {
+			// A dead anti-bot session must ABORT the plugin call: the bodyOnly
+			// contract (nil on failure) would swallow the challenge into an empty
+			// result and the human-verify wizard could never re-open. callLua
+			// re-wraps this marker into a typed ChallengeError.
+			frame.ThrowError(fmt.Errorf("%s: %s", hostnet.ErrChallenge.Error(), url))
+			return frame.ReturnValue(lua.Nil()) // unreachable: ThrowError never returns
+		}
 		if bodyOnly {
 			// Nil covers both a transport failure and a non-200 answer, so a
 			// plugin can treat one nil check as "the fetch failed".

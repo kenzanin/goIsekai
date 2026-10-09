@@ -47,7 +47,10 @@ func (m *Manager) setupGlobals(state *lua.State, id string) error {
 		if err != nil {
 			return frame.ReturnValue(errorTable(state, "http_request marshal: "+err.Error()))
 		}
-		respJSON, err := m.proxy.HandleRequest(id, string(reqJSON))
+		// Bound by the invoke context (frame.Context = the SetContext deadline):
+		// a CDP solve cascade triggered by a challenge response runs for
+		// minutes and would otherwise block past the plugin invoke timeout.
+		respJSON, err := m.proxy.HandleRequestContext(frame.Context(), id, string(reqJSON))
 		if err != nil {
 			return frame.ReturnValue(errorTable(state, err.Error()))
 		}

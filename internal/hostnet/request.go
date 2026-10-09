@@ -39,7 +39,7 @@ func (p *Proxy) RequestContext(ctx context.Context, pluginID string, req types.H
 	// cookies or an earlier solve): a solve here is a multi-minute CDP cascade
 	// that would burn every plugin-invoke budget even though the jar is clear.
 	if p.needsJSHint(pluginID) && p.CDPConfig().enabled() && !p.hasVerifyCookie(pluginID, hostOf(req.URL)) {
-		_ = p.solveAndSeed(pluginID, req.URL)
+		_ = p.solveAndSeed(ctx, pluginID, req.URL)
 	}
 
 	// Stdlib h2 path: pinned plugins skip tls-client entirely (WAF blocks the
@@ -59,7 +59,7 @@ func (p *Proxy) RequestContext(ctx context.Context, pluginID string, req types.H
 		if !p.CDPConfig().enabled() {
 			return types.HTTPResponse{}, &ChallengeError{VerifyURL: req.URL}
 		}
-		if err := p.solveAndSeed(pluginID, req.URL); err != nil {
+		if err := p.solveAndSeed(ctx, pluginID, req.URL); err != nil {
 			return types.HTTPResponse{}, &ChallengeError{VerifyURL: req.URL}
 		}
 		retried, rerr := p.doRequest(ctx, pluginID, req)
@@ -86,7 +86,7 @@ func (p *Proxy) RequestContext(ctx context.Context, pluginID string, req types.H
 		}
 		// Ladder exhausted (or HTML block). Last resort: solve via the engine,
 		// seed cookies, and retry once.
-		if p.CDPConfig().enabled() && p.solveAndSeed(pluginID, req.URL) == nil {
+		if p.CDPConfig().enabled() && p.solveAndSeed(ctx, pluginID, req.URL) == nil {
 			if retried, rerr := p.doRequest(ctx, pluginID, req); rerr == nil && !isWafBlock(retried) && !isChallengeResponse(retried) {
 				return retried, nil
 			}
@@ -111,17 +111,39 @@ func isChallengeResponse(resp types.HTTPResponse) bool {
 
 // solveAndSeed runs the browser engine against targetURL and seeds the
 // harvested cookies + browser UA into the plugin's verify-cookie store.
-func (p *Proxy) solveAndSeed(pluginID, targetURL string) error {
+//
+// The wait is bounded by ctx: the engine ladder (obscura → lightpanda → …)
+// can run for minutes and is not ctx-aware itself, so without this wrapper a
+// dead-cookie session would block the whole plugin invoke past its deadline.
+// On ctx expiry the caller unblocks immediately (the orphaned solve keeps
+// running; its result is dropped) and the challenge surfaces as a
+// ChallengeError so the wizard can re-prompt for fresh cookies.
+func (p *Proxy) solveAndSeed(ctx context.Context, pluginID, targetURL string) error {
 	solver := p.solveChallenge
 	if solver == nil {
 		return errors.New("hostnet: no challenge solver installed")
 	}
 	cfg := p.CDPConfig()
-	cookies, ua, err := solver(cfg, targetURL)
-	if err != nil {
-		return err
+	type solveResult struct {
+		cookies []*http.Cookie
+		ua      string
+		err     error
 	}
-	return p.SetVerifyCookies(pluginID, hostOf(targetURL), cookieHeader(cookies), ua)
+	ch := make(chan solveResult, 1)
+	go func() {
+		cookies, ua, err := solver(cfg, targetURL)
+		ch <- solveResult{cookies: cookies, ua: ua, err: err}
+	}()
+	var r solveResult
+	select {
+	case r = <-ch:
+	case <-ctx.Done():
+		return ctx.Err()
+	}
+	if r.err != nil {
+		return r.err
+	}
+	return p.SetVerifyCookies(pluginID, hostOf(targetURL), cookieHeader(r.cookies), r.ua)
 }
 
 // cookieHeader serializes cookies into a "a=1; b=2" header string for the
@@ -139,14 +161,23 @@ func cookieHeader(cookies []*http.Cookie) string {
 
 // HandleRequest decodes a request JSON string, executes it, and returns the
 // response marshaled to a JSON string. Malformed JSON or network failures are
-// returned as errors (never panic).
+// returned as errors (never panic). It is HandleRequestContext with a
+// background context — callers that run inside a plugin invoke should pass
+// their invoke context so a CDP solve cascade cannot outlive the invoke
+// deadline.
 func (p *Proxy) HandleRequest(pluginID string, requestJSON string) (string, error) {
+	return p.HandleRequestContext(context.Background(), pluginID, requestJSON)
+}
+
+// HandleRequestContext is HandleRequest with a caller context: it bounds both
+// the upstream call and any challenge-solve cascade triggered along the way.
+func (p *Proxy) HandleRequestContext(ctx context.Context, pluginID string, requestJSON string) (string, error) {
 	var req types.HTTPRequest
 	if err := json.Unmarshal([]byte(requestJSON), &req); err != nil {
 		return "", fmt.Errorf("hostnet: malformed request JSON: %w", err)
 	}
 
-	resp, err := p.Request(pluginID, req)
+	resp, err := p.RequestContext(ctx, pluginID, req)
 	if err != nil {
 		logger.Warn("plugin request failed",
 			"plugin", pluginID, "method", req.Method, "url", req.URL, "error", err)
