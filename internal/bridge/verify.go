@@ -38,7 +38,10 @@ func (s *AppService) GetPluginVerifyState(pluginID string) (database.PluginVerif
 
 // PluginMeta returns runtime metadata (verify url, needs-human-verify, thumb
 // ratio) for pluginID, or the zero value when the plugin isn't loaded.
+// It ensures the plugin is loaded first so the wizard gate sees the flag
+// even when the genre cache avoided any earlier plugin call.
 func (s *AppService) PluginMeta(pluginID string) pluginmanager.LoadedPlugin {
+	_ = s.mgr.EnsureLoaded(pluginID)
 	for _, m := range s.mgr.LoadedPlugins() {
 		if m.ID == pluginID {
 			return m

@@ -44,6 +44,7 @@ type AppService struct {
 	imgFormat   ImageFormat
 	coverMaxDim int
 	enhance     enhanceConfig
+	shutdownFn  func()
 }
 
 // NewAppService returns an AppService backed by the supplied database, plugin
@@ -69,6 +70,19 @@ func NewAppService(db *database.DB, mgr *pluginmanager.Manager, proxy *hostnet.P
 // Shutdown stops the worker pool.
 func (s *AppService) Shutdown() {
 	s.pool.Shutdown()
+}
+
+// TriggerShutdown signals the server to begin graceful shutdown.
+// If shutdownFn is set, calls it; otherwise is a no-op.
+func (s *AppService) TriggerShutdown() {
+	if s.shutdownFn != nil {
+		s.shutdownFn()
+	}
+}
+
+// SetShutdownFn sets the function to call when shutdown is triggered.
+func (s *AppService) SetShutdownFn(fn func()) {
+	s.shutdownFn = fn
 }
 
 // GetPool returns the worker pool.

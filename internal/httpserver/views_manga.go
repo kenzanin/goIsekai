@@ -71,6 +71,11 @@ func (s *Server) buildMangaDetailData(r *http.Request, pluginID, mangaID string)
 	altCovers, _ := s.service.ListAltCovers(pluginID, mangaID)
 	s.logger.Debug("enrichment cache", "plugin", pluginID, "manga", mangaID, "categories", len(cats), "related", len(rels))
 	overrideGenres, _, _ := s.service.GetMangaGenres(pluginID, mangaID)
+	// Human verification: when a plugin declared needs_human_verify=true, the
+	// challenge banner becomes an inline wizard (detail.lua / search.lua).
+	// Prefill with any cookies/UA already saved for this plugin.
+	verifyRow, _, _ := s.service.GetPluginVerifyState(pluginID)
+	pluginMeta, _ := s.service.PluginMetas()[pluginID]
 
 	const chapterPageSize = 50
 	chPage, _ := strconv.Atoi(r.URL.Query().Get("ChPage"))
@@ -95,6 +100,11 @@ func (s *Server) buildMangaDetailData(r *http.Request, pluginID, mangaID string)
 		"Continue":       continueTo,
 		"InLibrary":      inLibrary,
 		"Challenge":      challenge,
+		"Verify":          verifyRow.Cookies,
+		"VerifyURL":       pluginMeta.VerifyURL,
+		"VerifyUserAgent": verifyRow.UserAgent,
+		"NeedsHumanVerify": pluginMeta.NeedsHumanVerify,
+		"VerifyCookies":    verifyRow.Cookies,
 		"CachedData":     cachedData,
 		"ChCurrentPage":  chPage,
 		"ChTotalPages":   max((chTotal+chapterPageSize-1)/chapterPageSize, 1),

@@ -9,6 +9,7 @@ import (
 	"goisekai/internal/bridge"
 	"goisekai/internal/database"
 	"goisekai/internal/hostnet"
+	"goisekai/internal/pluginmanager"
 	"goisekai/internal/version"
 	"goisekai/pkg/types"
 	"strings"
@@ -79,15 +80,36 @@ func (s *Server) viewSearch(w http.ResponseWriter, r *http.Request) {
 	}
 	var results []types.Manga
 	challenge := false
-	if (q != "" || genre != "") && pluginID != "" {
-		results, err = s.service.SearchManga(pluginID, types.SearchFilter{Query: q, Page: page, Genres: []string{genre}})
-		if err != nil {
-			if _, ok := errors.AsType[*hostnet.ChallengeError](err); ok {
+	if q != "" || genre != "" {
+		if pluginID != "" {
+			// Human verification wizard check: if plugin needs human verification,
+			// show the wizard immediately without attempting search (avoids CDP timeout).
+			// PluginMeta self-loads so the flag is fresh even with a genre-cache hit.
+			if pluginMeta := s.service.PluginMeta(pluginID); pluginMeta.NeedsHumanVerify {
 				challenge = true
-				results = nil
-				s.logger.Warn("search blocked by challenge", "plugin", pluginID, "q", q)
+			results = nil
 			} else {
-				s.logger.Error("search", "error", err, "plugin", pluginID, "q", q)
+				results, err = s.service.SearchManga(pluginID, types.SearchFilter{Query: q, Page: page, Genres: []string{genre}})
+				if err != nil {
+					if _, ok := errors.AsType[*hostnet.ChallengeError](err); ok {
+						challenge = true
+						results = nil
+						s.logger.Warn("search blocked by challenge", "plugin", pluginID, "q", q)
+					} else {
+						s.logger.Error("search", "error", err, "plugin", pluginID, "q", q)
+					}
+				}
+			}
+		} else {
+			results, err = s.service.SearchManga(pluginID, types.SearchFilter{Query: q, Page: page, Genres: []string{genre}})
+			if err != nil {
+				if _, ok := errors.AsType[*hostnet.ChallengeError](err); ok {
+					challenge = true
+					results = nil
+					s.logger.Warn("search blocked by challenge", "plugin", pluginID, "q", q)
+				} else {
+					s.logger.Error("search", "error", err, "plugin", pluginID, "q", q)
+				}
 			}
 		}
 	}
@@ -99,27 +121,37 @@ func (s *Server) viewSearch(w http.ResponseWriter, r *http.Request) {
 	end := min(start+pageSize, total)
 	pluginName := pluginID
 	pluginIcon := ""
+	var pluginMeta pluginmanager.LoadedPlugin
+	var verifyRow database.PluginVerifyRow
 	if pluginID != "" {
 		names, icons := s.pluginDisplayMaps()
 		if name := names[pluginID]; name != "" {
 			pluginName = name
 		}
 		pluginIcon = icons[pluginID]
+		// Human verification wizard data: PluginMeta self-loads the plugin so
+		// the NeedsHumanVerify flag is visible before any search runs.
+		pluginMeta = s.service.PluginMeta(pluginID)
+		verifyRow, _, _ = s.service.GetPluginVerifyState(pluginID)
 	}
 	s.renderPage(w, r, "views/search", "search", map[string]any{
-		"Plugins":    plugins,
-		"Q":          q,
-		"PluginID":   pluginID,
-		"Genres":     genres,
-		"Genre":      genre,
-		"PluginName": pluginName,
-		"PluginIcon": pluginIcon,
-		"Results":    results[start:end],
-		"Page":       page,
-		"TotalPages": max((total+pageSize-1)/pageSize, 1),
-		"HasNext":    end < total,
-		"ThumbRatio": s.service.PluginMeta(pluginID).ThumbRatio,
-		"Challenge":  challenge,
+		"Plugins":            plugins,
+		"Q":                  q,
+		"PluginID":           pluginID,
+		"Genres":             genres,
+		"Genre":              genre,
+		"PluginName":         pluginName,
+		"PluginIcon":         pluginIcon,
+		"Results":            results[start:end],
+		"Page":               page,
+		"TotalPages":         max((total+pageSize-1)/pageSize, 1),
+		"HasNext":            end < total,
+		"ThumbRatio":         pluginMeta.ThumbRatio,
+		"Challenge":          challenge,
+		"NeedsHumanVerify":   pluginMeta.NeedsHumanVerify,
+		"VerifyURL":          pluginMeta.VerifyURL,
+		"VerifyCookies":      verifyRow.Cookies,
+		"VerifyUserAgent":    verifyRow.UserAgent,
 	})
 }
 

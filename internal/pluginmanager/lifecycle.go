@@ -87,6 +87,14 @@ func (m *Manager) ensureLoaded(id string) error {
 	return nil
 }
 
+// EnsureLoaded publicly exposes ensureLoaded so callers (e.g. viewSearch
+// human-verify gate) can force metadata population before reading
+// PluginMetas. Without this, PluginMetas returns zero-value meta until
+// first lazy load, and the wizard gate never fires when genre cache hits.
+func (m *Manager) EnsureLoaded(id string) error {
+	return m.ensureLoaded(id)
+}
+
 // registerLoaded publishes a freshly instantiated runtime into the plugin map
 // and fires the load hooks. Every eager load goes through here, so a plugin
 // that is loaded at install or reload time still has its metadata re-read.

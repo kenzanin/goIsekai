@@ -101,6 +101,7 @@ func (s *Server) registerAPIRoutes(r chi.Router) {
 	r.Get("/stats", s.apiStats)
 	r.Get("/workers", s.apiWorkers)
 	r.Post("/library/toggle/{pluginID}/{mangaID}", s.apiToggleLibrary)
+	r.Post("/shutdown", s.apiShutdown)
 	r.Post("/chapters/read/{pluginID}/{mangaID}/{chapterID}", s.apiMarkChapterRead)
 	r.Post("/progress/{pluginID}/{mangaID}/{chapterID}", s.apiSetProgress)
 	r.Get("/image/{pluginID}/{mangaID}/{chapterID}", s.apiImage)
@@ -174,5 +175,11 @@ func (s *Server) apiStats(w http.ResponseWriter, r *http.Request) {
 		"total_entries": total,
 		"hit_count":     hits,
 		"hit_rate":      hitRate,
-	})
+		})
+}
+
+// apiShutdown triggers a graceful shutdown of the server via the AppService.
+func (s *Server) apiShutdown(w http.ResponseWriter, r *http.Request) {
+	s.service.TriggerShutdown()
+	writeJSON(w, http.StatusOK, map[string]string{"status": "shutting down"})
 }

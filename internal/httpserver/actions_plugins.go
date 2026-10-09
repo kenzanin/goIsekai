@@ -163,8 +163,13 @@ func (s *Server) handleRefreshPlugins(w http.ResponseWriter, r *http.Request) {
 }
 
 // handleSaveVerify stores pasted verification cookies/UA for a plugin.
+// If mangaID is provided in the path (e.g., /action/save-verify/{pluginID}/{mangaID}),
+// redirect back to the manga detail page so the inline wizard closes on success.
+// If only pluginID is present (e.g., the plugins/search pages), redirect back to
+// the search page preserving the query params so the user stays on their search.
 func (s *Server) handleSaveVerify(w http.ResponseWriter, r *http.Request) {
 	pluginID := param(r, "pluginID")
+	mangaID := r.PathValue("mangaID")
 	if err := r.ParseForm(); err != nil {
 		s.logger.Error("save verify: parse form", "error", err)
 		http.Error(w, err.Error(), http.StatusBadRequest)
@@ -175,7 +180,19 @@ func (s *Server) handleSaveVerify(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	s.hxRedirect(w, r, "/view/plugins")
+	// Prefer the manga page (if called with mangaID) else the search page.
+	if mangaID != "" {
+		s.hxRedirect(w, r, "/view/manga/"+pluginID+"/"+mangaID)
+	} else {
+		// Preserve the original search query (q, pluginID, genre, page) so the
+		// wizard closes and the user is dropped back on the same search results.
+		query := r.URL.Query()
+		urlStr := "/view/search"
+		if len(query) > 0 {
+			urlStr += "?" + query.Encode()
+		}
+		s.hxRedirect(w, r, urlStr)
+	}
 }
 
 // bytesBuffer wraps a byte slice to satisfy io.ReaderAt.
