@@ -82,12 +82,28 @@ func (s *Server) viewSearch(w http.ResponseWriter, r *http.Request) {
 	challenge := false
 	if q != "" || genre != "" {
 		if pluginID != "" {
-			// Human verification wizard check: if plugin needs human verification,
-			// show the wizard immediately without attempting search (avoids CDP timeout).
-			// PluginMeta self-loads so the flag is fresh even with a genre-cache hit.
+			// Human verification wizard check: if the plugin needs human
+			// verification and no cookies are saved yet, render the wizard
+			// immediately without calling the plugin (avoids CDP timeout).
+			// Once cookies exist, fall through to the normal search path below so
+			// the saved cookies are used by the proxy.
 			if pluginMeta := s.service.PluginMeta(pluginID); pluginMeta.NeedsHumanVerify {
-				challenge = true
-			results = nil
+				verifyState, hasVerify, verifyErr := s.service.GetPluginVerifyState(pluginID)
+				if verifyErr == nil && (!hasVerify || verifyState.Cookies == "") {
+					challenge = true
+					results = nil
+				} else {
+					results, err = s.service.SearchManga(pluginID, types.SearchFilter{Query: q, Page: page, Genres: []string{genre}})
+					if err != nil {
+						if _, ok := errors.AsType[*hostnet.ChallengeError](err); ok {
+							challenge = true
+							results = nil
+							s.logger.Warn("search blocked by challenge", "plugin", pluginID, "q", q)
+						} else {
+							s.logger.Error("search", "error", err, "plugin", pluginID, "q", q)
+						}
+					}
+				}
 			} else {
 				results, err = s.service.SearchManga(pluginID, types.SearchFilter{Query: q, Page: page, Genres: []string{genre}})
 				if err != nil {
@@ -135,23 +151,23 @@ func (s *Server) viewSearch(w http.ResponseWriter, r *http.Request) {
 		verifyRow, _, _ = s.service.GetPluginVerifyState(pluginID)
 	}
 	s.renderPage(w, r, "views/search", "search", map[string]any{
-		"Plugins":            plugins,
-		"Q":                  q,
-		"PluginID":           pluginID,
-		"Genres":             genres,
-		"Genre":              genre,
-		"PluginName":         pluginName,
-		"PluginIcon":         pluginIcon,
-		"Results":            results[start:end],
-		"Page":               page,
-		"TotalPages":         max((total+pageSize-1)/pageSize, 1),
-		"HasNext":            end < total,
-		"ThumbRatio":         pluginMeta.ThumbRatio,
-		"Challenge":          challenge,
-		"NeedsHumanVerify":   pluginMeta.NeedsHumanVerify,
-		"VerifyURL":          pluginMeta.VerifyURL,
-		"VerifyCookies":      verifyRow.Cookies,
-		"VerifyUserAgent":    verifyRow.UserAgent,
+		"Plugins":          plugins,
+		"Q":                q,
+		"PluginID":         pluginID,
+		"Genres":           genres,
+		"Genre":            genre,
+		"PluginName":       pluginName,
+		"PluginIcon":       pluginIcon,
+		"Results":          results[start:end],
+		"Page":             page,
+		"TotalPages":       max((total+pageSize-1)/pageSize, 1),
+		"HasNext":          end < total,
+		"ThumbRatio":       pluginMeta.ThumbRatio,
+		"Challenge":        challenge,
+		"NeedsHumanVerify": pluginMeta.NeedsHumanVerify,
+		"VerifyURL":        pluginMeta.VerifyURL,
+		"VerifyCookies":    verifyRow.Cookies,
+		"VerifyUserAgent":  verifyRow.UserAgent,
 	})
 }
 
