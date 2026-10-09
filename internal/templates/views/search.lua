@@ -153,7 +153,7 @@ return function(data)
 			.. "</div>"
 			.. '<div class="space-y-2">'
 			.. '<label class="block text-xs font-medium text-neutral-300">Saved cookies for this plugin</label>'
-			.. '<textarea id="verify-cookies" rows="4" class="w-full bg-neutral-950 border border-neutral-700 rounded-lg p-2 text-xs text-neutral-200 font-mono" placeholder="' .. h(placeholder) .. '">' .. h(verifyCookies) .. "</textarea>"
+			.. '<textarea id="verify-cookies" rows="4" class="w-full bg-neutral-950 border border-neutral-700 rounded-lg p-2 text-xs text-neutral-200 font-mono" placeholder="' .. h(placeholder) .. '" autofocus onfocus="this.scrollTop=0">' .. h(verifyCookies) .. "</textarea>"
 			.. '<label class="block text-xs font-medium text-neutral-300">Saved browser user-agent</label>'
 			.. '<input type="text" id="verify-useragent" value="' .. h(useragent) .. '" class="w-full bg-neutral-950 border border-neutral-700 rounded-lg p-2 text-xs text-neutral-200">'
 			.. "</div>"
