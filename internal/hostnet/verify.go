@@ -1,6 +1,7 @@
 package hostnet
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net/url"
@@ -92,7 +93,9 @@ func (p *Proxy) SetVerifyCookies(pluginID, domain, cookieHeader, ua string) erro
 }
 
 // parseVerifyCookies tolerantly parses cookieHeader into fhttp cookies scoped
-// to domain.
+// to domain. Accepted forms: a full "Cookie" header ("a=1; b=2"), a single
+// "name=value" pair, a bare value (treated as cf_clearance=<value>), or a
+// Cookie-Editor style JSON export: [{"name":"...","value":"..."}, ...].
 func parseVerifyCookies(domain, cookieHeader string) (verifySeed, error) {
 	domain = normalizeDomain(domain)
 	if domain == "" {
@@ -102,6 +105,13 @@ func parseVerifyCookies(domain, cookieHeader string) (verifySeed, error) {
 	if h == "" {
 		return verifySeed{}, errors.New("hostnet: empty verify cookie")
 	}
+	if strings.HasPrefix(h, "[") {
+		var err error
+		h, err = cookieJSONToHeader(h)
+		if err != nil {
+			return verifySeed{}, err
+		}
+	}
 	if !strings.ContainsAny(h, "=;") {
 		h = "cf_clearance=" + h
 	}
@@ -110,6 +120,38 @@ func parseVerifyCookies(domain, cookieHeader string) (verifySeed, error) {
 		return verifySeed{}, fmt.Errorf("hostnet: no cookies parsed from %q", cookieHeader)
 	}
 	return verifySeed{domain: domain, cookies: cookies}, nil
+}
+
+// cookieJSONEntry is one element of a Cookie-Editor style JSON export
+// ([{"name":"...","value":"..."}, ...]). Extra fields are ignored.
+type cookieJSONEntry struct {
+	Name  string `json:"name"`
+	Value string `json:"value"`
+}
+
+// cookieJSONToHeader converts a Cookie-Editor JSON export into a Cookie header
+// ("n1=v1; n2=v2"). Values are URL-unescaped when escaped (exporters encode
+// trailing "=" as %3D); entries with an empty name are skipped.
+func cookieJSONToHeader(raw string) (string, error) {
+	var entries []cookieJSONEntry
+	if err := json.Unmarshal([]byte(raw), &entries); err != nil {
+		return "", fmt.Errorf("hostnet: invalid cookie JSON: %w", err)
+	}
+	pairs := make([]string, 0, len(entries))
+	for _, e := range entries {
+		if e.Name == "" {
+			continue
+		}
+		v := e.Value
+		if u, err := url.QueryUnescape(v); err == nil {
+			v = u
+		}
+		pairs = append(pairs, e.Name+"="+v)
+	}
+	if len(pairs) == 0 {
+		return "", fmt.Errorf("hostnet: no cookies parsed from %q", raw)
+	}
+	return strings.Join(pairs, "; "), nil
 }
 
 // normalizeDomain strips scheme and path from a caller-supplied domain, so
