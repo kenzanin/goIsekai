@@ -153,6 +153,7 @@ func main() {
 
 	svc := bridge.NewAppService(db, mgr, proxy, cfgPath, cacheDir, enrichReg)
 	svc.LogEnhanceStatus()
+	svc.SeedVerifyCookies() // re-seed saved human-verify cookies into the proxy
 	mgr.SetOnLoad(svc.SyncPluginMeta)
 	mgr.SetEnrichRegistry(enrichReg)
 

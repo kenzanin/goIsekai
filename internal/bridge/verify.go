@@ -3,8 +3,10 @@ package bridge
 import (
 	"fmt"
 	"net/url"
+	"time"
 
 	"goisekai/internal/database"
+	"goisekai/internal/logger"
 	"goisekai/internal/pluginmanager"
 )
 
@@ -39,6 +41,33 @@ func (s *AppService) SavePluginVerify(pluginID, cookies, userAgent string) error
 		return fmt.Errorf("bridge: save plugin verify: %w", err)
 	}
 	return nil
+}
+
+// SeedVerifyCookies re-seeds the proxy from every stored verification row at
+// startup. Without it the saved credentials only exist in the database — the
+// proxy jar stays empty until the next save, so the first plugin request after
+// a restart would still fire the preemptive CDP solve instead of using the
+// pasted cookies. Best-effort: errors are logged, never fatal.
+func (s *AppService) SeedVerifyCookies() {
+	rows, err := s.db.ListPluginVerify()
+	if err != nil {
+		logger.Warn("verify: list stored cookies failed", "error", err)
+		return
+	}
+	for _, row := range rows {
+		if row.Cookies == "" {
+			continue
+		}
+		domain := verifyHost(row.VerifyURL)
+		if domain == "" {
+			continue
+		}
+		if err := s.proxy.SetVerifyCookies(row.PluginID, domain, row.Cookies, row.UserAgent); err != nil {
+			logger.Warn("verify: seed cookies failed", "plugin", row.PluginID, "error", err)
+			continue
+		}
+		logger.Info("verify: seeded cookies from DB", "plugin", row.PluginID, "domain", domain, "updated", time.Unix(row.UpdatedAt, 0).Format(time.RFC3339))
+	}
 }
 
 // GetPluginVerifyState returns the stored verification row for a plugin.

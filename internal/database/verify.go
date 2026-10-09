@@ -72,3 +72,24 @@ func (d *DB) GetPluginVerify(pluginID string) (PluginVerifyRow, bool, error) {
 		UpdatedAt: m.UpdatedAt,
 	}, true, nil
 }
+
+// ListPluginVerify returns every stored verification row, used at startup to
+// re-seed the proxy cookie jars so saved credentials survive a restart.
+func (d *DB) ListPluginVerify() ([]PluginVerifyRow, error) {
+	var rows []model.PluginVerify
+	if err := tbl.PluginVerify.SELECT(tbl.PluginVerify.AllColumns).
+		Query(d.db, &rows); err != nil {
+		return nil, err
+	}
+	out := make([]PluginVerifyRow, 0, len(rows))
+	for _, m := range rows {
+		out = append(out, PluginVerifyRow{
+			PluginID:  derefStr(m.PluginID),
+			VerifyURL: m.VerifyURL,
+			Cookies:   m.Cookies,
+			UserAgent: m.UserAgent,
+			UpdatedAt: m.UpdatedAt,
+		})
+	}
+	return out, nil
+}
