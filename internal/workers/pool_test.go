@@ -583,3 +583,41 @@ func TestInteractiveStalledPluginDoesNotBlockOthers(t *testing.T) {
 		t.Fatalf("stalled job errored: %v", err)
 	}
 }
+
+// Shutdown must return within poolDrainTimeout even when a running job
+// ignores ctx cancellation — the stuck challenge-solve ladder used to block
+// SIGTERM shutdown indefinitely (frozen app on restart during an onisaga
+// search).
+func TestShutdownBoundedWhenJobIgnoresCtx(t *testing.T) {
+	old := poolDrainTimeout
+	poolDrainTimeout = 50 * time.Millisecond
+	defer func() { poolDrainTimeout = old }()
+
+	p := New(Config{MaintenanceSize: 1, MaintenanceQueue: 4})
+	block := make(chan struct{})
+	defer close(block) // unblock the job so its worker can exit after the test
+	started := make(chan struct{})
+	_, err := p.Enqueue(context.Background(), &Job{
+		Lane: LaneMaintenance,
+		Run: func(ctx context.Context) error {
+			close(started)
+			<-block // ignores ctx — like the solve ladder under Background
+			return nil
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	<-started
+
+	done := make(chan struct{})
+	go func() {
+		p.Shutdown()
+		close(done)
+	}()
+	select {
+	case <-done:
+	case <-time.After(2 * time.Second):
+		t.Fatal("Shutdown blocked on a job that ignores cancellation")
+	}
+}

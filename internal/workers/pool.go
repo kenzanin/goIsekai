@@ -706,6 +706,15 @@ func (p *Pool) Status(id string) (JobInfo, bool) {
 	return JobInfo{ID: id, Lane: h.job.Lane, Status: h.status, Attempts: h.attempts, LastError: h.lastErr}, true
 }
 
+// poolDrainTimeout bounds how long Shutdown waits for running jobs to exit
+// after cancellation. ponytail: jobs that honor their ctx (image/fetch lanes)
+// drain in milliseconds; this ceiling exists for jobs that don't — the
+// challenge-solve engine ladder runs its per-engine timeouts under a
+// Background context, which used to block shutdown for minutes (one stuck
+// onisaga solve froze SIGTERM indefinitely). Raise/remove it once hostnet
+// propagates the job ctx into the solver. A var so tests can shrink it.
+var poolDrainTimeout = 5 * time.Second
+
 // Shutdown stops accepting jobs and cancels queued work. Running jobs are
 // cancelled via ctx; workers exit. Safe to call twice.
 func (p *Pool) Shutdown() {
@@ -714,7 +723,17 @@ func (p *Pool) Shutdown() {
 	}
 	p.stop()
 	// Unblock workers sitting on full/empty queues.
-	p.wg.Wait()
+	drained := make(chan struct{})
+	go func() {
+		p.wg.Wait()
+		close(drained)
+	}()
+	select {
+	case <-drained:
+	case <-time.After(poolDrainTimeout):
+		// Workers still busy with a non-cooperative job: proceed with the
+		// process shutdown anyway — exiting reaps them.
+	}
 }
 
 // --- jobHandle internals ---
