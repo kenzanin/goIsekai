@@ -137,6 +137,15 @@ type Config struct {
 	WorkersMaintenanceSize  int
 	WorkersMaintenanceQueue int
 
+	// [tray] — goisekai-tray wrapper settings. All optional: an empty value
+	// derives the default at startup (server binary next to the tray, URL
+	// from Host/Port, log under DataDir, repo-relative icon), so a plain
+	// deployment needs no [tray] section at all.
+	TrayServerBin string
+	TrayURL       string
+	TrayLogFile   string
+	TrayIcon      string
+
 	// aliasTouched records the names a config file line already supplied, so
 	// the first line for a name replaces the built-in variants instead of
 	// appending to them.
@@ -195,6 +204,13 @@ func (c *Config) Save(path string) error {
 		"max_cache_gb", strconv.FormatFloat(c.MaxCacheGB, 'f', 1, 64))
 	putAlias(f, "genre", c.GenreAlias)
 	putAlias(f, "status", c.StatusAlias)
+	// [tray] is always written (like [enhance]) so the keys are discoverable
+	// in a generated file; empty values mean "derive the default".
+	put(f, "tray",
+		"server_bin", c.TrayServerBin,
+		"url", c.TrayURL,
+		"log_file", c.TrayLogFile,
+		"icon", c.TrayIcon)
 	return f.SaveTo(path)
 }
 

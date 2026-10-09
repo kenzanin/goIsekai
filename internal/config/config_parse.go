@@ -244,6 +244,17 @@ func (c *Config) set(section, key, val string) {
 				c.WorkersMaintenanceQueue = n
 			}
 		}
+	case "tray":
+		switch key {
+		case "server_bin":
+			c.TrayServerBin = val
+		case "url":
+			c.TrayURL = val
+		case "log_file":
+			c.TrayLogFile = val
+		case "icon":
+			c.TrayIcon = val
+		}
 	}
 }
 
