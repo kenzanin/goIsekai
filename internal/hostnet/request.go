@@ -34,8 +34,11 @@ func (p *Proxy) Request(pluginID string, req types.HTTPRequest) (types.HTTPRespo
 // chapter switch releases the work.
 func (p *Proxy) RequestContext(ctx context.Context, pluginID string, req types.HTTPRequest) (types.HTTPResponse, error) {
 	// needs_js: preemptively solve + seed cookies via the browser engine so the
-	// client-side site is already cleared when the fast path runs.
-	if p.needsJSHint(pluginID) && p.CDPConfig().enabled() {
+	// client-side site is already cleared when the fast path runs. Skipped when
+	// the plugin already carries cookies for the target host (pasted verify
+	// cookies or an earlier solve): a solve here is a multi-minute CDP cascade
+	// that would burn every plugin-invoke budget even though the jar is clear.
+	if p.needsJSHint(pluginID) && p.CDPConfig().enabled() && !p.hasVerifyCookie(pluginID, hostOf(req.URL)) {
 		_ = p.solveAndSeed(pluginID, req.URL)
 	}
 

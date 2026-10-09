@@ -80,9 +80,15 @@ func cookieMatchesHost(domain, host string) bool {
 	if host == "" || domain == "" {
 		return true
 	}
-	// Strip any port from the host: cookie domains are host-only.
+	// Strip any port from both sides: cookie domains are host-only and never
+	// carry a port, but callers may pass a seed domain normalized from a URL
+	// (e.g. "example.com:8443" or "127.0.0.1:PORT") — a port on one side only
+	// must not defeat the host match.
 	if h, _, err := net.SplitHostPort(host); err == nil {
 		host = h
+	}
+	if h, _, err := net.SplitHostPort(domain); err == nil {
+		domain = h
 	}
 	domain = strings.TrimPrefix(domain, ".")
 	return host == domain || strings.HasSuffix(host, "."+domain)

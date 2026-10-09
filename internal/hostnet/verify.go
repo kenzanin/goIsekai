@@ -92,6 +92,33 @@ func (p *Proxy) SetVerifyCookies(pluginID, domain, cookieHeader, ua string) erro
 	return nil
 }
 
+// hasVerifyCookie reports whether pluginID's pending seed or any cached client
+// jar already carries a cookie scoped to host. Request uses it to skip the
+// preemptive CDP solve for needs_js plugins: pasted verify cookies mean the
+// site is already cleared, and a solve that always times out (2m per engine)
+// would otherwise burn the whole plugin-invoke budget on every request. The
+// reactive paths (challenge/WAF responses) still solve when a real challenge
+// is observed.
+func (p *Proxy) hasVerifyCookie(pluginID, host string) bool {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
+	if seed, ok := p.pendingVerify[pluginID]; ok && cookieMatchesHost(seed.domain, host) && len(seed.cookies) > 0 {
+		return true
+	}
+	prefix := pluginID + "\x00"
+	u := &url.URL{Scheme: "https", Host: host}
+	for k, c := range p.clients {
+		if !strings.HasPrefix(k, prefix) {
+			continue
+		}
+		if len(c.GetCookies(u)) > 0 {
+			return true
+		}
+	}
+	return false
+}
+
 // parseVerifyCookies tolerantly parses cookieHeader into fhttp cookies scoped
 // to domain. Accepted forms: a full "Cookie" header ("a=1; b=2"), a single
 // "name=value" pair, a bare value (treated as cf_clearance=<value>), or a

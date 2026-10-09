@@ -148,3 +148,30 @@ func TestNeedsJSRouting(t *testing.T) {
 		t.Errorf("solve calls = %d, want 0 (needs_js but engine off)", solver2.calls)
 	}
 }
+
+// TestNeedsJSSkipsSolveWithSavedCookies verifies that a needs_js plugin whose
+// verify cookies are already seeded for the target host skips the preemptive
+// CDP solve entirely — pasted cookies mean the site is clear, and a solve that
+// always times out would otherwise burn every plugin-invoke budget.
+func TestNeedsJSSkipsSolveWithSavedCookies(t *testing.T) {
+	srv := challengeServer(0) // server answers 200 directly — no challenge body
+	defer srv.Close()
+
+	p := NewProxy()
+	p.ConfigureCDP(CDPConfig{Engine: "chrome", Path: "/usr/bin/chrome"})
+	p.SetNeedsJS("plugin-1", true)
+	solver := &fakeSolver{}
+	p.solveChallenge = solver.solve
+
+	host := strings.TrimPrefix(srv.URL, "http://")
+	if err := p.SetVerifyCookies("plugin-1", host, "cf_clearance=pasted", "ua-1"); err != nil {
+		t.Fatalf("SetVerifyCookies: %v", err)
+	}
+
+	if _, err := p.Request("plugin-1", types.HTTPRequest{Method: "GET", URL: srv.URL + "/page"}); err != nil {
+		t.Fatalf("Request failed: %v", err)
+	}
+	if solver.calls != 0 {
+		t.Errorf("solve calls = %d, want 0 (verify cookies already seeded)", solver.calls)
+	}
+}

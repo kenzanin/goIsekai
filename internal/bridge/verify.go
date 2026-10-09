@@ -14,15 +14,25 @@ import (
 // they survive a restart. A plugin without a declared verify URL skips the
 // client seeding but still stores the row.
 func (s *AppService) SavePluginVerify(pluginID, cookies, userAgent string) error {
-	meta := s.PluginMeta(pluginID)
-	if domain := verifyHost(meta.VerifyURL); domain != "" {
+	// Prefer the stored row's verify URL over runtime metadata: reading the
+	// metadata would EnsureLoaded the plugin and wait on its invoke mutex,
+	// which a stuck plugin call (CDP solve cascade) can hold for minutes —
+	// the save request must never block behind an in-flight plugin call.
+	verifyURL := ""
+	if row, ok, err := s.db.GetPluginVerify(pluginID); err == nil && ok {
+		verifyURL = row.VerifyURL
+	}
+	if verifyURL == "" {
+		verifyURL = s.PluginMeta(pluginID).VerifyURL
+	}
+	if domain := verifyHost(verifyURL); domain != "" {
 		if err := s.proxy.SetVerifyCookies(pluginID, domain, cookies, userAgent); err != nil {
 			return fmt.Errorf("bridge: save plugin verify: %w", err)
 		}
 	}
 	if err := s.db.UpsertPluginVerify(database.PluginVerifyRow{
 		PluginID:  pluginID,
-		VerifyURL: meta.VerifyURL,
+		VerifyURL: verifyURL,
 		Cookies:   cookies,
 		UserAgent: userAgent,
 	}); err != nil {
