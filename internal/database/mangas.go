@@ -10,6 +10,27 @@ import (
 	. "github.com/go-jet/jet/v2/sqlite"
 )
 
+// SetMangaCover force-writes a manga's cover_url, bypassing the custom_cover
+// guard that keeps plugin re-syncs from overwriting a user pick. Used by the
+// explicit set-cover action, which IS the user pick.
+func (d *DB) SetMangaCover(pluginID, sourceMangaID, coverURL string) error {
+	_, err := Mangas.UPDATE().
+		SET(Mangas.CoverURL.SET(String(coverURL))).
+		WHERE(Mangas.PluginID.EQ(String(pluginID)).AND(Mangas.SourceMangaID.EQ(String(sourceMangaID)))).
+		Exec(d.db)
+	if err != nil {
+		return err
+	}
+	var id int64
+	if err := d.db.QueryRow(
+		`SELECT id FROM mangas WHERE plugin_id = ? AND source_manga_id = ?`,
+		pluginID, sourceMangaID,
+	).Scan(&id); err != nil {
+		return err
+	}
+	return d.SyncFTS(strconv.FormatInt(id, 10))
+}
+
 // UpsertManga inserts a manga or, on a duplicate (plugin_id, source_manga_id),
 // refreshes the mutable columns and updated_at. Returns the manga ID.
 func (d *DB) UpsertManga(m Manga) (int64, error) {

@@ -3,8 +3,6 @@ package bridge
 import (
 	"context"
 	"fmt"
-
-	"goisekai/internal/database"
 )
 
 // FetchCovers fetches alternative cover candidates from enrichment sources
@@ -37,15 +35,9 @@ func (s *AppService) setCover(pluginID, mangaID, url string) error {
 	if _, err := s.GetImage(context.Background(), pluginID, url, nil, "", "", PrioHigh); err != nil {
 		return fmt.Errorf("bridge: set cover download: %w", err)
 	}
-	if _, err := s.db.UpsertManga(database.Manga{
-		PluginID:      pluginID,
-		SourceMangaID: mangaID,
-		Title:         cached.Title,
-		CoverURL:      url,
-		Description:   cached.Description,
-		Status:        cached.Status,
-		InLibrary:     cached.InLibrary,
-	}); err != nil {
+	// Force-write the pick: this is the user's explicit choice, so it must
+	// land even if custom_cover is already set (re-picking another cover).
+	if err := s.db.SetMangaCover(pluginID, mangaID, url); err != nil {
 		return fmt.Errorf("bridge: set cover update url: %w", err)
 	}
 	// Lock the pick: later UpsertManga calls (detail refresh) must not

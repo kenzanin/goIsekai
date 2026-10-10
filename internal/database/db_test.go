@@ -810,3 +810,54 @@ func TestSQLiteTune(t *testing.T) {
 		t.Errorf("synchronous = %d, want 1 (NORMAL)", syncMode)
 	}
 }
+
+// TestSetMangaCoverBypassesCustomLock pins the re-pick path: once custom_cover
+// is locked (user picked a cover), UpsertManga must NOT overwrite it — but
+// SetMangaCover (the explicit set-cover action) must still force the new URL
+// through. Without the force-write, re-picking a second cover is a silent
+// no-op (303 returned, DB cover_url unchanged).
+func TestSetMangaCoverBypassesCustomLock(t *testing.T) {
+	db := openTestDB(t)
+
+	m := Manga{PluginID: "p1", SourceMangaID: "s1", Title: "C", CoverURL: "http://a/1.jpg"}
+	if _, err := db.UpsertManga(m); err != nil {
+		t.Fatalf("upsert: %v", err)
+	}
+
+	// First pick: force-write + lock.
+	if err := db.SetMangaCover("p1", "s1", "http://a/2.jpg"); err != nil {
+		t.Fatalf("set cover 1: %v", err)
+	}
+	if _, err := db.db.Exec(`UPDATE mangas SET custom_cover = 1 WHERE plugin_id = 'p1'`); err != nil {
+		t.Fatalf("lock: %v", err)
+	}
+
+	// A plugin re-sync (UpsertManga) must NOT overwrite the locked pick.
+	m.CoverURL = "http://plugin/default.jpg"
+	if _, err := db.UpsertManga(m); err != nil {
+		t.Fatalf("upsert resync: %v", err)
+	}
+	if got := coverURL(t, db, "p1", "s1"); got != "http://a/2.jpg" {
+		t.Fatalf("UpsertManga overwrote locked cover: got %q", got)
+	}
+
+	// A second explicit pick must still land, even though custom_cover=1.
+	if err := db.SetMangaCover("p1", "s1", "http://a/3.jpg"); err != nil {
+		t.Fatalf("set cover 2: %v", err)
+	}
+	if got := coverURL(t, db, "p1", "s1"); got != "http://a/3.jpg" {
+		t.Fatalf("SetMangaCover did not bypass custom_cover lock: got %q, want http://a/3.jpg", got)
+	}
+}
+
+func coverURL(t *testing.T, db *DB, pluginID, sourceMangaID string) string {
+	t.Helper()
+	var u string
+	if err := db.db.QueryRow(
+		`SELECT cover_url FROM mangas WHERE plugin_id = ? AND source_manga_id = ?`,
+		pluginID, sourceMangaID,
+	).Scan(&u); err != nil {
+		t.Fatalf("scan cover_url: %v", err)
+	}
+	return u
+}
