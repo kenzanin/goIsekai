@@ -35,6 +35,8 @@ type AppService struct {
 	hostLanes   map[string]*hostLanes // host -> priority lanes
 	imgPaceMu   sync.Mutex
 	imgPace     map[string]time.Time // host -> earliest allowed next request (MD@Home pacing)
+	imgRefMu    sync.Mutex
+	imgRef      map[string]string // image host -> Referer that worked (process memo)
 	enrich      *enrich.Registry
 	genres      *genreIndex
 	statusAlias map[string][]string
