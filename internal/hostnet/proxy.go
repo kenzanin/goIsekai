@@ -1,32 +1,13 @@
 package hostnet
 
 import (
-	"context"
-	"fmt"
-	"goisekai/internal/logger"
 	nethttp "net/http"
-	"net/url"
-	"strings"
 	"sync"
 	"time"
 
 	http "github.com/bogdanfinn/fhttp"
 	tls_client "github.com/bogdanfinn/tls-client"
 )
-
-// CDPConfig carries the host-level browser-engine settings for anti-bot
-// challenge solving. Engine is "off", "lightpanda", "obscura", or "chrome";
-// the zero value (Engine == "") is treated as "off".
-type CDPConfig struct {
-	Engine  string
-	Path    string
-	Timeout time.Duration
-}
-
-// enabled reports whether a browser engine is configured for challenge solving.
-func (c CDPConfig) enabled() bool {
-	return c.Engine != "" && c.Engine != "off"
-}
 
 // Proxy is a sandboxed HTTP client that enforces standard header injection and
 // per-plugin cookie persistence. Plugins must not open sockets directly; all
@@ -165,80 +146,4 @@ func (p *Proxy) CDPConfig() CDPConfig {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	return p.cdp
-}
-
-// CDPCookie holds a cookie harvested by the CDP engine.
-type CDPCookie struct {
-	Name     string `json:"name"`
-	Value    string `json:"value"`
-	Domain   string `json:"domain"`
-	Path     string `json:"path"`
-	Secure   bool   `json:"secure"`
-	HTTPOnly bool   `json:"httpOnly"`
-}
-
-// CDPCookies returns cookies from all per-plugin jars matching the domain.
-func (p *Proxy) CDPCookies(domain string) []CDPCookie {
-	p.mu.Lock()
-	defer p.mu.Unlock()
-	var out []CDPCookie
-	for _, cli := range p.clients {
-		cookies := cli.GetCookies(&url.URL{Scheme: "https", Host: domain})
-		for _, c := range cookies {
-			if c.Domain == domain || strings.HasSuffix(c.Domain, "."+domain) {
-				out = append(out, CDPCookie{
-					Name: c.Name, Value: c.Value, Domain: c.Domain,
-					Path: c.Path, Secure: c.Secure, HTTPOnly: c.HttpOnly,
-				})
-			}
-		}
-	}
-	return out
-}
-
-// TestCDP runs the configured CDP solver against the given URL and returns the
-// harvested cookies plus browser User-Agent. Intended for sandbox debugging.
-func (p *Proxy) TestCDP(cfg CDPConfig, targetURL string) ([]*http.Cookie, string, error) {
-	p.mu.Lock()
-	solver := p.solveChallenge
-	p.mu.Unlock()
-	if solver == nil {
-		return nil, "", fmt.Errorf("CDP solver not configured")
-	}
-	return solver(cfg, targetURL)
-}
-
-// Preconnect opens a HEAD request to the given host to warm the connection pool.
-// It is fire-and-forget: failures are logged at debug level and silently ignored.
-func (p *Proxy) Preconnect(host string) {
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
-	req, err := nethttp.NewRequestWithContext(ctx, nethttp.MethodHead, "https://"+host, nil)
-	if err != nil {
-		logger.Debug("preconnect build request", "host", host, "error", err)
-		return
-	}
-	req.Header.Set("User-Agent", defaultUA)
-
-	resp, err := p.stdlibTransport.RoundTrip(req)
-	if err != nil {
-		logger.Debug("preconnect failed", "host", host, "error", err)
-		return
-	}
-	_ = resp.Body.Close()
-	if resp.StatusCode >= 400 {
-		logger.Debug("preconnect non-2xx", "host", host, "status", resp.StatusCode)
-		logger.Debug("transport request completed", "host", host, "status", resp.StatusCode)
-		return
-	}
-	logger.Info("preconnected", "host", host, "status", resp.StatusCode)
-}
-
-// GetTransportStats returns current transport stats (idle connections count).
-// Returns 0 if stats not available (stdlib Transport has no public stats API).
-func (p *Proxy) GetTransportStats() (idleConns int) {
-	// stdlib Transport doesn't expose idle connection count publicly
-	// We log at debug level on each preconnect instead
-	return 0
 }

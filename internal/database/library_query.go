@@ -1,7 +1,6 @@
 package database
 
 import (
-	"slices"
 	"time"
 
 	"goisekai/internal/database/.gen/model"
@@ -10,29 +9,6 @@ import (
 
 	. "github.com/go-jet/jet/v2/sqlite"
 )
-
-// PluginCount is one row of the per-plugin library title counts.
-type PluginCount struct {
-	PluginID string `alias:"mangas.plugin_id"`
-	Count    int    `alias:"stats.count"`
-}
-
-// CountLibraryByPlugin returns how many in-library titles each plugin
-// contributes, ordered by count descending.
-func (d *DB) CountLibraryByPlugin() ([]PluginCount, error) {
-	var rows []PluginCount
-	stmt := SELECT(
-		Mangas.PluginID.AS("mangas.plugin_id"),
-		COUNT(Mangas.ID).AS("stats.count"),
-	).FROM(Mangas).
-		WHERE(Mangas.InLibrary.EQ(Int(1))).
-		GROUP_BY(Mangas.PluginID)
-	if err := stmt.Query(d.db, &rows); err != nil {
-		return nil, err
-	}
-	slices.SortFunc(rows, func(a, b PluginCount) int { return b.Count - a.Count })
-	return rows, nil
-}
 
 // ListLibrary returns all in-library manga ordered by last update.
 func (d *DB) ListLibrary() ([]Manga, error) {
@@ -67,46 +43,6 @@ func (d *DB) ListLibraryStale(cutoff time.Time) ([]Manga, error) {
 		result[i] = mangaFromModel(m)
 	}
 	return result, nil
-}
-
-// LibraryMangaStats holds per-manga aggregation for the library grid.
-//
-// qrm matches result columns to named-struct fields via two-part alias tags
-// (anonymous structs match by bare lowercase column alias instead); a named
-// struct without matching alias tags silently yields zero rows.
-type LibraryMangaStats struct {
-	MangaID       string     `alias:"mangas.manga_id"`
-	TotalChapters int        `alias:"stats.total_chapters"`
-	ReadChapters  int        `alias:"stats.read_chapters"`
-	NewSince      *time.Time `alias:"mangas.new_since"`
-	HasNew        bool       // derived: NewSince != nil
-}
-
-// ListLibraryWithProgress returns in-library manga with chapter count stats.
-// HasNew comes from the new_since stamp (set when a sync finds new chapters,
-// cleared when the manga is opened) — not from unread count, so the badge
-// disappears on open as specified.
-func (d *DB) ListLibraryWithProgress() ([]LibraryMangaStats, error) {
-	readCond := Chapters.IsRead.EQ(Int(1)).OR(
-		Chapters.TotalPages.GT(Int(0)).AND(Chapters.LastPageRead.GT_EQ(Chapters.TotalPages)))
-	var out []LibraryMangaStats
-	err := SELECT(
-		Mangas.ID.AS("mangas.manga_id"),
-		COUNT(Chapters.ID).AS("stats.total_chapters"),
-		COALESCE(SUM(CASE().WHEN(readCond).THEN(Int(1)).ELSE(Int(0))), Int(0)).AS("stats.read_chapters"),
-		Mangas.NewSince.AS("mangas.new_since"),
-	).FROM(Mangas.LEFT_JOIN(Chapters, Chapters.MangaID.EQ(Mangas.ID))).
-		WHERE(Mangas.InLibrary.EQ(Int(1))).
-		GROUP_BY(Mangas.ID).
-		ORDER_BY(Mangas.UpdatedAt.DESC()).
-		Query(d.db, &out)
-	if err != nil {
-		return nil, err
-	}
-	for i := range out {
-		out[i].HasNew = out[i].NewSince != nil
-	}
-	return out, nil
 }
 
 // MarkMangaNew stamps new_since so the library card shows the [New] badge
