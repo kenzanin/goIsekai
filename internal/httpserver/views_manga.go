@@ -51,6 +51,18 @@ func (s *Server) buildMangaDetailData(r *http.Request, pluginID, mangaID string)
 			}
 		}
 	}
+	// Offline-first: a blocked plugin must not blank out a manga we already hold
+	// a copy of — the reader prefers the persisted copy, so the detail page does
+	// too. Covers both block paths above (no cookies saved yet, and cookies that
+	// went stale mid-session). challenge stays true so the wizard still renders
+	// over the data; with no copy the page degrades to the wizard alone rather
+	// than returning nil.
+	if challenge && manga.ID == "" {
+		if cachedManga, cachedChapters, cerr := s.service.CachedMangaAndChapters(pluginID, mangaID); cerr == nil {
+			manga, chapters = cachedManga, cachedChapters
+			cachedData = true
+		}
+	}
 	// Source plugins rarely supply an author; fall back to the one captured by
 	// an enrichment provider, if any.
 	if strings.TrimSpace(manga.Author) == "" {
