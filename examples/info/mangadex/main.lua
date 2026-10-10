@@ -351,19 +351,41 @@ end
 -- covers queries MangaDex's /cover catalogue, which lists every uploaded
 -- cover per volume/edition (the manga payload itself carries only the primary
 -- cover_art). URL shape: uploads.mangadex.org/covers/{manga}/{file}.
+-- Sort: English covers first, Japanese as fallback, everything else after -
+-- so the picker shows the covers the user can read before the variants.
+-- (ponytail: locale comes from item.attributes.locale; if MangaDex ever
+-- ships per-cover language prefs, add a user setting that reorders here.)
 local function covers(data)
 	local page = get(API .. "/cover?manga%5B%5D=" .. data.id .. "&limit=50")
-	local out, seen = {}, {}
+	local en, ja, rest = {}, {}, {}
 	for _, item in ipairs(page and page.data or {}) do
-		local file = item.attributes and item.attributes.fileName or ""
+		local attrs = item.attributes or {}
+		local file = attrs.fileName or ""
 		if file ~= "" then
 			local url = "https://uploads.mangadex.org/covers/" .. data.id .. "/" .. file
-			if not seen[url] then
-				seen[url] = true
-				out[#out + 1] = { value = url, url = SITE .. "/title/" .. data.id }
+			local entry = { value = url, url = SITE .. "/title/" .. data.id }
+			local locale = attrs.locale or ""
+			if locale == "en" then
+				en[#en + 1] = entry
+			elseif locale == "ja" then
+				ja[#ja + 1] = entry
+			else
+				rest[#rest + 1] = entry
 			end
 		end
 	end
+	local out, seen = {}, {}
+	local function push(list)
+		for _, entry in ipairs(list) do
+			if not seen[entry.value] then
+				seen[entry.value] = true
+				out[#out + 1] = entry
+			end
+		end
+	end
+	push(en)
+	push(ja)
+	push(rest)
 	return items(out)
 end
 

@@ -100,6 +100,15 @@
     }
     window.location.href = '/view/library';
   };
+  // Cover picker: the modal is server-rendered double-hidden (class +
+  // inline style), so opening must clear both. Called from the detail
+  // template buttons and auto-opened after a Find-covers fetch.
+  window.openCoverModal = () => {
+    var m = document.getElementById('cover-modal');
+    if (!m) return;
+    m.style.display = '';
+    m.classList.remove('hidden');
+  };
   // Global helper: submit a form via SPA fetch (same as submit event handler).
   // Called as: @click="submitForm($el.closest('form'))"
   window.submitForm = (form) => {
@@ -144,6 +153,11 @@
           }
           if (window.syncEnrichmentPanel) syncEnrichmentPanel();
           rememberListPage();
+          // Find-covers just re-rendered the picker: open it so fetch →
+          // pick → set is one flow instead of two buttons.
+          if (form.getAttribute('data-open-covers')) {
+            if (window.openCoverModal) window.openCoverModal();
+          }
           // An action mutates the current page, it does not navigate: the
           // address bar keeps the page URL. `/action/` is never a page, and
           // writing it in makes a reload or a back press land on the action.
@@ -736,6 +750,11 @@
               }
               if (window.syncEnrichmentPanel) syncEnrichmentPanel();
               rememberListPage();
+              // Find-covers just re-rendered the picker: open it so fetch →
+              // pick → set is one flow instead of two buttons.
+              if (form.getAttribute('data-open-covers')) {
+                if (window.openCoverModal) window.openCoverModal();
+              }
               // See submitForm: never leave an /action/ URL in the address bar.
               const u = resp.url || '';
               if (u.indexOf(window.location.origin) === 0 && u.indexOf('/action/') === -1) {

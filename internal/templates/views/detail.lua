@@ -90,7 +90,7 @@ return function(data)
 			.. h(pluginID)
 			.. "/"
 			.. h(data.MangaID)
-			.. '" method="POST" style="display:inline">'
+			.. '" method="POST" style="display:inline" data-open-covers="1">'
 			.. csrfInput(data.csrf_token or "")
 			.. '<input type="hidden" name="manga_title" value="'
 			.. h(currentTitle)
@@ -104,7 +104,7 @@ return function(data)
 			.. '" method="POST" style="display:inline">'
 			.. '<button type="submit" title="Re-download the cover from the source" class="inline-flex items-center text-neutral-400 hover:text-neutral-200 transition cursor-pointer">Refetch</button>'
 			.. "</form>"
-			.. '<button type="button" onclick="document.getElementById(\'cover-modal\').classList.remove(\'hidden\')" title="Pick a cover from the fetched candidates" class="inline-flex items-center text-neutral-400 hover:text-neutral-200 transition cursor-pointer">Get cover</button>'
+			.. '<button type="button" onclick="openCoverModal()" title="Pick a cover from the fetched candidates" class="inline-flex items-center text-neutral-400 hover:text-neutral-200 transition cursor-pointer">Get cover</button>'
 			.. "</div>"
 	else
 		coverHTML = '<div class="w-full aspect-[2/3] bg-neutral-800 rounded-xl flex items-center justify-center text-neutral-500 text-4xl font-semibold">'
@@ -115,14 +115,14 @@ return function(data)
 			.. h(pluginID)
 			.. "/"
 			.. h(data.MangaID)
-			.. '" method="POST" style="display:inline">'
+			.. '" method="POST" style="display:inline" data-open-covers="1">'
 			.. csrfInput(data.csrf_token or "")
 			.. '<input type="hidden" name="manga_title" value="'
 			.. h(currentTitle)
 			.. '">'
 			.. '<button type="submit" title="Fetch alternative cover candidates from enrichment sources" class="inline-flex items-center text-neutral-400 hover:text-neutral-200 transition cursor-pointer">Find covers</button>'
 			.. "</form>"
-			.. '<button type="button" onclick="document.getElementById(\'cover-modal\').classList.remove(\'hidden\')" title="Pick a cover from the fetched candidates" class="inline-flex items-center text-neutral-400 hover:text-neutral-200 transition cursor-pointer">Get cover</button>'
+			.. '<button type="button" onclick="openCoverModal()" title="Pick a cover from the fetched candidates" class="inline-flex items-center text-neutral-400 hover:text-neutral-200 transition cursor-pointer">Get cover</button>'
 			.. "</div>"
 	end
 
@@ -443,7 +443,7 @@ return function(data)
 				.. h(c.url)
 				.. '&prio=high" alt="cover" loading="lazy" class="w-32 aspect-[2/3] rounded-lg object-cover border-2 transition cursor-pointer '
 				.. (c.current and "border-emerald-500" or "border-transparent group-hover:border-blue-400")
-				.. '">'
+				.. '" onclick="submitForm(this.closest(\'form\'))" title="Use this cover">'
 				.. '<div class="text-[10px] text-neutral-400 text-center mt-1 truncate">'
 				.. h(c.current and "current" or c.source)
 				.. "</div>"
@@ -452,11 +452,11 @@ return function(data)
 	end
 	body = body
 		.. [[<div id="cover-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center" style="display:none">
-    <div class="absolute inset-0 bg-black/70" onclick="this.parentElement.classList.add('hidden')"></div>
+    <div class="absolute inset-0 bg-black/70" onclick="var m=this.parentElement;m.classList.add('hidden');m.style.display='none'"></div>
     <div class="relative bg-neutral-900 border border-neutral-700 rounded-xl p-4 max-w-3xl max-h-[80vh] overflow-y-auto">
         <div class="flex items-center justify-between mb-3">
             <h3 class="text-sm font-semibold text-neutral-200">Pick a cover</h3>
-            <button onclick="this.closest('#cover-modal').classList.add('hidden')" class="text-neutral-400 hover:text-neutral-200 text-lg leading-none" aria-label="Close">&times;</button>
+            <button onclick="var m=this.closest('#cover-modal');m.classList.add('hidden');m.style.display='none'" class="text-neutral-400 hover:text-neutral-200 text-lg leading-none" aria-label="Close">&times;</button>
         </div>
         <div class="flex flex-wrap gap-3">]]
 		.. coverGrid
