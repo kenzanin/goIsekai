@@ -76,7 +76,7 @@ func (m *Manager) loadJS(id, dir string) (*loadedPlugin, error) {
 	// returns JSON {"status","headers","body"}.
 	if err := vm.Set("http_request", func(call goja.FunctionCall) goja.Value {
 		input := call.Arguments[0].String()
-		result, err := m.proxy.HandleRequest(id, input)
+		result, err := m.proxy.HandleRequestContext(m.invokeCtx(id), id, input)
 		if err != nil {
 			return vm.ToValue(map[string]any{"status": 0, "body": err.Error()})
 		}

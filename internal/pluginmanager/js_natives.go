@@ -157,7 +157,7 @@ func jsHTTPRequest(m *Manager, id, method, url, body string, headers any) (map[s
 	if err != nil {
 		return nil, err
 	}
-	respJSON, err := m.proxy.HandleRequest(id, string(reqJSON))
+	respJSON, err := m.proxy.HandleRequestContext(m.invokeCtx(id), id, string(reqJSON))
 	if err != nil {
 		return nil, err
 	}

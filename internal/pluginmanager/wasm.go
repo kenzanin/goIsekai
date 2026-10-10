@@ -189,7 +189,7 @@ func (m *Manager) hostHTTPRequest(ctx context.Context, mod api.Module, stack []u
 		stack[0] = pack(0, 0)
 		return
 	}
-	respJSON, err := m.proxy.HandleRequest(mod.Name(), string(reqBytes))
+	respJSON, err := m.proxy.HandleRequestContext(ctx, mod.Name(), string(reqBytes))
 	if err != nil {
 		logger.Warn("wasm host_http_request failed", "plugin", mod.Name(), "error", err)
 		stack[0] = pack(0, 0)

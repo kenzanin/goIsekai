@@ -1,6 +1,7 @@
 package pluginmanager
 
 import (
+	"context"
 	"encoding/json"
 	"testing"
 )
@@ -35,7 +36,7 @@ func TestWasmHostCallDispatch(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.fn, func(t *testing.T) {
-			got, err := m.dispatchHostCall("test", tc.fn, tc.args)
+			got, err := m.dispatchHostCall(context.Background(), "test", tc.fn, tc.args)
 			if err != nil {
 				t.Fatalf("dispatchHostCall(%s): %v", tc.fn, err)
 			}
@@ -53,7 +54,7 @@ func TestWasmHostCallDispatch(t *testing.T) {
 // TestWasmHostCallUnknownFunction pins that an unknown name is reported rather
 // than silently returning null, so a typo surfaces at the plugin call site.
 func TestWasmHostCallUnknownFunction(t *testing.T) {
-	if _, err := (&Manager{}).dispatchHostCall("test", "text.nope", nil); err == nil {
+	if _, err := (&Manager{}).dispatchHostCall(context.Background(), "test", "text.nope", nil); err == nil {
 		t.Fatal("an unknown host function should error")
 	}
 }

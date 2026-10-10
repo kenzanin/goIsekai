@@ -52,7 +52,14 @@ type loadedPlugin struct {
 	// source ABI and is excluded from the manga-source plugin list.
 	infoOnly bool
 	// mu serializes invocations: concurrent calls to the same plugin must not interleave.
+	// It also guards curCtx: the JS runtime's goja natives receive no context, so
+	// callJS publishes the invoke ctx here for them to read.
 	mu sync.Mutex
+	// curCtx is the in-flight invocation's context, set by callJS while mu is
+	// held. It carries the invoke deadline so a blocking host call (a CDP solve,
+	// an upstream fetch) is torn down when the invoke budget runs out instead of
+	// outliving it on context.Background(). Zero value means "no invoke running".
+	curCtx context.Context
 }
 
 // invokeDeadline returns the per-invocation wall-clock budget: the plugin's
@@ -97,6 +104,21 @@ func (m *Manager) SetOnLoad(fn func(id string)) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	m.onLoad = fn
+}
+
+// invokeCtx returns the context of the in-flight invocation for plugin id, or
+// context.Background() when none is running. JS natives run inside the goja VM
+// and receive no ctx from the runtime, so they read the ctx published by
+// callJS here; without it a blocking host call (HTTP fetch, CDP solve) outlives
+// the invoke deadline.
+func (m *Manager) invokeCtx(id string) context.Context {
+	m.mu.RLock()
+	p, ok := m.plugins[id]
+	m.mu.RUnlock()
+	if !ok || p.curCtx == nil {
+		return context.Background()
+	}
+	return p.curCtx
 }
 
 // SetEnrichRegistry wires an enrichment registry so that plugin-declared

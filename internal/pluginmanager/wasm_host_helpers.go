@@ -41,7 +41,7 @@ func (m *Manager) hostCall(ctx context.Context, mod api.Module, stack []uint64) 
 		stack[0] = writeWasmResult(ctx, mod, wasmHostError("host_call: "+err.Error()))
 		return
 	}
-	value, err := m.dispatchHostCall(mod.Name(), req.Fn, req.Args)
+	value, err := m.dispatchHostCall(ctx, mod.Name(), req.Fn, req.Args)
 	if err != nil {
 		stack[0] = writeWasmResult(ctx, mod, wasmHostError(err.Error()))
 		return
@@ -117,8 +117,10 @@ var wasmHostStr2Err = map[string]func(string, string) (string, error){
 }
 
 // dispatchHostCall resolves one host helper by its "<namespace>.<name>" key.
-// id is the plugin id, used to attribute proxied HTTP requests.
-func (m *Manager) dispatchHostCall(id, fn string, args []string) (any, error) {
+// id is the plugin id, used to attribute proxied HTTP requests; ctx bounds the
+// invocations that reach the proxy (an HTTP fetch, a CDP solve) so they die
+// with the invoke deadline instead of outliving it.
+func (m *Manager) dispatchHostCall(ctx context.Context, id, fn string, args []string) (any, error) {
 	if f, ok := wasmHostStr1[fn]; ok {
 		return f(wasmArg(args, 0)), nil
 	}
@@ -209,13 +211,13 @@ func (m *Manager) dispatchHostCall(id, fn string, args []string) (any, error) {
 	case "html.xpath_list_attr":
 		return wasmHTML(args, func(d *htmldoc.Document) (any, error) { return d.XPathListAttr(wasmArg(args, 1), wasmArg(args, 2)) })
 	case "http.get":
-		return m.wasmHTTP(id, "GET", args, false)
+		return m.wasmHTTP(ctx, id, "GET", args, false)
 	case "http.post":
-		return m.wasmHTTP(id, "POST", args, false)
+		return m.wasmHTTP(ctx, id, "POST", args, false)
 	case "http.get_body":
-		return m.wasmHTTP(id, "GET", args, true)
+		return m.wasmHTTP(ctx, id, "GET", args, true)
 	case "http.post_body":
-		return m.wasmHTTP(id, "POST", args, true)
+		return m.wasmHTTP(ctx, id, "POST", args, true)
 	}
 	return nil, fmt.Errorf("unknown host function %q", fn)
 }
@@ -307,7 +309,7 @@ func wasmVRFSign(apiPath, paramsJSON, stagesJSON string) (any, error) {
 // object. The plain forms return the response object, with a {status:0,body:err}
 // object on a transport failure; the _body forms return the response body, or
 // null when the request failed or did not answer 200.
-func (m *Manager) wasmHTTP(id, method string, args []string, bodyOnly bool) (any, error) {
+func (m *Manager) wasmHTTP(ctx context.Context, id, method string, args []string, bodyOnly bool) (any, error) {
 	name := strings.ToLower(method)
 	url := wasmArg(args, 0)
 	body, headersJSON := "", wasmArg(args, 1)
@@ -329,7 +331,7 @@ func (m *Manager) wasmHTTP(id, method string, args []string, bodyOnly bool) (any
 	if err != nil {
 		return nil, fmt.Errorf("http.%s marshal: %w", name, err)
 	}
-	respJSON, err := m.proxy.HandleRequest(id, string(reqJSON))
+	respJSON, err := m.proxy.HandleRequestContext(ctx, id, string(reqJSON))
 	if bodyOnly {
 		if err != nil {
 			return nil, nil

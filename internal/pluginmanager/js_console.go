@@ -1,6 +1,7 @@
 package pluginmanager
 
 import (
+	"context"
 	"fmt"
 	"github.com/goccy/go-json"
 	"time"
@@ -23,8 +24,16 @@ func callJS(p *loadedPlugin, fnName, inputJSON string) (string, error) {
 		return "", fmt.Errorf("js plugin %s: %s is not a function", p.id, jsName)
 	}
 
+	ctx, cancel := context.WithTimeout(context.Background(), p.invokeDeadline())
+	defer cancel()
+
 	// Timeout via Interrupt. A stale interrupt on an idle VM persists into the
-	// next call, so always ClearInterrupt after the call completes.
+	// next call, so always ClearInterrupt after the call completes. The interrupt
+	// aborts JS between statements; ctx carries the same deadline and tears down
+	// host calls (an HTTP fetch, a CDP solve) already blocking inside a native,
+	// which goja cannot interrupt. The interrupt must not watch ctx.Done():
+	// cancel() runs on return, after ClearInterrupt, so a select on Done() can
+	// fire late and leave a stale interrupt for the next call.
 	stop := make(chan struct{})
 	go func() {
 		select {
@@ -36,6 +45,8 @@ func callJS(p *loadedPlugin, fnName, inputJSON string) (string, error) {
 
 	p.mu.Lock()
 	defer p.mu.Unlock()
+	p.curCtx = ctx
+	defer func() { p.curCtx = nil }()
 
 	callable, ok := goja.AssertFunction(fn)
 	if !ok {
