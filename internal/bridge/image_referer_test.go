@@ -2,10 +2,10 @@ package bridge
 
 import "testing"
 
-func TestWithDefaultReferer(t *testing.T) {
+func TestWithReferer(t *testing.T) {
 	t.Parallel()
-	t.Run("fills missing referer", func(t *testing.T) {
-		got := withDefaultReferer(map[string]string{"Accept": "image/*"}, "https://mangak.io")
+	t.Run("sets referer preserving others", func(t *testing.T) {
+		got := withReferer(map[string]string{"Accept": "image/*"}, "https://mangak.io")
 		if got["Referer"] != "https://mangak.io" {
 			t.Fatalf("Referer = %q", got["Referer"])
 		}
@@ -13,30 +13,53 @@ func TestWithDefaultReferer(t *testing.T) {
 			t.Fatalf("Accept lost: %q", got["Accept"])
 		}
 	})
-	t.Run("explicit referer wins", func(t *testing.T) {
-		got := withDefaultReferer(map[string]string{"Referer": "https://other/"}, "https://mangak.io")
-		if got["Referer"] != "https://other/" {
-			t.Fatalf("Referer = %q", got["Referer"])
-		}
-	})
-	t.Run("case-insensitive explicit wins", func(t *testing.T) {
-		got := withDefaultReferer(map[string]string{"referer": "https://other/"}, "https://mangak.io")
-		if got["referer"] != "https://other/" {
-			t.Fatalf("referer = %q", got["referer"])
-		}
-	})
-	t.Run("empty siteURL no-op", func(t *testing.T) {
+	t.Run("empty ref no-op", func(t *testing.T) {
 		in := map[string]string{"Accept": "image/*"}
-		got := withDefaultReferer(in, "")
+		got := withReferer(in, "")
 		if len(got) != 1 {
 			t.Fatalf("headers mutated: %v", got)
 		}
 	})
 	t.Run("does not mutate input map", func(t *testing.T) {
 		in := map[string]string{"Accept": "image/*"}
-		_ = withDefaultReferer(in, "https://mangak.io")
+		_ = withReferer(in, "https://mangak.io")
 		if _, ok := in["Referer"]; ok {
 			t.Fatal("input map was mutated")
 		}
 	})
+}
+
+func TestRefererCandidates(t *testing.T) {
+	t.Parallel()
+	t.Run("origin first site fallback", func(t *testing.T) {
+		got := refererCandidates("https://uploads.mangadex.org/covers/x.jpg", "https://mangadex.org")
+		if len(got) != 2 || got[0] != "https://uploads.mangadex.org/" || got[1] != "https://mangadex.org" {
+			t.Fatalf("candidates = %v", got)
+		}
+	})
+	t.Run("dedupes identical origin and site", func(t *testing.T) {
+		got := refererCandidates("https://x.io/a.jpg", "https://x.io/")
+		if len(got) != 1 || got[0] != "https://x.io/" {
+			t.Fatalf("candidates = %v", got)
+		}
+	})
+	t.Run("unparseable url falls back to site", func(t *testing.T) {
+		got := refererCandidates("::bad", "https://site.io")
+		if len(got) != 1 || got[0] != "https://site.io" {
+			t.Fatalf("candidates = %v", got)
+		}
+	})
+}
+
+func TestMemorizedReferer(t *testing.T) {
+	t.Parallel()
+	s := &AppService{}
+	if _, ok := s.memorizedReferer("h"); ok {
+		t.Fatal("expected miss on empty memo")
+	}
+	s.memorizeReferer("h", "https://site.io/")
+	ref, ok := s.memorizedReferer("h")
+	if !ok || ref != "https://site.io/" {
+		t.Fatalf("memo = %q, %v", ref, ok)
+	}
 }

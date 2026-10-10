@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"maps"
+	neturl "net/url"
 	"os"
 	"strings"
 	"time"
@@ -12,22 +13,72 @@ import (
 	"goisekai/internal/workers"
 )
 
-// withDefaultReferer returns headers with siteURL filled in as Referer when
-// the caller didn't set one (any casing). Empty siteURL or an explicit Referer
-// returns headers unchanged.
-func withDefaultReferer(headers map[string]string, siteURL string) map[string]string {
-	if siteURL == "" {
-		return headers
-	}
+// hasHeader reports whether headers already carry the named key (case-insensitive).
+func hasHeader(headers map[string]string, name string) bool {
 	for k := range headers {
-		if strings.EqualFold(k, "Referer") {
-			return headers
+		if strings.EqualFold(k, name) {
+			return true
 		}
 	}
-	h := make(map[string]string, len(headers)+1)
-	maps.Copy(h, headers)
-	h["Referer"] = siteURL
-	return h
+	return false
+}
+
+// withReferer returns a copy of headers carrying the given Referer (input never
+// mutated). An empty ref leaves headers untouched.
+func withReferer(headers map[string]string, ref string) map[string]string {
+	if ref == "" {
+		return headers
+	}
+	out := make(map[string]string, len(headers)+1)
+	maps.Copy(out, headers)
+	out["Referer"] = ref
+	return out
+}
+
+// memorizedReferer returns the Referer that previously succeeded for this
+// image host, so gated CDNs (rx.resmk.org) pay the extra 403 round-trip only
+// once per host instead of once per image.
+func (s *AppService) memorizedReferer(host string) (string, bool) {
+	s.imgRefMu.Lock()
+	defer s.imgRefMu.Unlock()
+	if s.imgRef == nil {
+		s.imgRef = make(map[string]string)
+	}
+	ref, ok := s.imgRef[host]
+	return ref, ok
+}
+
+// memorizeReferer records the Referer that succeeded for an image host.
+func (s *AppService) memorizeReferer(host, ref string) {
+	s.imgRefMu.Lock()
+	defer s.imgRefMu.Unlock()
+	if s.imgRef == nil {
+		s.imgRef = make(map[string]string)
+	}
+	s.imgRef[host] = ref
+}
+
+// refererCandidates are the Referer values to try for one image fetch, in
+// order, when the caller set none (explicit Referer always wins, untouched).
+// The image's own origin leads: a CDN that serves its own origin (uploads.
+// mangadex.org) returns the real image there, while a foreign Referer (e.g.
+// the plugin's site) silently serves a placeholder — a 200 with wrong bytes,
+// undetectable by status. The plugin's siteURL follows as fallback because
+// gated CDNs (rx.resmk.org) reject the origin and accept only the plugin
+// site. A failure of the first candidate costs one extra request, only for
+// CDNs that gate on the plugin site.
+func refererCandidates(imageURL, siteURL string) []string {
+	var out []string
+	if u, err := neturl.Parse(imageURL); err == nil && u.Scheme != "" && u.Host != "" {
+		out = append(out, u.Scheme+"://"+u.Host+"/")
+	}
+	if siteURL != "" && (len(out) == 0 || out[0] != siteURL) {
+		out = append(out, siteURL)
+	}
+	if len(out) == 0 {
+		out = append(out, "")
+	}
+	return out
 }
 
 // GetImage fetches image bytes for pluginID from url (with optional per-request

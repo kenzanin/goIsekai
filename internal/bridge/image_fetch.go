@@ -45,10 +45,19 @@ func (s *AppService) fetchImage(ctx context.Context, pluginID, url string, heade
 	}()
 	s.hostAcquire(host, prio)
 	defer s.hostRelease(host, prio)
-	// Gated image CDNs (rx.resmk.org) 403 without a same-site Referer. When the
-	// caller set none (reader ?referer= / Page.Headers always win), fall back to
-	// the plugin's site_url — what a browser sends on a normal page load.
-	headers = withDefaultReferer(headers, s.mgr.SiteURL(pluginID))
+	// Referer candidates: caller wins when set; otherwise try the image's own
+	// origin first (hotlink guards like mangadex serve the real image there
+	// and a silent placeholder for foreign referers) and fall back to the
+	// plugin site (gated CDNs like resmk only accept that). The memo keeps
+	// gated hosts to one extra request per process lifetime.
+	refs := []string{""}
+	if !hasHeader(headers, "Referer") {
+		if w, ok := s.memorizedReferer(host); ok {
+			refs = []string{w}
+		} else {
+			refs = refererCandidates(url, s.mgr.SiteURL(pluginID))
+		}
+	}
 	var resp types.HTTPResponse
 	var err error
 	var body []byte
@@ -75,12 +84,22 @@ func (s *AppService) fetchImage(ctx context.Context, pluginID, url string, heade
 			logger.Debug("image fetch abandoned", "url", url, "plugin", pluginID, "reason", ctx.Err())
 			return nil, ctx.Err()
 		}
-		s.paceImage(host)
-		resp, err = s.proxy.RequestContext(ctx, pluginID, types.HTTPRequest{
-			Method:  http.MethodGet,
-			URL:     url,
-			Headers: headers,
-		})
+		var won string
+		for _, ref := range refs {
+			s.paceImage(host)
+			resp, err = s.proxy.RequestContext(ctx, pluginID, types.HTTPRequest{
+				Method:  http.MethodGet,
+				URL:     url,
+				Headers: withReferer(headers, ref),
+			})
+			if ctx.Err() == nil && err == nil && resp.Status >= 200 && resp.Status < 300 {
+				won = ref
+				break
+			}
+		}
+		if won != "" {
+			s.memorizeReferer(host, won)
+		}
 		if ctx.Err() != nil {
 			logger.Debug("image fetch abandoned", "url", url, "plugin", pluginID, "reason", ctx.Err())
 			return nil, ctx.Err()
