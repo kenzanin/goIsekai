@@ -30,6 +30,11 @@ const libraryFTSMigration = 23
 // tests (and future rebuilds) can land on it twice.
 const genresColumnMigration = 26
 
+// customCoverMigration is the index for the mangas.custom_cover ALTER TABLE
+// (user-chosen main cover lock). Special-cased for the same reason as
+// skipColumnMigration: rewind-replay tests can land on it twice.
+const customCoverMigration = 28
+
 // migrations is an ordered list of DDL statements applied in sequence.
 // Version is tracked via PRAGMA user_version; migrations[i] is applied when
 // user_version < len(migrations) so partial upgrades resume correctly.
@@ -181,4 +186,6 @@ var migrations = []string{
 		created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
 		UNIQUE(manga_row_id, url)
 	);`,
+	// Index 28: user-chosen main cover lock — UpsertManga must not overwrite it.
+	`ALTER TABLE mangas ADD COLUMN custom_cover INTEGER NOT NULL DEFAULT 0;`,
 }

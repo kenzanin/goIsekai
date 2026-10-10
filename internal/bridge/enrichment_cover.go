@@ -48,5 +48,10 @@ func (s *AppService) setCover(pluginID, mangaID, url string) error {
 	}); err != nil {
 		return fmt.Errorf("bridge: set cover update url: %w", err)
 	}
+	// Lock the pick: later UpsertManga calls (detail refresh) must not
+	// overwrite the user-chosen cover with the plugin default.
+	if _, err := s.db.Exec(`UPDATE mangas SET custom_cover = 1 WHERE plugin_id = ? AND source_manga_id = ?`, pluginID, mangaID); err != nil {
+		return fmt.Errorf("bridge: set cover lock: %w", err)
+	}
 	return nil
 }

@@ -36,7 +36,7 @@ func (d *DB) UpsertManga(m Manga) (int64, error) {
 	).ON_CONFLICT(Mangas.PluginID, Mangas.SourceMangaID).DO_UPDATE(
 		SET(
 			Mangas.Title.SET(RawString("CASE WHEN mangas.custom_title = 1 THEN mangas.title ELSE excluded.title END")),
-			Mangas.CoverURL.SET(Mangas.EXCLUDED.CoverURL),
+			Mangas.CoverURL.SET(RawString("CASE WHEN mangas.custom_cover = 1 THEN mangas.cover_url ELSE excluded.cover_url END")),
 			Mangas.Description.SET(RawString("CASE WHEN mangas.custom_description = 1 THEN mangas.description ELSE excluded.description END")),
 			Mangas.Status.SET(Mangas.EXCLUDED.Status),
 			Mangas.UpdatedAt.SET(RawTimestamp("CURRENT_TIMESTAMP")),
@@ -96,7 +96,7 @@ func (d *DB) RepointManga(mangaID int64, pluginID, sourceMangaID, title, coverUR
 			plugin_id = ?,
 			source_manga_id = ?,
 			title = CASE WHEN custom_title = 1 THEN title ELSE ? END,
-			cover_url = ?,
+			cover_url = CASE WHEN custom_cover = 1 THEN cover_url ELSE ? END,
 			description = CASE WHEN custom_description = 1 THEN description ELSE ? END,
 			status = ?,
 			updated_at = CURRENT_TIMESTAMP

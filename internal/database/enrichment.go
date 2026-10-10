@@ -185,8 +185,8 @@ func (d *DB) ResetEnrichment(mangaRowID string) error {
 	if _, err := d.db.Exec(`DELETE FROM read_history WHERE chapter_id IN (SELECT id FROM chapters WHERE manga_id = ?)`, mangaRowID); err != nil {
 		return err
 	}
-	// Restore title/synopsis to plugin originals.
-	if _, err := d.db.Exec(`UPDATE mangas SET custom_title = 0, custom_description = 0, genres = NULL WHERE id = ?`, mangaRowID); err != nil {
+	// Restore title/synopsis/cover to plugin originals.
+	if _, err := d.db.Exec(`UPDATE mangas SET custom_title = 0, custom_description = 0, custom_cover = 0, genres = NULL WHERE id = ?`, mangaRowID); err != nil {
 		return err
 	}
 	// Dropping the alt titles changes what is searchable.

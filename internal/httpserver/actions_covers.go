@@ -64,3 +64,16 @@ func (s *Server) handleToggleCoverDim(w http.ResponseWriter, r *http.Request) {
 	}
 	s.hxRedirect(w, r, "/view/manga/"+pluginID+"/"+mangaID)
 }
+
+// handleClearCovers drops the stored alternative cover candidates so the
+// next fetch re-pulls them fresh from enrichment sources.
+func (s *Server) handleClearCovers(w http.ResponseWriter, r *http.Request) {
+	pluginID := param(r, "pluginID")
+	mangaID := param(r, "mangaID")
+	if err := s.service.ClearCovers(pluginID, mangaID); err != nil {
+		s.logger.Error("clear covers", "pluginID", pluginID, "mangaID", mangaID, "error", err)
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	s.toastRedirect(w, r, "/view/manga/"+pluginID+"/"+mangaID, "Cover candidates cleared")
+}

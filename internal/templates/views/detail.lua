@@ -93,19 +93,26 @@ return function(data)
 			.. '" method="POST" style="display:inline" data-open-covers="1">'
 			.. csrfInput(data.csrf_token or "")
 			.. '<input type="hidden" name="manga_title" value="'
-			.. h(currentTitle)
-			.. '">'
-			.. '<button type="submit" title="Fetch alternative cover candidates from enrichment sources" class="inline-flex items-center text-neutral-400 hover:text-neutral-200 transition cursor-pointer">Find covers</button>'
-			.. "</form>"
-			.. '<form action="/action/refetch-cover/'
+		.. h(currentTitle)
+		.. '">'
+		.. '<button type="submit" title="Fetch cover candidates if needed, then pick the main cover" class="inline-flex items-center text-neutral-400 hover:text-neutral-200 transition cursor-pointer">Covers</button>'
+		.. "</form>"
+		.. '<form action="/action/clear-covers/'
+			.. h(pluginID)
+			.. "/"
+			.. h(data.MangaID)
+			.. '" method="POST" style="display:inline">'
+			.. csrfInput(data.csrf_token or "")
+			.. '<button type="submit" title="Drop stored cover candidates so the next fetch re-pulls them fresh" class="inline-flex items-center text-neutral-400 hover:text-neutral-200 transition cursor-pointer">Clear</button>'
+		.. "</form>"
+		.. '<form action="/action/refetch-cover/'
 			.. h(pluginID)
 			.. "/"
 			.. h(data.MangaID)
 			.. '" method="POST" style="display:inline">'
 			.. '<button type="submit" title="Re-download the cover from the source" class="inline-flex items-center text-neutral-400 hover:text-neutral-200 transition cursor-pointer">Refetch</button>'
-			.. "</form>"
-			.. '<button type="button" onclick="openCoverModal()" title="Pick a cover from the fetched candidates" class="inline-flex items-center text-neutral-400 hover:text-neutral-200 transition cursor-pointer">Get cover</button>'
-			.. "</div>"
+		.. "</form>"
+		.. "</div>"
 	else
 		coverHTML = '<div class="w-full aspect-[2/3] bg-neutral-800 rounded-xl flex items-center justify-center text-neutral-500 text-4xl font-semibold">'
 			.. h(getInitials(manga.Title or ""))
@@ -120,10 +127,17 @@ return function(data)
 			.. '<input type="hidden" name="manga_title" value="'
 			.. h(currentTitle)
 			.. '">'
-			.. '<button type="submit" title="Fetch alternative cover candidates from enrichment sources" class="inline-flex items-center text-neutral-400 hover:text-neutral-200 transition cursor-pointer">Find covers</button>'
-			.. "</form>"
-			.. '<button type="button" onclick="openCoverModal()" title="Pick a cover from the fetched candidates" class="inline-flex items-center text-neutral-400 hover:text-neutral-200 transition cursor-pointer">Get cover</button>'
-			.. "</div>"
+			.. '<button type="submit" title="Fetch cover candidates if needed, then pick the main cover" class="inline-flex items-center text-neutral-400 hover:text-neutral-200 transition cursor-pointer">Covers</button>'
+		.. "</form>"
+		.. '<form action="/action/clear-covers/'
+			.. h(pluginID)
+			.. "/"
+			.. h(data.MangaID)
+			.. '" method="POST" style="display:inline">'
+			.. csrfInput(data.csrf_token or "")
+			.. '<button type="submit" title="Drop stored cover candidates so the next fetch re-pulls them fresh" class="inline-flex items-center text-neutral-400 hover:text-neutral-200 transition cursor-pointer">Clear</button>'
+		.. "</form>"
+		.. "</div>"
 	end
 
 	-- Genre tags — toggle via Alpine (click adds/removes from user override)
