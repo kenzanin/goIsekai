@@ -7,6 +7,7 @@
 -- data.ThumbRatio: float, data.Challenge: bool
 
 local pagination = require("partials.pagination")
+local verifyWizard = require("partials.verify_wizard")
 
 return function(data)
 	local plugins = data.Plugins or {}
@@ -130,66 +131,18 @@ return function(data)
 			.. " to paste your session cookies.</div>"
 	end
 
-	-- Human verification wizard (auto-open modal, mirrors detail.lua pattern)
-	local verifyHTML = ""
-	local needsHumanVerify = data.NeedsHumanVerify or false
-	local verifyURL = data.VerifyURL or ""
-	local verifyCookies = data.VerifyCookies or ""
-	local verifyUserAgent = data.VerifyUserAgent or ""
-	-- Show the wizard only when the plugin is actually blocked: either the
-	-- search came back/stayed blocked (challenge) or no cookies are saved yet.
-	-- Saved cookies suppress the modal so the search can run with them.
-	if needsHumanVerify and verifyURL ~= "" and (challenge or verifyCookies == "") then
-		local placeholder = verifyCookies ~= "" and verifyCookies or 'cf_clearance=...; session=...'
-		local useragent = verifyUserAgent ~= "" and verifyUserAgent or "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
-		verifyHTML = '<div id="verify-modal" class="fixed inset-0 z-50 flex items-center justify-center">'
-			.. '<div class="absolute inset-0 bg-black/70" onclick="this.parentElement.classList.add(\'hidden\')"></div>'
-			.. '<div class="relative bg-neutral-900 border border-neutral-700 rounded-xl p-4 max-w-lg max-h-[80vh] overflow-y-auto">'
-			.. '<div class="space-y-4">'
-			.. '<div class="bg-amber-500/10 border border-amber-600/50 rounded-lg p-3">'
-			.. '<h3 class="text-sm font-semibold text-amber-200 mb-2">⚠️ Plugin blocked by bot verification</h3>'
-			.. '<p class="text-xs text-amber-200/80 mb-2">This site requires manual verification. Open the link below in your browser, solve the challenge, then paste cookies below — either as name=value pairs or a Cookie-Editor JSON export.</p>'
-			.. '<a href="' .. h(verifyURL) .. '" target="_blank" rel="noopener" class="text-xs text-amber-400 hover:text-amber-300 hover:underline break-all">' .. h(verifyURL) .. "</a>"
-			.. "</div>"
-			.. '<div class="space-y-2">'
-			.. '<label class="block text-xs font-medium text-neutral-300">Saved cookies for this plugin</label>'
-			.. '<textarea id="verify-cookies" rows="4" class="w-full bg-neutral-950 border border-neutral-700 rounded-lg p-2 text-xs text-neutral-200 font-mono" placeholder="' .. h(placeholder) .. '" autofocus onfocus="this.scrollTop=0">' .. h(verifyCookies) .. "</textarea>"
-			.. '<label class="block text-xs font-medium text-neutral-300">Saved browser user-agent</label>'
-			.. '<input type="text" id="verify-useragent" value="' .. h(useragent) .. '" class="w-full bg-neutral-950 border border-neutral-700 rounded-lg p-2 text-xs text-neutral-200">'
-			.. "</div>"
-			.. '<div class="flex gap-2">'
-			.. '<button id="save-verify-search" type="button" onclick="saveVerifySearch(\'' .. h(pluginID) .. '\')" class="bg-amber-600 hover:bg-amber-500 text-white rounded-md px-4 py-2 text-sm font-medium">Save & retry</button>'
-			.. '<button type="button" onclick="this.closest(\'#verify-modal\').classList.add(\'hidden\')" class="border border-neutral-600 text-neutral-300 hover:bg-neutral-800 rounded-md px-4 py-2 text-sm">Cancel</button>'
-			.. "</div>"
-			.. "</div>"
-			.. "</div></div>"
-		.. "<script>"
-		.. "function saveVerifySearch(pid) {"
-		.. "  var cookies = document.getElementById('verify-cookies').value;"
-		.. "  var ua = document.getElementById('verify-useragent').value;"
-		.. "  var form = new URLSearchParams();"
-		.. "  form.append('cookies', cookies);"
-		.. "  form.append('user_agent', ua);"
-		.. "  var qs = new URLSearchParams(window.location.search).toString();"
-		.. "  var url = '/action/save-verify/' + encodeURIComponent(pid) + (qs ? '?' + qs : '');"
-		.. "  fetch(url, {"
-		.. "    method: 'POST',"
-		.. "    headers: {"
-		.. "      'Content-Type': 'application/x-www-form-urlencoded',"
-		.. "      'X-CSRF-Token': '" .. h(data.csrf_token or "") .. "',"
-		.. "    },"
-		.. "    body: form.toString()"
-		.. "  }).then(r => {"
-		.. "    if (r.status === 303 || r.ok) {"
-		.. "      document.getElementById('verify-modal').classList.add('hidden');"
-		.. "      location.reload();"
-		.. "    } else {"
-		.. "      alert('Save failed: ' + r.status);"
-		.. "    }"
-		.. "  }).catch(e => { alert('Save failed: ' + e.message); });"
-		.. "}"
-		.. "</script>"
-	end
+	-- Human verification wizard modal (shared partial; renders "" when hidden).
+	-- MangaID "" = search context: save keeps the query string.
+	local verifyHTML = verifyWizard({
+		csrf_token = data.csrf_token or "",
+		PluginID = pluginID,
+		MangaID = "",
+		NeedsHumanVerify = data.NeedsHumanVerify or false,
+		VerifyURL = data.VerifyURL or "",
+		VerifyCookies = data.VerifyCookies or "",
+		VerifyUserAgent = data.VerifyUserAgent or "",
+		Challenge = challenge,
+	})
 
 	-- Results grid
 	local resultsHTML = ""
