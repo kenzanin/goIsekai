@@ -20,17 +20,22 @@ goIsekai: manga library manager + reader, embedded HTTP server + browser UI, Go 
 
 `just build` does **not** build `goisekai-tray` — build it manually with `go build -o goisekai-tray ./cmd/goisekai-tray`.
 
-## 2. Runtime state (as of 2026-10-10 05:50 +0700)
+## 2. Runtime state (as of 2026-10-10 10:10 +0700)
 
-- Tray PID 10665 → server PID 10674, port 8080, started 2026-10-10 05:44 (fresh, after all commits).
-- Binary `./goisekai` built 2026-10-09 19:11 ≈ HEAD `9822609`. Rebuild (`just build`) + restart tray after any Go change; Lua templates compile at startup (`hot_reload=false` in ini), so a restart is always needed after `internal/templates/` edits.
-- Onisaga verify cookies re-pasted 2026-10-10 05:47:47 (DB `plugin_verify`). **`cf_clearance` dies in <30 min** — evidence: save 20:26 → 403 by 20:53. Expect frequent re-paste via the human-verify wizard.
+- Tray PID 430999 → server PID 431009, port 8080, started 2026-10-10 10:10.
+- Binary `./goisekai` built 2026-10-10 10:07 ≈ HEAD `635ed48`. Rebuild (`just build`) + restart tray after any Go change; Lua templates compile at startup (`hot_reload=false` in ini), so a restart is always needed after `internal/templates/` edits. Tray does **not** respawn its child — `POST /api/shutdown` kills the server only, then kill+relaunch the tray with `DISPLAY=:0.0 XDG_RUNTIME_DIR=/run/user/1000 DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/1000/bus`.
+- **Onisaga cookies DEAD** (probe 09:47 → 403, age 230 min). Re-paste via the wizard before any live onisaga test. `cf_clearance` dies in <30 min — evidence: save 20:26 → 403 by 20:53; save 05:47 → 403 by 09:37.
+- onisaga plugin (`app_data/plugins/onisaga/main.lua`, 222 lines, md5 `7a80117e`) is gitignored → backed up to `~/goisekai-backups/onisaga/` 2026-10-10.
 - `cdp_engine = obscura` in `goisekai.ini` (obscura daemon usually dead; both CDP engines always time out 120s vs Cloudflare anyway — see `manual_cookies` below).
+- `api_key` empty in ini — required for browser testing (reader.js same-origin fetches carry no `X-API-Key`).
 
 ## 3. Shipped this session (all on `main`, newest first)
 
 | Commit | What |
 |---|---|
+| `635ed48` | pluginmanager: propagate invoke ctx into JS + wasm proxy calls (was `context.Background()`, unbounded CDP solve); `callJS` publishes ctx on `loadedPlugin.curCtx`, JS natives read via `Manager.invokeCtx`; wasm threads wazero ctx into `host_http_request` + `host_call`. Regression test pins it (1 s vs 8 s) |
+| `202a021` | docs: add this handover |
+| `5855d16` | css: wizard modal utility classes (`max-w-lg`, `border-neutral-600`, amber text, `p-2`) — were used by search.lua/detail.lua but missing from generated CSS |
 | `9822609` | `manual_cookies=true` per-plugin meta → `solveAndSeed` returns instantly, no CDP ever; empty/stale cookies → wizard in ~340ms (was 247s) |
 | `001e1ad` | Wizard cookie textarea autofocus |
 | `555e561` | Challenge solves bounded by invoke ctx (15s) via lunar `frame.Context()`; `ErrChallenge` marker → typed `ChallengeError` re-raise in `callLua`; wizard re-raises instead of silent empty results |
@@ -61,13 +66,19 @@ Plugin declares `needs_js`, `needs_human_verify`, `manual_cookies = true`.
 
 ## 5. Open items (next agent)
 
-1. **Reader E2E** — last blocked task. Fresh cookies are in the DB (05:47). Test: open `/view/read/onisaga/kaerazaru-hyouga/kaerazaru-hyouga:871798`, confirm pages render. Watch the signed `src` `exp` TTL (≈10 min): if page opens after expiry → image proxy must re-sign or re-fetch (refresh API needs a token; one probe hit 429 score-throttle).
-2. **Chapters live re-check** — offline pattern proven (4/4), live check was blocked by expired cookies. `curl /view/manga/onisaga/kaerazaru-hyouga` → expect 4 rows with correct labels (0, 0.1, 0.2, 1), not "Write a review".
-3. **Purge `plugin_cache` after any plugin edit** — `DELETE FROM plugin_cache WHERE plugin_id='onisaga'`; GetMangaDetail 24h / GetChapterList 168h TTL masks fixes (symptom: old payload served, or 13ms detail = cache hit).
-4. **ctx propagation into solve across all 3 runtimes** — bounded only for Lua (`frame.Context()`); JS/wasm still Background. Deferred.
-5. **`get_genres` export for onisaga** — site has `/genre/` pages; search-page genre dropdown empty because onisaga declares `genres = {}` with no export (old issue "search genres", never confirmed closed).
-6. **Uncommitted**: `cmd/goisekai/frontend/lib/tailwind.css` + `.br` (+27 lines: `max-w-lg`, `border-neutral-600`, …) — generated CSS from an earlier session, review + commit or revert.
-7. **Test litter to clean** (untracked): `cmd/probe/`, `har_inspect.py`, `*.har` ×4 (onisaga, onisaga_search, cf_wizard, manga_action), `goisekai_new`, `goisekai.log`, `server.log`, `pi.sh`, `*.jsonl`. HARs still useful for issue #1/#2 — keep until reader E2E passes.
+Done this session: #3 (cache purged), #4 (ctx propagation, `635ed48`), #6 (CSS committed), #7 (litter cleaned, minus HARs — see below).
+
+Still open, **all three blocked on fresh cookies** (current cookies are 403-dead as of 09:37):
+
+1. **Reader E2E** — the last blocked task. Re-paste cookies via the wizard first, then open `/view/read/onisaga/kaerazaru-hyouga/kaerazaru-hyouga:871798` and confirm pages render. Watch the signed `src` `exp` TTL (≈10 min): if the page opens after expiry, the image proxy must re-sign or re-fetch (refresh API needs a token; one probe hit 429 score-throttle).
+2. **Chapters live re-check** — offline pattern proven (4/4), live check was blocked by expired cookies. `curl /view/manga/onisaga/kaerazaru-hyouga` → expect 4 rows with labels (0, 0.1, 0.2, 1), not "Write a review".
+5. **`get_genres` export for onisaga** — site has `/genre/` pages; the search-page genre dropdown is empty because onisaga declares `genres = {}` with no export. Needs a live fetch to enumerate the genre slugs (saved HARs cannot help — see #7).
+
+**Routine, not an item**: purge `plugin_cache` after any plugin edit — `DELETE FROM plugin_cache WHERE plugin_id='onisaga'`. GetMangaDetail 24h / GetChapterList 168h TTL masks fixes (symptom: old payload served, or a 13 ms detail = cache hit). Already purged 2026-10-10 09:45.
+
+**HARs are useless — safe to delete.** The earlier note said keep them until reader E2E passes; that premise is wrong. `onisaga.har` (174 entries), `onisaga_search.har` (259), `cf_wizard.har` (10) all stored **no response bodies** (only `size`/`mimeType`, `text` empty) — a browser-export setting. `manga_action.har` has bodies but they are localhost `127.0.0.1:8080` captures of the atsumaru plugin, not onisaga. So they cannot serve issue #1/#2; they only add ~9 MB of untracked litter.
+
+**Untracked leftovers not yet cleaned**: `.pi/` (prompts + skills from the previous pi harness — delete unless you still use it) and the openspec skill diffs (`.agents/skills/`, `.opencode/`) which are upstream tooling updates, not ours — review and commit separately.
 
 ## 6. Critical rules (distilled — these bite)
 
@@ -80,6 +91,8 @@ Plugin declares `needs_js`, `needs_human_verify`, `manual_cookies = true`.
 - **Wizard visibility is two-layer**: Go `viewSearch` gate (`GetPluginVerifyState`) + search.lua modal condition — fix both or the modal redraws.
 - **`Discover()` seeds zero-value plugin metadata** — view-time gates must load meta eagerly (self-load bridge call), not read stale `PluginMetas()`.
 - **Plugin invocations run on `context.Background()+15s`**, not the job ctx — SIGTERM never reaches plugin code; shutdown relies on the 5s bounded drain.
+- **JS invoke ctx lives on `loadedPlugin.curCtx`** — goja natives get no ctx from the runtime, so `callJS` publishes it and natives read it via `Manager.invokeCtx`. wasm threads its wazero call ctx into `host_http_request`/`host_call` instead. Without this the proxy call runs on `context.Background()` and outlives the deadline.
+- **goja's `Interrupt` cannot abort a Go native already blocking inside it.** Only ctx tears the fetch down. And the interrupt goroutine must keep its original `time.After` select — switching it to watch `ctx.Done()` races with the deferred `cancel()` (which runs after `ClearInterrupt`) and can fire late, leaving a stale interrupt that fails the *next* call instantly. Symptom: `timeout` at 0.00s on the second call.
 - **coregex** (not Go regexp) backs Lua `host.regex.*`: bounded repeats ≳1000 rejected silently → empty result.
 - **Lua empty-table ABI**: results encode `{}`→`[]`, request headers stay `{}`; object ABI results must never return `{}`. Breaking this kills all Lua plugin HTTP silently.
 - **lunar has no bitwise ops** (`~ & | << >>` parse-fail).
