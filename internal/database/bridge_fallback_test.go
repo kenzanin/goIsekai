@@ -193,6 +193,51 @@ func TestMangaDescriptionIfCustom(t *testing.T) {
 	}
 }
 
+func TestMangaCoverIfCustom(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "custom-cover.db")
+	db, err := Open(path)
+	if err != nil {
+		t.Fatalf("Open: %v", err)
+	}
+	defer func() { _ = db.Close() }()
+
+	_, err = db.UpsertManga(Manga{
+		PluginID: "p1", SourceMangaID: "s1",
+		Title: "T", CoverURL: "http://plugin/cover.jpg",
+	})
+	if err != nil {
+		t.Fatalf("upsert: %v", err)
+	}
+
+	// No custom cover yet.
+	_, custom, err := db.MangaCoverIfCustom("p1", "s1")
+	if err != nil {
+		t.Fatalf("MangaCoverIfCustom: %v", err)
+	}
+	if custom {
+		t.Fatal("custom should be false when no pick was made")
+	}
+
+	// User picks a cover — mirrors setCover (SetMangaCover + lock).
+	if err := db.SetMangaCover("p1", "s1", "http://picked/alt.jpg"); err != nil {
+		t.Fatalf("set cover: %v", err)
+	}
+	if _, err := db.db.Exec(`UPDATE mangas SET custom_cover = 1 WHERE plugin_id = 'p1' AND source_manga_id = 's1'`); err != nil {
+		t.Fatalf("lock: %v", err)
+	}
+
+	dbCover, custom, err := db.MangaCoverIfCustom("p1", "s1")
+	if err != nil {
+		t.Fatalf("MangaCoverIfCustom after pick: %v", err)
+	}
+	if !custom {
+		t.Fatal("custom should be true after pick")
+	}
+	if dbCover != "http://picked/alt.jpg" {
+		t.Errorf("custom cover = %q, want %q", dbCover, "http://picked/alt.jpg")
+	}
+}
+
 func TestGetMangaDetailsOfflineFallback(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "offline.db")
 	db, err := Open(path)

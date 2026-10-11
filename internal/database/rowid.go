@@ -36,6 +36,18 @@ func (d *DB) MangaDescriptionIfCustom(pluginID, sourceMangaID string) (string, b
 	}
 	return desc, custom, nil
 }
+
+// MangaCoverIfCustom returns the stored cover URL and whether it is a
+// user-set (custom) cover that must override the plugin-sourced one.
+func (d *DB) MangaCoverIfCustom(pluginID, sourceMangaID string) (string, bool, error) {
+	var cover string
+	var custom bool
+	err := d.db.QueryRow(`SELECT cover_url, custom_cover FROM mangas WHERE plugin_id = ? AND source_manga_id = ?`, pluginID, sourceMangaID).Scan(&cover, &custom)
+	if err != nil {
+		return "", false, fmt.Errorf("manga custom cover: %w", err)
+	}
+	return cover, custom, nil
+}
 func (d *DB) MangaTitle(pluginID, sourceMangaID string) (string, error) {
 	var title string
 	err := d.db.QueryRow(`SELECT title FROM mangas WHERE plugin_id = ? AND source_manga_id = ?`, pluginID, sourceMangaID).Scan(&title)

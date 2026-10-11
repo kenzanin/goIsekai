@@ -88,6 +88,9 @@ func (s *AppService) GetMangaDetails(pluginID, mangaID string) (types.Manga, []t
 			if dbDesc, custom, err := s.db.MangaDescriptionIfCustom(pluginID, mangaID); err == nil && custom {
 				manga.Description = dbDesc
 			}
+			if dbCover, custom, err := s.db.MangaCoverIfCustom(pluginID, mangaID); err == nil && custom {
+				manga.CoverURL = dbCover
+			}
 			if genres, has, err := s.GetMangaGenres(pluginID, mangaID); err == nil && has && len(genres) > 0 {
 				manga.Genres = genres
 			}
@@ -104,6 +107,9 @@ func (s *AppService) GetMangaDetails(pluginID, mangaID string) (types.Manga, []t
 		}
 		if dbDesc, custom, err := s.db.MangaDescriptionIfCustom(pluginID, mangaID); err == nil && custom {
 			manga.Description = dbDesc
+		}
+		if dbCover, custom, err := s.db.MangaCoverIfCustom(pluginID, mangaID); err == nil && custom {
+			manga.CoverURL = dbCover
 		}
 		if genres, has, err := s.GetMangaGenres(pluginID, mangaID); err == nil && has && len(genres) > 0 {
 			manga.Genres = genres
