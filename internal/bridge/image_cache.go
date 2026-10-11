@@ -4,7 +4,9 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	neturl "net/url"
+	"os"
 	"path/filepath"
+	"strconv"
 )
 
 // diskCachePath returns the L2 cache file path prefix (SHA256 hex, no
@@ -29,4 +31,39 @@ func (s *AppService) diskCachePath(pluginID, mangaID, chapterID, url string) str
 		sub = filepath.Join(mangaID, chapterID)
 	}
 	return filepath.Join(s.cacheDir, "images", pluginID, sub, hex.EncodeToString(h[:8]))
+}
+
+// evictCoverURL drops one cover URL from L1 (imageCache) and L2 (disk file
+// across all encoded extensions). Mirrors the refetchCover evict block.
+func (s *AppService) evictCoverURL(pluginID, url string) {
+	if url == "" {
+		return
+	}
+	s.imageMu.Lock()
+	delete(s.imageCache, url)
+	s.imageMu.Unlock()
+	if base := s.diskCachePath(pluginID, "", "", url); base != "" {
+		for _, ext := range []string{"." + string(FormatAVIF), "." + string(FormatWebP), ".img", "." + string(FormatJXL)} {
+			_ = os.Remove(base + ext)
+		}
+	}
+}
+
+// CoverCacheVersion returns a cache-buster string for a cover URL derived
+// from the L2 file's mtime/size. Empty when no cached file exists (fresh
+// fetch gets no buster). No DB migration needed.
+func (s *AppService) CoverCacheVersion(pluginID, url string) string {
+	if url == "" {
+		return ""
+	}
+	base := s.diskCachePath(pluginID, "", "", url)
+	if base == "" {
+		return ""
+	}
+	for _, ext := range []string{"." + string(FormatAVIF), "." + string(FormatWebP), ".img", "." + string(FormatJXL)} {
+		if fi, err := os.Stat(base + ext); err == nil {
+			return strconv.FormatInt(fi.ModTime().Unix(), 10) + "-" + strconv.FormatInt(fi.Size(), 10)
+		}
+	}
+	return ""
 }

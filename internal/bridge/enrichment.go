@@ -199,12 +199,19 @@ func (s *AppService) ListAltCovers(pluginID, mangaID string) ([]database.AltCove
 	return s.db.ListAltCovers(rowID)
 }
 
-// ClearCovers drops the stored alternative cover candidates for a manga.
-// The next fetch re-pulls them fresh from enrichment sources.
+// ClearCovers drops the stored alternative cover candidates for a manga,
+// evicting each candidate's L1+L2 image bytes first so stale placeholders
+// are not re-served from cache. The next fetch re-pulls them fresh from
+// enrichment sources.
 func (s *AppService) ClearCovers(pluginID, mangaID string) error {
 	rowID, err := s.db.ResolveMangaRowID(pluginID, mangaID)
 	if err != nil {
 		return err
+	}
+	if covers, err := s.db.ListAltCovers(rowID); err == nil {
+		for _, c := range covers {
+			s.evictCoverURL(pluginID, c.URL)
+		}
 	}
 	return s.db.RemoveAltCovers(rowID)
 }

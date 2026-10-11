@@ -97,6 +97,19 @@ func (s *Server) buildMangaDetailData(r *http.Request, pluginID, mangaID string)
 	cats, _ := s.service.ListCategories(pluginID, mangaID)
 	rels, _ := s.service.ListRelated(pluginID, mangaID)
 	altCovers, _ := s.service.ListAltCovers(pluginID, mangaID)
+	coverVersions := make(map[string]string, len(altCovers)+1)
+	for _, c := range altCovers {
+		if c.URL != "" {
+			if v := s.service.CoverCacheVersion(pluginID, c.URL); v != "" {
+				coverVersions[c.URL] = v
+			}
+		}
+	}
+	if manga.CoverURL != "" {
+		if v := s.service.CoverCacheVersion(pluginID, manga.CoverURL); v != "" {
+			coverVersions[manga.CoverURL] = v
+		}
+	}
 	s.logger.Debug("enrichment cache", "plugin", pluginID, "manga", mangaID, "categories", len(cats), "related", len(rels))
 	overrideGenres, _, _ := s.service.GetMangaGenres(pluginID, mangaID)
 	// Human verification wizard data (verifyRow/pluginMeta hoisted to the top
@@ -142,6 +155,7 @@ func (s *Server) buildMangaDetailData(r *http.Request, pluginID, mangaID string)
 		"OverrideGenres":   overrideGenres,
 		"Genres":           manga.Genres,
 		"CoverDim":         manga.CoverDim,
+		"CoverVersions":    coverVersions,
 		"LastSynced":       lastSynced,
 	}
 }

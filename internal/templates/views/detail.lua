@@ -32,6 +32,7 @@ return function(data)
 	local chTotalPages = data.ChTotalPages or 1
 	local cats = data.Categories or {}
 	local rels = data.Related or {}
+	local coverVersions = data.CoverVersions or {}
 	local altCovers = data.AltCovers or {}
 	-- Human verification wizard data
 	local needsHumanVerify = data.NeedsHumanVerify or false
@@ -69,6 +70,7 @@ return function(data)
 			.. "&url="
 			.. h(manga.CoverURL)
 			.. "&prio=high"
+			.. (coverVersions[manga.CoverURL] and coverVersions[manga.CoverURL] ~= "" and ("&cb=" .. h(coverVersions[manga.CoverURL])) or "")
 			.. '" alt="'
 			.. h(manga.Title or "")
 			.. '" class="w-full aspect-[2/3] rounded-xl object-cover">'
@@ -455,7 +457,9 @@ return function(data)
 				.. h(pluginID)
 				.. "&url="
 				.. h(c.url)
-				.. '&prio=high" alt="cover" loading="lazy" class="w-32 aspect-[2/3] rounded-lg object-cover border-2 transition cursor-pointer '
+				.. '&prio=high'
+				.. (coverVersions[c.url] and coverVersions[c.url] ~= "" and ("&cb=" .. h(coverVersions[c.url])) or "")
+				.. '" alt="cover" loading="lazy" class="w-32 aspect-[2/3] rounded-lg object-cover border-2 transition cursor-pointer '
 				.. (c.current and "border-emerald-500" or "border-transparent group-hover:border-blue-400")
 				.. '" onclick="submitForm(this.closest(\'form\'))" title="Use this cover">'
 				.. '<div class="text-[10px] text-neutral-400 text-center mt-1 truncate">'
