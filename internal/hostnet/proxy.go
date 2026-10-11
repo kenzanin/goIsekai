@@ -25,6 +25,7 @@ type Proxy struct {
 	hints           map[string][]string              // pluginID -> ordered profile ladder from metadata
 	persistPin      func(pluginID, profile string)   // persists pin to DB; nil-safe
 	cdp             CDPConfig
+	pluginCDPTimeout map[string]time.Duration // per-plugin CDP solve budget (PLUGIN timeout key)
 
 	// solveChallenge is swappable for tests; nil means the real rod solver.
 	solveChallenge func(cfg CDPConfig, url string) ([]*http.Cookie, string, error)
@@ -65,6 +66,7 @@ func NewProxy() *Proxy {
 		manualCookies:   make(map[string]bool),
 		pins:            make(map[string]string),
 		hints:           make(map[string][]string),
+		pluginCDPTimeout: make(map[string]time.Duration),
 		solveChallenge:  solveChallenge,
 		stdlibTransport: &nethttp.Transport{
 			MaxIdleConnsPerHost: 6,
@@ -79,6 +81,30 @@ func (p *Proxy) SetDefaultHeader(key, value string) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	p.defaultHeaders[key] = value
+}
+
+// SetPluginCDPTimeout records a plugin's declared invoke budget (PLUGIN
+// timeout key) so browser solves for that plugin use it instead of the
+// global cdp_solve_timeout. A zero duration clears the override.
+func (p *Proxy) SetPluginCDPTimeout(pluginID string, d time.Duration) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	if d <= 0 {
+		delete(p.pluginCDPTimeout, pluginID)
+		return
+	}
+	p.pluginCDPTimeout[pluginID] = d
+}
+
+// pluginCDPDeadline returns the effective CDP solve budget for a plugin:
+// the plugin's own timeout when declared, else the global cdp value.
+func (p *Proxy) pluginCDPDeadline(pluginID string) time.Duration {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	if d, ok := p.pluginCDPTimeout[pluginID]; ok && d > 0 {
+		return d
+	}
+	return p.cdp.Timeout
 }
 
 // SetSecCHUA configures the Sec-CH-UA client hint. An empty value switches

@@ -6,6 +6,7 @@ import (
 	"goisekai/internal/logger"
 	"math"
 	"net/url"
+	"time"
 )
 
 // ensureLoaded lazily instantiates the plugin runtime on first use.
@@ -55,6 +56,9 @@ func (m *Manager) ensureLoaded(id string) error {
 	m.proxy.SetNeedsJS(id, p.meta.NeedsJS)
 	m.proxy.SetManualCookies(id, p.meta.ManualCookies)
 	m.proxy.SetHTTPProfiles(id, p.meta.HTTPProfiles)
+	if p.meta.Timeout > 0 {
+		m.proxy.SetPluginCDPTimeout(id, time.Duration(p.meta.Timeout)*time.Second)
+	}
 	logger.Info("plugin loaded (lazy)", "id", id, "kind", p.kind, "version", p.contractVersion)
 
 	// Register plugin-declared enrichment providers so they're visible
@@ -104,6 +108,9 @@ func (m *Manager) registerLoaded(id string, p *loadedPlugin) {
 	m.proxy.SetNeedsJS(id, p.meta.NeedsJS)
 	m.proxy.SetManualCookies(id, p.meta.ManualCookies)
 	m.proxy.SetHTTPProfiles(id, p.meta.HTTPProfiles)
+	if p.meta.Timeout > 0 {
+		m.proxy.SetPluginCDPTimeout(id, time.Duration(p.meta.Timeout)*time.Second)
+	}
 	m.notifyLoaded(id)
 }
 

@@ -18,7 +18,9 @@ func (p *Proxy) BrowserFetch(pluginID, url string) (string, error) {
 	if !p.cdp.enabled() {
 		return "", fmt.Errorf("hostnet: browser fetch requires a CDP engine (cdp_engine is off)")
 	}
-	timeout := p.cdp.Timeout
+	// The plugin's declared invoke budget overrides the global cdp_solve_timeout
+	// so a plugin waiting on its own JS loop is not cut off mid-wait.
+	timeout := p.pluginCDPDeadline(pluginID)
 	if timeout <= 0 {
 		timeout = solveDefaultTimeout
 	}
@@ -83,7 +85,7 @@ func (p *Proxy) browserEvaluateWithInit(pluginID, url, initJS, js string) (strin
 	if !p.cdp.enabled() {
 		return "", fmt.Errorf("hostnet: browser evaluate requires a CDP engine (cdp_engine is off)")
 	}
-	timeout := p.cdp.Timeout
+	timeout := p.pluginCDPDeadline(pluginID)
 	if timeout <= 0 {
 		timeout = solveDefaultTimeout
 	}
