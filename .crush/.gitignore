@@ -1,1 +1,4 @@
 *.db
+logs/
+.amem-backups/
+memory.amem
