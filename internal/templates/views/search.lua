@@ -202,6 +202,7 @@ return function(data)
 		.. '<button type="submit" class="bg-indigo-600 hover:bg-indigo-500 text-white rounded-md px-4 py-2 text-sm font-medium">Search</button>'
 		.. (topPagination ~= "" and topPagination or "")
 		.. "</form>"
+		.. '<div id="search-history" class="mb-6"></div>'
 		.. resultsHTML
 		.. "\n"
 		.. noResults
@@ -211,4 +212,38 @@ return function(data)
 		.. verifyHTML
 		.. "\n"
 		.. bottomPagination
+		.. [[<script>
+(function(){
+  var KEY = "gi_search_history", MAX = 20;
+  function load() {
+    try { var v = JSON.parse(localStorage.getItem(KEY) || "[]"); return Array.isArray(v) ? v : []; }
+    catch (e) { return []; }
+  }
+  function save(h) { try { localStorage.setItem(KEY, JSON.stringify(h.slice(0, MAX))); } catch (e) {} }
+  var qEl = document.getElementById("q"), pEl = document.getElementById("pluginID"), gEl = document.getElementById("genre");
+  var q = qEl ? qEl.value : "", pid = pEl ? pEl.value : "", genre = gEl ? gEl.value : "";
+  var h = load();
+  if (q || genre) {
+    h = h.filter(function(e) { return !(e.q === q && e.pid === pid && e.g === genre); });
+    h.unshift({ q: q, pid: pid, g: genre || "" });
+    save(h);
+  }
+  if (q || genre || !h.length) return;
+  var box = document.getElementById("search-history");
+  if (!box) return;
+  var label = document.createElement("div");
+  label.className = "text-xs text-neutral-400 mb-2";
+  label.textContent = "Recent searches";
+  box.appendChild(label);
+  h.forEach(function(e) {
+    var a = document.createElement("a");
+    var url = "/view/search?pluginID=" + encodeURIComponent(e.pid || "") + "&q=" + encodeURIComponent(e.q || "");
+    if (e.g) url += "&genre=" + encodeURIComponent(e.g);
+    a.href = url;
+    a.className = "inline-flex items-center gap-1.5 text-[10px] px-2 py-0.5 rounded-full bg-neutral-800 text-neutral-500 mr-2 mb-2";
+    a.textContent = e.q || e.g;
+    box.appendChild(a);
+  });
+})();
+</script>]]
 end
