@@ -182,6 +182,11 @@ graph TD
     E --> E15["POST /action/reset-enrichment/{id}"]
     E --> E16["POST /action/set-chapter-progress"]
     E --> E17["POST /action/mark-read/{id}"]
+    E --> E18["POST /action/fetch-covers/{id}"]
+    E --> E19["POST /action/set-cover/{id}"]
+    E --> E20["POST /action/clear-covers/{id}"]
+    E --> E21["POST /action/refetch-cover/{id}"]
+    E --> E22["POST /action/toggle-cover-dim/{id}"]
 
     G --> G1["/plugin-static/{id}/{file}"]
     F --> F1["/image?pluginID=&url=&mangaID=&chapterID="]
@@ -393,7 +398,7 @@ just clean           # remove the binary
 just --list          # everything else
 ```
 
-Stack: Go 1.27 · chi · Lua templates (lunar) · Alpine.js · Tailwind CSS (static build) · Extism · goja · tls-client · chromedp · modernc.org/sqlite (via go-jet) · gen2brain/webp.
+Stack: Go 1.27 · chi · Lua templates (lunar) · Alpine.js · Tailwind CSS (static build) · wazero · goja · yaegi · tls-client · go-rod · modernc.org/sqlite (via go-jet) · gen2brain/webp.
 
 ## License
 
