@@ -16,8 +16,11 @@
     img = null,
     loading = false,
     _lastFailedRetry = null;
-  var viewMode = localStorage.getItem('gi_viewMode') || 'fitWidth';
-  var direction = localStorage.getItem('gi_direction') || 'ltr';
+  var scope = `${pid}.${mid}`;
+  var viewKey = `gi_viewMode.${scope}`;
+  var dirKey = `gi_direction.${scope}`;
+  var viewMode = localStorage.getItem(viewKey) || localStorage.getItem('gi_viewMode') || 'fitWidth';
+  var direction = localStorage.getItem(dirKey) || localStorage.getItem('gi_direction') || 'ltr';
   var smoothing = (localStorage.getItem('gi_renderMode') || 'smooth') === 'smooth';
   var zoom = 1,
     panX = 0,
@@ -41,8 +44,9 @@
   // Vertical strip mode: continuous downward scroll. When a chapter's pages run
   // out, the next chapter's pages are appended seamlessly (sites that split one
   // manga release across several chapter parts read as one flow).
-  var stripKey = `gi_stripMode.${mid}`;
-  var stripMode = localStorage.getItem(stripKey) === '1';
+  var stripKey = `gi_stripMode.${scope}`;
+  var stripMode =
+    localStorage.getItem(stripKey) === '1' || localStorage.getItem(`gi_stripMode.${mid}`) === '1';
   var stripView = document.getElementById('strip-view');
   var stripLoading = false; // strip is appending a neighbor chapter
 
@@ -637,12 +641,15 @@
     zoom = 1;
     panX = 0;
     panY = 0;
-    localStorage.setItem(`gi_zoom_${viewMode}`, '1');
+    localStorage.setItem(`gi_zoom_${viewMode}.${scope}`, '1');
     calcBaseScale();
     render();
   }
   function restoreZoom() {
-    zoom = parseFloat(localStorage.getItem(`gi_zoom_${viewMode}`)) || 1;
+    zoom =
+      parseFloat(localStorage.getItem(`gi_zoom_${viewMode}.${scope}`)) ||
+      parseFloat(localStorage.getItem(`gi_zoom_${viewMode}`)) ||
+      1;
     panX = 0;
     panY = 0;
     calcBaseScale();
@@ -812,7 +819,7 @@
   function zoomBy(factor, cx, cy) {
     if (stripMode) {
       zoom = Math.max(0.2, Math.min(5, zoom * factor));
-      localStorage.setItem(`gi_zoom_${viewMode}`, String(zoom));
+      localStorage.setItem(`gi_zoom_${viewMode}.${scope}`, String(zoom));
       applyStripSizing();
       return;
     }
@@ -824,7 +831,7 @@
     panX = mx - (mx - panX) * sc;
     panY = my - (my - panY) * sc;
     zoom = nz;
-    localStorage.setItem(`gi_zoom_${viewMode}`, String(zoom));
+    localStorage.setItem(`gi_zoom_${viewMode}.${scope}`, String(zoom));
     clampPan();
     render();
   }
@@ -955,7 +962,7 @@
   }
   fitBtn.addEventListener('click', () => {
     viewMode = fitOrder[(fitOrder.indexOf(viewMode) + 1) % fitOrder.length];
-    localStorage.setItem('gi_viewMode', viewMode);
+    localStorage.setItem(viewKey, viewMode);
     syncFitLabel();
     restoreZoom();
   });
@@ -967,7 +974,7 @@
   }
   dirBtn.addEventListener('click', () => {
     direction = direction === 'ltr' ? 'rtl' : 'ltr';
-    localStorage.setItem('gi_direction', direction);
+    localStorage.setItem(dirKey, direction);
     syncDirLabel();
   });
   syncDirLabel();

@@ -117,7 +117,10 @@ return function(data)
   if (dirBtn) {
     var RTL_CLASSES = 'bg-indigo-600/20 border-indigo-500/40';
     function applyDirStyle() {
-      if (localStorage.getItem('gi_direction') === 'rtl') dirBtn.classList.add(...RTL_CLASSES.split(' '));
+      var _root = document.getElementById('reader');
+      var _scope = _root ? (_root.dataset.pluginId + '.' + _root.dataset.mangaId) : '';
+      var _rtl = localStorage.getItem('gi_direction.' + _scope) === 'rtl' || localStorage.getItem('gi_direction') === 'rtl';
+      if (_rtl) dirBtn.classList.add(...RTL_CLASSES.split(' '));
       else dirBtn.classList.remove(...RTL_CLASSES.split(' '));
     }
     applyDirStyle();
