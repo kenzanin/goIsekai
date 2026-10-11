@@ -20,6 +20,7 @@ PLUGIN = {
     version = "1",
     contract_version = 1,
     search_page_size = 28,
+    timeout = 60,
 }
 
 local function find(html, pat)
@@ -203,7 +204,7 @@ function get_page_list(arg)
     ]]
     local js = [[() => {
         return (async () => {
-            for (let i = 0; i < 30; i++) {
+            for (let i = 0; i < 18; i++) {
                 if (window.__cxPages) return window.__cxPages;
                 await new Promise(r => setTimeout(r, 500));
             }

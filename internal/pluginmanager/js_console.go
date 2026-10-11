@@ -24,7 +24,10 @@ func callJS(p *loadedPlugin, fnName, inputJSON string) (string, error) {
 		return "", fmt.Errorf("js plugin %s: %s is not a function", p.id, jsName)
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), p.invokeDeadline())
+	budget := p.invokeDeadline()
+	start := time.Now()
+	logger.Debug("plugin invoke start", "plugin", p.id, "fn", fnName, "budget", budget.String())
+	ctx, cancel := context.WithTimeout(context.Background(), budget)
 	defer cancel()
 
 	// Timeout via Interrupt. A stale interrupt on an idle VM persists into the
@@ -58,6 +61,7 @@ func callJS(p *loadedPlugin, fnName, inputJSON string) (string, error) {
 	close(stop)
 	p.js.ClearInterrupt()
 	if err != nil {
+		logger.Debug("plugin invoke fail", "plugin", p.id, "fn", fnName, "elapsed", time.Since(start).String(), "error", err)
 		return "", fmt.Errorf("js plugin %s %s: %w", p.id, jsName, err)
 	}
 	if goja.IsUndefined(v) || goja.IsNull(v) {
@@ -65,13 +69,16 @@ func callJS(p *loadedPlugin, fnName, inputJSON string) (string, error) {
 	}
 	// If it's already a string, return directly.
 	if s, ok := v.Export().(string); ok {
+		logger.Debug("plugin invoke done", "plugin", p.id, "fn", fnName, "elapsed", time.Since(start).String(), "bytes", len(s))
 		return s, nil
 	}
 	// Otherwise marshal to JSON.
 	raw, err := json.Marshal(v.Export())
 	if err != nil {
+		logger.Debug("plugin invoke fail", "plugin", p.id, "fn", fnName, "elapsed", time.Since(start).String(), "error", err)
 		return "", fmt.Errorf("js plugin %s %s: marshal result: %w", p.id, jsName, err)
 	}
+	logger.Debug("plugin invoke done", "plugin", p.id, "fn", fnName, "elapsed", time.Since(start).String(), "bytes", len(raw))
 	return string(raw), nil
 }
 

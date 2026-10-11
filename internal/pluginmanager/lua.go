@@ -4,10 +4,12 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"time"
 
 	lua "github.com/mmcdole/lunar"
 
 	"goisekai/internal/hostnet"
+	"goisekai/internal/logger"
 	"goisekai/pkg/types"
 )
 
@@ -44,7 +46,10 @@ func callLua(p *loadedPlugin, fnName, inputJSON string) (string, error) {
 
 	// Set a wall-clock deadline on the State's context (PLUGIN.timeout may
 	// extend the default for round-trip-heavy calls).
-	ctx, cancel := context.WithTimeout(context.Background(), p.invokeDeadline())
+	budget := p.invokeDeadline()
+	start := time.Now()
+	logger.Debug("plugin invoke start", "plugin", p.id, "fn", fnName, "budget", budget.String())
+	ctx, cancel := context.WithTimeout(context.Background(), budget)
 	defer cancel()
 	if err := state.SetContext(ctx); err != nil {
 		return "", fmt.Errorf("lua plugin %s %s: set context: %w", p.id, fnName, err)
@@ -53,6 +58,7 @@ func callLua(p *loadedPlugin, fnName, inputJSON string) (string, error) {
 
 	vals, err := state.Call(fnVal, lua.String(inputJSON))
 	if err != nil {
+		logger.Debug("plugin invoke fail", "plugin", p.id, "fn", fnName, "elapsed", time.Since(start).String(), "error", err)
 		// The http natives throw the ErrChallenge marker when a dead anti-bot
 		// session aborts the call — map it back to the typed error the views
 		// check for, so the human-verify wizard re-opens.
@@ -62,6 +68,7 @@ func callLua(p *loadedPlugin, fnName, inputJSON string) (string, error) {
 		return "", fmt.Errorf("lua plugin %s %s: %w", p.id, fnName, err)
 	}
 	if len(vals) == 0 {
+		logger.Debug("plugin invoke fail", "plugin", p.id, "fn", fnName, "elapsed", time.Since(start).String(), "error", "returned no values")
 		return "", fmt.Errorf("lua plugin %s %s: returned no values", p.id, fnName)
 	}
 	res := vals[0]
@@ -84,10 +91,13 @@ func callLua(p *loadedPlugin, fnName, inputJSON string) (string, error) {
 			// A plugin that propagates the native's challenge text verbatim
 			// (nil, err) lands here — same typed-error mapping as above.
 			if ce, ok := challengeFromVM(reason); ok {
+				logger.Debug("plugin invoke fail", "plugin", p.id, "fn", fnName, "elapsed", time.Since(start).String(), "error", reason)
 				return "", ce
 			}
+			logger.Debug("plugin invoke fail", "plugin", p.id, "fn", fnName, "elapsed", time.Since(start).String(), "error", reason)
 			return "", fmt.Errorf("lua plugin %s %s: %s", p.id, fnName, reason)
 		}
+		logger.Debug("plugin invoke fail", "plugin", p.id, "fn", fnName, "elapsed", time.Since(start).String(), "error", "returned nil")
 		return "", fmt.Errorf("lua plugin %s %s: returned nil", p.id, fnName)
 	case res.Kind() == lua.BoolKind:
 		return "", fmt.Errorf("lua plugin %s %s: returned bool, want string or table", p.id, fnName)
@@ -95,11 +105,14 @@ func callLua(p *loadedPlugin, fnName, inputJSON string) (string, error) {
 		tbl, _ := res.AsTable()
 		jsonBytes, err := lunarTableToJSON(state, tbl)
 		if err != nil {
+			logger.Debug("plugin invoke fail", "plugin", p.id, "fn", fnName, "elapsed", time.Since(start).String(), "error", err)
 			return "", fmt.Errorf("lua plugin %s %s: encode result table: %w", p.id, fnName, err)
 		}
+		logger.Debug("plugin invoke done", "plugin", p.id, "fn", fnName, "elapsed", time.Since(start).String(), "bytes", len(jsonBytes))
 		return string(jsonBytes), nil
 	default:
 		s, _ := res.AsString()
+		logger.Debug("plugin invoke done", "plugin", p.id, "fn", fnName, "elapsed", time.Since(start).String(), "bytes", len(s))
 		return s, nil
 	}
 }
