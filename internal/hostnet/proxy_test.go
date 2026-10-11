@@ -86,6 +86,8 @@ func TestParseVerifyCookies(t *testing.T) {
 		{"single pair", "name=value", map[string]string{"name": "value"}, true},
 		{"bare value", "cdef0123", map[string]string{"cf_clearance": "cdef0123"}, true},
 		{"cookie-editor JSON", `[{"name":"XSRF-TOKEN","value":"tok123%3D"},{"name":"onisaga_session","value":"sess456"}]`, map[string]string{"XSRF-TOKEN": "tok123=", "onisaga_session": "sess456"}, true},
+		{"cookies.txt Netscape", "# Netscape HTTP Cookie File\n# https://curl.haxx.se/rfc/cookie_spec.html\n\nonisaga.com\tFALSE\t/\tFALSE\t1796888484\tXSRF-TOKEN\ttok123%3D\n.onisaga.com\tTRUE\t/\tTRUE\t1823240480\tcf_clearance\tclear456", map[string]string{"XSRF-TOKEN": "tok123=", "cf_clearance": "clear456"}, true},
+		{"cookies.txt Netscape no header", "example.com\tFALSE\t/\tFALSE\t1796888484\ta\t1\nexample.com\tFALSE\t/\tFALSE\t1796888484\tb\t2", map[string]string{"a": "1", "b": "2"}, true},
 		{"empty", "", nil, false},
 	}
 	for _, tt := range tests {
