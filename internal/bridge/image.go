@@ -75,9 +75,12 @@ func refererCandidates(imageURL, siteURL string) []string {
 	if siteURL != "" && (len(out) == 0 || out[0] != siteURL) {
 		out = append(out, siteURL)
 	}
-	if len(out) == 0 {
-		out = append(out, "")
-	}
+	// Last-resort: some CDNs (comix.to's lov.*.site) reject ANY Referer and
+	// serve only with none. Working plugins memoize at an earlier candidate and
+	// never reach this one, so appending it is a no-op for them. Without it, a
+	// host that 403s on both image-origin and plugin-site Referers has no
+	// no-Referer attempt and every image fails.
+	out = append(out, "")
 	return out
 }
 

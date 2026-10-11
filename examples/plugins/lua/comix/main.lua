@@ -21,6 +21,7 @@ PLUGIN = {
     contract_version = 1,
     search_page_size = 28,
     timeout = 60,
+    logo = "logo.png"
 }
 
 local function find(html, pat)
@@ -175,71 +176,77 @@ function get_page_list(arg)
         return nil, "no_pages"
     end
     local url = BASE .. "/title/" .. host.text.url_encode(slug) .. "/" .. host.text.url_encode(chid)
-    -- Pages come from a token-gated API. Hook fetch before page scripts run,
-    -- let the reader fetch, then read the captured API response which holds
-    -- all page URLs at once (no scrolling needed).
+    -- comix.to's page list exists only in the browser: the chapter API returns an
+    -- encrypted {"e":"..."} payload that the site's own JS decrypts, and each
+    -- page's <img src> is injected lazily as it scrolls into view. Neither the API
+    -- nor SSR contains the URLs — the rendered DOM is the only source of truth.
+    --
+    -- Proven recipe (verified against a 28-page chapter with a standalone rod probe,
+    -- 28/28 images harvested; curl confirmed the CDN serves 200 with no Referer and
+    -- 403 with any Referer — handled by the referer-ladder no-Referer candidate):
+    --   1. initJS: read-modify-write localStorage['reader.webtoon.v3'].state.preload
+    --      to "all" (EvalOnNewDocument, before page scripts — persists to origin).
+    --      Verified live: a 75-page chapter went from 3 imgs (some) to 68 (all).
+    --      Even "all" still defers pages until viewport touch, so scrolling is required.
+    --   2. js: wait for .rpage-page slots, then per-element scrollIntoView (NOT
+    --      window.scroll — .rpage is a scroll parent) with a 180ms dwell so the
+    --      reader's IntersectionObserver fires and sets img src. Sweep unloaded
+    --      slots across up to 2 rounds, then read img[src] directly.
+
     local initJS = [[
-        window.__cxPages = null;
-        const origParse = JSON.parse;
-        JSON.parse = function(text, ...rest) {
-            try {
-                const obj = origParse.call(this, text, ...rest);
-                // Pages API returns {pages: [...]} or [{...}]; capture arrays
-                // of objects with image URLs.
-                const check = (v) => {
-                    if (Array.isArray(v) && v.length >= 5 && v[0] && typeof v[0] === 'object') {
-                        const s = JSON.stringify(v[0]);
-                        if (s.includes('http') && (s.includes('.site/') || s.includes('comix'))) {
-                            window.__cxPages = JSON.stringify(v);
-                        }
-                    }
-                };
-                if (obj && typeof obj === 'object') {
-                    check(obj.pages || obj.data || obj);
-                    for (const k of Object.keys(obj).slice(0, 10)) check(obj[k]);
-                }
-            } catch (e) {}
-            return origParse.call(this, text, ...rest);
-        };
+        try {
+            const raw = localStorage.getItem('reader.webtoon.v3');
+            const cur = raw ? JSON.parse(raw) : { state: {} };
+            cur.state = cur.state || {};
+            cur.state.preload = 'all';
+            localStorage.setItem('reader.webtoon.v3', JSON.stringify(cur));
+        } catch (e) {}
     ]]
-    local js = [[() => {
-        return (async () => {
-            for (let i = 0; i < 18; i++) {
-                if (window.__cxPages) return window.__cxPages;
-                await new Promise(r => setTimeout(r, 500));
+
+    local js = [[async () => {
+        for (let i = 0; i < 25; i++) {
+            if (document.querySelector('.rpage-page')) break;
+            await new Promise(r => setTimeout(r, 400));
+        }
+        const slots = () => Array.from(document.querySelectorAll('.rpage-page'));
+        for (let round = 0; round < 2; round++) {
+            let done = true;
+            for (const p of slots()) {
+                const img = p.querySelector('img');
+                if (!img || !img.getAttribute('src')) {
+                    done = false;
+                    p.scrollIntoView({ block: 'center', inline: 'center' });
+                    await new Promise(r => setTimeout(r, 180));
+                }
             }
-            return '';
-        })();
+            if (done) break;
+        }
+        const pages = [];
+        document.querySelectorAll('.rpage-page img[src]').forEach((img) => {
+            pages.push({ url: img.currentSrc || img.src });
+        });
+        return JSON.stringify(pages);
     }]]
+
     local out = host.browser.evaluate_with_init(url, initJS, js)
     if not out or out == "" then
         log.error("comix: browser evaluate failed for pages: " .. composite)
         return nil, "upstream_unavailable"
     end
-    -- The captured API response is encrypted {"e": "..."}; decrypt via
-    -- the site's own flow is not available, so fall back to DOM images.
-    -- For now, try parsing as direct URL list; if encrypted, report it.
-    local urls = host.json.decode(out)
-    if not urls or #urls == 0 then
+    local pages = host.json.decode(out)
+    if not pages or #pages == 0 then
         log.error("comix: no page images in chapter: " .. composite)
         return nil, "no_pages"
     end
-    -- Captured pages may be objects {url=..., src=..., image=...} or plain
-    -- URL strings; normalize to strings.
-    local pages = {}
-    for i, u in ipairs(urls) do
-        local urlstr = nil
-        if type(u) == "string" then
-            urlstr = u
-        elseif type(u) == "table" then
-            urlstr = u.url or u.src or u.image or u.link
-        end
-        if urlstr then
-            pages[#pages + 1] = { index = i - 1, url = urlstr }
+    -- Normalize to 0-based index, dropping any slot that yielded no URL.
+    local result = {}
+    for i, p in ipairs(pages) do
+        if p.url then
+            result[#result + 1] = { index = i - 1, url = p.url }
         end
     end
-    log.info("comix: found " .. tostring(#pages) .. " pages for " .. composite)
-    return host.json.encode(pages)
+    log.info("comix: found " .. tostring(#result) .. " pages for " .. composite)
+    return host.json.encode(result)
 end
 
 -- ─── ABI: get_genres ─────────────────────────────────────────────────────
