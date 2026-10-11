@@ -61,6 +61,37 @@ func (d *DB) GetMangaCoverDim(mangaID int64) (int64, bool, error) {
 	return *dim, true, nil
 }
 
+// ReaderPrefs is the per-manga reader settings blob: view mode, reading
+// direction, per-fit-mode zoom, and strip mode. Empty values mean "use the
+// global default". Stored as a JSON object in mangas.reader_prefs.
+type ReaderPrefs struct {
+	ViewMode  string         `json:"viewMode,omitempty"`
+	Direction string         `json:"direction,omitempty"`
+	Zoom      map[string]int `json:"zoom,omitempty"`
+	Strip     *bool          `json:"strip,omitempty"`
+}
+
+// SetReaderPrefs stores the per-manga reader prefs JSON blob.
+// Pass "" to clear back to global defaults.
+func (d *DB) SetReaderPrefs(mangaID int64, raw string) error {
+	_, err := d.db.Exec(`UPDATE mangas SET reader_prefs = ? WHERE id = ?`, raw, mangaID)
+	return err
+}
+
+// GetReaderPrefs returns the stored per-manga reader prefs blob.
+// Returns ("", false) when the manga uses global defaults.
+func (d *DB) GetReaderPrefs(mangaID int64) (string, bool, error) {
+	var prefs string
+	err := d.db.QueryRow(`SELECT reader_prefs FROM mangas WHERE id = ?`, mangaID).Scan(&prefs)
+	if err != nil {
+		return "", false, err
+	}
+	if prefs == "" {
+		return "", false, nil
+	}
+	return prefs, true, nil
+}
+
 // GetMangaGenres returns the stored genre override for a manga.
 // Returns the genre list and true on success; returns (nil, false) when no override exists.
 func (d *DB) GetMangaGenres(mangaID int64) ([]string, bool, error) {

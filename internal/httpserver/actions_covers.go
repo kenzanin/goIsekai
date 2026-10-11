@@ -1,7 +1,11 @@
 package httpserver
 
 import (
+	"io"
 	"net/http"
+	"strings"
+
+	"github.com/goccy/go-json"
 )
 
 // handleFetchCovers gathers alternative cover candidates from enrichment
@@ -63,6 +67,41 @@ func (s *Server) handleToggleCoverDim(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s.hxRedirect(w, r, "/view/manga/"+pluginID+"/"+mangaID)
+}
+
+// handleSaveReaderPrefs stores the per-manga reader prefs JSON blob.
+// Body is the raw JSON object; empty body clears back to global defaults.
+// Answers 204 — the reader fires it debounced in the background.
+func (s *Server) handleSaveReaderPrefs(w http.ResponseWriter, r *http.Request) {
+	pluginID := param(r, "pluginID")
+	mangaID := param(r, "mangaID")
+	raw, err := io.ReadAll(io.LimitReader(r.Body, 4096))
+	if err != nil {
+		http.Error(w, "read body", http.StatusBadRequest)
+		return
+	}
+	prefs := strings.TrimSpace(string(raw))
+	if prefs == "" {
+		prefs = ""
+	} else {
+		var v map[string]any
+		if err := json.Unmarshal([]byte(prefs), &v); err != nil {
+			http.Error(w, "prefs must be a JSON object", http.StatusBadRequest)
+			return
+		}
+		raw, err := json.Marshal(v)
+		if err != nil {
+			http.Error(w, "encode prefs", http.StatusBadRequest)
+			return
+		}
+		prefs = string(raw)
+	}
+	if err := s.service.SaveReaderPrefs(pluginID, mangaID, prefs); err != nil {
+		s.logger.Error("save reader prefs", "pluginID", pluginID, "mangaID", mangaID, "error", err)
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
 }
 
 // handleClearCovers drops the stored alternative cover candidates so the

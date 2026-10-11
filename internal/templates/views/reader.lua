@@ -13,8 +13,9 @@ return function(data)
 	local currentChapter = data.CurrentChapter or {}
 	local chNum = currentChapter.ChapterNum or 0
 	local chTitle = currentChapter.Title or ""
-	local prevChapterID = data.PrevChapterID or ""
-	local nextChapterID = data.NextChapterID or ""
+  local prevChapterID = data.PrevChapterID or ""
+  local nextChapterID = data.NextChapterID or ""
+  local readerPrefs = data.ReaderPrefs or ""
 
 	local prevStyle = prevChapterID == "" and ' style="display:none"' or ""
 	local nextStyle = nextChapterID == "" and ' style="display:none"' or ""
@@ -36,7 +37,8 @@ return function(data)
   data-chapter-id="]] .. h(chapterID) .. [["
   data-manga-title="]] .. h(mangaTitle) .. [["
   data-next-chapter-id="]] .. h(nextChapterID) .. [["
-  data-prev-chapter-id="]] .. h(prevChapterID) .. [[">
+  data-prev-chapter-id="]] .. h(prevChapterID) .. [["
+  data-manga-prefs="]] .. h(readerPrefs) .. [[">
   <!-- Top bar: persistent (back + page counter + controls) -->
   <div id="top-bar" class="absolute top-0 left-0 right-0 z-30 flex flex-wrap items-center gap-2 bg-neutral-950/85 backdrop-blur-sm px-3 py-2 text-sm transition-transform duration-300 ease-in-out">
   <a href="/view/manga/]] .. h(pluginID) .. "/" .. h(mangaID) .. [[" class="border border-neutral-700 hover:bg-neutral-800 active:scale-95 transition rounded-md px-3 py-1.5">← Back</a>

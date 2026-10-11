@@ -16,11 +16,27 @@
     img = null,
     loading = false,
     _lastFailedRetry = null;
+  // Server per-manga prefs (embedded by the view; "" = global defaults).
+  // Server wins over the localStorage mirror so a synced device picks up
+  // fresh values instead of a stale mirror.
+  var srvPrefs = {};
+  try {
+    srvPrefs = JSON.parse(root.dataset.mangaPrefs || '{}') || {};
+  } catch {
+    srvPrefs = {};
+  }
   var scope = `${pid}.${mid}`;
+  function hasSrv(k) {
+    return Object.prototype.hasOwnProperty.call(srvPrefs, k);
+  }
   var viewKey = `gi_viewMode.${scope}`;
   var dirKey = `gi_direction.${scope}`;
-  var viewMode = localStorage.getItem(viewKey) || localStorage.getItem('gi_viewMode') || 'fitWidth';
-  var direction = localStorage.getItem(dirKey) || localStorage.getItem('gi_direction') || 'ltr';
+  var viewMode = hasSrv('viewMode')
+    ? srvPrefs.viewMode
+    : localStorage.getItem(viewKey) || localStorage.getItem('gi_viewMode') || 'fitWidth';
+  var direction = hasSrv('direction')
+    ? srvPrefs.direction
+    : localStorage.getItem(dirKey) || localStorage.getItem('gi_direction') || 'ltr';
   var smoothing = (localStorage.getItem('gi_renderMode') || 'smooth') === 'smooth';
   var zoom = 1,
     panX = 0,
@@ -45,8 +61,9 @@
   // out, the next chapter's pages are appended seamlessly (sites that split one
   // manga release across several chapter parts read as one flow).
   var stripKey = `gi_stripMode.${scope}`;
-  var stripMode =
-    localStorage.getItem(stripKey) === '1' || localStorage.getItem(`gi_stripMode.${mid}`) === '1';
+  var stripMode = hasSrv('strip')
+    ? !!srvPrefs.strip
+    : localStorage.getItem(stripKey) === '1' || localStorage.getItem(`gi_stripMode.${mid}`) === '1';
   var stripView = document.getElementById('strip-view');
   var stripLoading = false; // strip is appending a neighbor chapter
 
@@ -62,6 +79,19 @@
     const el = document.querySelector('meta[name="csrf-token"]');
     return el ? el.getAttribute('content') || '' : '';
   })();
+  // Debounced server save of the per-manga prefs blob. Wheel-zoom fires
+  // per tick, so only the settled value is POSTed (600ms).
+  var savePrefsTimer = null;
+  function savePrefs() {
+    clearTimeout(savePrefsTimer);
+    savePrefsTimer = setTimeout(() => {
+      fetch(`/action/reader-prefs/${[pid, mid].map(encodeURIComponent).join('/')}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrfToken },
+        body: JSON.stringify({ viewMode, direction, strip: stripMode, zoom, zoomMode: viewMode }),
+      }).catch(() => {});
+    }, 600);
+  }
   var warmCtrl = { next: null, prev: null };
   // key -> true while a read-ahead fetch is in flight. prefetch() runs on every
   // page turn, so without this the same page would be re-requested until its
@@ -438,6 +468,7 @@
   function enterStrip() {
     stripMode = true;
     localStorage.setItem(stripKey, '1');
+    savePrefs();
     stripBtn();
     canvas.style.display = 'none';
     stripView.classList.remove('hidden');
@@ -460,6 +491,7 @@
   function exitStrip() {
     stripMode = false;
     localStorage.setItem(stripKey, '0');
+    savePrefs();
     stripBtn();
     stripView.classList.add('hidden');
     stripView.innerHTML = '';
@@ -642,11 +674,14 @@
     panX = 0;
     panY = 0;
     localStorage.setItem(`gi_zoom_${viewMode}.${scope}`, '1');
+    savePrefs();
     calcBaseScale();
     render();
   }
   function restoreZoom() {
+    var srvZoom = hasSrv('zoom') && srvPrefs.zoomMode === viewMode ? parseFloat(srvPrefs.zoom) : NaN;
     zoom =
+      srvZoom ||
       parseFloat(localStorage.getItem(`gi_zoom_${viewMode}.${scope}`)) ||
       parseFloat(localStorage.getItem(`gi_zoom_${viewMode}`)) ||
       1;
@@ -820,6 +855,7 @@
     if (stripMode) {
       zoom = Math.max(0.2, Math.min(5, zoom * factor));
       localStorage.setItem(`gi_zoom_${viewMode}.${scope}`, String(zoom));
+      savePrefs();
       applyStripSizing();
       return;
     }
@@ -832,6 +868,7 @@
     panY = my - (my - panY) * sc;
     zoom = nz;
     localStorage.setItem(`gi_zoom_${viewMode}.${scope}`, String(zoom));
+    savePrefs();
     clampPan();
     render();
   }
@@ -963,6 +1000,7 @@
   fitBtn.addEventListener('click', () => {
     viewMode = fitOrder[(fitOrder.indexOf(viewMode) + 1) % fitOrder.length];
     localStorage.setItem(viewKey, viewMode);
+    savePrefs();
     syncFitLabel();
     restoreZoom();
   });
@@ -975,6 +1013,7 @@
   dirBtn.addEventListener('click', () => {
     direction = direction === 'ltr' ? 'rtl' : 'ltr';
     localStorage.setItem(dirKey, direction);
+    savePrefs();
     syncDirLabel();
   });
   syncDirLabel();

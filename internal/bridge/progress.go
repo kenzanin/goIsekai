@@ -175,6 +175,34 @@ func (s *AppService) ToggleCoverDim(pluginID, mangaID string) error {
 	return nil
 }
 
+// SaveReaderPrefs stores the per-manga reader prefs JSON blob.
+// raw must be a JSON object (possibly empty); validation stays minimal so
+// future pref keys need no bridge change.
+func (s *AppService) SaveReaderPrefs(pluginID, mangaID, raw string) error {
+	mangaIntID, err := s.db.ResolveMangaIntID(pluginID, mangaID)
+	if err != nil {
+		return fmt.Errorf("bridge: resolve manga: %w", err)
+	}
+	if err := s.db.SetReaderPrefs(mangaIntID, raw); err != nil {
+		return fmt.Errorf("bridge: set reader_prefs: %w", err)
+	}
+	return nil
+}
+
+// GetReaderPrefs returns the stored per-manga reader prefs blob.
+// Returns ("", false) when the manga uses global defaults.
+func (s *AppService) GetReaderPrefs(pluginID, mangaID string) (string, bool, error) {
+	mangaIntID, err := s.db.ResolveMangaIntID(pluginID, mangaID)
+	if err != nil {
+		return "", false, fmt.Errorf("bridge: resolve manga: %w", err)
+	}
+	prefs, ok, err := s.db.GetReaderPrefs(mangaIntID)
+	if err != nil {
+		return "", false, fmt.Errorf("bridge: get reader_prefs: %w", err)
+	}
+	return prefs, ok, nil
+}
+
 // SetChaptersSkip sets the skip flag for the given source chapters of a manga.
 func (s *AppService) SetChaptersSkip(pluginID, mangaID string, chapterIDs []string, skip bool) error {
 	mangaIntID, err := s.db.ResolveMangaIntID(pluginID, mangaID)

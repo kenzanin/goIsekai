@@ -35,6 +35,10 @@ const genresColumnMigration = 26
 // skipColumnMigration: rewind-replay tests can land on it twice.
 const customCoverMigration = 28
 
+// readerPrefsMigration is the index for the mangas.reader_prefs ALTER TABLE
+// (per-manga reader prefs JSON). Idempotent for the same reason.
+const readerPrefsMigration = 29
+
 // migrations is an ordered list of DDL statements applied in sequence.
 // Version is tracked via PRAGMA user_version; migrations[i] is applied when
 // user_version < len(migrations) so partial upgrades resume correctly.
@@ -188,4 +192,7 @@ var migrations = []string{
 	);`,
 	// Index 28: user-chosen main cover lock — UpsertManga must not overwrite it.
 	`ALTER TABLE mangas ADD COLUMN custom_cover INTEGER NOT NULL DEFAULT 0;`,
+	// Index 29: per-manga reader prefs (JSON object: viewMode, direction,
+	// zoom per fit-mode, strip). Empty string means "use global defaults".
+	`ALTER TABLE mangas ADD COLUMN reader_prefs TEXT NOT NULL DEFAULT '';`,
 }

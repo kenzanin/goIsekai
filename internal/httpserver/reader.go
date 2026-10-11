@@ -104,6 +104,9 @@ func (s *Server) viewReader(w http.ResponseWriter, r *http.Request) {
 			break
 		}
 	}
+	// Per-manga reader prefs (JSON blob, "" = global defaults). Best-effort:
+	// a miss must not fail the read — the frontend falls back to globals.
+	readerPrefs, _, _ := s.service.GetReaderPrefs(pluginID, mangaID)
 	// active "" on purpose: the reader has no nav (blank layout), so a partial
 	// response must not advertise one.
 	s.renderPage(w, r, "views/reader", "", map[string]any{
@@ -116,6 +119,7 @@ func (s *Server) viewReader(w http.ResponseWriter, r *http.Request) {
 		"CurrentChapter": currentChapter,
 		"PrevChapterID":  prev,
 		"NextChapterID":  next,
+		"ReaderPrefs":    readerPrefs,
 	})
 }
 
