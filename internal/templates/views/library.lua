@@ -168,20 +168,6 @@ return function(data)
 	sortCarried = sortCarried
 		.. (tagFilter ~= "" and '<input type="hidden" name="tag" value="' .. h(tagFilter) .. '">' or "")
 
-	-- Source filter chip: clears pluginID, keeps q.
-	local chip = ""
-	if pluginID ~= "" then
-		local clearURL = "/view/library"
-		if q ~= "" then
-			clearURL = clearURL .. "?q=" .. h(q)
-		end
-		chip = '<a href="'
-			.. clearURL
-			.. '" class="inline-flex items-center gap-1.5 rounded-md border border-neutral-700 px-2.5 py-1 text-xs text-neutral-400 hover:bg-neutral-800 hover:text-neutral-200" title="Clear source filter">'
-			.. "Source: "
-			.. h(pluginName)
-			.. ' <span class="text-neutral-500">✕</span></a>'
-	end
 	local topPagination = pagination({
 		Pagination = { Base = pagBase, Param = "page", Current = page, Total = totalPages, Compact = true },
 	})
@@ -192,9 +178,7 @@ return function(data)
 	return '<div class="flex items-center gap-3 flex-wrap mb-6">'
 		.. '<div class="shrink-0"><h1 class="text-xl font-semibold">Library</h1>'
 		.. '<div class="text-xs text-neutral-500">'
-		.. h(subtitle)
-		.. "</div></div>"
-		.. chip
+		.. h(subtitle) .. "</div></div>"
 		.. '<form method="get" action="/view/library" class="flex-1 min-w-[180px] max-w-md" role="search">'
 		.. searchCarried
 		.. '<div class="flex gap-2">'
