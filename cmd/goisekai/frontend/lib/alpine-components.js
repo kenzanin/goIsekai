@@ -873,15 +873,26 @@
   const LIB_VIEW_STORAGE_KEY = 'gsk:library-view';
 
   const syncLibraryView = () => {
-    if (window.location.pathname !== '/view/library') return;
+    var libPath = window.location.pathname;
+    if (libPath !== '/view/library' && libPath !== '/') return;
 
     const params = new URLSearchParams(window.location.search);
     const hasParams = window.location.search && params.toString().length > 0;
     if (!hasParams) {
       const saved = localStorage.getItem(LIB_VIEW_STORAGE_KEY);
       if (saved) {
-        window.location.replace('/view/library?' + saved);
+        window.location.replace(window.location.pathname + '?' + saved);
         return;
+      }
+    } else {
+      // Tag/status chips and pagination are plain links (no submit event),
+      // so a submit listener alone never sees them. Persist the canonical
+      // URL state on load instead; drop page so a stale page number is
+      // never restored.
+      params.delete('page');
+      const serialized = params.toString();
+      if (serialized) {
+        localStorage.setItem(LIB_VIEW_STORAGE_KEY, serialized);
       }
     }
 
