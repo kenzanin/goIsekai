@@ -54,14 +54,24 @@ function search_manga(arg)
 		a = { query = a, page = 1 }
 	end
 	local query = a and (a.query or a.q)
-	if query == nil or query == "" then
+	local genres = (a and a.genres) or {}
+	log.debug("search q=" .. tostring(query) .. " page=" .. tostring(a and a.page or 1) .. " genres=" .. tostring(#genres))
+	-- Genre browse works without a text query; text-only search requires one.
+	if (query == nil or query == "") and #genres == 0 then
 		return host.json.encode({}), nil
 	end
 	local page = tonumber(a.page) or 1
 	local url = "https://api.mangade.io/api/comics?page="
 		.. tostring(page)
-		.. "&size=20&name="
-		.. host.text.url_encode(query)
+		.. "&size=20"
+	if query and query ~= "" then
+		url = url .. "&name=" .. host.text.url_encode(query)
+	end
+	if #genres > 0 then
+		-- First genre wins (^A combine pattern). The API filters by numeric
+		-- IDs: genres[0]={id}. Slug is the genre's numeric id (string).
+		url = url .. "&genres%5B0%5D=" .. genres[1]
+	end
 	local data = api_get(url)
 	if data == nil or type(data.list) ~= "table" then
 		return host.json.encode({}), nil
@@ -174,4 +184,27 @@ function get_page_list(arg)
 		end
 	end
 	return host.json.encode(pages), nil
+end
+
+-- ─── get_genres ─────────────────────────────────────────────────────────────
+-- GET https://api.mangade.io/api/genres?size=500 — full genre vocabulary.
+-- The /api/comics search filters by numeric genre ID, so the slug is the
+-- ID as a string. Cached in-memory for the VM lifetime; the host persists
+-- the result in plugins.genres for cross-restart freshness.
+
+local cached_genres = nil
+function get_genres()
+	if cached_genres then return cached_genres end
+	local data = api_get("https://api.mangade.io/api/genres?size=500")
+	local genres = {}
+	if data and type(data) == "table" and type(data.genres) == "table" then
+			for _, g in ipairs(data.genres) do
+				if g.id ~= nil and g.name and g.name ~= "" then
+					genres[#genres + 1] = { name = g.name, slug = tostring(g.id) }
+				end
+			end
+		end
+	log.debug("mangade genres found=" .. tostring(#genres))
+	cached_genres = host.json.encode(genres)
+	return cached_genres
 end
