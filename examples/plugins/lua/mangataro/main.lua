@@ -40,7 +40,15 @@ end
 
 function search_manga(arg)
   local q = host.json.decode(arg)
-  local body = http_get(BASE .. "/?s=" .. host.text.url_encode(q.query))
+  local genres = q.genres or {}
+  local body
+  if #genres > 0 then
+    -- Genre browse: WordPress tag archives at /tag/{slug}/ use the same
+    -- card template as search results.
+    body = http_get(BASE .. "/tag/" .. host.text.url_encode(genres[1]) .. "/")
+  else
+    body = http_get(BASE .. "/?s=" .. host.text.url_encode(q.query))
+  end
   if not body then
     return nil, "fetch_failed"
   end
@@ -181,4 +189,35 @@ function get_page_list(arg)
     out[#out + 1] = { index = i - 1, url = url }
   end
   return host.json.encode(out)
+end
+
+-- ─── genres ────────────────────────────────────────────────────────────────
+
+-- Genre vocabulary harvested from the mangataro.org tag page (WordPress tags
+-- at /tag/{slug}/, filter by appending the slug). Display names preserve
+-- the site's exact casing.
+local GENRES = {
+    { name = "Action",          slug = "action" },
+    { name = "Adaptation",      slug = "adaptation" },
+    { name = "Adventure",       slug = "adventure" },
+    { name = "Award Winning",   slug = "award-winning" },
+    { name = "Ecchi",           slug = "ecchi" },
+    { name = "Isekai",          slug = "isekai" },
+    { name = "Martial Arts",    slug = "martial-arts" },
+    { name = "Mecha",           slug = "mecha" },
+    { name = "Mythology",       slug = "mythology" },
+    { name = "Reincarnation",   slug = "reincarnation" },
+    { name = "Romance",         slug = "romance" },
+    { name = "Shounen",         slug = "shounen" },
+    { name = "Slice of Life",   slug = "slice-of-life" },
+    { name = "Team Sports",     slug = "team-sports" },
+    { name = "Video Game",      slug = "video-game" },
+}
+
+function get_genres()
+    local genres = {}
+    for _, g in ipairs(GENRES) do
+        genres[#genres + 1] = { name = g.name, slug = g.slug }
+    end
+    return host.json.encode(genres)
 end
