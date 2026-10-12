@@ -25,19 +25,33 @@ local function decode_id(arg)
 end
 
 -- ─── search_manga ──────────────────────────────────────────────────────────
--- GET https://www.mangahere.cc/search?title={query}&page={N} — server-rendered
--- result rows with 20 cards per page.
+-- Text search:  GET /search?title={query}&page={N} — server-rendered rows.
+-- Genre search: GET /search?title={query}&genres={id}&nogenres=&sort=... — the
+--   genre param is a numeric id from the GENRES table below; with an empty
+--   title the endpoint still returns genre-filtered cards (HAR-confirmed).
 function search_manga(arg)
 	local a = host.json.decode(arg)
 	if type(a) == "string" then
 		a = { query = a, page = 1 }
 	end
-	local query = a and (a.query or a.q)
-	if query == nil or query == "" then
-		return host.json.encode({}), nil
-	end
+	local query = a and (a.query or a.q or "")
 	local page = tonumber(a.page) or 1
-	local url = "https://www.mangahere.cc/search?title=" .. host.text.url_encode(query) .. "&page=" .. tostring(page)
+	local genres = a and (a.genres or {})
+	log.debug("mangahere search q=" .. query .. " page=" .. tostring(page) .. " genres=" .. tostring(#genres))
+
+	local url
+	if #genres > 0 then
+		-- First genre wins (^A combine pattern). Empty title is valid: the
+		-- endpoint returns genre-only results.
+		url = "https://www.mangahere.cc/search?title=" .. host.text.url_encode(query)
+			.. "&genres=" .. tostring(genres[1]) .. "&nogenres=&sort=name"
+		if page > 1 then url = url .. "&page=" .. tostring(page) end
+	else
+		if query == "" then
+			return host.json.encode({}), nil
+		end
+		url = "https://www.mangahere.cc/search?title=" .. host.text.url_encode(query) .. "&page=" .. tostring(page)
+	end
 	local html = host.http.get_body(url)
 	if html == "" then
 		return host.json.encode({}), nil
@@ -92,4 +106,54 @@ function get_page_list(arg)
 		return host.json.encode({}), nil
 	end
 	return host.json.encode(urls), nil
+end
+
+-- ─── get_genres ──────────────────────────────────────────────────────────────
+-- Genre names + numeric ids for /search?genres=<id>. Harvested from the
+-- search-page genre dropdown markup: <a data-val="N" title="Name">Name</a>
+-- (ids 19 and 29 are absent from the site, so the table skips them).
+local GENRES = {
+	{ name = "Action",          slug = "1" },
+	{ name = "Adventure",       slug = "2" },
+	{ name = "Comedy",          slug = "3" },
+	{ name = "Fantasy",         slug = "4" },
+	{ name = "Historical",      slug = "5" },
+	{ name = "Horror",          slug = "6" },
+	{ name = "Martial Arts",    slug = "7" },
+	{ name = "Mystery",         slug = "8" },
+	{ name = "Romance",         slug = "9" },
+	{ name = "Shounen Ai",      slug = "10" },
+	{ name = "Supernatural",    slug = "11" },
+	{ name = "Drama",           slug = "12" },
+	{ name = "Shounen",         slug = "13" },
+	{ name = "School Life",     slug = "14" },
+	{ name = "Shoujo",          slug = "15" },
+	{ name = "Gender Bender",   slug = "16" },
+	{ name = "Josei",           slug = "17" },
+	{ name = "Psychological",   slug = "18" },
+	{ name = "Slice of Life",   slug = "20" },
+	{ name = "Sci-fi",          slug = "21" },
+	{ name = "Ecchi",           slug = "22" },
+	{ name = "Harem",           slug = "23" },
+	{ name = "Shoujo Ai",       slug = "24" },
+	{ name = "Yuri",            slug = "25" },
+	{ name = "Mature",          slug = "26" },
+	{ name = "Tragedy",         slug = "27" },
+	{ name = "Yaoi",            slug = "28" },
+	{ name = "Sports",          slug = "30" },
+	{ name = "Adult",           slug = "31" },
+	{ name = "One Shot",        slug = "32" },
+	{ name = "Smut",            slug = "33" },
+	{ name = "Mecha",           slug = "34" },
+	{ name = "Shotacon",        slug = "35" },
+	{ name = "Lolicon",         slug = "36" },
+	{ name = "Webtoons",        slug = "37" },
+}
+
+function get_genres()
+	local genres = {}
+	for _, g in ipairs(GENRES) do
+		genres[#genres + 1] = { name = g.name, slug = g.slug }
+	end
+	return host.json.encode(genres)
 end
