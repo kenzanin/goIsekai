@@ -15,7 +15,7 @@ import (
 // librarySorts are the accepted values of ?sort=. Anything else keeps the
 // previous behaviour (most recently updated first) rather than erroring, since
 // this is a preference in a URL bar.
-var librarySorts = []string{"updated", "title", "read", "progress"}
+var librarySorts = []string{"updated", "title", "read", "progress", "recent_read"}
 
 // libraryStatuses are the accepted values of ?status=, which answers "which of
 // these did I actually read" - the question a source migration starts from.
@@ -68,6 +68,24 @@ func sortLibrary(mangas []database.Manga, stats map[string]database.LibraryManga
 			ri, ti := readState(mangas[i], stats)
 			rj, tj := readState(mangas[j], stats)
 			return ratio(ri, ti) > ratio(rj, tj)
+		})
+	case "recent_read":
+		// Most recently read first. Never-read sinks to the bottom (nil
+		// LastReadAt sorts after any timestamp), keeping insertion order
+		// among unread via the stable sort.
+		sort.SliceStable(mangas, func(i, j int) bool {
+			si := stats[strconv.FormatInt(mangas[i].ID, 10)].LastReadAt
+			sj := stats[strconv.FormatInt(mangas[j].ID, 10)].LastReadAt
+			if si == nil && sj == nil {
+				return false
+			}
+			if si == nil {
+				return false
+			}
+			if sj == nil {
+				return true
+			}
+			return si.After(*sj)
 		})
 	}
 }

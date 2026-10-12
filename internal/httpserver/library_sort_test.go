@@ -3,6 +3,7 @@ package httpserver
 import (
 	"strconv"
 	"testing"
+	"time"
 
 	"goisekai/internal/database"
 )
@@ -130,6 +131,24 @@ func TestSortTitleIsCaseInsensitive(t *testing.T) {
 
 // ?sort= is a preference in a URL bar, so an unknown value must fall back to the
 // existing order rather than reshuffle the library or 400.
+func TestSortRecentReadPutsRecentlyReadFirst(t *testing.T) {
+	old := manga(1, "p", "read yesterday")
+	newest := manga(2, "p", "read just now")
+	never := manga(3, "p", "never opened")
+	now := time.Now()
+	yesterday := now.Add(-24 * time.Hour)
+	st := map[string]database.LibraryMangaStats{
+		strconv.FormatInt(old.ID, 10):    {MangaID: strconv.FormatInt(old.ID, 10), LastReadAt: &yesterday},
+		strconv.FormatInt(newest.ID, 10): {MangaID: strconv.FormatInt(newest.ID, 10), LastReadAt: &now},
+		strconv.FormatInt(never.ID, 10):  {MangaID: strconv.FormatInt(never.ID, 10)},
+	}
+	list := []database.Manga{never, old, newest}
+	sortLibrary(list, st, "recent_read")
+	if got := titles(list); !equal(got, []string{"read just now", "read yesterday", "never opened"}) {
+		t.Errorf("recent_read sort: got %v", got)
+	}
+}
+
 func TestUnknownSortKeepsGivenOrder(t *testing.T) {
 	a := manga(1, "p", "a")
 	b := manga(2, "p", "b")

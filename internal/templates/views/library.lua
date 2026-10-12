@@ -215,6 +215,9 @@ return function(data)
 		.. '<option value="progress"'
 		.. (sortKey == "progress" and " selected" or "")
 		.. ">Progress</option>"
+		.. '<option value="recent_read"'
+		.. (sortKey == "recent_read" and " selected" or "")
+		.. ">Recently read</option>"
 		.. "</select>"
 		.. "</form>"
 		.. tagBar

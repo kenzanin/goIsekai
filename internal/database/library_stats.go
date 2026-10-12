@@ -42,6 +42,7 @@ type LibraryMangaStats struct {
 	TotalChapters int        `alias:"stats.total_chapters"`
 	ReadChapters  int        `alias:"stats.read_chapters"`
 	NewSince      *time.Time `alias:"mangas.new_since"`
+	LastReadAt    *time.Time `alias:"history.last_read_at"`
 	HasNew        bool       // derived: NewSince != nil
 }
 
@@ -58,7 +59,10 @@ func (d *DB) ListLibraryWithProgress() ([]LibraryMangaStats, error) {
 		COUNT(Chapters.ID).AS("stats.total_chapters"),
 		COALESCE(SUM(CASE().WHEN(readCond).THEN(Int(1)).ELSE(Int(0))), Int(0)).AS("stats.read_chapters"),
 		Mangas.NewSince.AS("mangas.new_since"),
-	).FROM(Mangas.LEFT_JOIN(Chapters, Chapters.MangaID.EQ(Mangas.ID))).
+		MAX(ReadHistory.ReadAt).AS("history.last_read_at"),
+	).FROM(Mangas.
+		LEFT_JOIN(Chapters, Chapters.MangaID.EQ(Mangas.ID)).
+		LEFT_JOIN(ReadHistory, ReadHistory.ChapterID.EQ(Chapters.ID))).
 		WHERE(Mangas.InLibrary.EQ(Int(1))).
 		GROUP_BY(Mangas.ID).
 		ORDER_BY(Mangas.UpdatedAt.DESC()).
