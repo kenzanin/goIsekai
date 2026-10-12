@@ -34,6 +34,11 @@ BASE = "https://mangabuddy1.co.uk"
 CDN = "https://cdn1.love4awalk.xyz"
 UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 Safari/537.36"
 
+-- ─── helpers ────────────────────────────────────────────────────────────────
+
+local trim = host.text.trim
+local unescape = host.text.unescape
+
 -- ─── site-specific helpers ────────────────────────────────────────────────
 
 -- Full manga id is "{slug}.{zid}"; several endpoints want the bare slug.
@@ -57,28 +62,55 @@ end
 function search_manga(arg)
     local args = host.json.decode(arg)
     local query = args.query or ""
-    log.debug("search q=" .. query)
-    -- /home?keyword= renders the plain home feed (no server-side filtering);
-    -- the search modal calls /api/search?search=Q instead.
-    local raw = http_get(BASE .. "/api/search?search=" .. host.text.url_encode(query), true)
-    if not raw then
-        return host.json.encode({})
-    end
-    local ok, data = pcall(host.json.decode, raw)
-    if not ok or not data or type(data.comics) ~= "table" then
-        return host.json.encode({})
-    end
+    local genres = args.genres or {}
+    log.debug("search q=" .. query .. " page=" .. tostring(args.page or 1) .. " genres=" .. tostring(#genres))
+
     local out = {}
-    for _, c in ipairs(data.comics) do
-        if c.slug_hash and c.slug_hash ~= "" then
-            out[#out + 1] = {
-                id = c.slug_hash,
-                title = c.title or "",
-                cover_url = c.image or ""
-            }
+    if #genres > 0 then
+        -- Genre browse: /series?genres=<slug> renders HTML comic cards.
+        -- First genre wins (^A combine pattern). The page embeds both the
+        -- series id (href="/series/{id}") and a cover (data-src="...").
+        local url = BASE .. "/series?genres=" .. host.text.url_encode(genres[1])
+        local page = args.page or 1
+        if page > 1 then url = url .. "&page=" .. tostring(page) end
+        local body = http_get(url, false)
+        if not body then
+            return host.json.encode({})
+        end
+        -- Card: <a href="/series/{id}"> ... <img alt="Cover of {title}" ... data-src="{cover}">
+        -- (?s) so .* crosses the multi-line gap between <a> and <img>; alt appears
+        -- before data-src in the emitted tag, so capture order is href, title, cover.
+        for href, title, cover in host.regex.gmatch(body,
+            [[(?s)<a[^>]*href="/series/([^/?"]+)"[^>]*>.*?<img[^>]*alt="Cover of ([^"]+)"[^>]*data-src="([^"]+)"]]) do
+            if href ~= "" then
+                out[#out + 1] = {
+                    id = href,
+                    title = unescape(title),
+                    cover_url = trim(cover)
+                }
+            end
+        end
+    else
+        -- Text search: /api/search?search=Q returns JSON {comics:[{slug_hash,title,image,status}]}.
+        local raw = http_get(BASE .. "/api/search?search=" .. host.text.url_encode(query), true)
+        if not raw then
+            return host.json.encode({})
+        end
+        local ok, data = pcall(host.json.decode, raw)
+        if not ok or not data or type(data.comics) ~= "table" then
+            return host.json.encode({})
+        end
+        for _, c in ipairs(data.comics) do
+            if c.slug_hash and c.slug_hash ~= "" then
+                out[#out + 1] = {
+                    id = c.slug_hash,
+                    title = c.title or "",
+                    cover_url = c.image or ""
+                }
+            end
         end
     end
-    log.debug("search: found " .. #out .. " results for q=" .. query)
+    log.debug("search: found " .. #out .. " results")
     return host.json.encode(out)
 end
 
@@ -206,4 +238,57 @@ function get_page_list(arg)
     end
     log.debug("pages: " .. #pages .. " for chapter " .. manga_id .. ":" .. chslug)
     return host.json.encode(pages)
+end
+
+-- Genre names + slugs for /series?genres=<slug>. Harvested from the
+-- search-page genre[] checkbox markup (visible label in <span>, data-slug = param).
+local GENRES = {
+    { name = "Action",         slug = "action" },
+    { name = "Adult",          slug = "adult" },
+    { name = "Adventure",      slug = "adventure" },
+    { name = "Boys Love",      slug = "boys-love" },
+    { name = "Comedy",         slug = "comedy" },
+    { name = "Demons",         slug = "demons" },
+    { name = "Drama",          slug = "drama" },
+    { name = "Ecchi",          slug = "ecchi" },
+    { name = "Fantasy",        slug = "fantasy" },
+    { name = "Full Color",     slug = "full-color" },
+    { name = "Girls Love",     slug = "girls-love" },
+    { name = "Harem",          slug = "harem" },
+    { name = "Historical",     slug = "historical" },
+    { name = "Horror",         slug = "horror" },
+    { name = "Isekai",         slug = "isekai" },
+    { name = "Josei",          slug = "josei" },
+    { name = "Magic",          slug = "magic" },
+    { name = "Manga",          slug = "manga" },
+    { name = "Manhwa",         slug = "manhwa" },
+    { name = "Martial Arts",   slug = "martial-arts" },
+    { name = "Mature",         slug = "mature" },
+    { name = "Mystery",        slug = "mystery" },
+    { name = "One shot",       slug = "one-shot" },
+    { name = "Others",         slug = "others" },
+    { name = "Psychological",  slug = "psychological" },
+    { name = "Romance",        slug = "romance" },
+    { name = "School",         slug = "school" },
+    { name = "School life",    slug = "school-life" },
+    { name = "Sci-Fi",         slug = "sci-fi" },
+    { name = "Seinen",         slug = "seinen" },
+    { name = "Shoujo",         slug = "shoujo" },
+    { name = "Shounen",        slug = "shounen" },
+    { name = "Slice of Life",  slug = "slice-of-life" },
+    { name = "Smut",           slug = "smut" },
+    { name = "Sports",         slug = "sports" },
+    { name = "Supernatural",   slug = "supernatural" },
+    { name = "Thriller",       slug = "thriller" },
+    { name = "Tragedy",        slug = "tragedy" },
+    { name = "Webtoons",       slug = "webtoons" },
+    { name = "Yaoi",           slug = "yaoi" },
+}
+
+function get_genres()
+    local genres = {}
+    for _, g in ipairs(GENRES) do
+        genres[#genres + 1] = { name = g.name, slug = g.slug }
+    end
+    return host.json.encode(genres)
 end
