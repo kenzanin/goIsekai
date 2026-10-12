@@ -55,13 +55,52 @@ local function split_id(id)
 end
 
 -- ─── ABI: search_manga ─────────────────────────────────────────────────
--- arg: {query=string, page=n}. id packs "{mangaId}|{slug}" (chapters need
--- the opaque mangaId, pages need the slug — neither derives the other).
+-- arg: {query=string, page=n, genres?={slug,...}}. id packs "{mangaId}|{slug}"
+-- (chapters need the opaque mangaId, pages need the slug — neither derives
+-- the other). Genre mode browses /genres/<slug>/ SSR JSON (the search REST
+-- endpoint silently ignores genre params — verified 2026-10-12); query is
+-- ignored in genre mode, same as anisascans.
 
 function search_manga(arg)
     local args = host.json.decode(arg)
     local query = (args and args.query) or ""
     local page = (args and args.page) or 1
+    local genres = (args and args.genres) or {}
+
+    -- Genre browse: SSR JSON at /_next/data/<buildId>/genres/<slug>.json.
+    if #genres > 0 then
+        local bid = build_id()
+        if not bid then
+            log.error("comizy: version backend unreachable")
+            return nil, "upstream_unavailable"
+        end
+        local gslug = host.text.url_encode(genres[1])
+        local url = WEB .. "/_next/data/" .. bid .. "/genres/" .. gslug
+            .. ".json?slug=" .. gslug
+        if page > 1 then
+            url = url .. "&page=" .. tostring(page)
+        end
+        local res = get_json(url)
+        if not res then
+            log.error("comizy: genre browse backend unreachable")
+            return nil, "upstream_unavailable"
+        end
+        local items = ((res.pageProps or {}).items) or {}
+        local out = {}
+        for _, it in ipairs(items) do
+            if it.id and it.slug then
+                out[#out + 1] = {
+                    id = it.id .. "|" .. it.slug,
+                    title = it.name or it.slug,
+                    cover_url = it.cover or "",
+                }
+            end
+        end
+        log.info("comizy: genre " .. genres[1] .. " page "
+            .. tostring(page) .. " found " .. tostring(#out))
+        return host.json.encode(out)
+    end
+
     if query == "" then
         return host.json.encode({})
     end
@@ -86,6 +125,27 @@ function search_manga(arg)
     end
     log.info("comizy: search found " .. tostring(#out) .. " for " .. query)
     return host.json.encode(out)
+end
+
+-- ─── ABI: get_genres ───────────────────────────────────────────────────
+-- Static genre list from GET /genres (71 entries). Slug doubles as the
+-- browse key (/genres/<slug>/). Cached per VM lifetime.
+
+local cached_genres = nil
+function get_genres()
+    if cached_genres then return cached_genres end
+    local res = get_json(API .. "/genres")
+    local genres = {}
+    if res then
+        for _, g in ipairs(((res.data or {}).items) or {}) do
+            if g.slug and g.name then
+                genres[#genres + 1] = { name = g.name, slug = g.slug }
+            end
+        end
+    end
+    log.debug("comizy genres found=" .. tostring(#genres))
+    cached_genres = host.json.encode(genres)
+    return cached_genres
 end
 
 -- ─── ABI: get_manga_detail ─────────────────────────────────────────────

@@ -51,6 +51,12 @@ function search_manga(arg)
 
     local url = BASE .. "/search/data?text=" .. query
         .. "&limit=" .. limit .. "&offset=" .. offset
+    -- Genre filter: /search/data accepts repeated included_tag params
+    -- (HAR: ...&included_tag=Isekai). First genre wins.
+    local genres_arg = args.genres or {}
+    if #genres_arg > 0 then
+        url = url .. "&included_tag=" .. host.text.url_encode(genres_arg[1])
+    end
     local doc = fetch(url)
     if not doc then
         return host.json.encode({})
@@ -90,6 +96,38 @@ function search_manga(arg)
     end
     log.info("weebcentral: search found " .. tostring(#out))
     return host.json.encode(out)
+end
+
+-- ─── ABI: get_genres ───────────────────────────────────────────────────
+-- Live /search page checkbox ids carry a badge prefix: <input id="tag-g-Action">.
+-- The g- badge prefix is stripped; name == slug == tag text (no prefix).
+-- Cached per VM lifetime (view_search calls ListGenres on every render).
+
+local cached_genres = nil
+function get_genres()
+    if cached_genres then return cached_genres end
+    local body = host.http.get_body(BASE .. "/search", {
+        ["User-Agent"] = UA,
+        ["Accept"] = "text/html,application/xhtml+xml",
+    })
+    local genres = {}
+    local seen = {}
+    if body then
+        for tag in body:gmatch('id="tag-([^"]+)"') do
+            -- skip hidden value mirrors: id="tag-g-Action-value"
+            if not tag:match("%-value$") then
+                tag = tag:gsub("^g%-","")  -- strip badge prefix from live markup
+                if not seen[tag] then
+                    seen[tag] = true
+                    genres[#genres + 1] = { name = tag, slug = tag }
+                end
+            end
+        end
+        table.sort(genres, function(a, b) return a.name < b.name end)
+    end
+    log.info("weebcentral: genres found " .. tostring(#genres))
+    cached_genres = host.json.encode(genres)
+    return cached_genres
 end
 
 -- ─── ABI: get_manga_detail ───────────────────────────────────────────────
