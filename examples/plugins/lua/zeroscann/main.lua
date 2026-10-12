@@ -44,7 +44,15 @@ function search_manga(arg)
     local args = host.json.decode(arg) or {}
     local query = host.text.url_encode(args.query or "")
     local page = args.page or 1
-    local url = BASE .. "/manga?keyword=" .. query
+    local genres = args.genres or {}
+    -- Genre browsing: GET /manga/genre/<slug> (same .zs-bg-3 cards).
+    -- Note: genre+keyword combined returns 500, so genre ignores query.
+    local url
+    if #genres > 0 then
+        url = BASE .. "/manga/genre/" .. genres[1]
+    else
+        url = BASE .. "/manga?keyword=" .. query
+    end
     if page > 1 then
         url = url .. "&page=" .. page
     end
@@ -176,4 +184,56 @@ function get_page_list(arg)
         out[#out + 1] = { index = i - 1, url = img_url }
     end
     return host.json.encode(out)
+end
+
+-- ─── ABI: get_genres ────────────────────────────────────────────────────────
+-- Static vocabulary harvested once from /manga filter-genre-item markup
+-- (41 pairs). Host plugins.genres cache is the freshness layer.
+
+local GENRES = {
+    { name = "Action", slug = "action" },
+    { name = "Adventure", slug = "adventure" },
+    { name = "Avant Garde", slug = "avant-garde" },
+    { name = "Boys Love", slug = "boys-love" },
+    { name = "Comedy", slug = "comedy" },
+    { name = "Demons", slug = "demons" },
+    { name = "Drama", slug = "drama" },
+    { name = "Ecchi", slug = "ecchi" },
+    { name = "Fantasy", slug = "fantasy" },
+    { name = "Girls Love", slug = "girls-love" },
+    { name = "Gourmet", slug = "gourmet" },
+    { name = "Harem", slug = "harem" },
+    { name = "Horror", slug = "horror" },
+    { name = "Isekai", slug = "isekai" },
+    { name = "Iyashikei", slug = "iyashikei" },
+    { name = "Josei", slug = "josei" },
+    { name = "Kids", slug = "kids" },
+    { name = "Magic", slug = "magic" },
+    { name = "Mahou Shoujo", slug = "mahou-shoujo" },
+    { name = "Martial Arts", slug = "martial-arts" },
+    { name = "Mecha", slug = "mecha" },
+    { name = "Military", slug = "military" },
+    { name = "Music", slug = "music" },
+    { name = "Mystery", slug = "mystery" },
+    { name = "Parody", slug = "parody" },
+    { name = "Psychological", slug = "psychological" },
+    { name = "Reverse Harem", slug = "reverse-harem" },
+    { name = "Romance", slug = "romance" },
+    { name = "School", slug = "school" },
+    { name = "Sci-Fi", slug = "sci-fi" },
+    { name = "Seinen", slug = "seinen" },
+    { name = "Shoujo", slug = "shoujo" },
+    { name = "Shounen", slug = "shounen" },
+    { name = "Slice of Life", slug = "slice-of-life" },
+    { name = "Space", slug = "space" },
+    { name = "Sports", slug = "sports" },
+    { name = "Super Power", slug = "super-power" },
+    { name = "Supernatural", slug = "supernatural" },
+    { name = "Suspense", slug = "suspense" },
+    { name = "Thriller", slug = "thriller" },
+    { name = "Vampire", slug = "vampire" },
+}
+
+function get_genres()
+    return host.json.encode(GENRES)
 end
