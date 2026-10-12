@@ -13,18 +13,18 @@ import (
 // per-plugin cookie persistence. Plugins must not open sockets directly; all
 // network access flows through here.
 type Proxy struct {
-	mu              sync.Mutex
-	defaultHeaders  map[string]string
-	clients         map[string]tls_client.HttpClient // keyed by pluginID+"\x00"+profile
-	uaOverrides     map[string]string                // per-plugin User-Agent override
-	secCHUAExplicit string                           // config-set Sec-CH-UA hint ("" = derive from UA)
-	pendingVerify   map[string]verifySeed            // cookie jar seeds awaiting client creation
-	needsJS         map[string]bool                  // per-plugin needs_js hint
-	manualCookies   map[string]bool                  // per-plugin manual_cookies hint
-	pins            map[string]string                // pluginID -> pinned profile ("stdlib" = use doRequestStd)
-	hints           map[string][]string              // pluginID -> ordered profile ladder from metadata
-	persistPin      func(pluginID, profile string)   // persists pin to DB; nil-safe
-	cdp             CDPConfig
+	mu               sync.Mutex
+	defaultHeaders   map[string]string
+	clients          map[string]tls_client.HttpClient // keyed by pluginID+"\x00"+profile
+	uaOverrides      map[string]string                // per-plugin User-Agent override
+	secCHUAExplicit  string                           // config-set Sec-CH-UA hint ("" = derive from UA)
+	pendingVerify    map[string]verifySeed            // cookie jar seeds awaiting client creation
+	needsJS          map[string]bool                  // per-plugin needs_js hint
+	manualCookies    map[string]bool                  // per-plugin manual_cookies hint
+	pins             map[string]string                // pluginID -> pinned profile ("stdlib" = use doRequestStd)
+	hints            map[string][]string              // pluginID -> ordered profile ladder from metadata
+	persistPin       func(pluginID, profile string)   // persists pin to DB; nil-safe
+	cdp              CDPConfig
 	pluginCDPTimeout map[string]time.Duration // per-plugin CDP solve budget (PLUGIN timeout key)
 
 	// solveChallenge is swappable for tests; nil means the real rod solver.
@@ -58,16 +58,16 @@ func NewProxy() *Proxy {
 			// Empty Referer by default; only injected when a plugin sets one.
 			"Referer": "",
 		},
-		clients:         make(map[string]tls_client.HttpClient),
-		uaOverrides:     make(map[string]string),
-		secCHUAExplicit: "",
-		pendingVerify:   make(map[string]verifySeed),
-		needsJS:         make(map[string]bool),
-		manualCookies:   make(map[string]bool),
-		pins:            make(map[string]string),
-		hints:           make(map[string][]string),
+		clients:          make(map[string]tls_client.HttpClient),
+		uaOverrides:      make(map[string]string),
+		secCHUAExplicit:  "",
+		pendingVerify:    make(map[string]verifySeed),
+		needsJS:          make(map[string]bool),
+		manualCookies:    make(map[string]bool),
+		pins:             make(map[string]string),
+		hints:            make(map[string][]string),
 		pluginCDPTimeout: make(map[string]time.Duration),
-		solveChallenge:  solveChallenge,
+		solveChallenge:   solveChallenge,
 		stdlibTransport: &nethttp.Transport{
 			MaxIdleConnsPerHost: 6,
 			IdleConnTimeout:     90 * time.Second,

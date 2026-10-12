@@ -33,7 +33,8 @@ func solveWithEngine(cfg CDPConfig, url string) ([]*http.Cookie, string, error) 
 	}
 	// Let the document settle before evaluating; the challenge poll below
 	// re-tries, so a transient not-ready here is not fatal.
-	_ = page.WaitStable(time.Second)
+	page = page.Context(ctx)
+	_ = page.WaitStable(2 * time.Second)
 	if err := waitChallengeClearedRod(page, timeout); err != nil {
 		return nil, "", err
 	}

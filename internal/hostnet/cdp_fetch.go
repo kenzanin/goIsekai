@@ -45,7 +45,12 @@ func (p *Proxy) BrowserFetch(pluginID, url string) (string, error) {
 		return "", fmt.Errorf("hostnet: rod new page %s: %w", url, err)
 	}
 	logger.Debug("cdp fetch page created", "plugin", pluginID, "elapsed", time.Since(start).String())
-	_ = page.WaitStable(time.Second)
+	page = page.Context(ctx)
+	// SPA pages (e.g. mangataro) never fire loadEventFired and never idle, so
+	// WaitStable/WaitLoad block until the full ctx budget. page.Navigate
+	// returns on commit; give lazy JS a bounded window (ctx-bounded) to render
+	// the chapter list before eval.
+	time.Sleep(2 * time.Second)
 	logger.Debug("cdp fetch stable", "plugin", pluginID, "elapsed", time.Since(start).String())
 	challStart := time.Now()
 	if err := waitChallengeClearedRod(page, timeout); err != nil {
@@ -124,7 +129,12 @@ func (p *Proxy) browserEvaluateWithInit(pluginID, url, initJS, js string) (strin
 		return "", fmt.Errorf("hostnet: browser navigate %s: %w", url, err)
 	}
 	logger.Debug("cdp evaluate navigated", "plugin", pluginID, "elapsed", time.Since(start).String(), "nav_elapsed", time.Since(navStart).String())
-	_ = page.WaitStable(time.Second)
+	page = page.Context(ctx)
+	// SPA pages (e.g. mangataro) never fire loadEventFired and never idle, so
+	// WaitStable/WaitLoad block until the full ctx budget. page.Navigate
+	// returns on commit; give lazy JS a bounded window (ctx-bounded) to render
+	// the chapter list before eval.
+	time.Sleep(2 * time.Second)
 	logger.Debug("cdp evaluate stable", "plugin", pluginID, "elapsed", time.Since(start).String())
 	challStart := time.Now()
 	if err := waitChallengeClearedRod(page, timeout); err != nil {
