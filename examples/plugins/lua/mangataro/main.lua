@@ -20,6 +20,7 @@ PLUGIN = {
   verify_url = "https://mangataro.org",
   needs_human_verify = false,
   thumb_ratio = 0.667,
+  logo = "logo.png",
 }
 
 BASE = "https://mangataro.org"

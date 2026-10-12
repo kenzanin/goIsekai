@@ -13,6 +13,7 @@ PLUGIN = {
     verify_url = "https://zeroscann.com",
     needs_human_verify = false,
     thumb_ratio = 0.667,
+    logo = "logo.png",
 }
 
 BASE = "https://zeroscann.com"

@@ -18,6 +18,7 @@ PLUGIN = {
     verify_url = "https://violetmanga.com",
     needs_human_verify = false,
     thumb_ratio = 0.667,
+    logo = "logo.png",
 }
 
 BASE = "https://violetmanga.com"
