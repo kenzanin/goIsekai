@@ -27,12 +27,24 @@ function search_manga(arg)
     local args = host.json.decode(arg)
     local query = args.query or ""
     local page = args.page or 1
+    local genres = args.genres or {}
 
-    local url = BASE .. "/?s=" .. host.text.url_encode(query) .. "&post_type=wp-manga"
-    if page > 1 then
-        url = url .. "&paged=" .. tostring(page)
+    local body
+    -- Genre browsing: first genre wins (^A combine pattern). Madara genre
+    -- archives live under /manga-genre/<slug>/; page N is /page/N/.
+    if #genres > 0 then
+        local url = BASE .. "/manga-genre/" .. host.text.url_encode(genres[1]) .. "/"
+        if page > 1 then
+            url = url .. "page/" .. tostring(page) .. "/"
+        end
+        body = host.http.get_body(url)
+    else
+        local url = BASE .. "/?s=" .. host.text.url_encode(query) .. "&post_type=wp-manga"
+        if page > 1 then
+            url = url .. "&paged=" .. tostring(page)
+        end
+        body = host.http.get_body(url)
     end
-    local body = host.http.get_body(url)
     if not body then return host.json.encode({}) end
 
     local results = {}
@@ -180,5 +192,67 @@ function get_page_list(arg)
 
     log.debug("lhtranslation pages " .. path .. " count=" .. tostring(#pages))
     return host.json.encode(pages)
+end
+
+-- Genre slugs for this site's /manga-genre/<slug>/ archive pages. Extracted
+-- from the search page's genre[] checkbox markup. Names and slugs are
+-- identical here (Madara theme).
+local GENRES = {
+    "Action",
+    "Adult",
+    "Adventure",
+    "Anime",
+    "Comedy",
+    "Comic",
+    "Cooking",
+    "Drama",
+    "Ecchi",
+    "Fantasy",
+    "Game",
+    "Gender Bender",
+    "Harem",
+    "Historical",
+    "Horror",
+    "Isekai",
+    "Josei",
+    "LGBTQ",
+    "Love",
+    "Magic",
+    "Mecha",
+    "Medical",
+    "Music",
+    "Mystery",
+    "Parody",
+    "Philosophical",
+    "Political",
+    "Post-apocalypse",
+    "Psychological",
+    "Romance",
+    "School Life",
+    "Sci-Fi",
+    "Seinen",
+    "Shoujo",
+    "Shounen",
+    "Slice of Life",
+    "Smut",
+    "Sports",
+    "Super Power",
+    "Supernatural",
+    "Survival",
+    "Tragedy",
+    "War",
+    "Wuxia",
+    "Yaoi",
+    "Yuri",
+}
+
+-- get_genres: list of genres this site supports. Slug is the URL segment
+-- used in /manga-genre/<slug>/; name is the human-readable title.
+function get_genres()
+    local genres = {}
+    for _, slug in ipairs(GENRES) do
+        genres[#genres + 1] = { name = slug, slug = slug }
+    end
+    return host.json.encode(genres)
 end
 
