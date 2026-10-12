@@ -89,3 +89,55 @@ func (d *DB) PruneOrphans() (string, error) {
 	}
 	return strings.TrimSpace(b.String()), nil
 }
+
+// PurgeRemovedPlugin deletes every row belonging to one plugin: its manga
+// (chapters, pages, history and enrichment data follow), its response cache,
+// its verify cookies, its FTS documents and finally the plugins row itself.
+// It is meant for plugins the user has removed from disk — a removed plugin
+// normally only flips to is_active=0 because reading history still names it.
+// Returns a human-readable summary of what was removed.
+func (d *DB) PurgeRemovedPlugin(pluginID string) (string, error) {
+	if pluginID == "" {
+		return "", fmt.Errorf("purge: empty plugin id")
+	}
+	var b strings.Builder
+	run := func(label, query string, args ...any) {
+		res, err := d.db.Exec(query, args...)
+		if err != nil {
+			fmt.Fprintf(&b, "%s: error %v; ", label, err)
+			return
+		}
+		n, _ := res.RowsAffected()
+		if n > 0 {
+			fmt.Fprintf(&b, "%s=%d ", label, n)
+		}
+	}
+
+	// Children before parents: manga-linked rows go first so nothing is left
+	// pointing at a manga that is already gone.
+	// plugin_id binds as TEXT against a TEXT column, so the FTS delete matches
+	// (an integer bind against these columns silently matches zero rows).
+	run("fts", `DELETE FROM library_fts WHERE plugin_id = ?`, pluginID)
+	run("alt_titles", `DELETE FROM alt_titles WHERE manga_row_id IN (SELECT id FROM mangas WHERE plugin_id = ?)`, pluginID)
+	run("alt_covers", `DELETE FROM alt_covers WHERE manga_row_id IN (SELECT id FROM mangas WHERE plugin_id = ?)`, pluginID)
+	// mangas cascades chapters -> chapter_pages/read_history plus the
+	// alt_descriptions/manga_categories/manga_related tables that carry an
+	// ON DELETE CASCADE to it.
+	run("mangas", `DELETE FROM mangas WHERE plugin_id = ?`, pluginID)
+	run("plugin_cache", `DELETE FROM plugin_cache WHERE plugin_id = ?`, pluginID)
+	run("plugin_verify", `DELETE FROM plugin_verify WHERE plugin_id = ?`, pluginID)
+	run("plugin", `DELETE FROM plugins WHERE id = ?`, pluginID)
+
+	if b.Len() == 0 {
+		return "clean", nil
+	}
+	return strings.TrimSpace(b.String()), nil
+}
+
+// Vacuum reclaims the pages freed by the purge deletes. It cannot run inside a
+// transaction and holds the write lock for the duration, so callers should run
+// it once at the end of a maintenance action rather than per plugin.
+func (d *DB) Vacuum() error {
+	_, err := d.db.Exec("VACUUM")
+	return err
+}

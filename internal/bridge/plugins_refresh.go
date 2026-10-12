@@ -3,6 +3,7 @@ package bridge
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 
 	"goisekai/internal/database"
@@ -100,4 +101,58 @@ func (s *AppService) RefreshPlugins() (RefreshSummary, error) {
 		}
 	}
 	return sum, nil
+}
+
+// PurgeRemovedPlugins deletes every trace of plugins whose files are gone from
+// disk: their manga rows (chapters, history and enrichment data cascade),
+// response cache, verify cookies, FTS documents, the plugins row itself, and
+// their image cache directory. Then it VACUUMs once to reclaim the space.
+//
+// This is the destructive counterpart to RefreshPlugins, which only flips such
+// rows to is_active=0 because reading history still references plugin_id.
+// Returns a human-readable summary; an empty result means nothing was removed.
+func (s *AppService) PurgeRemovedPlugins() (string, error) {
+	dbPlugins, err := s.db.ListPlugins()
+	if err != nil {
+		return "", fmt.Errorf("bridge: list plugins: %w", err)
+	}
+	// Pass 1 — decide eligibility before touching anything. wasm_path is stored
+	// relative to the plugin root, so a server started from the wrong working
+	// directory reports EVERY plugin as missing; purge has to refuse in that
+	// case instead of wiping the whole library.
+	var removed []database.Plugin
+	present := 0
+	for _, p := range dbPlugins {
+		if _, err := os.Stat(p.WasmPath); !os.IsNotExist(err) {
+			present++
+			continue
+		}
+		removed = append(removed, p)
+	}
+	if len(removed) == 0 {
+		return "clean", nil
+	}
+	if present == 0 {
+		return "", fmt.Errorf("refusing to purge: no plugin files found at all (wrong working directory?)")
+	}
+
+	// Pass 2 — delete.
+	var b strings.Builder
+	for _, p := range removed {
+		summary, err := s.db.PurgeRemovedPlugin(p.ID)
+		if err != nil {
+			return b.String(), fmt.Errorf("bridge: purge %s: %w", p.ID, err)
+		}
+		if s.cacheDir != "" {
+			if err := os.RemoveAll(filepath.Join(s.cacheDir, "images", p.ID)); err != nil {
+				logger.Warn("purge: image cache remove failed", "id", p.ID, "error", err)
+			}
+		}
+		fmt.Fprintf(&b, "%s: %s; ", p.ID, summary)
+	}
+	if err := s.db.Vacuum(); err != nil {
+		logger.Warn("purge: vacuum failed", "error", err)
+	}
+	logger.Info("purged removed plugins", "count", len(removed))
+	return strings.TrimSpace(strings.TrimSuffix(b.String(), "; ")), nil
 }

@@ -143,3 +143,107 @@ func TestPruneOrphansPurgePolicy(t *testing.T) {
 		t.Errorf("library manga was pruned")
 	}
 }
+
+// TestPurgeRemovedPlugin covers the destructive path the "Purge removed"
+// maintenance button runs: every row keyed to one plugin disappears while the
+// other plugin's rows survive. Two traps are pinned here — alt_covers has no
+// ON DELETE CASCADE (unlike alt_titles), so it only goes if the purge deletes
+// it explicitly, and library_fts is a virtual table whose columns carry no
+// type affinity, so a delete bound with the wrong type matches zero rows and
+// silently leaves a stale index behind.
+func TestPurgeRemovedPlugin(t *testing.T) {
+	d := openTestDB(t)
+
+	count := func(query string, args ...any) int {
+		var n int
+		if err := d.db.QueryRow(query, args...).Scan(&n); err != nil {
+			t.Fatalf("count %q: %v", query, err)
+		}
+		return n
+	}
+
+	for _, id := range []string{"gone", "kept"} {
+		if err := d.RegisterPlugin(Plugin{ID: id, Name: id, Version: "1", WasmPath: "/nonexistent/" + id, IsActive: true}); err != nil {
+			t.Fatalf("register %s: %v", id, err)
+		}
+		if _, err := d.db.Exec(`INSERT INTO plugin_verify (plugin_id, verify_url, cookies, user_agent) VALUES (?, 'https://x', 'ck', 'ua')`, id); err != nil {
+			t.Fatalf("plugin_verify %s: %v", id, err)
+		}
+		mid, err := d.UpsertManga(Manga{PluginID: id, SourceMangaID: "s1", Title: "Title " + id, InLibrary: true})
+		if err != nil {
+			t.Fatalf("upsert %s: %v", id, err)
+		}
+		if _, err := d.db.Exec(`INSERT INTO alt_titles (manga_row_id, title, source) VALUES (?, ?, 'test')`, mid, "Alt "+id); err != nil {
+			t.Fatalf("alt_titles %s: %v", id, err)
+		}
+		if _, err := d.db.Exec(`INSERT INTO alt_covers (manga_row_id, url, source) VALUES (?, ?, 'test')`, mid, "https://img/"+id); err != nil {
+			t.Fatalf("alt_covers %s: %v", id, err)
+		}
+		cid, err := d.UpsertChapter(Chapter{MangaID: mid, SourceChapterID: "c1", Title: "Ch", ChapterNum: 1})
+		if err != nil {
+			t.Fatalf("chapter %s: %v", id, err)
+		}
+		if err := d.RecordRead(cid, 1); err != nil {
+			t.Fatalf("record read %s: %v", id, err)
+		}
+		if _, err := d.db.Exec(`INSERT INTO plugin_cache (id, plugin_id, manga_id, function_name, response, expires_at) VALUES (?, ?, 's1', 'GetMangaDetail', '{}', '2099-01-01')`, "pc-"+id, id); err != nil {
+			t.Fatalf("plugin_cache %s: %v", id, err)
+		}
+	}
+
+	// Setup guard: without rows on both sides every later "is 0" assertion
+	// would pass even if the purge did nothing.
+	for table, want := range map[string]int{
+		"mangas": 2, "chapters": 2, "read_history": 2, "alt_titles": 2,
+		"alt_covers": 2, "plugin_cache": 2, "plugin_verify": 2,
+		"plugins": 2, "library_fts": 2,
+	} {
+		if got := count(`SELECT COUNT(*) FROM ` + table); got != want {
+			t.Fatalf("setup: %s has %d rows, want %d", table, got, want)
+		}
+	}
+
+	if _, err := d.PurgeRemovedPlugin("gone"); err != nil {
+		t.Fatalf("PurgeRemovedPlugin: %v", err)
+	}
+	if err := d.Vacuum(); err != nil {
+		t.Fatalf("Vacuum: %v", err)
+	}
+
+	if got := count(`SELECT COUNT(*) FROM mangas WHERE plugin_id = 'gone'`); got != 0 {
+		t.Errorf("gone manga survived: %d", got)
+	}
+	if got := count(`SELECT COUNT(*) FROM chapters`); got != 1 {
+		t.Errorf("chapters = %d, want 1 (gone's chapter cascaded, kept's stayed)", got)
+	}
+	if got := count(`SELECT COUNT(*) FROM read_history`); got != 1 {
+		t.Errorf("read_history = %d, want 1", got)
+	}
+	if got := count(`SELECT COUNT(*) FROM alt_titles`); got != 1 {
+		t.Errorf("alt_titles = %d, want 1", got)
+	}
+	// alt_covers has no ON DELETE CASCADE — only an explicit delete clears it.
+	if got := count(`SELECT COUNT(*) FROM alt_covers`); got != 1 {
+		t.Errorf("alt_covers = %d, want 1 (no cascade: purge must delete it)", got)
+	}
+	if got := count(`SELECT COUNT(*) FROM plugin_cache`); got != 1 {
+		t.Errorf("plugin_cache = %d, want 1", got)
+	}
+	if got := count(`SELECT COUNT(*) FROM plugin_verify`); got != 1 {
+		t.Errorf("plugin_verify = %d, want 1", got)
+	}
+	if got := count(`SELECT COUNT(*) FROM plugins WHERE id = 'gone'`); got != 0 {
+		t.Errorf("plugins row for the removed plugin survived")
+	}
+	// The stale-index trap: gone's FTS document must be gone, kept's must not.
+	if got := count(`SELECT COUNT(*) FROM library_fts WHERE plugin_id = 'gone'`); got != 0 {
+		t.Errorf("library_fts still indexes the removed plugin: %d rows", got)
+	}
+	if got := count(`SELECT COUNT(*) FROM library_fts WHERE plugin_id = 'kept'`); got != 1 {
+		t.Errorf("library_fts lost the surviving plugin's document: %d rows", got)
+	}
+
+	if _, err := d.PurgeRemovedPlugin(""); err == nil {
+		t.Error("empty plugin id should be rejected")
+	}
+}

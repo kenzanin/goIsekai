@@ -42,6 +42,10 @@ return function(data)
 		.. '<form method="post" action="/action/refresh-plugins" class="flex items-center" title="Re-sync plugin list with disk: register new, deactivate missing, purge backups">'
 		.. csrfInput(data.csrf_token or "")
 		.. '<button type="submit" class="border border-solid border-neutral-700 hover:border-indigo-500 hover:bg-neutral-800 rounded-md px-3 py-2 text-sm text-neutral-400 transition">Refresh</button>'
+		.. "</form>"
+		.. '<form method="post" action="/action/purge-removed-plugins" class="flex items-center" title="Delete all data of plugins whose files are gone: manga, history, cache, then VACUUM the database" data-confirm="Delete ALL data of removed plugins (manga, history, cache)? This cannot be undone.">'
+		.. csrfInput(data.csrf_token or "")
+		.. '<button type="submit" class="border border-solid border-neutral-700 hover:border-red-600 hover:bg-red-600/10 rounded-md px-3 py-2 text-sm text-neutral-400 hover:text-red-300 transition">Purge removed</button>'
 		.. "</form></div>"
 		.. cardsHTML
 		.. [[<script>

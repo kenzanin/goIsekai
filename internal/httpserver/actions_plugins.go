@@ -161,3 +161,21 @@ func (s *Server) handleRefreshPlugins(w http.ResponseWriter, r *http.Request) {
 	}
 	s.hxRedirect(w, r, fmt.Sprintf("/view/plugins?refreshed=%d-%d-%d-%d", sum.Added, sum.Deactivated, sum.Updated, sum.Purged))
 }
+
+// handlePurgeRemovedPlugins deletes all data belonging to plugins whose files
+// are gone from disk — manga rows, response cache, verify cookies, FTS
+// documents, the plugins row and the image cache directory — then VACUUMs the
+// database. Destructive; the button carries a data-confirm.
+func (s *Server) handlePurgeRemovedPlugins(w http.ResponseWriter, r *http.Request) {
+	summary, err := s.service.PurgeRemovedPlugins()
+	if err != nil {
+		s.logger.Error("purge removed plugins", "error", err)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	if summary == "clean" {
+		s.toastRedirect(w, r, "/view/plugins", "No removed plugins to purge")
+		return
+	}
+	s.toastRedirect(w, r, "/view/plugins", "Purged "+summary)
+}
