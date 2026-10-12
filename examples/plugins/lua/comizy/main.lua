@@ -1,0 +1,209 @@
+-- Comizy plugin for goIsekai (Lua / Lunar VM)
+-- Site: https://comizy.io (Next.js, API-first)
+-- ABI contract version: 1
+--
+-- Contract (verified live 2026-10-12):
+--   search:   GET https://api.comizy.io/titles/search?q=<q>&page=N&limit=24
+--             -> {success,data:{items:[{id,slug,name,cover,status,cv}],pagination}}
+--   version:  GET https://comizy.io/api/version -> {buildId}
+--   detail:   GET https://comizy.io/_next/data/{buildId}/{slug}.json?slug={slug}
+--             -> {pageProps:{initialManga:{name,summary,cover,status,
+--                genres:[{name}],authors:[{name}],cv}}}
+--   chapters: GET https://api.comizy.io/titles/{mangaId}/chapters
+--             -> {success,data:{chapters:[{id,name,slug,updated_at}]}}
+--             (cv param optional — works without; embedded list in detail
+--             JSON is capped, never use it)
+--   pages:    GET https://comizy.io/_next/data/{buildId}/{mSlug}/{cSlug}.json
+--             -> {pageProps:{initialChapter:{images:["url",...]}}}
+-- Images need Referer: https://comizy.io/ — covered by host image-proxy
+-- fallback to site_url (origin-first policy).
+
+PLUGIN = {
+    contract_version = 1,
+    name = "Comizy",
+    site_url = "https://comizy.io",
+    logo = "logo.png",
+    verify_url = "https://comizy.io",
+    needs_human_verify = false,
+    thumb_ratio = 0.703,
+}
+
+local API = "https://api.comizy.io"
+local WEB = "https://comizy.io"
+
+local function get_json(url)
+    local body = host.http.get_body(url, { ["accept"] = "application/json" })
+    if not body or body == "" then return nil end
+    local ok, decoded = pcall(host.json.decode, body)
+    if not ok or decoded == nil then return nil end
+    return decoded
+end
+
+-- buildId rotates per deploy; cache per VM lifetime.
+local cached_build_id = nil
+local function build_id()
+    if cached_build_id then return cached_build_id end
+    local v = get_json(WEB .. "/api/version")
+    if v and v.buildId then cached_build_id = v.buildId end
+    return cached_build_id
+end
+
+local function split_id(id)
+    local sep = id:find("|", 1, true)
+    if not sep then return nil, nil end
+    return id:sub(1, sep - 1), id:sub(sep + 1)
+end
+
+-- ─── ABI: search_manga ─────────────────────────────────────────────────
+-- arg: {query=string, page=n}. id packs "{mangaId}|{slug}" (chapters need
+-- the opaque mangaId, pages need the slug — neither derives the other).
+
+function search_manga(arg)
+    local args = host.json.decode(arg)
+    local query = (args and args.query) or ""
+    local page = (args and args.page) or 1
+    if query == "" then
+        return host.json.encode({})
+    end
+
+    local url = API .. "/titles/search?q=" .. host.text.url_encode(query)
+        .. "&page=" .. tostring(page) .. "&limit=24"
+    local res = get_json(url)
+    if not res then
+        log.error("comizy: search backend unreachable")
+        return nil, "upstream_unavailable"
+    end
+    local items = ((res.data or {}).items) or {}
+    local out = {}
+    for _, it in ipairs(items) do
+        if it.id and it.slug then
+            out[#out + 1] = {
+                id = it.id .. "|" .. it.slug,
+                title = it.name or it.slug,
+                cover_url = it.cover or "",
+            }
+        end
+    end
+    log.info("comizy: search found " .. tostring(#out) .. " for " .. query)
+    return host.json.encode(out)
+end
+
+-- ─── ABI: get_manga_detail ─────────────────────────────────────────────
+-- arg: JSON string '"{mangaId}|{slug}"'.
+
+function get_manga_detail(arg)
+    local manga_id = host.json.decode(arg)
+    -- empty table encodes as []; detail must stay an OBJECT — emit {id} only
+    if manga_id == nil then
+        return host.json.encode({})
+    end
+    local _, slug = split_id(manga_id)
+    if not slug then
+        return host.json.encode({ id = manga_id })
+    end
+
+    local bid = build_id()
+    if not bid then
+        log.error("comizy: version backend unreachable")
+        return nil, "upstream_unavailable"
+    end
+    local res = get_json(WEB .. "/_next/data/" .. bid .. "/" .. slug
+        .. ".json?slug=" .. host.text.url_encode(slug))
+    local m = res and (res.pageProps or {}).initialManga
+    if not m then
+        return host.json.encode({ id = manga_id })
+    end
+
+    local genres = {}
+    for _, g in ipairs(m.genres or {}) do
+        genres[#genres + 1] = g.name or g.slug
+    end
+    local author = ""
+    if m.authors and m.authors[1] then
+        author = m.authors[1].name or ""
+    end
+    return host.json.encode({
+        id = manga_id,
+        title = m.name or "",
+        cover_url = m.cover or "",
+        author = author,
+        description = m.summary or "",
+        genres = genres,
+        status = host.text.normalize_status(m.status or ""),
+    })
+end
+
+-- ─── ABI: get_chapter_list ─────────────────────────────────────────────
+-- arg: JSON string '"{mangaId}|{slug}"'. Dedicated endpoint (no cv);
+-- returns newest-first, reversed to ascending. Chapter id packs
+-- "{mangaSlug}|{chapterSlug}" for get_page_list.
+
+function get_chapter_list(arg)
+    local manga_id = host.json.decode(arg)
+    if manga_id == nil then
+        return host.json.encode({})
+    end
+    local mid, slug = split_id(manga_id)
+    if not mid then
+        return host.json.encode({})
+    end
+
+    local res = get_json(API .. "/titles/" .. mid .. "/chapters")
+    if not res then
+        log.error("comizy: chapters backend unreachable")
+        return nil, "upstream_unavailable"
+    end
+    local chs = ((res.data or {}).chapters) or {}
+    local out = {}
+    for _, c in ipairs(chs) do
+        if c.slug then
+            out[#out + 1] = {
+                id = slug .. "|" .. c.slug,
+                title = c.name or c.slug,
+                released_at = c.updated_at or "",
+            }
+        end
+    end
+    -- endpoint is newest-first; reader wants ascending
+    local asc = {}
+    for i = #out, 1, -1 do
+        asc[#asc + 1] = out[i]
+    end
+    log.info("comizy: found " .. tostring(#asc) .. " chapters")
+    return host.json.encode(asc)
+end
+
+-- ─── ABI: get_page_list ────────────────────────────────────────────────
+-- arg: JSON string '"{mangaSlug}|{chapterSlug}"'. images[] are plain URL
+-- strings; Referer comes from the host proxy (site_url fallback).
+
+function get_page_list(arg)
+    local chapter_id = host.json.decode(arg)
+    if chapter_id == nil then
+        return host.json.encode({})
+    end
+    local mslug, cslug = split_id(chapter_id)
+    if not mslug then
+        return host.json.encode({})
+    end
+
+    local bid = build_id()
+    if not bid then
+        log.error("comizy: version backend unreachable")
+        return nil, "upstream_unavailable"
+    end
+    local res = get_json(WEB .. "/_next/data/" .. bid .. "/" .. mslug .. "/"
+        .. cslug .. ".json?slug=" .. host.text.url_encode(mslug)
+        .. "&chapter-slug=" .. host.text.url_encode(cslug))
+    local ch = res and (res.pageProps or {}).initialChapter
+    local imgs = ch and ch.images or {}
+    if #imgs == 0 then
+        return nil, "no_pages"
+    end
+    local out = {}
+    for _, u in ipairs(imgs) do
+        out[#out + 1] = { index = #out, url = u }
+    end
+    log.info("comizy: found " .. tostring(#out) .. " pages")
+    return host.json.encode(out)
+end
