@@ -127,14 +127,6 @@ return function(data)
 		-- Plugin counts
 		if #pluginCounts > 0 then
 			local pluginRows = ""
-			-- All chip: show total count, link clears pluginID filter
-			local totalCount = stats.TotalTitles or 0
-			pluginRows = pluginRows
-				.. '<a href="/view/library" onclick="localStorage.removeItem(\"gsk:library-view\");return true" class="flex items-center justify-between gap-2 text-sm rounded-md px-1.5 py-1 hover:bg-neutral-800">'
-				.. '<span class="text-sm font-medium text-neutral-200 truncate">All</span>'
-				.. '<span class="text-sm font-bold text-indigo-400 shrink-0">'
-				.. h(tostring(totalCount))
-				.. "</span></a>"
 			for _, p in ipairs(pluginCounts) do
 				local iconHTML = ""
 				if p.Icon and p.Icon ~= "" then
