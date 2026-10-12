@@ -72,7 +72,7 @@ return function(data)
 	if atCount > 0 then
 		body = body
 			.. '<div class="mb-3">'
-			.. '<span class="text-[11px] font-semibold text-neutral-400 uppercase">Alternative titles ('
+			.. '<span class="text-xs font-semibold text-neutral-400 uppercase">Alternative titles ('
 			.. atCount
 			.. ")</span>"
 		local atBody = '<div class="flex flex-wrap gap-1.5 mt-1">'
@@ -82,7 +82,7 @@ return function(data)
 			.. '<span class="text-indigo-300" title="Current main title">'
 			.. h(currentTitle)
 			.. "</span>"
-			.. '<span class="text-[10px] px-1.5 py-0.5 rounded-full bg-indigo-900/40 text-indigo-300">via '
+			.. '<span class="text-xs px-1.5 py-0.5 rounded-full bg-indigo-900/40 text-indigo-300">via '
 			.. h(pluginID)
 			.. "</span>"
 			.. "</span>"
@@ -103,7 +103,7 @@ return function(data)
 				.. h(t.Title or "")
 				.. "</span>"
 				.. "</form>"
-				.. (t.Source and t.Source ~= "" and ('<span class="text-[10px] px-1.5 py-0.5 rounded-full bg-neutral-700/50 text-neutral-400">via ' .. h(
+				.. (t.Source and t.Source ~= "" and ('<span class="text-xs px-1.5 py-0.5 rounded-full bg-neutral-700/50 text-neutral-400">via ' .. h(
 					t.Source
 				) .. "</span>") or "")
 				.. '<form method="post" action="/action/remove-alt-title/'
@@ -127,7 +127,7 @@ return function(data)
 	if asCount > 0 then
 		body = body
 			.. '<div class="mb-3">'
-			.. '<span class="text-[11px] font-semibold text-neutral-400 uppercase">Alternative synopses ('
+			.. '<span class="text-xs font-semibold text-neutral-400 uppercase">Alternative synopses ('
 			.. asCount
 			.. ")</span>"
 		for _, a in ipairs(altSummaries) do
@@ -147,7 +147,7 @@ return function(data)
 				.. "</span>"
 				.. "</form>"
 				.. '<div class="flex items-center gap-1.5 shrink-0 mt-0.5">'
-				.. (a.Source and a.Source ~= "" and ('<span class="text-[10px] px-1.5 py-0.5 rounded-full bg-neutral-700/50 text-neutral-400">via ' .. h(
+				.. (a.Source and a.Source ~= "" and ('<span class="text-xs px-1.5 py-0.5 rounded-full bg-neutral-700/50 text-neutral-400">via ' .. h(
 					a.Source
 				) .. "</span>") or "")
 				.. '<form method="post" action="/action/remove-alt-summary/'
@@ -168,7 +168,7 @@ return function(data)
 	-- Genres — toggle via add/remove endpoints, highlighted if currently active
 	if #cats > 0 then
 		body = body .. '<div class="mb-3">'
-		body = body .. '<span class="text-[11px] font-semibold text-neutral-400 uppercase">Categories / Genres</span>'
+		body = body .. '<span class="text-xs font-semibold text-neutral-400 uppercase">Categories / Genres</span>'
 		body = body .. '<div class="flex flex-wrap gap-1.5 mt-1">'
 		for _, c in ipairs(cats) do
 			if not c.Value or c.Value == "" then

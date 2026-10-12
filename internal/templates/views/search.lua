@@ -42,7 +42,7 @@ return function(data)
 	local pluginBadge = ""
 	if pluginName ~= "" then
 		pluginBadge =
-			'<span class="inline-flex items-center gap-1.5 text-[10px] px-2 py-0.5 rounded-full bg-neutral-800 text-neutral-500">'
+			'<span class="inline-flex items-center gap-1.5 text-xs px-2 py-0.5 rounded-full bg-neutral-800 text-neutral-500">'
 		if pluginIcon ~= "" then
 			pluginBadge = pluginBadge
 				.. '<img src="'
@@ -106,7 +106,7 @@ return function(data)
 			.. h(title)
 			.. "</div>"
 			.. '<div class="flex items-center gap-1">'
-			.. (pluginBadge ~= "" and '<span class="text-[10px] text-neutral-500">' .. pluginBadge .. "</span>" or "")
+			.. (pluginBadge ~= "" and '<span class="text-xs text-neutral-500">' .. pluginBadge .. "</span>" or "")
 			.. "</div>"
 			.. "</div></a>"
 	end
@@ -241,7 +241,7 @@ return function(data)
     var url = "/view/search?pluginID=" + encodeURIComponent(e.pid || "") + "&q=" + encodeURIComponent(e.q || "");
     if (e.g) url += "&genre=" + encodeURIComponent(e.g);
     a.href = url;
-    a.className = "inline-flex items-center gap-1.5 text-[10px] px-2 py-0.5 rounded-full bg-neutral-800 text-neutral-500 mr-2 mb-2";
+    a.className = "inline-flex items-center gap-1.5 text-xs px-2 py-0.5 rounded-full bg-neutral-800 text-neutral-500 mr-2 mb-2";
     var src = e.pname || e.pid || "";
     a.textContent = (e.q || e.g) + (src ? " via " + src : "");
     box.appendChild(a);

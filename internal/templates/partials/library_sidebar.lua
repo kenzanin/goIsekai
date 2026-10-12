@@ -79,7 +79,7 @@ return function(data)
 							.. h(m.Title or "")
 							.. '" class="w-8 h-11 object-cover rounded shrink-0" loading="lazy">'
 					else
-						cover = '<div class="w-8 h-11 rounded bg-neutral-800 flex items-center justify-center text-[10px] text-neutral-500 font-semibold shrink-0">'
+						cover = '<div class="w-8 h-11 rounded bg-neutral-800 flex items-center justify-center text-xs text-neutral-500 font-semibold shrink-0">'
 							.. h(getInitials(m.Title or ""))
 							.. "</div>"
 					end

@@ -89,12 +89,12 @@ return function(data)
 					.. "</span>"
 					.. (
 						statsObj.HasNew
-							and ' <span class="text-[10px] px-1.5 py-0.5 rounded-full bg-red-500 text-white font-medium align-middle">New</span>'
+							and ' <span class="text-xs px-1.5 py-0.5 rounded-full bg-red-500 text-white font-medium align-middle">New</span>'
 						or ""
 					)
 				if total > 0 and read >= total then
 					finishedMark =
-						' <span class="text-[10px] px-1.5 py-0.5 rounded-full bg-emerald-600 text-white font-medium align-middle">Done</span>'
+						' <span class="text-xs px-1.5 py-0.5 rounded-full bg-emerald-600 text-white font-medium align-middle">Done</span>'
 				end
 			end
 

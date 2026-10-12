@@ -462,7 +462,7 @@ return function(data)
 				.. '" alt="cover" loading="lazy" class="w-32 aspect-[2/3] rounded-lg object-cover border-2 transition cursor-pointer '
 				.. (c.current and "border-emerald-500" or "border-transparent group-hover:border-blue-400")
 				.. '" onclick="submitForm(this.closest(\'form\'))" title="Use this cover">'
-				.. '<div class="text-[10px] text-neutral-400 text-center mt-1 truncate">'
+				.. '<div class="text-xs text-neutral-400 text-center mt-1 truncate">'
 				.. h(c.current and "current" or c.source)
 				.. "</div>"
 				.. "</form>"

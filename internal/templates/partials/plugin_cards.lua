@@ -67,14 +67,14 @@ return function(data)
 			end
 
 			local profileBadge = pinnedProfile ~= ""
-					and ('<span class="text-[10px] px-1.5 py-0.5 rounded-full bg-sky-500/15 text-sky-400">' .. h(
+					and ('<span class="text-xs px-1.5 py-0.5 rounded-full bg-sky-500/15 text-sky-400">' .. h(
 						pinnedProfile
 					) .. "</span>")
 				or ""
 
 			local kind = KIND_BADGE[p.Kind]
 			local kindBadge = kind
-					and ('<span class="text-[10px] px-1.5 py-0.5 rounded-full font-medium ' .. kind.class .. '" title="' .. h(
+					and ('<span class="text-xs px-1.5 py-0.5 rounded-full font-medium ' .. kind.class .. '" title="' .. h(
 						kind.title
 					) .. '">' .. kind.label .. "</span>")
 				or ""
@@ -88,7 +88,7 @@ return function(data)
 				.. kindBadge
 				.. profileBadge
 				.. "</div>"
-				.. '<div class="text-[10px] text-neutral-500">'
+				.. '<div class="text-xs text-neutral-500">'
 				.. countHTML
 				.. "</div>"
 				.. '<div class="text-xs font-mono text-neutral-500 truncate">'
