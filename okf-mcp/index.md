@@ -17,4 +17,6 @@ Progressive disclosure index for this OKF bundle.
 * [Session dailies 2026-08-29 to 2026-09-30](concept/session-dailies-2026-08-29-to-09-30.md) - Roll-up of 8 daily scratchpads: tls-client migration, image burst pacing root cause, wasm ports, decimal-chapter audit, FanFox findings
 * [Onisaga genre support findings](concept/onisaga-genre-support-findings.md) - Host genre contract, onisaga page structure, and the open slug-vocabulary mapping for search-genre support
 * [Onisaga Cloudflare challenge behavior](concept/onisaga-cloudflare-challenge.md) - Observed Cloudflare blocking on onisaga fetches and the cookie/TLS evidence so far
+* [VioletManga search/detail selector findings](concept/violetmanga-search-detail-findings.md) - Bixbox theme selectors, bare-slug IDs, pure-HTTP pages
+* [Zeroscann search/detail selector findings](concept/zeroscann-search-detail-findings.md) - Vuetify card scoping, slash chapter hrefs, Referer-gated images
 
