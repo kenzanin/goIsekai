@@ -864,6 +864,51 @@
   syncViewMode();
 
   // =====================================================================
+  // Library filter/sort persistence.
+  // The URL already encodes all filter + sort state (sort, status, tag, q,
+  // pluginID). We persist the last query string on every form submit and
+  // restore it when the user opens a bare /view/library with no params.
+  // URL is canonical: we never diverge from it.
+  // ===================================================================
+  const LIB_VIEW_STORAGE_KEY = 'gsk:library-view';
+
+  const syncLibraryView = () => {
+    if (window.location.pathname !== '/view/library') return;
+
+    const params = new URLSearchParams(window.location.search);
+    const hasParams = window.location.search && params.toString().length > 0;
+    if (!hasParams) {
+      const saved = localStorage.getItem(LIB_VIEW_STORAGE_KEY);
+      if (saved) {
+        window.location.replace('/view/library?' + saved);
+        return;
+      }
+    }
+
+    document.addEventListener('submit', (e) => {
+      const form = e.target;
+      if (
+        form instanceof HTMLFormElement &&
+        form.action &&
+        form.action.includes('/view/library') &&
+        form.method.toLowerCase() === 'get'
+      ) {
+        const qs = new FormData(form);
+        const out = new URLSearchParams();
+        qs.forEach((v, k) => {
+          if (v !== '' && v != null) out.append(k, v);
+        });
+        const serialized = out.toString();
+        if (serialized) {
+          localStorage.setItem(LIB_VIEW_STORAGE_KEY, serialized);
+        }
+      }
+    });
+  };
+  window.syncLibraryView = syncLibraryView;
+  syncLibraryView();
+
+  // =====================================================================
   // Backward compat — window.showToast(msg, isError)
   // Defined outside alpine:init so it's available immediately; safely
   // no-ops if the store isn't mounted yet.

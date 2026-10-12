@@ -118,6 +118,15 @@ return function(data)
 	if #catsSorted > 0 then
 		tagBar = '<div class="flex items-center gap-1.5 flex-wrap mt-2">'
 			.. '<span class="text-xs text-neutral-500">Tag:</span>'
+		-- "All" reset chip: drops the tag filter so users can recover
+		-- (when a tag is persisted, clicking a chip action saved by the
+		-- JS persistence leaves no other reset). Active when no tag is set.
+		tagBar = tagBar
+			.. '<a href="'
+			.. libraryLink({ tag = "" })
+			.. '" class="inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-xs '
+			.. (tagFilter == "" and "border-emerald-500 bg-emerald-500/15 text-emerald-200" or "border-neutral-700 text-neutral-400 hover:bg-neutral-800")
+			.. '">All</a>'
 		for _, c in ipairs(catsSorted) do
 			local on = c[1] == tagFilter
 			tagBar = tagBar
