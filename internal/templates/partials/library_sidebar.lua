@@ -131,7 +131,7 @@ return function(data)
 		-- Plugin counts — always visible so All can reset even on empty filter results
 		if #pluginCounts > 0 then
 			local curPluginID = data.PluginID or ""
-		local pluginRows = '<a href="/view/library" onclick="try{sessionStorage.removeItem(\'gsk:library-view\')}catch(e){}" class="flex items-center justify-between gap-2 text-sm rounded-md px-1.5 py-1 mb-1 border border-dashed ' .. (curPluginID == "" and "border-indigo-500 bg-indigo-500/15" or "border-neutral-700") .. '"><span class="text-sm font-medium ' .. (curPluginID == "" and "text-indigo-200" or "text-neutral-300") .. '">All</span><span class="text-xs text-neutral-500">all manga</span></a>'
+		local pluginRows = '<a href="/view/library" onclick="try{localStorage.removeItem(\'gsk:library-view\')}catch(e){}" class="flex items-center justify-between gap-2 text-sm rounded-md px-1.5 py-1 mb-1 border border-dashed ' .. (curPluginID == "" and "border-indigo-500 bg-indigo-500/15" or "border-neutral-700") .. '"><span class="text-sm font-medium ' .. (curPluginID == "" and "text-indigo-200" or "text-neutral-300") .. '">All</span><span class="text-xs text-neutral-500">all manga</span></a>'
 		for _, p in ipairs(pluginCounts) do
 			local active = (curPluginID ~= "" and p.PluginID == curPluginID)
 			local iconHTML = ""

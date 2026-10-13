@@ -6,6 +6,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -456,5 +457,82 @@ func TestGetImageNonSuccessNotCached(t *testing.T) {
 	// workaround), so two calls observe 6 upstream hits.
 	if got := hits.Load(); got != 6 {
 		t.Errorf("expected 6 network hits (2 calls x 3 attempts, errors not cached), got %d", got)
+	}
+}
+
+// TestDisabledPluginGetImageOfflineGate verifies that a disabled plugin
+// (is_active=0) cannot make remote image fetch requests.
+func TestDisabledPluginGetImageOfflineGate(t *testing.T) {
+	db, err := database.Open(filepath.Join(t.TempDir(), "offline.db"))
+	if err != nil {
+		t.Fatalf("open db: %v", err)
+	}
+	defer func() { _ = db.Close() }()
+
+	// Register a disabled plugin (is_active=0).
+	plugin := database.Plugin{
+		ID:       "disabled-plugin",
+		Name:     "Disabled Plugin",
+		WasmPath: "disabled-plugin.wasm",
+		IsActive: false,
+	}
+	if err := db.RegisterPlugin(plugin); err != nil {
+		t.Fatalf("register plugin: %v", err)
+	}
+
+	s := NewAppService(db, nil, hostnet.NewProxy(), "", "", nil)
+	t.Cleanup(s.Shutdown)
+
+	// Fetch attempt on disabled plugin should error without network call.
+	var hits atomic.Int32
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		hits.Add(1)
+		w.Header().Set("Content-Type", "image/png")
+		_, _ = w.Write([]byte("should-not-be-written"))
+	}))
+	defer srv.Close()
+
+	_, err = s.GetImage(context.Background(), "disabled-plugin", srv.URL+"/img.png", nil, "", "", PrioLow)
+	if err == nil {
+		t.Fatal("expected error for disabled plugin, got nil")
+	}
+	if !strings.Contains(err.Error(), "is offline") {
+		t.Errorf("error = %q, want error containing 'is offline'", err.Error())
+	}
+	if got := hits.Load(); got != 0 {
+		t.Errorf("expected 0 network hits (offline gate blocked), got %d", got)
+	}
+}
+
+// TestDisabledPluginSearchOfflineGate verifies that a disabled plugin
+// cannot make remote search requests.
+func TestDisabledPluginSearchOfflineGate(t *testing.T) {
+	db, err := database.Open(filepath.Join(t.TempDir(), "offline-search.db"))
+	if err != nil {
+		t.Fatalf("open db: %v", err)
+	}
+	defer func() { _ = db.Close() }()
+
+	// Register a disabled plugin (is_active=0).
+	plugin := database.Plugin{
+		ID:       "disabled-search",
+		Name:     "Disabled Search Plugin",
+		WasmPath: "disabled-search.wasm",
+		IsActive: false,
+	}
+	if err := db.RegisterPlugin(plugin); err != nil {
+		t.Fatalf("register plugin: %v", err)
+	}
+
+	s := NewAppService(db, nil, hostnet.NewProxy(), "", "", nil)
+	t.Cleanup(s.Shutdown)
+
+	// Search attempt on disabled plugin should return empty results.
+	results, err := s.SearchManga("disabled-search", types.SearchFilter{})
+	if err != nil {
+		t.Fatalf("SearchManga: %v", err)
+	}
+	if len(results) != 0 {
+		t.Errorf("expected 0 results for disabled plugin, got %d", len(results))
 	}
 }

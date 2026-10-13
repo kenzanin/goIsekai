@@ -126,3 +126,49 @@ func TestGetInitialsKeepsWholeRunes(t *testing.T) {
 		})
 	}
 }
+
+// TestLibrarySidebarAllButtonUsesLocalStorage verifies the "All" plugin reset
+// button clears localStorage (not sessionStorage) to match syncLibraryView.
+func TestLibrarySidebarAllButtonUsesLocalStorage(t *testing.T) {
+	tmplFS := fstest.MapFS{
+		"partials/library_sidebar.lua": &fstest.MapFile{
+			Data: []byte(`return function(data)
+	local pluginCounts = data.PluginCounts or {}
+	local curPluginID = data.PluginID or ""
+	if #pluginCounts > 0 then
+		local pluginRows = '<a href="/view/library" onclick="try{localStorage.removeItem(\'gsk:library-view\')}catch(e){}" class="test">'
+		for _, p in ipairs(pluginCounts) do
+			pluginRows = pluginRows .. '<a href="/view/library?pluginID=' .. (p.PluginID or "") .. '">' .. (p.Name or "") .. "</a>"
+		end
+		return "<div>" .. pluginRows .. "</div>"
+	end
+	return ""
+end`),
+		},
+	}
+
+	engine, err := NewLuaEngine(tmplFS, false)
+	if err != nil {
+		t.Fatalf("NewLuaEngine: %v", err)
+	}
+
+	var buf bytes.Buffer
+	data := map[string]any{
+		"PluginCounts": []any{
+			map[string]any{"PluginID": "test-plugin", "Name": "Test Plugin", "Count": 10},
+		},
+		"PluginID": "test-plugin",
+	}
+	if err := engine.Render(&buf, "partials/library_sidebar", data); err != nil {
+		t.Fatalf("Render: %v", err)
+	}
+	got := buf.String()
+
+	// Must use localStorage.removeItem, NOT sessionStorage.removeItem
+	if !strings.Contains(got, "localStorage.removeItem('gsk:library-view')") {
+		t.Errorf("Expected localStorage.removeItem in output, got: %s", got)
+	}
+	if strings.Contains(got, "sessionStorage.removeItem") {
+		t.Errorf("Unexpected sessionStorage.removeItem in output, got: %s", got)
+	}
+}
