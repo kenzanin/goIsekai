@@ -86,14 +86,14 @@ return function(data)
 				selNames[#selNames + 1] = pname
 			end
 			cbHTML = cbHTML
-				.. '<label class="inline-flex items-center gap-1.5 text-xs text-neutral-300 hover:text-neutral-100 cursor-pointer">'
-				.. '<input type="checkbox" name="pluginIDs" value="'
+				.. '<label class="inline-flex items-center gap-2 text-sm text-neutral-300 hover:text-neutral-100 cursor-pointer select-none">'
+			.. '<input type="checkbox" name="pluginIDs" value="'
 				.. h(p.ID)
 				.. '"'
 				.. (selSet[p.ID] and " checked" or "")
-				.. ' class="accent-indigo-500">'
-				.. (ic ~= "" and ('<img src="' .. h(ic) .. '" alt="" class="w-4 h-4 rounded object-cover">') or "")
-				.. h(pname)
+				.. ' class="accent-indigo-500 w-4 h-4">'
+				.. (ic ~= "" and ('<img src="' .. h(ic) .. '" alt="" class="w-5 h-5 rounded object-cover">') or "")
+				.. '<span class="font-medium">' .. h(pname) .. "</span>"
 				.. "</label>"
 		end
 	end
@@ -105,28 +105,16 @@ return function(data)
 		.. '" id="migrateForm" class="mb-3">'
 	body = body .. '<div class="flex flex-wrap gap-2 items-end">'
 	body = body
-		.. '<div class="flex-1 min-w-[200px]"><label class="block text-xs text-neutral-400 mb-1">Search</label><input type="text" id="migrateQ" name="q" value="'
+		.. '<div class="flex-1 min-w-[280px]"><label class="block text-xs text-neutral-400 mb-1">Search</label><input type="text" id="migrateQ" name="q" value="'
 		.. h(q)
 		.. '" placeholder="Manga title..." class="w-full bg-neutral-900 border border-neutral-700 rounded-md px-3 py-2 text-sm"></div>'
 	body = body
-		.. '<div class="flex-1 min-w-[220px]"><div class="flex items-center justify-between mb-1"><label class="block text-xs text-neutral-400">Plugins (none = all)</label><button type="button" id="migrateSelectAll" class="text-xs text-indigo-400 hover:text-indigo-300">Select all</button></div><div class="flex flex-wrap gap-x-3 gap-y-1 border border-neutral-700 rounded-md px-3 py-2 bg-neutral-900 max-h-24 overflow-auto">'
+		.. '<div class="flex-1"><label class="block text-xs text-neutral-400 mb-1">Source plugins (select all to search all)</label><div class="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-5 gap-2 border border-neutral-700 rounded-md px-3 py-3 bg-neutral-900">'
 		.. cbHTML
 		.. "</div></div>"
 	body = body
-		.. '<button type="submit" class="bg-indigo-600 hover:bg-indigo-500 text-white rounded-md px-4 py-2 text-sm font-medium self-end">Search</button></div></form>'
-	body = body .. '<div id="migrate-history" class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2 mb-6"></div>'
-	body = body
-		.. [[<script>(function(){
-  var sa=document.getElementById('migrateSelectAll');
-  if(sa){sa.addEventListener('click',function(){document.querySelectorAll('input[name="pluginIDs"]').forEach(function(c){c.checked=true})})}
-  var qEl=document.getElementById('migrateQ');
-  var KEY='gi_search_history',MAX=20,MAX_SHOW=8;
-  try{var h=JSON.parse(localStorage.getItem(KEY)||'[]');var box=document.getElementById('migrate-history');if(box&&h.length){var isMigrate=function(url){return url.indexOf('/view/migrate/')!==-1};var urlToMigrate=function(url){var a=document.createElement('a');a.href=url;var u=new URL(a.href,location.origin);return '/view/migrate/]]
-		.. h(pluginID)
-		.. "/"
-		.. h(mangaID)
-		.. [['+u.search};h.slice(0,MAX_SHOW).forEach(function(e){var a=document.createElement('a');var base=e.q?'/view/search?pluginID='+encodeURIComponent(e.pid||'')+'&q='+encodeURIComponent(e.q||'')+(e.g?'&genre='+encodeURIComponent(e.g):''):'';a.href=urlToMigrate(base);a.className='block truncate text-xs px-3 py-1.5 rounded-md bg-neutral-800 border border-neutral-700 text-neutral-300 hover:bg-neutral-700';a.title=(e.q||e.g)+(e.pname||e.pid?' via '+(e.pname||e.pid):'');a.textContent=(e.q||e.g)+(e.pname||e.pid?' via '+(e.pname||e.pid):'');box.appendChild(a)})}}catch(e){}
-})();</script>]]
+		.. '<div class="flex justify-end mt-2"><button type="submit" class="bg-indigo-600 hover:bg-indigo-500 text-white rounded-md px-4 py-2 text-sm font-medium">Search</button></div>'
+	.. "</form>"
 
 	-- Results grid (search-like)
 	if #cands == 0 then
