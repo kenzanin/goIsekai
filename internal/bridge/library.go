@@ -13,8 +13,13 @@ import (
 // SearchManga delegates to the plugin's Search function. Blank genre entries
 // are dropped first: plugins read a non-empty genre list as "browse by genre",
 // so the empty string a form submits for "all genres" would send them down
-// that path with nothing to match.
+// that path with nothing to match. For offline plugins returns empty result.
 func (s *AppService) SearchManga(pluginID string, filter types.SearchFilter) ([]types.Manga, error) {
+	// Deactivated plugins must not issue remote requests.
+	if !s.db.IsPluginActive(pluginID) {
+		return nil, nil
+	}
+
 	filter.Genres = slices.DeleteFunc(filter.Genres, func(g string) bool { return g == "" })
 	var (
 		result []types.Manga
@@ -54,6 +59,11 @@ func (s *AppService) ClearMangaNew(pluginID, mangaID string) error {
 // same-lane awaits.
 func (s *AppService) GetMangaDetails(pluginID, mangaID string) (types.Manga, []types.Chapter, error) {
 	mangaIntID, _ := s.db.ResolveMangaIntID(pluginID, mangaID)
+
+	// Deactivated plugins must not issue remote requests; their data stays readable from SQLite.
+	if !s.db.IsPluginActive(pluginID) {
+		return s.cachedMangaFallback(pluginID, mangaID, mangaIntID)
+	}
 
 	if s.mgr == nil {
 		return s.cachedMangaFallback(pluginID, mangaID, mangaIntID)
@@ -131,6 +141,20 @@ func (s *AppService) resolveChapterIntID(pluginID, mangaID, chapterID string) (i
 
 // GetPageList delegates to the plugin's GetPageList function.
 func (s *AppService) GetPageList(pluginID, chapterID string) ([]types.Page, error) {
+	// Deactivated plugins must not issue remote requests.
+	if !s.db.IsPluginActive(pluginID) {
+		chapterIntID, _ := s.resolveChapterIntID(pluginID, "", chapterID)
+		cached, err := s.db.GetChapterPages(chapterIntID)
+		if err != nil || cached == nil {
+			return nil, fmt.Errorf("bridge: get page list: plugin %s is offline and has no cached pages", pluginID)
+		}
+		var pages []types.Page
+		if uerr := json.Unmarshal(cached, &pages); uerr != nil {
+			return nil, fmt.Errorf("bridge: unmarshal cached pages: %w", uerr)
+		}
+		return pages, nil
+	}
+
 	var (
 		result []types.Page
 		err    error

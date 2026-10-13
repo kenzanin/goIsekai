@@ -37,6 +37,9 @@ func (s *AppService) LibrarySyncState(pluginID, mangaID string, now time.Time) (
 // again by update_stale_days. Refuses when the manga is not in the library
 // (non-library rows are detail-view cache).
 func (s *AppService) SyncManga(pluginID, mangaID string) error {
+	if !s.db.IsPluginActive(pluginID) {
+		return fmt.Errorf("bridge: sync manga: plugin %s is offline", pluginID)
+	}
 	cached, err := s.db.GetMangaCached(pluginID, mangaID)
 	if err != nil {
 		return fmt.Errorf("bridge: sync manga: %w", err)
@@ -91,6 +94,9 @@ func (s *AppService) SyncStaleLibrary(cutoff time.Time) error {
 
 func (s *AppService) syncMangas(library []database.Manga) error {
 	for _, manga := range library {
+		if !s.db.IsPluginActive(manga.PluginID) {
+			continue
+		}
 		m, detailErr := s.mgr.GetMangaDetail(manga.PluginID, manga.SourceMangaID)
 		if detailErr != nil {
 			logger.Error("sync detail failed", "id", manga.ID, "plugin", manga.PluginID, "error", detailErr)

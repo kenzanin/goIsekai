@@ -91,6 +91,15 @@ func (d *DB) SetPluginActive(id string, active bool) error {
 	return err
 }
 
+// IsPluginActive reports whether plugin id is active. Missing row => false (offline).
+func (d *DB) IsPluginActive(id string) bool {
+	var models []model.Plugins
+	if err := Plugins.SELECT(Plugins.IsActive).WHERE(Plugins.ID.EQ(String(id))).Query(d.db, &models); err != nil || len(models) == 0 || models[0].IsActive == nil {
+		return false
+	}
+	return *models[0].IsActive != 0
+}
+
 // DeletePlugin removes a plugin row entirely. Only for artifacts that were
 // never real plugins (e.g. *.bak.* backup dirs that discovery once picked
 // up). Real plugins are deactivated, not deleted, to preserve history.

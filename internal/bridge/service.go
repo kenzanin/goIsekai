@@ -117,8 +117,28 @@ func (s *AppService) GetConfigPath() string {
 }
 
 // GetChapterList fetches the chapter list for a manga from the plugin.
-// Rides the interactive lane (task 4.1).
+// Rides the interactive lane (task 4.1). For offline plugins returns cached data.
 func (s *AppService) GetChapterList(pluginID, mangaID string) ([]types.Chapter, error) {
+	// Deactivated plugins must not issue remote requests.
+	if !s.db.IsPluginActive(pluginID) {
+		mangaIntID, _ := s.db.ResolveMangaIntID(pluginID, mangaID)
+		if dc, err := s.db.ListChaptersCached(mangaIntID); err == nil && len(dc) > 0 {
+			out := make([]types.Chapter, len(dc))
+			for i, c := range dc {
+				out[i] = types.Chapter{
+					ID:         c.SourceChapterID,
+					MangaID:    mangaID,
+					Title:      c.Title,
+					ChapterNum: c.ChapterNum,
+					VolumeNum:  c.VolumeNum,
+					ReleasedAt: c.FetchedAt,
+				}
+			}
+			return out, nil
+		}
+		return nil, nil
+	}
+
 	var (
 		chapters []types.Chapter
 		err      error
