@@ -7,7 +7,7 @@ func Default() *Config {
 	c := &Config{
 		DataDir:         "app_data",
 		Title:           "goIsekai",
-		LogLevel:        "info",
+		LogLevel:        "debug",
 		Width:           1200,
 		Height:          800,
 		Host:            "127.0.0.1",

@@ -7,7 +7,11 @@ return function(data)
 	local manga = data.Manga or {}
 	local plugins = data.Plugins or {}
 	local q = data.Q or ""
-	local targetPluginID = data.TargetPluginID or ""
+	local selKey = data.PluginIDs or ""
+	local selSet, selNames = {}, {}
+	for id in string.gmatch(selKey, "[^,]+") do
+		selSet[id] = true
+	end
 	local cands = data.Candidates or {}
 	local failures = data.Failures or {}
 	local searchErr = data.SearchError or ""
@@ -71,25 +75,57 @@ return function(data)
 			.. "</p>"
 	end
 
-	local selIcon, selName = "", targetPluginID
-	if targetPluginID == "" then selName = "All plugins" else for _, p in ipairs(plugins) do if p.ID == targetPluginID then selIcon = p.IconURL or ""; selName = p.Name ~= "" and p.Name or p.ID; break end end end
-	local pickerBtn = '<button type="button" id="migratePickerBtn" class="flex items-center gap-2 bg-neutral-900 border border-neutral-700 rounded-md px-3 py-2 text-sm min-w-[180px] text-left">' .. (selIcon ~= "" and ('<img src="' .. h(selIcon) .. '" alt="" class="w-5 h-5 rounded object-cover flex-shrink-0">') or '') .. '<span class="truncate">' .. h(selName) .. '</span></button>'
-	local pickerDrop = '<div id="migratePickerDrop" class="hidden absolute z-20 mt-1 w-56 bg-neutral-900 border border-neutral-700 rounded-md shadow-lg py-1 max-h-64 overflow-auto">'
-	pickerDrop = pickerDrop .. '<button type="button" data-pick="" data-pname="All plugins" class="w-full flex items-center gap-2 px-3 py-2 text-sm text-left hover:bg-neutral-800">All plugins</button>'
-	for _, p in ipairs(plugins) do if p.IsActive then local ic = p.IconURL or ""; pickerDrop = pickerDrop .. '<button type="button" data-pick="' .. h(p.ID) .. '" data-pname="' .. h(p.Name ~= "" and p.Name or p.ID) .. '" class="w-full flex items-center gap-2 px-3 py-2 text-sm text-left hover:bg-neutral-800">' .. (ic ~= "" and ('<img src="' .. h(ic) .. '" alt="" class="w-5 h-5 rounded object-cover flex-shrink-0">') or '<span class="w-5 h-5 rounded bg-neutral-700 flex-shrink-0"></span>') .. h(p.Name ~= "" and p.Name or p.ID) .. '</button>' end end
-	pickerDrop = pickerDrop .. '</div>'
-	body = body .. '<form method="get" action="/view/migrate/' .. h(pluginID) .. "/" .. h(mangaID) .. '" id="migrateForm" class="mb-3">'
-	body = body .. '<div class="flex gap-2 items-end">'
-	body = body .. '<div class="relative"><label class="block text-xs text-neutral-400 mb-1">Plugin</label>' .. pickerBtn .. pickerDrop .. '<input type="hidden" id="migratePluginID" name="pluginID" value="' .. h(targetPluginID) .. '" data-pname="' .. h(selName) .. '"></div>'
-	body = body .. '<div class="flex-1"><label class="block text-xs text-neutral-400 mb-1">&nbsp;</label><input type="text" id="migrateQ" name="q" value="' .. h(q) .. '" placeholder="Manga title..." class="w-full bg-neutral-900 border border-neutral-700 rounded-md px-3 py-2 text-sm"></div>'
-	body = body .. '<button type="submit" class="bg-indigo-600 hover:bg-indigo-500 text-white rounded-md px-4 py-2 text-sm font-medium self-end">Search</button></div></form>'
+	-- Form: [search box] [plugin checkboxes] [Search button]. No checkbox checked
+	-- means every active plugin is searched.
+	local cbHTML = ""
+	for _, p in ipairs(plugins) do
+		if p.IsActive then
+			local ic = p.IconURL or ""
+			local pname = p.Name ~= "" and p.Name or p.ID
+			if selSet[p.ID] then
+				selNames[#selNames + 1] = pname
+			end
+			cbHTML = cbHTML
+				.. '<label class="inline-flex items-center gap-1.5 text-xs text-neutral-300 hover:text-neutral-100 cursor-pointer">'
+				.. '<input type="checkbox" name="pluginIDs" value="'
+				.. h(p.ID)
+				.. '"'
+				.. (selSet[p.ID] and " checked" or "")
+				.. ' class="accent-indigo-500">'
+				.. (ic ~= "" and ('<img src="' .. h(ic) .. '" alt="" class="w-4 h-4 rounded object-cover">') or "")
+				.. h(pname)
+				.. "</label>"
+		end
+	end
+	body = body
+		.. '<form method="get" action="/view/migrate/'
+		.. h(pluginID)
+		.. "/"
+		.. h(mangaID)
+		.. '" id="migrateForm" class="mb-3">'
+	body = body .. '<div class="flex flex-wrap gap-2 items-end">'
+	body = body
+		.. '<div class="flex-1 min-w-[200px]"><label class="block text-xs text-neutral-400 mb-1">Search</label><input type="text" id="migrateQ" name="q" value="'
+		.. h(q)
+		.. '" placeholder="Manga title..." class="w-full bg-neutral-900 border border-neutral-700 rounded-md px-3 py-2 text-sm"></div>'
+	body = body
+		.. '<div class="flex-1 min-w-[220px]"><div class="flex items-center justify-between mb-1"><label class="block text-xs text-neutral-400">Plugins (none = all)</label><button type="button" id="migrateSelectAll" class="text-xs text-indigo-400 hover:text-indigo-300">Select all</button></div><div class="flex flex-wrap gap-x-3 gap-y-1 border border-neutral-700 rounded-md px-3 py-2 bg-neutral-900 max-h-24 overflow-auto">'
+		.. cbHTML
+		.. "</div></div>"
+	body = body
+		.. '<button type="submit" class="bg-indigo-600 hover:bg-indigo-500 text-white rounded-md px-4 py-2 text-sm font-medium self-end">Search</button></div></form>'
 	body = body .. '<div id="migrate-history" class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2 mb-6"></div>'
-	body = body .. [[<script>(function(){
-  var btn=document.getElementById('migratePickerBtn'),drop=document.getElementById('migratePickerDrop'),hid=document.getElementById('migratePluginID');
-  if(btn&&drop&&hid){btn.addEventListener('click',function(){drop.classList.toggle('hidden')});drop.querySelectorAll('[data-pick]').forEach(function(el){el.addEventListener('click',function(){hid.value=el.getAttribute('data-pick');hid.setAttribute('data-pname',el.getAttribute('data-pname')||el.getAttribute('data-pick')||'All plugins');document.getElementById('migrateForm').submit()})});document.addEventListener('click',function(e){if(!btn.contains(e.target)&&!drop.contains(e.target))drop.classList.add('hidden')})}
+	body = body
+		.. [[<script>(function(){
+  var sa=document.getElementById('migrateSelectAll');
+  if(sa){sa.addEventListener('click',function(){document.querySelectorAll('input[name="pluginIDs"]').forEach(function(c){c.checked=true})})}
   var qEl=document.getElementById('migrateQ');
   var KEY='gi_search_history',MAX=20,MAX_SHOW=8;
-  try{var h=JSON.parse(localStorage.getItem(KEY)||'[]');var box=document.getElementById('migrate-history');if(box&&h.length){var isMigrate=function(url){return url.indexOf('/view/migrate/')!==-1};var urlToMigrate=function(url){var a=document.createElement('a');a.href=url;var u=new URL(a.href,location.origin);return '/view/migrate/]] .. h(pluginID) .. "/" .. h(mangaID) .. [['+u.search};h.slice(0,MAX_SHOW).forEach(function(e){var a=document.createElement('a');var base=e.q?'/view/search?pluginID='+encodeURIComponent(e.pid||'')+'&q='+encodeURIComponent(e.q||'')+(e.g?'&genre='+encodeURIComponent(e.g):''):'';a.href=urlToMigrate(base);a.className='block truncate text-xs px-3 py-1.5 rounded-md bg-neutral-800 border border-neutral-700 text-neutral-300 hover:bg-neutral-700';a.title=(e.q||e.g)+(e.pname||e.pid?' via '+(e.pname||e.pid):'');a.textContent=(e.q||e.g)+(e.pname||e.pid?' via '+(e.pname||e.pid):'');box.appendChild(a)})}}catch(e){}
+  try{var h=JSON.parse(localStorage.getItem(KEY)||'[]');var box=document.getElementById('migrate-history');if(box&&h.length){var isMigrate=function(url){return url.indexOf('/view/migrate/')!==-1};var urlToMigrate=function(url){var a=document.createElement('a');a.href=url;var u=new URL(a.href,location.origin);return '/view/migrate/]]
+		.. h(pluginID)
+		.. "/"
+		.. h(mangaID)
+		.. [['+u.search};h.slice(0,MAX_SHOW).forEach(function(e){var a=document.createElement('a');var base=e.q?'/view/search?pluginID='+encodeURIComponent(e.pid||'')+'&q='+encodeURIComponent(e.q||'')+(e.g?'&genre='+encodeURIComponent(e.g):''):'';a.href=urlToMigrate(base);a.className='block truncate text-xs px-3 py-1.5 rounded-md bg-neutral-800 border border-neutral-700 text-neutral-300 hover:bg-neutral-700';a.title=(e.q||e.g)+(e.pname||e.pid?' via '+(e.pname||e.pid):'');a.textContent=(e.q||e.g)+(e.pname||e.pid?' via '+(e.pname||e.pid):'');box.appendChild(a)})}}catch(e){}
 })();</script>]]
 
 	-- Results grid (search-like)
@@ -99,7 +135,7 @@ return function(data)
 				.. '<div class="py-12 text-center text-neutral-500">No results for "'
 				.. h(q)
 				.. '"'
-				.. (targetPluginID ~= "" and " in " .. h(targetPluginID) or "")
+				.. (#selNames > 0 and " in " .. h(table.concat(selNames, ", ")) or "")
 				.. "</div>"
 		else
 			body = body .. '<div class="py-12 text-center text-neutral-500">Type a query and search</div>'
@@ -197,8 +233,8 @@ return function(data)
 				.. h(mangaID)
 				.. "?q="
 				.. h(q)
-				.. "&pluginID="
-				.. h(targetPluginID)
+				.. "&pluginIDs="
+				.. h(selKey)
 				.. "&page="
 			body = body .. '<div class="flex items-center justify-center gap-2 mt-6">'
 			if hasPrev then

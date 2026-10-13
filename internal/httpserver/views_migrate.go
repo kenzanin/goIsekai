@@ -1,7 +1,10 @@
 package httpserver
 
 import (
+	"maps"
+	"slices"
 	"strconv"
+	"strings"
 
 	"net/http"
 	"sync"
@@ -53,11 +56,41 @@ func (s *Server) viewMigrate(w http.ResponseWriter, r *http.Request) {
 			page = p
 		}
 	}
-	targetPluginID := r.URL.Query().Get("pluginID")
+	// Multi-select: pluginIDs carries a comma-separated list (the form posts one
+	// value per checkbox, pagination links join them). Empty = every active
+	// plugin. Legacy ?pluginID= single-value links fall through the same split.
+	selected := map[string]bool{}
+	for _, key := range []string{"pluginIDs", "pluginID"} {
+		for _, v := range r.URL.Query()[key] {
+			for id := range strings.SplitSeq(v, ",") {
+				if id = strings.TrimSpace(id); id != "" {
+					selected[id] = true
+				}
+			}
+		}
+		if len(selected) > 0 {
+			break
+		}
+	}
 	plugins, _ := s.service.ListPlugins()
 	activeMap := make(map[string]bool)
 	for _, p := range plugins {
 		activeMap[p.ID] = p.IsActive
+	}
+	for id := range selected {
+		if !activeMap[id] {
+			http.Error(w, "plugin not active", http.StatusBadRequest)
+			return
+		}
+	}
+	// Search targets: the checked plugins, or all active ones when none are
+	// checked. The entry's own source can never be a migration target.
+	targets := make([]string, 0, len(plugins))
+	for _, p := range plugins {
+		if !p.IsActive || p.ID == pluginID || (len(selected) > 0 && !selected[p.ID]) {
+			continue
+		}
+		targets = append(targets, p.ID)
 	}
 
 	type cand struct {
@@ -77,69 +110,40 @@ func (s *Server) viewMigrate(w http.ResponseWriter, r *http.Request) {
 
 	normalizedQ := pluginutil.NormalizeTitle(q)
 
-	if targetPluginID != "" {
-		// Single-plugin search.
-		if !activeMap[targetPluginID] {
-			http.Error(w, "plugin not active", http.StatusBadRequest)
-			return
-		}
-		results, err := s.service.SearchManga(targetPluginID, types.SearchFilter{Query: q, Page: page})
-		if err != nil {
-			searchErr = err
-			failures = append(failures, targetPluginID)
-		} else {
-			name := pluginName(plugins, targetPluginID)
-			for _, r := range results {
-				cands = append(cands, cand{PluginID: targetPluginID, PluginName: name, SourceMangaID: r.ID, Title: r.Title, CoverURL: r.CoverURL, IsExactMatch: pluginutil.NormalizeTitle(r.Title) == normalizedQ, ChapterCount: -1})
-			}
-		}
-	} else {
-		if q == "" {
-			// No query yet: show empty, don't hammer servers.
-		} else {
-			// Search every active plugin with q in parallel.
-			var mu sync.Mutex
-			var wg sync.WaitGroup
-			for _, p := range plugins {
-				if !p.IsActive || p.ID == pluginID {
-					continue
-				}
-				wg.Add(1)
-				go func(id, name string) {
-					defer wg.Done()
-					results, err := s.service.SearchManga(id, types.SearchFilter{Query: q, Page: page})
-					if err != nil {
-						logger.Warn("migrate search failed", "plugin", id, "error", err)
-						mu.Lock()
-						failures = append(failures, id)
-						mu.Unlock()
-						return
-					}
-					if len(results) == 0 {
-						return
-					}
-					var local []cand
-					for _, r := range results {
-						local = append(local, cand{PluginID: id, PluginName: name, SourceMangaID: r.ID, Title: r.Title, CoverURL: r.CoverURL, IsExactMatch: pluginutil.NormalizeTitle(r.Title) == normalizedQ, ChapterCount: -1})
-					}
+	if q != "" {
+		// Search every target in parallel; no query yet shows empty rather than
+		// hammering servers.
+		var mu sync.Mutex
+		var wg sync.WaitGroup
+		for _, id := range targets {
+			wg.Add(1)
+			go func(id string) {
+				defer wg.Done()
+				results, err := s.service.SearchManga(id, types.SearchFilter{Query: q, Page: page})
+				if err != nil {
+					logger.Warn("migrate search failed", "plugin", id, "error", err)
 					mu.Lock()
-					cands = append(cands, local...)
+					failures = append(failures, id)
 					mu.Unlock()
-				}(p.ID, p.Name)
-			}
-			wg.Wait()
-			if len(cands) == 0 && len(failures) > 0 {
-				// Count active candidates to distinguish all-failed vs no results.
-				activeCount := 0
-				for _, p := range plugins {
-					if p.IsActive && p.ID != pluginID {
-						activeCount++
-					}
+					return
 				}
-				if len(failures) == activeCount {
-					searchErr = errAllSourcesFailed
+				if len(results) == 0 {
+					return
 				}
-			}
+				name := pluginName(plugins, id)
+				var local []cand
+				for _, r := range results {
+					local = append(local, cand{PluginID: id, PluginName: name, SourceMangaID: r.ID, Title: r.Title, CoverURL: r.CoverURL, IsExactMatch: pluginutil.NormalizeTitle(r.Title) == normalizedQ, ChapterCount: -1})
+				}
+				mu.Lock()
+				cands = append(cands, local...)
+				mu.Unlock()
+			}(id)
+		}
+		wg.Wait()
+		if len(cands) == 0 && len(failures) > 0 && len(failures) == len(targets) {
+			// Every target failed: distinct from a genuine no-results.
+			searchErr = errAllSourcesFailed
 		}
 	}
 
@@ -193,7 +197,7 @@ func (s *Server) viewMigrate(w http.ResponseWriter, r *http.Request) {
 		"Plugins":            plugins,
 		"Q":                  displayQ,
 		"SourceChapterCount": sourceChapterCount,
-		"TargetPluginID":     targetPluginID,
+		"PluginIDs":          strings.Join(slices.Sorted(maps.Keys(selected)), ","),
 		"Candidates":         candidates,
 		"Page":               page,
 		"HasNext":            hasNext,

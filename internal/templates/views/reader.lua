@@ -13,9 +13,9 @@ return function(data)
 	local currentChapter = data.CurrentChapter or {}
 	local chNum = currentChapter.ChapterNum or 0
 	local chTitle = currentChapter.Title or ""
-  local prevChapterID = data.PrevChapterID or ""
-  local nextChapterID = data.NextChapterID or ""
-  local readerPrefs = data.ReaderPrefs or ""
+	local prevChapterID = data.PrevChapterID or ""
+	local nextChapterID = data.NextChapterID or ""
+	local readerPrefs = data.ReaderPrefs or ""
 
 	local prevStyle = prevChapterID == "" and ' style="display:none"' or ""
 	local nextStyle = nextChapterID == "" and ' style="display:none"' or ""

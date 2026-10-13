@@ -192,30 +192,50 @@ return function(data)
 		end
 	end
 	local pickerBtn = '<button type="button" id="pluginPickerBtn" class="flex items-center gap-2 bg-neutral-900 border border-neutral-700 rounded-md px-3 py-2 text-sm min-w-[180px] text-left">'
-		.. (selIcon ~= "" and ('<img src="' .. h(selIcon) .. '" alt="" class="w-5 h-5 rounded object-cover flex-shrink-0">') or '')
-		.. '<span id="pluginPickerLabel" class="truncate">' .. h(selName) .. '</span></button>'
-	local pickerDrop = '<div id="pluginPickerDrop" class="hidden absolute z-20 mt-1 w-56 bg-neutral-900 border border-neutral-700 rounded-md shadow-lg py-1 max-h-64 overflow-auto">'
+		.. (selIcon ~= "" and ('<img src="' .. h(selIcon) .. '" alt="" class="w-5 h-5 rounded object-cover flex-shrink-0">') or "")
+		.. '<span id="pluginPickerLabel" class="truncate">'
+		.. h(selName)
+		.. "</span></button>"
+	local pickerDrop =
+		'<div id="pluginPickerDrop" class="hidden absolute z-20 mt-1 w-56 bg-neutral-900 border border-neutral-700 rounded-md shadow-lg py-1 max-h-64 overflow-auto">'
 	for _, p in ipairs(plugins) do
 		if p.IsActive then
 			local ic = p.IconURL or ""
-			pickerDrop = pickerDrop .. '<button type="button" data-pick="' .. h(p.ID) .. '" data-pname="' .. h(p.Name) .. '" class="w-full flex items-center gap-2 px-3 py-2 text-sm text-left hover:bg-neutral-800">'
+			pickerDrop = pickerDrop
+				.. '<button type="button" data-pick="'
+				.. h(p.ID)
+				.. '" data-pname="'
+				.. h(p.Name)
+				.. '" class="w-full flex items-center gap-2 px-3 py-2 text-sm text-left hover:bg-neutral-800">'
 				.. (ic ~= "" and ('<img src="' .. h(ic) .. '" alt="" class="w-5 h-5 rounded object-cover flex-shrink-0">') or '<span class="w-5 h-5 rounded bg-neutral-700 flex-shrink-0"></span>')
-				.. h(p.Name) .. '</button>'
+				.. h(p.Name)
+				.. "</button>"
 		end
 	end
-	pickerDrop = pickerDrop .. '</div>'
+	pickerDrop = pickerDrop .. "</div>"
 	return [[<h1 class="text-xl font-semibold mb-6">Search]]
 		.. pluginBadge
 		.. [[</h1>]]
 		.. '<form method="get" action="/view/search" id="searchForm" class="mb-6">'
 		.. '<div class="flex gap-2 items-end">'
-		.. '<div class="relative"><label class="block text-xs text-neutral-400 mb-1">Plugin</label>' .. pickerBtn .. pickerDrop .. '<input type="hidden" id="pluginID" name="pluginID" value="' .. h(pluginID) .. '" data-pname="' .. h(selName) .. '"><select id="pluginIDNative" class="hidden">' .. pluginOpts .. '</select></div>'
-		.. (genreOpts ~= "" and ('<div><label for="genre" class="block text-xs text-neutral-400 mb-1">Category</label><select id="genre" name="genre" class="bg-neutral-900 border border-neutral-700 rounded-md px-3 py-2 text-sm">' .. genreOpts .. "</select></div>") or '')
-		.. '<div class="flex-1"><label for="q" class="block text-xs text-neutral-400 mb-1">&nbsp;</label><input id="q" name="q" type="text" value="' .. h(q) .. '" placeholder="Manga title..." class="w-full bg-neutral-900 border border-neutral-700 rounded-md px-3 py-2 text-sm"></div>'
+		.. '<div class="relative"><label class="block text-xs text-neutral-400 mb-1">Plugin</label>'
+		.. pickerBtn
+		.. pickerDrop
+		.. '<input type="hidden" id="pluginID" name="pluginID" value="'
+		.. h(pluginID)
+		.. '" data-pname="'
+		.. h(selName)
+		.. '"><select id="pluginIDNative" class="hidden">'
+		.. pluginOpts
+		.. "</select></div>"
+		.. (genreOpts ~= "" and ('<div><label for="genre" class="block text-xs text-neutral-400 mb-1">Category</label><select id="genre" name="genre" class="bg-neutral-900 border border-neutral-700 rounded-md px-3 py-2 text-sm">' .. genreOpts .. "</select></div>") or "")
+		.. '<div class="flex-1"><label for="q" class="block text-xs text-neutral-400 mb-1">&nbsp;</label><input id="q" name="q" type="text" value="'
+		.. h(q)
+		.. '" placeholder="Manga title..." class="w-full bg-neutral-900 border border-neutral-700 rounded-md px-3 py-2 text-sm"></div>'
 		.. '<button type="submit" class="bg-indigo-600 hover:bg-indigo-500 text-white rounded-md px-4 py-2 text-sm font-medium">Search</button>'
-		.. '</div>'
-		.. (topPagination ~= "" and ('<div class="mt-3">' .. topPagination .. '</div>') or "")
-		.. '</form>'
+		.. "</div>"
+		.. (topPagination ~= "" and ('<div class="mt-3">' .. topPagination .. "</div>") or "")
+		.. "</form>"
 		.. '<div id="search-history" class="mb-8"></div>'
 		.. [[<script>(function(){
   var btn = document.getElementById('pluginPickerBtn'), drop = document.getElementById('pluginPickerDrop'), hid = document.getElementById('pluginID');
