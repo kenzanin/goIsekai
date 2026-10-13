@@ -184,7 +184,7 @@ return function(data)
 		Pagination = { Base = pagBase, Param = "page", Current = page, Total = totalPages, Compact = false },
 	})
 	-- 3-zone toolbar: view-mode left, pagination centered, update right. Pagination below grid stays centered on its own.
-	local topToolbar = '<div class="flex items-center gap-3 mt-4 mb-4 flex-wrap"><div class="shrink-0">' .. viewModeHTML .. '</div><div class="flex-1 flex justify-center">' .. paginationOnly .. '</div><div class="shrink-0">' .. updateHTML .. '</div></div>'
+	local topToolbar = '<div class="flex items-center gap-3 mt-4 mb-4 flex-wrap"><div class="shrink-0">' .. viewModeHTML .. '</div><div class="flex-1 flex justify-center">' .. paginationOnly .. '</div><div class="shrink-0">' .. updateHTML .. "</div></div>"
 	local bottomPagination = paginationOnly
 
 	return '<div class="flex items-center gap-3 flex-wrap mb-6">'

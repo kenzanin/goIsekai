@@ -49,20 +49,20 @@ return function(data)
 		.. "</form></div>"
 		.. cardsHTML
 		.. [[<script>
-document.querySelectorAll('input[type=file]').forEach(inp => {
-  inp.addEventListener('change', function() {
+document.querySelectorAll("input[type=file]").forEach(inp => {
+  inp.addEventListener("change", function() {
     var label = this.previousElementSibling;
-    if (label) label.textContent = this.files[0] ? this.files[0].name : 'Choose plugin…';
+    if (label) label.textContent = this.files[0] ? this.files[0].name : "Choose plugin…";
   });
 });
 
-var pluginFilter = document.getElementById('plugin-filter');
+var pluginFilter = document.getElementById("plugin-filter");
 if (pluginFilter) {
-  pluginFilter.addEventListener('input', function() {
+  pluginFilter.addEventListener("input", function() {
     var q = this.value.toLowerCase();
-    document.querySelectorAll('.space-y-3 > div').forEach(function(card) {
+    document.querySelectorAll(".space-y-3 > div").forEach(function(card) {
       var text = card.textContent.toLowerCase();
-      card.style.display = text.indexOf(q) !== -1 ? '' : 'none';
+      card.style.display = text.indexOf(q) !== -1 ? "" : "none";
     });
   });
 }
@@ -70,48 +70,48 @@ if (pluginFilter) {
 function testProfile(pluginID) {
   var sel = document.querySelector('[data-plugin-profile="' + pluginID + '"]');
   var profile = sel.value;
-  if (!profile) { showToast('Select a profile first', true); return; }
+  if (!profile) { showToast("Select a profile first", true); return; }
   var btn = sel.nextElementSibling;
-  setBtnState(btn, 'busy');
-  fetch('/action/test-profile/' + pluginID, {
-    method: 'POST',
-    headers: {'Content-Type': 'application/x-www-form-urlencoded'},
-    body: 'profile=' + encodeURIComponent(profile)
+  setBtnState(btn, "busy");
+  fetch("/action/test-profile/" + pluginID, {
+    method: "POST",
+    headers: {"Content-Type": "application/x-www-form-urlencoded"},
+    body: "profile=" + encodeURIComponent(profile)
   }).then(function(r) { return r.json(); })
     .then(function(d) {
-      setBtnState(btn, d.ok ? 'ok' : 'fail');
+      setBtnState(btn, d.ok ? "ok" : "fail");
       if (d.ok) {
-        showToast('OK ' + d.status + ' via ' + profile, false);
+        showToast("OK " + d.status + " via " + profile, false);
       } else {
-        showToast(profile + ' → ' + d.status + ' blocked', true);
+        showToast(profile + " → " + d.status + " blocked", true);
       }
     })
     .catch(function() {
-      setBtnState(btn, 'fail');
-      showToast('Test request failed', true);
+      setBtnState(btn, "fail");
+      showToast("Test request failed", true);
     });
 }
 
 function setBtnState(btn, state) {
-  btn.disabled = (state === 'busy');
-  btn.className = 'rounded px-2 py-1 text-xs border transition-colors duration-150';
-  if (state === 'busy') {
-    btn.className += ' bg-amber-600 border-amber-600 text-white';
-    btn.textContent = 'Testing…';
-  } else if (state === 'ok') {
-    btn.className += ' bg-emerald-600 border-emerald-600 text-white';
-    btn.textContent = 'OK ✓';
+  btn.disabled = (state === "busy");
+  btn.className = "rounded px-2 py-1 text-xs border transition-colors duration-150";
+  if (state === "busy") {
+    btn.className += " bg-amber-600 border-amber-600 text-white";
+    btn.textContent = "Testing…";
+  } else if (state === "ok") {
+    btn.className += " bg-emerald-600 border-emerald-600 text-white";
+    btn.textContent = "OK ✓";
   } else {
-    btn.className += ' bg-red-600 border-red-600 text-white';
-    btn.textContent = 'Blocked ✗';
+    btn.className += " bg-red-600 border-red-600 text-white";
+    btn.textContent = "Blocked ✗";
   }
 }
 
 function resetProfile(pluginID) {
-  fetch('/action/reset-profile/' + pluginID, {method: 'POST'})
+  fetch("/action/reset-profile/" + pluginID, {method: "POST"})
     .then(function(r) { return r.json(); })
-    .then(function() { showToast('Profile reset to auto'); location.reload(); })
-    .catch(function() { showToast('Reset failed', true); });
+    .then(function() { showToast("Profile reset to auto"); location.reload(); })
+    .catch(function() { showToast("Reset failed", true); });
 }
 </script>
 ]]

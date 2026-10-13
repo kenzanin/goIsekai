@@ -61,55 +61,28 @@ return function(data)
 
 		local coverHtml
 		if coverURL ~= "" then
-			coverHtml = string.format(
-				'<img src="/image?pluginID=%s&amp;url=%s" alt="%s" class="w-24 aspect-[2/3] object-cover rounded shrink-0" loading="lazy" onerror="this.onerror=null;this.src=\'/static/img/placeholder.svg\';">',
-				h(pluginID),
-				h(coverURL),
-				h(title)
-			)
+			coverHtml = '<img src="/image?pluginID=' .. h(pluginID) .. "&amp;url=" .. h(coverURL) .. '" alt="' .. h(title) .. '" class="w-24 aspect-[2/3] object-cover rounded shrink-0" loading="lazy" onerror="this.onerror=null;this.src=\'/static/img/placeholder.svg\';">'
 		else
-			coverHtml = string.format(
-				'<div class="w-24 aspect-[2/3] bg-neutral-800 rounded flex items-center justify-center text-neutral-500 text-base font-semibold shrink-0">%s</div>',
-				h(getInitials(title))
-			)
+			coverHtml = '<div class="w-24 aspect-[2/3] bg-neutral-800 rounded flex items-center justify-center text-neutral-500 text-base font-semibold shrink-0">' .. h(getInitials(title)) .. "</div>"
 		end
 
 		local iconHtml = ""
 		if pluginIcon ~= "" then
-			iconHtml = string.format('<img src="%s" alt="" class="h-4 w-4 rounded-sm object-cover">', h(pluginIcon))
+			iconHtml = '<img src="' .. h(pluginIcon) .. '" alt="" class="h-4 w-4 rounded-sm object-cover">'
 		end
 
-		rows[#rows + 1] = string.format(
-			[[
-    <a href="/view/manga/%s/%s" class="flex items-center gap-4 py-4 -mx-2 px-2 rounded hover:bg-neutral-900 transition">
-        %s
-        <div class="flex-1 min-w-0">
-          <div class="flex items-center justify-between">
-            <div class="text-base font-medium truncate">%s</div>
-            <div class="text-sm text-neutral-500 shrink-0 hidden sm:block" data-ts="%s" title="%s">%s</div>
-          </div>
-          <div class="flex items-center gap-2 mt-1">
-            <span class="text-sm text-neutral-400">%s/%s chapters</span>
-            <span class="inline-flex items-center gap-1.5 text-sm px-2.5 py-1 rounded-full bg-neutral-800 text-neutral-500">%s%s</span>
-            <div class="text-sm text-neutral-500 sm:hidden" data-ts="%s" title="%s">%s</div>
-          </div>
-        </div>
-    </a>]],
-			h(pluginID),
-			h(sourceMangaID),
-			coverHtml,
-			h(title),
-			tsAttr,
-			formattedDate,
-			formattedDate,
-			h(tostring(readChapters)),
-			h(tostring(totalChapters)),
-			badge,
-			iconHtml,
-			tsAttr,
-			formattedDate,
-			formattedDate
-		)
+		rows[#rows + 1] = '<a href="/view/manga/' .. h(pluginID) .. "/" .. h(sourceMangaID) .. '" class="flex items-center gap-4 py-4 -mx-2 px-2 rounded hover:bg-neutral-900 transition">'
+			.. coverHtml
+			.. '<div class="flex-1 min-w-0">'
+			.. '<div class="flex items-center justify-between">'
+			.. '<div class="text-base font-medium truncate">' .. h(title) .. "</div>"
+			.. '<div class="text-sm text-neutral-500 shrink-0 hidden sm:block" data-ts="' .. tsAttr .. '" title="' .. formattedDate .. '">' .. formattedDate .. "</div>"
+			.. "</div>"
+			.. '<div class="flex items-center gap-2 mt-1">'
+			.. '<span class="text-sm text-neutral-400">' .. h(tostring(readChapters)) .. "/" .. h(tostring(totalChapters)) .. " chapters</span>"
+			.. '<span class="inline-flex items-center gap-1.5 text-sm px-2.5 py-1 rounded-full bg-neutral-800 text-neutral-500">' .. badge .. iconHtml .. "</span>"
+			.. '<div class="text-sm text-neutral-500 sm:hidden" data-ts="' .. tsAttr .. '" title="' .. formattedDate .. '">' .. formattedDate .. "</div>"
+			.. "</div></div></a>"
 	end
 
 	local pag = ""
@@ -123,11 +96,7 @@ return function(data)
 	local chips = ""
 	if next(stats) then
 		local function chip(label, value)
-			return string.format(
-				'<span class="text-xs px-2.5 py-1 rounded-full bg-neutral-800/80 text-neutral-400">%s <span class="text-neutral-200 font-medium">%d</span></span>',
-				label,
-				value or 0
-			)
+			return '<span class="text-xs px-2.5 py-1 rounded-full bg-neutral-800/80 text-neutral-400">' .. label .. ' <span class="text-neutral-200 font-medium">' .. tostring(value or 0) .. "</span></span>"
 		end
 		chips = table.concat({
 			chip("titles", stats.Total),
@@ -136,18 +105,12 @@ return function(data)
 		})
 	end
 
-	local listHTML = string.format(
-		[[
-<h1 class="text-xl font-semibold mb-3">Updates</h1>
-<div class="flex flex-wrap gap-2 mb-6">%s</div>
-%s
-<div class="divide-y divide-neutral-800">
-%s
-</div>]],
-		chips,
-		pag,
-		table.concat(rows, "\n")
-	)
+	local listHTML = '<h1 class="text-xl font-semibold mb-3">Updates</h1>'
+		.. '<div class="flex flex-wrap gap-2 mb-6">' .. chips .. "</div>"
+		.. pag
+		.. '<div class="divide-y divide-neutral-800">'
+		.. table.concat(rows, "\n")
+		.. "</div>"
 
 	return listHTML .. pag
 end
