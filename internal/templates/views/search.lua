@@ -182,27 +182,57 @@ return function(data)
 		})
 	end
 
+	-- Plugin picker (button + hidden native select keeps form semantics)
+	local selIcon, selName = "", pluginID
+	for _, p in ipairs(plugins) do
+		if p.ID == pluginID then
+			selIcon = p.IconURL or ""
+			selName = p.Name
+			break
+		end
+	end
+	local pickerBtn = '<button type="button" id="pluginPickerBtn" class="flex items-center gap-2 bg-neutral-900 border border-neutral-700 rounded-md px-3 py-2 text-sm min-w-[180px] text-left">'
+		.. (selIcon ~= "" and ('<img src="' .. h(selIcon) .. '" alt="" class="w-5 h-5 rounded object-cover flex-shrink-0">') or '')
+		.. '<span id="pluginPickerLabel" class="truncate">' .. h(selName) .. '</span></button>'
+	local pickerDrop = '<div id="pluginPickerDrop" class="hidden absolute z-20 mt-1 w-56 bg-neutral-900 border border-neutral-700 rounded-md shadow-lg py-1 max-h-64 overflow-auto">'
+	for _, p in ipairs(plugins) do
+		if p.IsActive then
+			local ic = p.IconURL or ""
+			pickerDrop = pickerDrop .. '<button type="button" data-pick="' .. h(p.ID) .. '" data-pname="' .. h(p.Name) .. '" class="w-full flex items-center gap-2 px-3 py-2 text-sm text-left hover:bg-neutral-800">'
+				.. (ic ~= "" and ('<img src="' .. h(ic) .. '" alt="" class="w-5 h-5 rounded object-cover flex-shrink-0">') or '<span class="w-5 h-5 rounded bg-neutral-700 flex-shrink-0"></span>')
+				.. h(p.Name) .. '</button>'
+		end
+	end
+	pickerDrop = pickerDrop .. '</div>'
 	return [[<h1 class="text-xl font-semibold mb-6">Search]]
 		.. pluginBadge
 		.. [[</h1>]]
-		.. '<form method="get" action="/view/search" class="flex gap-2 items-end mb-8">'
-		.. "<div>"
-		.. '<label for="pluginID" class="block text-xs text-neutral-400 mb-1">Plugin</label>'
-		.. '<select id="pluginID" name="pluginID" onchange="this.form.submit()" class="bg-neutral-900 border border-neutral-700 rounded-md px-3 py-2 text-sm">'
-		.. pluginOpts
-		.. "</select>"
-		.. "</div>"
-		.. '<div class="flex-1 max-w-md">'
-		.. '<label for="q" class="block text-xs text-neutral-400 mb-1">Query</label>'
-		.. '<input id="q" name="q" type="text" value="'
-		.. h(q)
-		.. '" placeholder="Manga title..." class="w-full bg-neutral-900 border border-neutral-700 rounded-md px-3 py-2 text-sm">'
-		.. "</div>"
-		.. (genreOpts ~= "" and ("<div>" .. '<label for="genre" class="block text-xs text-neutral-400 mb-1">Genre</label>' .. '<select id="genre" name="genre" class="bg-neutral-900 border border-neutral-700 rounded-md px-3 py-2 text-sm">' .. genreOpts .. "</select>" .. "</div>") or "")
+		.. '<form method="get" action="/view/search" id="searchForm" class="mb-6">'
+		.. '<div class="flex gap-2 items-end">'
+		.. '<div class="relative"><label class="block text-xs text-neutral-400 mb-1">Plugin</label>' .. pickerBtn .. pickerDrop .. '<input type="hidden" id="pluginID" name="pluginID" value="' .. h(pluginID) .. '" data-pname="' .. h(selName) .. '"><select id="pluginIDNative" class="hidden">' .. pluginOpts .. '</select></div>'
+		.. (genreOpts ~= "" and ('<div><label for="genre" class="block text-xs text-neutral-400 mb-1">Category</label><select id="genre" name="genre" class="bg-neutral-900 border border-neutral-700 rounded-md px-3 py-2 text-sm">' .. genreOpts .. "</select></div>") or '')
+		.. '<div class="flex-1"><label for="q" class="block text-xs text-neutral-400 mb-1">&nbsp;</label><input id="q" name="q" type="text" value="' .. h(q) .. '" placeholder="Manga title..." class="w-full bg-neutral-900 border border-neutral-700 rounded-md px-3 py-2 text-sm"></div>'
 		.. '<button type="submit" class="bg-indigo-600 hover:bg-indigo-500 text-white rounded-md px-4 py-2 text-sm font-medium">Search</button>'
-		.. (topPagination ~= "" and topPagination or "")
-		.. "</form>"
-		.. '<div id="search-history" class="mb-6"></div>'
+		.. '</div>'
+		.. (topPagination ~= "" and ('<div class="mt-3">' .. topPagination .. '</div>') or "")
+		.. '</form>'
+		.. '<div id="search-history" class="mb-8"></div>'
+		.. [[<script>(function(){
+  var btn = document.getElementById('pluginPickerBtn'), drop = document.getElementById('pluginPickerDrop'), hid = document.getElementById('pluginID');
+  if (btn && drop && hid) {
+    btn.addEventListener('click', function () { drop.classList.toggle('hidden'); });
+    drop.querySelectorAll('[data-pick]').forEach(function (el) {
+      el.addEventListener('click', function () {
+        hid.value = el.getAttribute('data-pick');
+        hid.setAttribute('data-pname', el.getAttribute('data-pname') || el.getAttribute('data-pick'));
+        document.getElementById('searchForm').submit();
+      });
+    });
+    document.addEventListener('click', function (e) {
+      if (!btn.contains(e.target) && !drop.contains(e.target)) drop.classList.add('hidden');
+    });
+  }
+})();</script>]]
 		.. resultsHTML
 		.. "\n"
 		.. noResults
@@ -214,7 +244,7 @@ return function(data)
 		.. bottomPagination
 		.. [[<script>
 (function(){
-  var KEY = "gi_search_history", MAX = 20;
+  var KEY = "gi_search_history", MAX = 20, MAX_SHOW = 8;
   function load() {
     try { var v = JSON.parse(localStorage.getItem(KEY) || "[]"); return Array.isArray(v) ? v : []; }
     catch (e) { return []; }
@@ -222,7 +252,7 @@ return function(data)
   function save(h) { try { localStorage.setItem(KEY, JSON.stringify(h.slice(0, MAX))); } catch (e) {} }
   var qEl = document.getElementById("q"), pEl = document.getElementById("pluginID"), gEl = document.getElementById("genre");
   var q = qEl ? qEl.value : "", pid = pEl ? pEl.value : "", genre = gEl ? gEl.value : "";
-  var pname = (pEl && pEl.selectedIndex >= 0 && pEl.options[pEl.selectedIndex]) ? pEl.options[pEl.selectedIndex].text : pid;
+  var pname = (pEl && pEl.dataset && pEl.dataset.pname) ? pEl.dataset.pname : pid;
   var h = load();
   if (q || genre) {
     h = h.filter(function(e) { return !(e.q === q && e.pid === pid && e.g === genre); });
@@ -236,15 +266,19 @@ return function(data)
   label.className = "text-xs text-neutral-400 mb-2";
   label.textContent = "Recent searches";
   box.appendChild(label);
-  h.forEach(function(e) {
+  var grid = document.createElement("div");
+  grid.className = "grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2";
+  box.appendChild(grid);
+  h.slice(0, MAX_SHOW).forEach(function (e) {
     var a = document.createElement("a");
     var url = "/view/search?pluginID=" + encodeURIComponent(e.pid || "") + "&q=" + encodeURIComponent(e.q || "");
     if (e.g) url += "&genre=" + encodeURIComponent(e.g);
     a.href = url;
-    a.className = "inline-flex items-center gap-1.5 text-xs px-2 py-0.5 rounded-full bg-neutral-800 text-neutral-500 mr-2 mb-2";
+    a.className = "block truncate text-xs px-3 py-1.5 rounded-md bg-neutral-800 border border-neutral-700 text-neutral-300 hover:bg-neutral-700";
+    a.title = (e.q || e.g) + (e.pname || e.pid ? " via " + (e.pname || e.pid) : "");
     var src = e.pname || e.pid || "";
     a.textContent = (e.q || e.g) + (src ? " via " + src : "");
-    box.appendChild(a);
+    grid.appendChild(a);
   });
 })();
 </script>]]

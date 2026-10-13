@@ -24,6 +24,8 @@ return function(data)
 	local duplicateGroups = data.DuplicateGroups or {}
 	local pluginCounts = data.PluginCounts or {}
 
+	local pluginID = data.PluginID or ""
+
 	local sidebarHTML = librarySidebar({
 		Mangas = mangas,
 		Q = q,
@@ -31,6 +33,7 @@ return function(data)
 		DuplicateCount = duplicateCount,
 		DuplicateGroups = duplicateGroups,
 		PluginCounts = pluginCounts,
+		PluginID = pluginID,
 	})
 
 	local mangaCards = libraryCards({
@@ -38,8 +41,6 @@ return function(data)
 		LibraryStats = libraryStats,
 		Ratios = ratios,
 	})
-
-	local pluginID = data.PluginID or ""
 	local pluginName = data.PluginName or pluginID
 	local titleCount = data.ResultCount
 	if not titleCount then
@@ -168,26 +169,23 @@ return function(data)
 	sortCarried = sortCarried
 		.. (tagFilter ~= "" and '<input type="hidden" name="tag" value="' .. h(tagFilter) .. '">' or "")
 
-	-- Source filter chip: clears pluginID, keeps q.
 	local chip = ""
-	if pluginID ~= "" then
-		local clearURL = "/view/library"
-		if q ~= "" then
-			clearURL = clearURL .. "?q=" .. h(q)
-		end
-		chip = '<a href="'
-			.. clearURL
-			.. '" class="inline-flex items-center gap-1.5 rounded-md border border-neutral-700 px-2.5 py-1 text-xs text-neutral-400 hover:bg-neutral-800 hover:text-neutral-200" title="Clear source filter">'
-			.. "Source: "
-			.. h(pluginName)
-			.. ' <span class="text-neutral-500">✕</span></a>'
-	end
-	local topPagination = pagination({
-		Pagination = { Base = pagBase, Param = "page", Current = page, Total = totalPages, Compact = true },
-	})
-	local bottomPagination = pagination({
+	local viewModeHTML = '<div class="view-mode-toggle flex items-center gap-1" role="group" aria-label="View mode" data-view-mode="grid">'
+		.. '<button type="button" id="view-grid-btn" aria-pressed="true" class="p-1.5 rounded-md hover:bg-neutral-800 transition" title="Grid view">'
+		.. '<svg class="w-4 h-4 text-neutral-400" fill="currentColor" viewBox="0 0 16 16"><rect x="1" y="1" width="6" height="6" rx="1"/><rect x="9" y="1" width="6" height="6" rx="1"/><rect x="1" y="9" width="6" height="6" rx="1"/><rect x="9" y="9" width="6" height="6" rx="1"/></svg></button>'
+		.. '<button type="button" id="view-list-btn" aria-pressed="false" class="p-1.5 rounded-md hover:bg-neutral-800 transition" title="List view">'
+		.. '<svg class="w-4 h-4 text-neutral-400" fill="currentColor" viewBox="0 0 16 16"><rect x="1" y="1" width="14" height="3" rx="1"/><rect x="1" y="6.5" width="14" height="3" rx="1"/><rect x="1" y="12" width="14" height="3" rx="1"/></svg></button></div>'
+	local updateHTML = '<form method="post" action="/action/sync" data-sync-form data-job-action="sync">'
+		.. csrfInput(data.csrf_token or "")
+		.. '<button type="submit" class="bg-indigo-600 hover:bg-indigo-500 text-white rounded-md px-4 py-2 text-sm font-medium inline-flex items-center gap-1.5">'
+		.. '<svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 0 0 4.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 0 1-15.357-2m15.357 2H15"/></svg>Update</button>'
+		.. "</form>"
+	local paginationOnly = pagination({
 		Pagination = { Base = pagBase, Param = "page", Current = page, Total = totalPages, Compact = false },
 	})
+	-- 3-zone toolbar: view-mode left, pagination centered, update right. Pagination below grid stays centered on its own.
+	local topToolbar = '<div class="flex items-center gap-3 mt-4 mb-4 flex-wrap"><div class="shrink-0">' .. viewModeHTML .. '</div><div class="flex-1 flex justify-center">' .. paginationOnly .. '</div><div class="shrink-0">' .. updateHTML .. '</div></div>'
+	local bottomPagination = paginationOnly
 
 	return '<div class="flex items-center gap-3 flex-wrap mb-6">'
 		.. '<div class="shrink-0"><h1 class="text-xl font-semibold">Library</h1>'
@@ -230,17 +228,8 @@ return function(data)
 		.. "</select>"
 		.. "</form>"
 		.. tagBar
-		.. topPagination
-		.. '<div class="view-mode-toggle shrink-0 flex items-center gap-1" role="group" aria-label="View mode" data-view-mode="grid">'
-		.. '<button type="button" id="view-grid-btn" aria-pressed="true" class="p-1.5 rounded-md hover:bg-neutral-800 transition" title="Grid view">'
-		.. '<svg class="w-4 h-4 text-neutral-400" fill="currentColor" viewBox="0 0 16 16"><rect x="1" y="1" width="6" height="6" rx="1"/><rect x="9" y="1" width="6" height="6" rx="1"/><rect x="1" y="9" width="6" height="6" rx="1"/><rect x="9" y="9" width="6" height="6" rx="1"/></svg></button>'
-		.. '<button type="button" id="view-list-btn" aria-pressed="false" class="p-1.5 rounded-md hover:bg-neutral-800 transition" title="List view">'
-		.. '<svg class="w-4 h-4 text-neutral-400" fill="currentColor" viewBox="0 0 16 16"><rect x="1" y="1" width="14" height="3" rx="1"/><rect x="1" y="6.5" width="14" height="3" rx="1"/><rect x="1" y="12" width="14" height="3" rx="1"/></svg></button></div>'
-		.. '<form method="post" action="/action/sync" class="ml-auto" data-sync-form data-job-action="sync">'
-		.. csrfInput(data.csrf_token or "")
-		.. '<button type="submit" class="bg-indigo-600 hover:bg-indigo-500 text-white rounded-md px-4 py-2 text-sm font-medium inline-flex items-center gap-1.5">'
-		.. '<svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 0 0 4.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 0 1-15.357-2m15.357 2H15"/></svg>Update</button>'
-		.. "</form></div>"
+		.. "</div>"
+		.. topToolbar
 		.. sidebarHTML
 		.. mangaCards
 		.. (sidebarHTML ~= "" and "</div></div>" or "")
