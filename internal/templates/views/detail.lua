@@ -42,7 +42,7 @@ return function(data)
 
 	-- Back button
 	local body = [[<div class="mb-4">
-    <button onclick="window.backToList ? backToList() : (window.location.href = "/view/library")" class="inline-flex items-center gap-1.5 text-sm text-neutral-400 hover:text-neutral-200 transition" aria-label="Back">
+    <button onclick="window.backToList ? backToList() : (window.location.href = '/view/library')" class="inline-flex items-center gap-1.5 text-sm text-neutral-400 hover:text-neutral-200 transition" aria-label="Back">
         <svg xmlns="http://www.w3.org/2000/svg" class="size-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg>
         Back
     </button></div>
@@ -253,7 +253,7 @@ return function(data)
 		if needsToggle then
 			synopsisHTML = synopsisHTML
 				.. '<span id="synopsis-fade" class="absolute inset-x-0 bottom-0 h-8 bg-gradient-to-t from-neutral-950 to-transparent pointer-events-none"></span>'
-				.. "<button type=\"button\" id=\"synopsis-toggle\" onclick=\"var t=document.getElementById("synopsis-text");var f=document.getElementById("synopsis-fade");var b=document.getElementById("synopsis-toggle");t.classList.toggle("max-h-[4.5rem]");t.classList.toggle("max-h-none");f.style.display=t.classList.contains("max-h-none")?"none":"block";b.textContent=t.classList.contains("max-h-none")?"Show less":"Read more";\" class=\"text-xs text-indigo-400 hover:text-indigo-300 transition mt-1 cursor-pointer\">Read more</button>"
+				.. "<button type=\"button\" id=\"synopsis-toggle\" onclick=\"var t=document.getElementById('synopsis-text');var f=document.getElementById('synopsis-fade');var b=document.getElementById('synopsis-toggle');t.classList.toggle('max-h-[4.5rem]');t.classList.toggle('max-h-none');f.style.display=t.classList.contains('max-h-none')?'none':'block';b.textContent=t.classList.contains('max-h-none')?'Show less':'Read more';\" class=\"text-xs text-indigo-400 hover:text-indigo-300 transition mt-1 cursor-pointer\">Read more</button>"
 		end
 		synopsisHTML = synopsisHTML .. "</div>"
 	end
@@ -457,7 +457,7 @@ return function(data)
 				.. h(pluginID)
 				.. "&url="
 				.. h(c.url)
-				.. "&prio=high"
+				.. '&prio=high'
 				.. (coverVersions[c.url] and coverVersions[c.url] ~= "" and ("&cb=" .. h(coverVersions[c.url])) or "")
 				.. '" alt="cover" loading="lazy" class="w-32 aspect-[2/3] rounded-lg object-cover border-2 transition cursor-pointer '
 				.. (c.current and "border-emerald-500" or "border-transparent group-hover:border-blue-400")
@@ -470,11 +470,11 @@ return function(data)
 	end
 	body = body
 		.. [[<div id="cover-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center" style="display:none">
-    <div class="absolute inset-0 bg-black/70" onclick="var m=this.parentElement;m.classList.add("hidden");m.style.display="none""></div>
+    <div class="absolute inset-0 bg-black/70" onclick="var m=this.parentElement;m.classList.add('hidden');m.style.display='none'"></div>
     <div class="relative bg-neutral-900 border border-neutral-700 rounded-xl p-4 max-w-3xl max-h-[80vh] overflow-y-auto">
         <div class="flex items-center justify-between mb-3">
             <h3 class="text-sm font-semibold text-neutral-200">Pick a cover</h3>
-            <button onclick="var m=this.closest("#cover-modal");m.classList.add("hidden");m.style.display="none"" class="text-neutral-400 hover:text-neutral-200 text-lg leading-none" aria-label="Close">&times;</button>
+            <button onclick="var m=this.closest('#cover-modal');m.classList.add('hidden');m.style.display='none'" class="text-neutral-400 hover:text-neutral-200 text-lg leading-none" aria-label="Close">&times;</button>
         </div>
         <div class="flex flex-wrap gap-3">]]
 		.. coverGrid

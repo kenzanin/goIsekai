@@ -31,7 +31,7 @@ return function(data)
 		'            <circle cx="44.5" cy="44.5" r="1.3" fill="#1e1b4b"/>',
 		'            <circle cx="48.5" cy="44.5" r="1.3" fill="#1e1b4b"/>',
 		"        </svg>",
-		"        <span style=\"font-family: "Space Grotesk", system-ui, sans-serif; letter-spacing: -0.02em;\">goIsekai</span>",
+		"        <span style=\"font-family: 'Space Grotesk', system-ui, sans-serif; letter-spacing: -0.02em;\">goIsekai</span>",
 		"    </a>",
 		navLink("/view/search", "search", "Search", active),
 		navLink("/view/updates", "updates", "Updates", active),

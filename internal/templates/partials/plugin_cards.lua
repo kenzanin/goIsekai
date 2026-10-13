@@ -19,9 +19,9 @@ return function(data)
 
 	local pluginCards = ""
 	if #plugins == 0 then
-		pluginCards = '<div class="py-16 text-center text-neutral-500">No plugins installed</div>"
+		pluginCards = '<div class="py-16 text-center text-neutral-500">No plugins installed</div>'
 	else
-		pluginCards = "<div class="space-y-3">'
+		pluginCards = '<div class="space-y-3">'
 		for _, p in ipairs(plugins) do
 			local id = p.ID or ""
 			local name = p.Name or ""
@@ -44,9 +44,9 @@ return function(data)
 			-- Count links to the library filtered by this plugin when > 0.
 			local countHTML = h(countLabel)
 			if libCount > 0 then
-				countHTML = '<a href="/view/library?pluginID="
+				countHTML = '<a href="/view/library?pluginID='
 					.. h(id)
-					.. "" class="hover:underline">'
+					.. '" class="hover:underline">'
 					.. h(countLabel)
 					.. "</a>"
 			end
@@ -56,12 +56,12 @@ return function(data)
 			-- Icon + name + profile badge
 			local iconHTML
 			if iconURL ~= "" then
-				iconHTML = '<img src=""
+				iconHTML = '<img src="'
 					.. h(iconURL)
-					.. "" alt="" class="h-10 w-10 rounded-md object-cover bg-neutral-800">"
+					.. '" alt="" class="h-10 w-10 rounded-md object-cover bg-neutral-800">'
 			else
 				local initials = getInitials(name)
-				iconHTML = "<div class="h-10 w-10 rounded-md bg-indigo-500/15 text-indigo-400 flex items-center justify-center text-sm font-semibold shrink-0">'
+				iconHTML = '<div class="h-10 w-10 rounded-md bg-indigo-500/15 text-indigo-400 flex items-center justify-center text-sm font-semibold shrink-0">'
 					.. h(initials)
 					.. "</div>"
 			end
@@ -74,16 +74,16 @@ return function(data)
 
 			local kind = KIND_BADGE[p.Kind]
 			local kindBadge = kind
-					and ('<span class="text-xs px-1.5 py-0.5 rounded-full font-medium " .. kind.class .. "" title="" .. h(
+					and ('<span class="text-xs px-1.5 py-0.5 rounded-full font-medium ' .. kind.class .. '" title="' .. h(
 						kind.title
-					) .. "">' .. kind.label .. "</span>")
+					) .. '">' .. kind.label .. "</span>")
 				or ""
 
 			cardHTML = cardHTML
-				.. '<div class="flex items-center gap-3">"
+				.. '<div class="flex items-center gap-3">'
 				.. iconHTML
-				.. "<div class="min-w-0 flex-1">"
-				.. "<div class="font-medium text-sm flex items-center gap-2">'
+				.. '<div class="min-w-0 flex-1">'
+				.. '<div class="font-medium text-sm flex items-center gap-2">'
 				.. h(name)
 				.. kindBadge
 				.. profileBadge
@@ -94,24 +94,24 @@ return function(data)
 				.. '<div class="text-xs font-mono text-neutral-500 truncate">'
 				.. h(id)
 				.. "</div>"
-				.. (siteURL ~= "" and ('<a href="" .. h(siteURL) .. "" target="_blank" rel="noopener" class="text-xs text-indigo-400 hover:text-indigo-300 truncate">' .. h(
+				.. (siteURL ~= "" and ('<a href="' .. h(siteURL) .. '" target="_blank" rel="noopener" class="text-xs text-indigo-400 hover:text-indigo-300 truncate">' .. h(
 					siteURL
 				) .. "</a>") or "")
 				.. "</div>"
-				.. '<div class="flex items-center gap-2 shrink-0 flex-wrap">"
+				.. '<div class="flex items-center gap-2 shrink-0 flex-wrap">'
 
 			-- Profile select
 			cardHTML = cardHTML
-				.. "<select data-plugin-profile=""
+				.. '<select data-plugin-profile="'
 				.. h(id)
-				.. "" class="bg-neutral-800 border border-neutral-700 rounded px-2 py-1 text-xs">"
-				.. "<option value="">auto</option>'
+				.. '" class="bg-neutral-800 border border-neutral-700 rounded px-2 py-1 text-xs">'
+				.. '<option value="">auto</option>'
 			for _, profileName in ipairs(availableProfiles) do
 				local sel = profileName == pinnedProfile and " selected" or ""
 				cardHTML = cardHTML
-					.. '<option value=""
+					.. '<option value="'
 					.. h(profileName)
-					.. ""'
+					.. '"'
 					.. sel
 					.. ">"
 					.. h(profileName)
@@ -121,7 +121,7 @@ return function(data)
 
 			-- Test button
 			cardHTML = cardHTML
-				.. '<button type="button" onclick="testProfile(\""
+				.. '<button type="button" onclick="testProfile(\''
 				.. h(id)
 				.. '\')" class="border border-neutral-700 text-neutral-400 hover:text-neutral-200 rounded px-2 py-1 text-xs">Test</button>'
 

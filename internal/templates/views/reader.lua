@@ -105,28 +105,28 @@ return function(data)
 <script src="/static/lib/reader.js" defer></script>
 <script>
 (function() {
-  var title = "]] .. h(mangaTitle) .. [[";
+  var title = ']] .. h(mangaTitle) .. [[';
   var chNum = ]] .. tostring(chNum) .. [[;
-  var chTitle = "]] .. h(chTitle) .. [[";
+  var chTitle = ']] .. h(chTitle) .. [[';
   if (title) {
     var label = title;
-    if (chNum > 0) { label += " \\u2013 Ch. " + chNum; if (chTitle) label += ": " + chTitle; }
-    else if (chTitle) { label += " \\u2013 " + chTitle; }
-    document.title = label + " \\u2013 goIsekai";
+    if (chNum > 0) { label += ' \\u2013 Ch. ' + chNum; if (chTitle) label += ': ' + chTitle; }
+    else if (chTitle) { label += ' \\u2013 ' + chTitle; }
+    document.title = label + ' \\u2013 goIsekai';
   }
 
-  var dirBtn = document.getElementById("btn-dir");
+  var dirBtn = document.getElementById('btn-dir');
   if (dirBtn) {
-    var RTL_CLASSES = "bg-indigo-600/20 border-indigo-500/40";
+    var RTL_CLASSES = 'bg-indigo-600/20 border-indigo-500/40';
     function applyDirStyle() {
-      var _root = document.getElementById("reader");
-      var _scope = _root ? (_root.dataset.pluginId + "." + _root.dataset.mangaId) : "";
-      var _rtl = localStorage.getItem("gi_direction." + _scope) === "rtl" || localStorage.getItem("gi_direction") === "rtl";
-      if (_rtl) dirBtn.classList.add(...RTL_CLASSES.split(" "));
-      else dirBtn.classList.remove(...RTL_CLASSES.split(" "));
+      var _root = document.getElementById('reader');
+      var _scope = _root ? (_root.dataset.pluginId + '.' + _root.dataset.mangaId) : '';
+      var _rtl = localStorage.getItem('gi_direction.' + _scope) === 'rtl' || localStorage.getItem('gi_direction') === 'rtl';
+      if (_rtl) dirBtn.classList.add(...RTL_CLASSES.split(' '));
+      else dirBtn.classList.remove(...RTL_CLASSES.split(' '));
     }
     applyDirStyle();
-    dirBtn.addEventListener("click", function() {
+    dirBtn.addEventListener('click', function() {
       requestAnimationFrame(applyDirStyle);
     });
   }

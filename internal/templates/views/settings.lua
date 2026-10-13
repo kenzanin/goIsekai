@@ -99,10 +99,10 @@ return function(data)
 
 <script>
 (function () {
-  var ra = document.getElementById("read_ahead");
-  ra.value = localStorage.getItem("gi_readAhead") || "3";
-  ra.closest("form").addEventListener("submit", function () {
-    localStorage.setItem("gi_readAhead", ra.value);
+  var ra = document.getElementById('read_ahead');
+  ra.value = localStorage.getItem('gi_readAhead') || '3';
+  ra.closest('form').addEventListener('submit', function () {
+    localStorage.setItem('gi_readAhead', ra.value);
   });
 })();
 </script>]] or [[<div class="py-16 text-center text-neutral-500">Failed to load configuration</div>]])
