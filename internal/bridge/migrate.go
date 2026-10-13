@@ -97,7 +97,7 @@ func (s *AppService) collectReadSourceIDs(mangaID int64) ([]string, error) {
 
 func repointMangaTx(tx *sql.Tx, mangaID int64, pluginID, sourceMangaID string, m types.Manga) error {
 	_, err := tx.Exec(
-		`UPDATE mangas SET plugin_id = ?, source_manga_id = ?, title = CASE WHEN custom_title = 1 THEN title ELSE ? END, cover_url = ?, description = CASE WHEN custom_description = 1 THEN description ELSE ? END, status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
+		`UPDATE mangas SET plugin_id = ?, source_manga_id = ?, title = ?, cover_url = ?, description = ?, status = ?, custom_title = 0, custom_description = 0, custom_cover = 0, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
 		pluginID, sourceMangaID, m.Title, m.CoverURL, m.Description, m.Status, mangaID,
 	)
 	return err
