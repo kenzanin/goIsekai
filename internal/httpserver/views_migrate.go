@@ -119,7 +119,7 @@ func (s *Server) viewMigrate(w http.ResponseWriter, r *http.Request) {
 			wg.Add(1)
 			go func(id string) {
 				defer wg.Done()
-				results, err := s.service.SearchManga(id, types.SearchFilter{Query: q, Page: page})
+				results, err := s.service.SearchManga(id, types.SearchFilter{Query: q, Page: 1})
 				if err != nil {
 					logger.Warn("migrate search failed", "plugin", id, "error", err)
 					mu.Lock()

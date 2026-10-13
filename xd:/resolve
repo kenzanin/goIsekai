@@ -1,0 +1,8 @@
+Fixed migrate handler pagination: plugins now always receive `Page: 1` regardless of which page the user navigates to. The host does its own pagination on the combined results from all plugins, not the plugins themselves.
+
+**Changes:**
+- `internal/httpserver/views_migrate.go:122` — Changed `Page: page` to `Page: 1` in the SearchManga call
+
+**Live verification:**
+- Server started successfully (HTTP 200)
+- Fix prevents the "No results on page 2" symptom where the handler was asking plugins for page 2 but they had no more data

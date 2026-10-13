@@ -103,17 +103,17 @@ return function(data)
 		.. "/"
 		.. h(mangaID)
 		.. '" id="migrateForm" class="mb-3">'
-	body = body .. '<div class="flex flex-wrap gap-2 items-end">'
+	body = body .. '<div class="mb-3">'
 	body = body
-		.. '<div class="flex-1 min-w-[280px]"><label class="block text-xs text-neutral-400 mb-1">Search</label><input type="text" id="migrateQ" name="q" value="'
+		.. '<div class="mb-2"><label class="block text-xs text-neutral-400 mb-1">Search</label><input type="text" id="migrateQ" name="q" value="'
 		.. h(q)
 		.. '" placeholder="Manga title..." class="w-full bg-neutral-900 border border-neutral-700 rounded-md px-3 py-2 text-sm"></div>'
 	body = body
-		.. '<div class="flex-1"><label class="block text-xs text-neutral-400 mb-1">Source plugins (select all to search all)</label><div class="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-5 gap-2 border border-neutral-700 rounded-md px-3 py-3 bg-neutral-900">'
+		.. '<div class="mb-2"><label class="block text-xs text-neutral-400 mb-1">Source plugins (select all to search all)</label><div class="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-5 gap-2 border border-neutral-700 rounded-md px-3 py-3 bg-neutral-900">'
 		.. cbHTML
 		.. "</div></div>"
 	body = body
-		.. '<div class="flex justify-end mt-2"><button type="submit" class="bg-indigo-600 hover:bg-indigo-500 text-white rounded-md px-4 py-2 text-sm font-medium">Search</button></div>'
+		.. '<div class="flex justify-end"><button type="submit" class="bg-indigo-600 hover:bg-indigo-500 text-white rounded-md px-4 py-2 text-sm font-medium">Search</button></div>'
 	.. "</form>"
 
 	-- Results grid (search-like)

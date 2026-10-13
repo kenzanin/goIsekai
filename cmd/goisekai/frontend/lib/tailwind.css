@@ -1007,10 +1007,6 @@ video {
   height: 100vh;
 }
 
-.max-h-24 {
-  max-height: 6rem;
-}
-
 .max-h-64 {
   max-height: 16rem;
 }
@@ -1113,14 +1109,6 @@ video {
 
 .min-w-\[180px\] {
   min-width: 180px;
-}
-
-.min-w-\[200px\] {
-  min-width: 200px;
-}
-
-.min-w-\[220px\] {
-  min-width: 220px;
 }
 
 .max-w-2xl {
@@ -1252,6 +1240,10 @@ video {
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
+.grid-cols-3 {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
 .flex-col {
   flex-direction: column;
 }
@@ -1312,15 +1304,6 @@ video {
   gap: 1.5rem;
 }
 
-.gap-x-3 {
-  -moz-column-gap: 0.75rem;
-       column-gap: 0.75rem;
-}
-
-.gap-y-1 {
-  row-gap: 0.25rem;
-}
-
 .space-y-1 > :not([hidden]) ~ :not([hidden]) {
   --tw-space-y-reverse: 0;
   margin-top: calc(0.25rem * calc(1 - var(--tw-space-y-reverse)));
@@ -1354,10 +1337,6 @@ video {
 .divide-neutral-800 > :not([hidden]) ~ :not([hidden]) {
   --tw-divide-opacity: 1;
   border-color: rgb(38 38 38 / var(--tw-divide-opacity, 1));
-}
-
-.self-end {
-  align-self: flex-end;
 }
 
 .overflow-auto {
@@ -2490,6 +2469,10 @@ video {
 
   .sm\:grid-cols-3 {
     grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .sm\:grid-cols-4 {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
   }
 }
 
