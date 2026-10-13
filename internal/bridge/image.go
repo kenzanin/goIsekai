@@ -169,6 +169,11 @@ func (s *AppService) GetImage(ctx context.Context, pluginID, url string, headers
 		return data, nil
 	}
 
+	// Deactivated plugins must not issue remote image requests.
+	if !s.db.IsPluginActive(pluginID) {
+		return nil, fmt.Errorf("bridge: image fetch: plugin %s is offline, cached image not available", pluginID)
+	}
+
 	// Singleflight: another caller may already be fetching this URL (draw +
 	// prefetch race). Join its call instead of queueing a duplicate fetch.
 	//
