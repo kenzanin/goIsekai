@@ -3,6 +3,7 @@ package bridge
 import (
 	"goisekai/internal/config"
 	"goisekai/internal/workers"
+	"time"
 )
 
 // loadImageFormat reads the cache encoding from the INI at cfgPath, defaulting
@@ -76,15 +77,15 @@ func loadWorkerPool(cfgPath string) workers.Config {
 	if err != nil || cfg == nil {
 		return workers.Config{}
 	}
-	s := cfg.WorkerPoolConfig()
 	return workers.Config{
-		InteractiveSize:  s.InteractiveSize,
-		InteractiveQueue: s.InteractiveQueue,
-		FetchSize:        s.FetchSize,
-		FetchQueue:       s.FetchQueue,
-		ImageSize:        s.ImageSize,
-		ImageQueue:       s.ImageQueue,
-		MaintenanceSize:  s.MaintenanceSize,
-		MaintenanceQueue: s.MaintenanceQueue,
+		InteractiveSize:          cfg.WorkersInteractiveSize,
+		InteractiveQueue:         cfg.WorkersInteractiveQueue,
+		FetchSize:                cfg.WorkersFetchSize,
+		FetchQueue:               cfg.WorkersFetchQueue,
+		ImageSize:                cfg.WorkersImageSize,
+		ImageQueue:               cfg.WorkersImageQueue,
+		MaintenanceSize:          cfg.WorkersMaintenanceSize,
+		MaintenanceQueue:         cfg.WorkersMaintenanceQueue,
+		BackgroundEnqueueTimeout: time.Duration(cfg.WorkersBackgroundEnqueueTimeout) * time.Second,
 	}
 }

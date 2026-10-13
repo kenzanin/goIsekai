@@ -132,6 +132,9 @@ type Config struct {
 	WorkersImageQueue       int
 	WorkersMaintenanceSize  int
 	WorkersMaintenanceQueue int
+	// WorkersBackgroundEnqueueTimeout bounds how long a background lane enqueue
+	// blocks before ErrBusy. Default 500ms. Zero = code default.
+	WorkersBackgroundEnqueueTimeout int
 
 	// [tray] — goisekai-tray wrapper settings. All optional: an empty value
 	// derives the default at startup (server binary next to the tray, URL
