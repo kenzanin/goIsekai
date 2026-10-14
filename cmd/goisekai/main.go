@@ -167,8 +167,9 @@ func main() {
 	defer close(maintenanceStop)
 
 	// Hourly background refresh of stale library manga (update_stale_days).
+	// Run via the maintenance lane via pool.Enqueue.
 	schedulerStop := make(chan struct{})
-	bridge.StartLibraryScheduler(svc, schedulerStop)
+	bridge.StartLibraryScheduler(svc, schedulerStop, svc.GetPool())
 	defer close(schedulerStop)
 
 	// cfg.HotReload re-reads + recompiles changed Lua templates per render, so
