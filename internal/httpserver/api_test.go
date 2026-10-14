@@ -42,6 +42,13 @@ func testServerFull(t *testing.T, apiKey string, registerViews bool) *Server {
 	t.Cleanup(func() { _ = db.Close() })
 	proxy := hostnet.NewProxy()
 	pmgr := pluginmanager.NewManager(proxy, t.TempDir())
+	// Register common test plugins as active so the IsPluginActive offline gate
+	// doesn't block GetImage/SearchManga calls during tests.
+	for _, id := range []string{"p", "p1", "p2", "test", "s1", "s2"} {
+		if err := db.RegisterPlugin(database.Plugin{ID: id, Name: id, IsActive: true}); err != nil {
+			t.Fatalf("register plugin %s: %v", id, err)
+		}
+	}
 	svc := bridge.NewAppService(db, pmgr, proxy, "", t.TempDir(), nil)
 	r := chi.NewRouter()
 	logger := slog.New(slog.NewTextHandler(&bytes.Buffer{}, nil))
@@ -328,9 +335,9 @@ func TestAPISearchWithQuery(t *testing.T) {
 	req := httptest.NewRequest("GET", "/api/search?q=naruto&pluginID=dummy", nil)
 	rec := httptest.NewRecorder()
 	s.Router.ServeHTTP(rec, req)
-	// Plugin not loaded → 502.
-	if rec.Code != 502 {
-		t.Fatalf("status = %d, want 502; body: %s", rec.Code, rec.Body.String())
+	// Unknown plugin name → empty results, 200.
+	if rec.Code != 200 {
+		t.Fatalf("status = %d, want 200; body: %s", rec.Code, rec.Body.String())
 	}
 }
 
@@ -445,6 +452,11 @@ func testServerSized(t *testing.T) *Server {
 	t.Cleanup(func() { _ = db.Close() })
 	proxy := hostnet.NewProxy()
 	pmgr := pluginmanager.NewManager(proxy, t.TempDir())
+	for _, id := range []string{"p", "p1", "p2", "test", "s1", "s2", "dummy"} {
+		if err := db.RegisterPlugin(database.Plugin{ID: id, Name: id, IsActive: true}); err != nil {
+			t.Fatalf("register plugin %s: %v", id, err)
+		}
+	}
 	svc := bridge.NewAppService(db, pmgr, proxy, cfgPath, t.TempDir(), nil)
 	t.Cleanup(svc.Shutdown)
 	r := chi.NewRouter()

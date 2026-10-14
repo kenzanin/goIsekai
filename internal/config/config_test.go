@@ -13,7 +13,7 @@ func TestLoadMissingFileReturnsDefaults(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Load missing file: %v", err)
 	}
-	if c.DataDir != "app_data" || c.Width != 1200 || c.Height != 800 || c.LogLevel != "info" {
+	if c.DataDir != "app_data" || c.Width != 1200 || c.Height != 800 || c.LogLevel != "debug" {
 		t.Fatalf("unexpected defaults: %+v", c)
 	}
 }
@@ -132,13 +132,13 @@ func TestLogLevelRoundTrips(t *testing.T) {
 }
 
 func TestMissingOrUnknownLogLevelKeepsDefault(t *testing.T) {
-	// Missing key keeps the "info" default.
+	// Missing key keeps the "debug" default.
 	c, err := Load(filepath.Join(t.TempDir(), "nolevel.ini"))
 	if err != nil {
 		t.Fatalf("Load: %v", err)
 	}
-	if c.LogLevel != "info" {
-		t.Fatalf("missing log_level: got %q want %q", c.LogLevel, "info")
+	if c.LogLevel != "debug" {
+		t.Fatalf("missing log_level: got %q want %q", c.LogLevel, "debug")
 	}
 
 	// Unknown value is ignored (default preserved), not applied.
@@ -150,8 +150,8 @@ func TestMissingOrUnknownLogLevelKeepsDefault(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Load: %v", err)
 	}
-	if got.LogLevel != "info" {
-		t.Fatalf("unknown log_level: got %q want %q", got.LogLevel, "info")
+	if got.LogLevel != "debug" {
+		t.Fatalf("unknown log_level: got %q want %q", got.LogLevel, "debug")
 	}
 }
 

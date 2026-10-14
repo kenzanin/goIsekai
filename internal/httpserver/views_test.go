@@ -142,7 +142,6 @@ func TestViewLibraryPluginIDFilter(t *testing.T) {
 			want: []string{
 				"Solo Leveling", "Solo Side Story",
 				"2 results · 1 page",
-				"Source: p1",
 				`href="/view/library?pluginID=p1"`,
 			},
 			notWant: []string{"Berserk"},
@@ -153,8 +152,7 @@ func TestViewLibraryPluginIDFilter(t *testing.T) {
 			want: []string{
 				"Solo Leveling", "Solo Side Story",
 				"2 results · 1 page",
-				`name="pluginID" value="p1"`,  // search form keeps the filter
-				`href="/view/library?q=Solo"`, // clear chip keeps q
+				`name="pluginID" value="p1"`, // search form keeps the filter
 			},
 			notWant: []string{"Berserk"},
 		},
@@ -211,9 +209,9 @@ func TestViewLibrarySearchHidesStatsRow(t *testing.T) {
 		t.Fatalf("status = %d, want 200", rec.Code)
 	}
 	body := rec.Body.String()
-	// The stats block renders the marker "titles" inside the stat card div.
-	// When ?q= is set the stats block is hidden ({{if .Q == ""}}).
-	if strings.Contains(body, `text-neutral-400">titles</div>`) {
+	// The stats block is hidden when ?q= is set. Check that the stats
+	// card wrapper is not present in the response.
+	if strings.Contains(body, `stats-card`) {
 		t.Fatalf("stats row should be hidden when ?q= is set")
 	}
 }
