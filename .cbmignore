@@ -1,0 +1,3 @@
+# Vendored minified vendor bundles — too large for the parser (parse timeout),
+# not project source. Excluded by design.
+cmd/goisekai/frontend/lib/mermaid.min.js

@@ -4,6 +4,8 @@ import (
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
+
+	"goisekai/internal/database"
 )
 
 // apiEnrichmentResponse is the JSON shape for enrichment data.
@@ -21,6 +23,12 @@ type apiEnrichmentItem struct {
 	Source string `json:"source"`
 }
 
+// enrichmentItem converts a database.EnrichmentRow to the wire format.
+// The URL field is omitted when empty via the `json:"url,omitempty"` tag.
+func enrichmentItem(row database.EnrichmentRow) apiEnrichmentItem {
+	return apiEnrichmentItem{Value: row.Value, URL: row.URL, Source: row.Source}
+}
+
 // apiEnrichment returns enrichment data for a manga.
 func (s *Server) apiEnrichment(w http.ResponseWriter, r *http.Request) {
 	pluginID := chi.URLParam(r, "pluginID")
@@ -35,19 +43,19 @@ func (s *Server) apiEnrichment(w http.ResponseWriter, r *http.Request) {
 
 	altTitles := make([]apiEnrichmentItem, 0, len(item.AltTitles))
 	for _, a := range item.AltTitles {
-		altTitles = append(altTitles, apiEnrichmentItem{Value: a.Value, Source: a.Source})
+		altTitles = append(altTitles, enrichmentItem(a))
 	}
 	altSummaries := make([]apiEnrichmentItem, 0, len(item.AltSummaries))
 	for _, a := range item.AltSummaries {
-		altSummaries = append(altSummaries, apiEnrichmentItem{Value: a.Value, Source: a.Source})
+		altSummaries = append(altSummaries, enrichmentItem(a))
 	}
 	categories := make([]apiEnrichmentItem, 0, len(item.Categories))
 	for _, c := range item.Categories {
-		categories = append(categories, apiEnrichmentItem{Value: c.Value, Source: c.Source})
+		categories = append(categories, enrichmentItem(c))
 	}
 	related := make([]apiEnrichmentItem, 0, len(item.Related))
 	for _, r := range item.Related {
-		related = append(related, apiEnrichmentItem{Value: r.Value, URL: r.URL, Source: r.Source})
+		related = append(related, enrichmentItem(r))
 	}
 
 	writeJSON(w, http.StatusOK, apiEnrichmentResponse{
@@ -72,7 +80,7 @@ func (s *Server) apiCategories(w http.ResponseWriter, r *http.Request) {
 
 	items := make([]apiEnrichmentItem, 0, len(cats))
 	for _, c := range cats {
-		items = append(items, apiEnrichmentItem{Value: c.Value, Source: c.Source})
+		items = append(items, enrichmentItem(c))
 	}
 	writeJSON(w, http.StatusOK, items)
 }
@@ -91,7 +99,7 @@ func (s *Server) apiRelated(w http.ResponseWriter, r *http.Request) {
 
 	items := make([]apiEnrichmentItem, 0, len(rels))
 	for _, r := range rels {
-		items = append(items, apiEnrichmentItem{Value: r.Value, URL: r.URL, Source: r.Source})
+		items = append(items, enrichmentItem(r))
 	}
 	writeJSON(w, http.StatusOK, items)
 }
@@ -158,7 +166,7 @@ func (s *Server) apiFetchEnrich(w http.ResponseWriter, r *http.Request) {
 	}
 	categories := make([]apiEnrichmentItem, 0, len(cats))
 	for _, c := range cats {
-		categories = append(categories, apiEnrichmentItem{Value: c.Value, Source: c.Source})
+		categories = append(categories, enrichmentItem(c))
 	}
 	rels, err := s.service.ListRelated(pluginID, mangaID)
 	if err != nil {
@@ -166,7 +174,7 @@ func (s *Server) apiFetchEnrich(w http.ResponseWriter, r *http.Request) {
 	}
 	related := make([]apiEnrichmentItem, 0, len(rels))
 	for _, r := range rels {
-		related = append(related, apiEnrichmentItem{Value: r.Value, URL: r.URL, Source: r.Source})
+		related = append(related, enrichmentItem(r))
 	}
 
 	writeJSON(w, http.StatusOK, map[string]any{

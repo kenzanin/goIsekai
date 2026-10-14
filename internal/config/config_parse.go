@@ -82,30 +82,3 @@ func (c *Config) addEnhanceMode(key, val string) {
 	}
 	c.EnhancePlugins[strings.ToLower(key)] = mode
 }
-
-// WorkerPoolConfig maps the [workers] INI section onto the workers pool
-// sizing (zero values mean "use code default" there).
-func (c *Config) WorkerPoolConfig() WorkersSizing {
-	return WorkersSizing{
-		InteractiveSize:  c.WorkersInteractiveSize,
-		InteractiveQueue: c.WorkersInteractiveQueue,
-		FetchSize:        c.WorkersFetchSize,
-		FetchQueue:       c.WorkersFetchQueue,
-		ImageSize:        c.WorkersImageSize,
-		ImageQueue:       c.WorkersImageQueue,
-		MaintenanceSize:  c.WorkersMaintenanceSize,
-		MaintenanceQueue: c.WorkersMaintenanceQueue,
-	}
-}
-
-// WorkersSizing is the config-facing view of workers.Config lane sizes.
-type WorkersSizing struct {
-	InteractiveSize  int
-	InteractiveQueue int
-	FetchSize        int
-	FetchQueue       int
-	ImageSize        int
-	ImageQueue       int
-	MaintenanceSize  int
-	MaintenanceQueue int
-}

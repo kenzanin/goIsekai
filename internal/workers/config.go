@@ -2,6 +2,8 @@ package workers
 
 import (
 	"time"
+
+	"goisekai/internal/config"
 )
 
 // Config sizes the lanes. Zero values mean "use the code default".
@@ -61,4 +63,23 @@ func (c Config) withDefaults() Config {
 		c.BackgroundEnqueueTimeout = defaultBGEnqueueTimeout
 	}
 	return c
+}
+
+// FromConfig creates a workers.Config from the config file settings.
+// Zero values in cfg are passed through, and workers.New applies defaults.
+func FromConfig(cfg *config.Config) Config {
+	if cfg == nil {
+		return Config{}
+	}
+	return Config{
+		InteractiveSize:          cfg.WorkersInteractiveSize,
+		InteractiveQueue:         cfg.WorkersInteractiveQueue,
+		FetchSize:                cfg.WorkersFetchSize,
+		FetchQueue:               cfg.WorkersFetchQueue,
+		ImageSize:                cfg.WorkersImageSize,
+		ImageQueue:               cfg.WorkersImageQueue,
+		MaintenanceSize:          cfg.WorkersMaintenanceSize,
+		MaintenanceQueue:         cfg.WorkersMaintenanceQueue,
+		BackgroundEnqueueTimeout: time.Duration(cfg.WorkersBackgroundEnqueueTimeout) * time.Second,
+	}
 }
