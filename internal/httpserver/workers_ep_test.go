@@ -40,7 +40,7 @@ func TestAPIWorkersReportsAllLanes(t *testing.T) {
 	if err := json.Unmarshal(rec.Body.Bytes(), &out); err != nil {
 		t.Fatalf("decode: %v (body: %s)", err, rec.Body.String())
 	}
-	if len(out.Lanes) != 4 {
+	if len(out.Lanes) != 5 {
 		t.Fatalf("lanes = %d, want 4 (body: %s)", len(out.Lanes), rec.Body.String())
 	}
 
@@ -48,7 +48,7 @@ func TestAPIWorkersReportsAllLanes(t *testing.T) {
 	for _, l := range out.Lanes {
 		switch l.Lane {
 		case workers.LaneInteractive.String(), workers.LaneFetch.String(),
-			workers.LaneImage.String(), workers.LaneMaintenance.String():
+			workers.LaneImage.String(), workers.LaneMaintenance.String(), workers.LaneCDP.String():
 		default:
 			t.Errorf("unexpected lane %q", l.Lane)
 			continue
