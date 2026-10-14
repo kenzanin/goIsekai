@@ -66,6 +66,9 @@ function search_manga(a) return "[]" end
 
 function get_manga_detail(a)
   local resp = host.http.get("` + fetchURL + `/manga")
+  if resp.status ~= 200 then
+    error("http " .. tostring(resp.status) .. ": " .. tostring(resp.body))
+  end
   return host.json.encode({ id = a, title = "live title" })
 end
 
@@ -99,6 +102,11 @@ func TestMangaDetailBlockedServesPersistedCopy(t *testing.T) {
 	defer srv.Close()
 
 	s, db := challengeTestServer(t, writeChallengePlugin(t, srv.URL))
+	// The plugin must be registered as active for GetMangaDetails to attempt
+	// a fetch instead of falling through to the cached-only fallback.
+	if err := db.RegisterPlugin(database.Plugin{ID: "blocked", Name: "blocked", IsActive: true}); err != nil {
+		t.Fatalf("register plugin: %v", err)
+	}
 	rowID := seedManga(t, db, "blocked", "m1", "Persisted Title")
 	seedChapters(t, db, rowID,
 		database.Chapter{SourceChapterID: "m1:c1", ChapterNum: 1},
