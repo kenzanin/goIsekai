@@ -93,11 +93,8 @@ func (s *Server) streamJobs(ws *websocket.Conn) {
 	}()
 
 	<-readDone
-
-	// Keep connection open for broadcasts
-	for {
-		time.Sleep(time.Second)
-	}
+	// Client disconnected (Decode returned EOF or error). Loop until the
+	// broadcast channel has no more writers / connection is torn down below.
 }
 
 func (s *Server) unregisterJobClient(ws *websocket.Conn) {
@@ -113,7 +110,11 @@ func (c *jobClients) filterClient(ws *websocket.Conn, jobID string) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	if jobID == "" {
-		// No filter - stay in unfiltered
+		// Un-filter: remove from all filtered buckets and restore to unfiltered.
+		for _, conns := range c.filtered {
+			delete(conns, ws)
+		}
+		c.conns[ws] = struct{}{}
 		return
 	}
 	if c.filtered[jobID] == nil {

@@ -12,6 +12,7 @@
 | Browse web pages, check UI                   | `obscura`            | Primary browser tool                                             |
 | Debug web pages (console, network)           | `playwright-cdp`     | Only when deep debugging needed                                  |
 | Look up API docs, library info                 | `deepwiki`           | For GitHub repos and documentation                               |
+| Read project OKF knowledge bundle / run BM25 search            | `qmd`               | Use `qmd search/get/ls -c okf-mcp`; no LLM model needed            |
 
 **Workflow:**
 
@@ -19,6 +20,7 @@
 2. Before testing changes → `obscura` to verify UI behavior
 3. After completing task → `vestige-mcp` to store session context
 4. When stuck on API → `deepwiki` to check documentation
+5. Before/after any task → consult `qmd` (`qmd search/get -c okf-mcp`) for the OKF bundle; persist findings to `okf-mcp/` (qmd-aware) and session memory
 
 ---
 
@@ -264,6 +266,30 @@ mcp_playwright-cdp_browser_snapshot
 # Click
 mcp_playwright-cdp_browser_click --target element-selector
 ```
+
+### qmd (OKF knowledge bundle — local GGUF search)
+
+```bash
+# Init per-project (one-time; creates .qmd/index.yml)
+qmd init
+
+# Index the bundled OKF memories (no collection path arg uses last index.yml)
+qmd update
+
+# BM25 keyword search — no LLM model required, fast & local
+qmd search "LaneCDP anti-bot workers pool" -c okf-mcp
+qmd search "image flight dedupe" -c okf-mcp
+
+# List/indexed documents
+qmd ls okf-mcp
+qmd get qmd://okf-mcp/task/workers-pool-refactoring-and-migration-to-pond-v2.md
+
+# Hybrid/semantic (OPTIONAL — needs `qmd pull` to download ~2GB GGUF models)
+qmd embed        # builds vector index
+qmd query "how does per-plugin CDP timeout route"  # LLM expansion + rerank
+```
+
+`qmd` ships on NVM (local), uses **local GGUF/HF models** (embeddinggemma, query-expansion, Qwen reranker) — **not** Ollama-dependent by default. For exploring the `okf-mcp/` bundle, `qmd search` (BM25) is sufficient and needs **no** model download.
 
 ### deepwiki
 
