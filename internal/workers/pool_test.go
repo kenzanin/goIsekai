@@ -298,7 +298,7 @@ func TestImagePriorityOrder(t *testing.T) {
 		}
 	}
 	close(block)
-	// Wait for all four to drain.
+	// Wait for all five to drain.
 	deadline := time.After(2 * time.Second)
 	for {
 		mu.Lock()

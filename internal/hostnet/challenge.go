@@ -50,10 +50,10 @@ func (p *Proxy) solveAndSeed(ctx context.Context, pluginID, targetURL string) er
 		err     error
 	}
 	ch := make(chan solveResult, 1)
-	go func() {
+	p.SubmitSolve(func() {
 		cookies, ua, err := solver(cfg, targetURL)
 		ch <- solveResult{cookies: cookies, ua: ua, err: err}
-	}()
+	})
 	var r solveResult
 	select {
 	case r = <-ch:

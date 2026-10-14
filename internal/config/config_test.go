@@ -29,7 +29,9 @@ func TestWorkersSection(t *testing.T) {
 		"image_size = 10\n" +
 		"image_queue = 100\n" +
 		"maintenance_size = 2\n" +
-		"maintenance_queue = 4\n"
+		"maintenance_queue = 4\n" +
+		"cdp_size = 3\n" +
+		"cdp_queue = 10\n"
 	if err := os.WriteFile(path, []byte(body), 0o644); err != nil {
 		t.Fatal(err)
 	}
@@ -40,7 +42,8 @@ func TestWorkersSection(t *testing.T) {
 	if c.WorkersInteractiveSize != 6 || c.WorkersInteractiveQueue != 50 ||
 		c.WorkersFetchSize != 3 || c.WorkersFetchQueue != 12 ||
 		c.WorkersImageSize != 10 || c.WorkersImageQueue != 100 ||
-		c.WorkersMaintenanceSize != 2 || c.WorkersMaintenanceQueue != 4 {
+		c.WorkersMaintenanceSize != 2 || c.WorkersMaintenanceQueue != 4 ||
+		c.WorkersCDPSize != 3 || c.WorkersCDPQueue != 10 {
 		t.Fatalf("[workers] not parsed: %+v", c)
 	}
 

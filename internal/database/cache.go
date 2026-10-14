@@ -1,11 +1,13 @@
 package database
 
 import (
+	"context"
 	"fmt"
 	"sync/atomic"
 	"time"
 
 	"goisekai/internal/logger"
+	"goisekai/internal/workers"
 )
 
 // cacheKey returns the deterministic cache row key: "pluginID|mangaID|funcName".
@@ -106,7 +108,16 @@ func (d *DB) CacheStats() (total, hits int64, err error) {
 
 // StartCacheCleanup starts a background goroutine that cleans expired cache
 // entries every hour. It stops when the cleanup channel is closed.
+// Deprecated: use DB.StartCacheCleanupWithPool instead.
 func (d *DB) StartCacheCleanup(maintenanceStop <-chan struct{}) {
+	d.StartCacheCleanupWithPool(maintenanceStop, nil)
+}
+
+// StartCacheCleanupWithPool starts a background goroutine that cleans expired
+// cache entries every hour via the maintenance pool. It stops when the cleanup
+// channel is closed. If pool is nil, the old goroutine pattern is used for
+// backward compatibility.
+func (d *DB) StartCacheCleanupWithPool(maintenanceStop <-chan struct{}, pool *workers.Pool) {
 	go func() {
 		ticker := time.NewTicker(1 * time.Hour)
 		defer ticker.Stop()
@@ -115,11 +126,30 @@ func (d *DB) StartCacheCleanup(maintenanceStop <-chan struct{}) {
 			case <-maintenanceStop:
 				return
 			case <-ticker.C:
-				n, err := d.CleanExpired()
-				if err != nil {
-					logger.Error("cache cleanup", "error", err)
-				} else if n > 0 {
-					logger.Info("cleaned expired cache entries", "count", n)
+				if pool != nil {
+					ctx := context.Background()
+					job := &workers.Job{
+						Lane: workers.LaneMaintenance,
+						Run: func(ctx context.Context) error {
+							n, err := d.CleanExpired()
+							if err != nil {
+								logger.Error("cache cleanup", "error", err)
+							} else if n > 0 {
+								logger.Info("cleaned expired cache entries", "count", n)
+							}
+							return nil
+						},
+					}
+					if _, err := pool.Enqueue(ctx, job); err != nil {
+						logger.Error("cache cleanup enqueue", "error", err)
+					}
+				} else {
+					n, err := d.CleanExpired()
+					if err != nil {
+						logger.Error("cache cleanup", "error", err)
+					} else if n > 0 {
+						logger.Info("cleaned expired cache entries", "count", n)
+					}
 				}
 			}
 		}

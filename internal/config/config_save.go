@@ -58,6 +58,19 @@ func (c *Config) Save(path string) error {
 		"prune_orphans", strconv.FormatBool(c.PruneOrphans),
 		"update_stale_days", strconv.Itoa(c.UpdateStaleDays),
 		"max_cache_gb", strconv.FormatFloat(c.MaxCacheGB, 'f', 1, 64))
+	// [workers] is always written (like [enhance]/[tray]) so the lane sizing
+	// keys are discoverable in a generated file; zeros mean "derive the default".
+	put(f, "workers",
+		"interactive_size", strconv.Itoa(c.WorkersInteractiveSize),
+		"interactive_queue", strconv.Itoa(c.WorkersInteractiveQueue),
+		"fetch_size", strconv.Itoa(c.WorkersFetchSize),
+		"fetch_queue", strconv.Itoa(c.WorkersFetchQueue),
+		"image_size", strconv.Itoa(c.WorkersImageSize),
+		"image_queue", strconv.Itoa(c.WorkersImageQueue),
+		"maintenance_size", strconv.Itoa(c.WorkersMaintenanceSize),
+		"maintenance_queue", strconv.Itoa(c.WorkersMaintenanceQueue),
+		"cdp_size", strconv.Itoa(c.WorkersCDPSize),
+		"cdp_queue", strconv.Itoa(c.WorkersCDPQueue))
 	putAlias(f, "genre", c.GenreAlias)
 	putAlias(f, "status", c.StatusAlias)
 	// [tray] is always written (like [enhance]) so the keys are discoverable

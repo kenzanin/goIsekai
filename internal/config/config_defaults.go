@@ -46,6 +46,8 @@ func Default() *Config {
 		WorkersImageQueue:       0,
 		WorkersMaintenanceSize:  0,
 		WorkersMaintenanceQueue: 0,
+		WorkersCDPSize:          0,
+		WorkersCDPQueue:         0,
 	}
 	c.CacheDir = filepath.Join(c.DataDir, "cache")
 	c.InfoDir = filepath.Join(c.DataDir, "info")

@@ -10,6 +10,7 @@ import (
 	"sync"
 	"time"
 
+	"goisekai/internal/config"
 	"goisekai/internal/database"
 	"goisekai/internal/enrich"
 	"goisekai/internal/hostnet"
@@ -49,6 +50,21 @@ type AppService struct {
 // NewAppService returns an AppService backed by the supplied database, plugin
 // manager, hostnet proxy, and enrichment registry.
 func NewAppService(db *database.DB, mgr *pluginmanager.Manager, proxy *hostnet.Proxy, cfgPath, cacheDir string, enrichReg *enrich.Registry) *AppService {
+	// nil cfg on error — FromConfig returns code-default zero values.
+	cfg, _ := config.Load(cfgPath)
+	pool := workers.New(workers.FromConfig(cfg))
+	if proxy != nil {
+		// Route anti-bot challenge solves through the CDP pool lane so
+		// concurrency stays bounded (default 4 workers).
+		proxy.SetSubmitSolve(func(f func()) {
+			if _, err := pool.Enqueue(context.Background(), &workers.Job{
+				Lane: workers.LaneCDP,
+				Run:  func(_ context.Context) error { f(); return nil },
+			}); err != nil {
+				logger.Warn("CDP lane enqueue failed", "error", err)
+			}
+		})
+	}
 	return &AppService{
 		db:          db,
 		mgr:         mgr,
@@ -56,7 +72,7 @@ func NewAppService(db *database.DB, mgr *pluginmanager.Manager, proxy *hostnet.P
 		cfgPath:     cfgPath,
 		cacheDir:    cacheDir,
 		imageCache:  make(map[string][]byte),
-		pool:        workers.New(loadWorkerPool(cfgPath)),
+		pool:        pool,
 		enrich:      enrichReg,
 		genres:      loadGenreIndex(cfgPath),
 		statusAlias: loadStatusAlias(cfgPath),

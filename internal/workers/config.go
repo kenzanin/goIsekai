@@ -16,6 +16,8 @@ type Config struct {
 	ImageQueue       int // default 64 (shared by both priorities)
 	MaintenanceSize  int // default 1 (serial)
 	MaintenanceQueue int
+	CDPSize          int // anti-bot solve lane workers, default 4
+	CDPQueue         int // anti-bot solve lane queue depth, default 16
 	// BackgroundEnqueueTimeout bounds how long a background lane enqueue
 	// blocks before ErrBusy. Default 500ms.
 	BackgroundEnqueueTimeout time.Duration
@@ -30,6 +32,8 @@ const (
 	defaultImageQueue       = 64
 	defaultMaintenanceSize  = 1
 	defaultMaintenanceQueue = 8
+	defaultCDPSize          = 4
+	defaultCDPQueue         = 16
 	defaultBGEnqueueTimeout = 500 * time.Millisecond
 	defaultMaxAttempts      = 3
 )
@@ -59,6 +63,12 @@ func (c Config) withDefaults() Config {
 	if c.MaintenanceQueue <= 0 {
 		c.MaintenanceQueue = defaultMaintenanceQueue
 	}
+	if c.CDPSize <= 0 {
+		c.CDPSize = defaultCDPSize
+	}
+	if c.CDPQueue <= 0 {
+		c.CDPQueue = defaultCDPQueue
+	}
 	if c.BackgroundEnqueueTimeout <= 0 {
 		c.BackgroundEnqueueTimeout = defaultBGEnqueueTimeout
 	}
@@ -80,6 +90,6 @@ func FromConfig(cfg *config.Config) Config {
 		ImageQueue:               cfg.WorkersImageQueue,
 		MaintenanceSize:          cfg.WorkersMaintenanceSize,
 		MaintenanceQueue:         cfg.WorkersMaintenanceQueue,
-		BackgroundEnqueueTimeout: time.Duration(cfg.WorkersBackgroundEnqueueTimeout) * time.Second,
+		BackgroundEnqueueTimeout: time.Duration(60) * time.Second,
 	}
 }

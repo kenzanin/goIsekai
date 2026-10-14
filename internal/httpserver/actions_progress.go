@@ -1,12 +1,13 @@
 package httpserver
 
 import (
+	"context"
 	"net/http"
 	neturl "net/url"
 	"strconv"
 )
 
-// handleSetChapterProgress records the last-read page for a chapter.
+// handleSetChapterProgress records the last-read page for a chapter via worker pool.
 func (s *Server) handleSetChapterProgress(w http.ResponseWriter, r *http.Request) {
 	if err := r.ParseForm(); err != nil {
 		s.logger.Error("set chapter progress: parse form", "error", err)
@@ -22,11 +23,15 @@ func (s *Server) handleSetChapterProgress(w http.ResponseWriter, r *http.Request
 		http.Error(w, "invalid 'page' value", http.StatusBadRequest)
 		return
 	}
-	if err := s.service.SetChapterProgress(pluginID, mangaID, chapterID, page); err != nil {
-		s.logger.Error("set chapter progress", "pluginID", pluginID, "mangaID", mangaID, "chapterID", chapterID, "error", err)
+	jobID, err := s.service.EnqueueSetChapterProgress(context.Background(), pluginID, mangaID, chapterID, page)
+	if err != nil {
+		s.logger.Error("set chapter progress enqueue failed", "pluginID", pluginID, "mangaID", mangaID, "chapterID", chapterID, "jobID", jobID, "error", err)
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
+	// EnqueueSetChapterProgress enqueues the job and returns immediately.
+	// The actual progress update happens asynchronously in the worker pool.
+	// We redirect back to the manga page; the progress will be updated in the background.
 	s.hxRedirect(w, r, "/view/manga/"+pluginID+"/"+mangaID)
 }
 

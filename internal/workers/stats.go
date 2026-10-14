@@ -130,18 +130,20 @@ func (p *Pool) statFor(lane Lane) *laneStat {
 		return &p.stats[LaneImage]
 	case LaneMaintenance:
 		return &p.stats[LaneMaintenance]
+	case LaneCDP:
+		return &p.stats[LaneCDP]
 	}
 	return &p.stats[LaneInteractive]
 }
 
-// LaneStates returns the observable state of all four lanes, in lane order.
-// Every lane is always present, whether or not it has been used.
+// LaneStates returns the observable state of all five lanes, in lane order.
 func (p *Pool) LaneStates() []LaneState {
 	return []LaneState{
 		p.laneState(LaneInteractive, len(p.interactive.queue), p.cfg.InteractiveSize, &p.stats[LaneInteractive]),
 		p.laneState(LaneFetch, len(p.fetch.queue), p.cfg.FetchSize, &p.stats[LaneFetch]),
 		p.laneState(LaneImage, len(p.imageHigh.queue)+len(p.imageLow.queue), p.cfg.ImageSize, &p.stats[LaneImage]),
 		p.laneState(LaneMaintenance, len(p.maintenance.queue), p.cfg.MaintenanceSize, &p.stats[LaneMaintenance]),
+		p.laneState(LaneCDP, len(p.cdp.queue), p.cfg.CDPSize, &p.stats[LaneCDP]),
 	}
 }
 

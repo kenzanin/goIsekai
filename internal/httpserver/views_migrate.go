@@ -1,6 +1,7 @@
 package httpserver
 
 import (
+	"context"
 	"maps"
 	"slices"
 	"strconv"
@@ -12,6 +13,7 @@ import (
 	"goisekai/internal/database"
 	"goisekai/internal/logger"
 	"goisekai/internal/pluginutil"
+	"goisekai/internal/workers"
 	"goisekai/pkg/types"
 )
 
@@ -111,15 +113,12 @@ func (s *Server) viewMigrate(w http.ResponseWriter, r *http.Request) {
 	normalizedQ := pluginutil.NormalizeTitle(q)
 
 	if q != "" {
-		// Search every target in parallel; no query yet shows empty rather than
+		// Search every target in parallel via worker pool; no query yet shows empty rather than
 		// hammering servers.
 		var mu sync.Mutex
-		var wg sync.WaitGroup
+		futures := make(map[string]*workers.Future)
 		for _, id := range targets {
-			wg.Add(1)
-			go func(id string) {
-				defer wg.Done()
-				results, err := s.service.SearchManga(id, types.SearchFilter{Query: q, Page: 1})
+			fut, err := s.service.EnqueueSearchManga(context.Background(), id, types.SearchFilter{Query: q, Page: 1}, func(ctx context.Context, results []types.Manga, err error) {
 				if err != nil {
 					logger.Warn("migrate search failed", "plugin", id, "error", err)
 					mu.Lock()
@@ -138,9 +137,25 @@ func (s *Server) viewMigrate(w http.ResponseWriter, r *http.Request) {
 				mu.Lock()
 				cands = append(cands, local...)
 				mu.Unlock()
-			}(id)
+			})
+			if err != nil {
+				logger.Warn("migrate search enqueue failed", "plugin", id, "error", err)
+				mu.Lock()
+				failures = append(failures, id)
+				mu.Unlock()
+				continue
+			}
+			futures[id] = fut
 		}
-		wg.Wait()
+		// Wait for all searches to complete
+		for id, fut := range futures {
+			if err := fut.Await(context.Background()); err != nil {
+				logger.Warn("migrate search future await failed", "plugin", id, "error", err)
+				mu.Lock()
+				failures = append(failures, id)
+				mu.Unlock()
+			}
+		}
 		if len(cands) == 0 && len(failures) > 0 && len(failures) == len(targets) {
 			// Every target failed: distinct from a genuine no-results.
 			searchErr = errAllSourcesFailed
@@ -161,23 +176,27 @@ func (s *Server) viewMigrate(w http.ResponseWriter, r *http.Request) {
 	// visible page is asked about, and the plugin cache holds a chapter list for
 	// 168h, so revisiting the picker is cheap. A source that cannot be reached
 	// keeps -1 and its card says "unknown" rather than lying about having none.
-	var wg sync.WaitGroup
-	sem := make(chan struct{}, 6)
+	futures := make(map[int]*workers.Future)
 	for i := range cands {
-		wg.Add(1)
-		go func(idx int) {
-			defer wg.Done()
-			sem <- struct{}{}
-			defer func() { <-sem }()
-			chapters, err := s.service.GetChapterList(cands[idx].PluginID, cands[idx].SourceMangaID)
+		fut, err := s.service.EnqueueGetChapterList(context.Background(), cands[i].PluginID, cands[i].SourceMangaID, func(ctx context.Context, chapters []types.Chapter, err error) {
 			if err != nil {
-				logger.Warn("migrate chapter count failed", "plugin", cands[idx].PluginID, "manga", cands[idx].SourceMangaID, "error", err)
+				logger.Warn("migrate chapter count failed", "plugin", cands[i].PluginID, "manga", cands[i].SourceMangaID, "error", err)
 				return
 			}
-			cands[idx].ChapterCount = len(chapters)
-		}(i)
+			cands[i].ChapterCount = len(chapters)
+		})
+		if err != nil {
+			logger.Warn("migrate chapter enqueue failed", "plugin", cands[i].PluginID, "manga", cands[i].SourceMangaID, "error", err)
+			continue
+		}
+		futures[i] = fut
 	}
-	wg.Wait()
+	// Wait for all chapter fetches to complete
+	for i, fut := range futures {
+		if err := fut.Await(context.Background()); err != nil {
+			logger.Warn("migrate chapter future await failed", "plugin", cands[i].PluginID, "manga", cands[i].SourceMangaID, "error", err)
+		}
+	}
 
 	var candidates []any
 	for _, c := range cands {

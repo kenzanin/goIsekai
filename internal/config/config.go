@@ -132,6 +132,8 @@ type Config struct {
 	WorkersImageQueue       int
 	WorkersMaintenanceSize  int
 	WorkersMaintenanceQueue int
+	WorkersCDPSize          int
+	WorkersCDPQueue         int
 	// WorkersBackgroundEnqueueTimeout bounds how long a background lane enqueue
 	// blocks before ErrBusy. Default 500ms. Zero = code default.
 	WorkersBackgroundEnqueueTimeout int

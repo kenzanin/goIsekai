@@ -1,6 +1,7 @@
 package httpserver
 
 import (
+	"context"
 	"github.com/goccy/go-json"
 	"net/http"
 	"net/url"
@@ -149,12 +150,12 @@ func (s *Server) apiSetProgress(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusBadRequest, "page must be >= 0")
 		return
 	}
-	if err := s.service.SetChapterProgress(pluginID, mangaID, chapterID, req.Page); err != nil {
-		s.logger.Error("api set progress", "error", err)
+	if _, err := s.service.EnqueueSetChapterProgress(context.Background(), pluginID, mangaID, chapterID, req.Page); err != nil {
+		s.logger.Error("api set progress enqueue", "error", err)
 		writeErr(w, http.StatusBadRequest, err.Error())
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]int{"page": req.Page, "total_pages": 0})
+	writeJSON(w, http.StatusOK, map[string]int{"page": req.Page})
 }
 
 // apiImage proxies an image through the bridge and returns the raw bytes with

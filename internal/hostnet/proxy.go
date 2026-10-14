@@ -31,6 +31,16 @@ type Proxy struct {
 	solveChallenge func(cfg CDPConfig, url string) ([]*http.Cookie, string, error)
 	// stdlibTransport is shared by all stdlib requests for connection pooling.
 	stdlibTransport *nethttp.Transport
+	// submitSolve runs a challenge solver off the hot path. Defaults to a bare
+	// goroutine so hostnet stays decoupled from the workers pool; main wires
+	// it to LaneCDP (anti-bot solve lane) to cap concurrency.
+	SubmitSolve func(f func())
+}
+
+// SetSubmitSolve overrides the default bare-goroutine solver dispatch.
+// main wires it to workers.LaneCDP after the pool is constructed.
+func (p *Proxy) SetSubmitSolve(fn func(f func())) {
+	p.SubmitSolve = fn
 }
 
 // defaultUA is a browser-like User-Agent so requests are less likely to be
@@ -73,6 +83,7 @@ func NewProxy() *Proxy {
 			IdleConnTimeout:     90 * time.Second,
 			TLSHandshakeTimeout: 10 * time.Second,
 		},
+		SubmitSolve: func(f func()) { go f() },
 	}
 }
 

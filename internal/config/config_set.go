@@ -165,6 +165,14 @@ func (c *Config) set(section, key, val string) {
 			if n, err := strconv.Atoi(val); err == nil && n > 0 {
 				c.WorkersMaintenanceQueue = n
 			}
+		case "cdp_size":
+			if n, err := strconv.Atoi(val); err == nil && n > 0 {
+				c.WorkersCDPSize = n
+			}
+		case "cdp_queue":
+			if n, err := strconv.Atoi(val); err == nil && n > 0 {
+				c.WorkersCDPQueue = n
+			}
 		}
 	case "tray":
 		switch key {

@@ -9,6 +9,7 @@ import (
 
 	"goisekai/internal/logger"
 	"goisekai/internal/pluginutil"
+	"goisekai/internal/workers"
 	"goisekai/pkg/types"
 )
 
@@ -116,8 +117,8 @@ func (s *AppService) collectCandidatesWithTitle(currentPluginID, title string, a
 			activeMap[dp.ID] = dp.IsActive
 		}
 	}
-	var wg sync.WaitGroup
 	var mu sync.Mutex
+	futures := make(map[string]*workers.Future)
 	for _, p := range s.mgr.LoadedPlugins() {
 		if p.ID == currentPluginID {
 			continue
@@ -126,44 +127,51 @@ func (s *AppService) collectCandidatesWithTitle(currentPluginID, title string, a
 			continue
 		}
 		searched++
-		wg.Add(1)
-		go func(plugID, plugName string) {
-			defer wg.Done()
-			// task 3.1: each source's search rides the fetch lane under its own
-			// PluginKey, so one slow source serializes only its own lookups while
-			// the other sources keep going.
-			searchErr := s.runOnFetch(context.Background(), plugID, func(context.Context) error {
-				results, err := s.mgr.Search(plugID, types.SearchFilter{Query: title})
-				if err != nil {
-					return err
-				}
-				if len(results) == 0 {
-					return nil
-				}
-				local := make([]MigrationCandidate, 0, len(results))
-				for _, r := range results {
-					local = append(local, MigrationCandidate{
-						PluginID:      plugID,
-						PluginName:    plugName,
-						SourceMangaID: r.ID,
-						Title:         r.Title,
-						IsExactMatch:  isExactMatch(r.Title, keys),
-					})
-				}
+		// task 3.1: each source's search rides the fetch lane under its own
+		// PluginKey, so one slow source serializes only its own lookups while
+		// the other sources keep going.
+		fut, err := s.EnqueueSearchManga(context.Background(), p.ID, types.SearchFilter{Query: title}, func(_ context.Context, results []types.Manga, err error) {
+			if err != nil {
+				logger.Warn("migration candidate search failed", "plugin", p.ID, "error", err)
 				mu.Lock()
-				candidates = append(candidates, local...)
+				failures = append(failures, p.ID)
 				mu.Unlock()
-				return nil
-			})
-			if searchErr != nil {
-				logger.Warn("migration candidate search failed", "plugin", plugID, "error", searchErr)
-				mu.Lock()
-				failures = append(failures, plugID)
-				mu.Unlock()
+				return
 			}
-		}(p.ID, p.Name)
+			if len(results) == 0 {
+				return
+			}
+			local := make([]MigrationCandidate, 0, len(results))
+			for _, r := range results {
+				local = append(local, MigrationCandidate{
+					PluginID:      p.ID,
+					PluginName:    p.Name,
+					SourceMangaID: r.ID,
+					Title:         r.Title,
+					IsExactMatch:  isExactMatch(r.Title, keys),
+				})
+			}
+			mu.Lock()
+			candidates = append(candidates, local...)
+			mu.Unlock()
+		})
+		if err != nil {
+			logger.Warn("migration candidate search enqueue failed", "plugin", p.ID, "error", err)
+			mu.Lock()
+			failures = append(failures, p.ID)
+			mu.Unlock()
+			continue
+		}
+		futures[p.ID] = fut
 	}
-	wg.Wait()
+	for id, fut := range futures {
+		if err := fut.Await(context.Background()); err != nil {
+			logger.Warn("migration candidate search future await failed", "plugin", id, "error", err)
+			mu.Lock()
+			failures = append(failures, id)
+			mu.Unlock()
+		}
+	}
 	if searched > 0 && len(candidates) == 0 && len(failures) == searched {
 		return nil, failures, fmt.Errorf("migration: sources could not be reached")
 	}

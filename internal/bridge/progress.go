@@ -60,11 +60,10 @@ func (s *AppService) SetChapterProgress(pluginID, mangaID, chapterID string, las
 	// Reaching the final page means the whole chapter is cached — write
 	// complete.csv so a later CBZ export can run fully offline. Best-effort.
 	if total, err := s.db.GetChapterTotalPages(chapterIntID); err == nil && total > 0 && lastPage >= total {
-		go func() {
-			if err := s.MarkChapterComplete(pluginID, mangaID, chapterID); err != nil {
-				logger.Warn("mark chapter complete", "error", err, "chapter", chapterID)
-			}
-		}()
+		_, err := s.EnqueueMarkChapterComplete(context.Background(), pluginID, mangaID, chapterID)
+		if err != nil {
+			logger.Warn("enqueue mark chapter complete failed", "plugin", pluginID, "manga", mangaID, "chapter", chapterID, "error", err)
+		}
 	}
 	return nil
 }

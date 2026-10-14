@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"goisekai/internal/workers"
+	"goisekai/pkg/types"
 )
 
 // interactiveEnqueueTimeout bounds how long a UI invoke waits for a queue
@@ -78,4 +79,76 @@ func (s *AppService) runOnInteractive(ctx context.Context, pluginKey string, fn 
 // classify as this so callers' cache fallbacks stay intact.
 func IsQueueFull(err error) bool {
 	return errors.Is(err, workers.ErrEnqueueTimeout) || errors.Is(err, workers.ErrBusy)
+}
+
+// EnqueueSearchManga queues a SearchManga call on the fetch lane with callback.
+// Returns a job ID for tracking; the callback runs after job completion with
+// the results. This is for fan-out patterns where multiple sources are searched
+// in parallel (e.g. migration candidate picker).
+func (s *AppService) EnqueueSearchManga(ctx context.Context, pluginID string, filter types.SearchFilter, cb func(context.Context, []types.Manga, error)) (*workers.Future, error) {
+	job := &workers.Job{
+		Lane:      workers.LaneFetch,
+		PluginKey: pluginID,
+	}
+	job.Run = func(ctx context.Context) error {
+		results, err := s.SearchManga(pluginID, filter)
+		cb(ctx, results, err)
+		return nil
+	}
+	return s.pool.Enqueue(ctx, job)
+}
+
+// EnqueueGetChapterList queues a GetChapterList call on the fetch lane with callback.
+// Returns a job ID for tracking; the callback runs after job completion with
+// the results. This is for fan-out patterns where multiple chapter counts are
+// fetched in parallel (e.g. migration candidate picker).
+func (s *AppService) EnqueueGetChapterList(ctx context.Context, pluginID, mangaID string, cb func(context.Context, []types.Chapter, error)) (*workers.Future, error) {
+	job := &workers.Job{
+		Lane:      workers.LaneFetch,
+		PluginKey: pluginID,
+	}
+	job.Run = func(ctx context.Context) error {
+		chapters, err := s.GetChapterList(pluginID, mangaID)
+		cb(ctx, chapters, err)
+		return nil
+	}
+	return s.pool.Enqueue(ctx, job)
+}
+
+// EnqueueMarkChapterComplete queues a MarkChapterComplete call on the interactive lane.
+// Returns a job ID for tracking. This is for progress completion marking without
+// blocking the UI thread.
+func (s *AppService) EnqueueMarkChapterComplete(ctx context.Context, pluginID, mangaID, chapterID string) (string, error) {
+	job := &workers.Job{
+		Lane:        workers.LaneInteractive,
+		PluginKey:   pluginID,
+		MaxAttempts: 1, // no retry for completion marking
+	}
+	job.Run = func(ctx context.Context) error {
+		return s.MarkChapterComplete(pluginID, mangaID, chapterID)
+	}
+	fut, err := s.pool.Enqueue(ctx, job)
+	if err != nil {
+		return "", err
+	}
+	return fut.GetID(), nil
+}
+
+// EnqueueSetChapterProgress queues a chapter progress update on the interactive lane.
+// If the chapter is complete (lastPage >= total), it also enqueues MarkChapterComplete.
+// Returns a job ID for tracking. This is for progress updates without blocking the UI thread.
+func (s *AppService) EnqueueSetChapterProgress(ctx context.Context, pluginID, mangaID, chapterID string, lastPage int) (string, error) {
+	job := &workers.Job{
+		Lane:        workers.LaneInteractive,
+		PluginKey:   pluginID,
+		MaxAttempts: 1, // no retry for progress update
+	}
+	job.Run = func(ctx context.Context) error {
+		return s.SetChapterProgress(pluginID, mangaID, chapterID, lastPage)
+	}
+	fut, err := s.pool.Enqueue(ctx, job)
+	if err != nil {
+		return "", err
+	}
+	return fut.GetID(), nil
 }

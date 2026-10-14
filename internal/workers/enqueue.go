@@ -19,6 +19,7 @@ func New(cfg Config) *Pool {
 		imageHigh:        &poolLane{name: LaneImage, queue: make(chan *jobHandle, cfg.ImageQueue)},
 		imageLow:         &poolLane{name: LaneImage, queue: make(chan *jobHandle, cfg.ImageQueue)},
 		maintenance:      &poolLane{name: LaneMaintenance, queue: make(chan *jobHandle, cfg.MaintenanceQueue)},
+		cdp:              &poolLane{name: LaneCDP, queue: make(chan *jobHandle, cfg.CDPQueue)},
 		fetchInUse:       map[string]bool{},
 		interactiveInUse: map[string]bool{},
 		registry:         map[string]*jobHandle{},
@@ -39,6 +40,9 @@ func New(cfg Config) *Pool {
 	}
 	for i := 0; i < cfg.MaintenanceSize; i++ {
 		p.spawnMaintenance()
+	}
+	for i := 0; i < cfg.CDPSize; i++ {
+		p.spawnCDP()
 	}
 	return p
 }
@@ -67,6 +71,12 @@ func (p *Pool) spawnMaintenance() {
 	go p.worker(p.maintenance, nil)
 }
 
+func (p *Pool) spawnCDP() {
+	p.nCDP.Add(1)
+	p.wg.Add(1)
+	go p.worker(p.cdp, nil)
+}
+
 // ResizeLane grows one lane's worker count to n (no-op on shrink). Wired to
 // the config reload path (task 1.4); grow-only by design — shrinking needs
 // drain protocols nothing requires yet.
@@ -85,6 +95,8 @@ func (p *Pool) ResizeLane(lane Lane, n int) {
 			cur = p.nImage.Load()
 		case LaneMaintenance:
 			cur = p.nMaintenance.Load()
+		case LaneCDP:
+			cur = p.nCDP.Load()
 		default:
 			return
 		}
@@ -111,6 +123,11 @@ func (p *Pool) ResizeLane(lane Lane, n int) {
 			if p.nMaintenance.CompareAndSwap(cur, cur+1) {
 				p.wg.Add(1)
 				go p.worker(p.maintenance, nil)
+			}
+		case LaneCDP:
+			if p.nCDP.CompareAndSwap(cur, cur+1) {
+				p.wg.Add(1)
+				go p.worker(p.cdp, nil)
 			}
 		}
 	}
@@ -178,6 +195,8 @@ func (p *Pool) Enqueue(ctx context.Context, job *Job) (*Future, error) {
 		}
 	case LaneMaintenance:
 		lane = p.maintenance
+	case LaneCDP:
+		lane = p.cdp
 	default:
 		cancel()
 		return nil, fmt.Errorf("workers: unknown lane %d", int(job.Lane))

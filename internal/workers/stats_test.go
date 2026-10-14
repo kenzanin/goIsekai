@@ -21,15 +21,15 @@ func findLane(t *testing.T, p *Pool, lane Lane) LaneState {
 	return LaneState{}
 }
 
-// Task 2.2: all four lanes are reported with zero values when idle, whether or
+// Task 2.2: all five lanes are reported with zero values when idle, whether or
 // not they have ever been used.
 func TestLaneStatesReportsAllLanesIdle(t *testing.T) {
 	p := New(Config{})
 	defer p.Shutdown()
 
 	states := p.LaneStates()
-	if len(states) != 4 {
-		t.Fatalf("LaneStates() returned %d lanes, want 4", len(states))
+	if len(states) != 5 {
+		t.Fatalf("LaneStates() returned %d lanes, want 5", len(states))
 	}
 	for _, st := range states {
 		if st.Waiting != 0 || st.Running != 0 {
@@ -173,6 +173,8 @@ func TestLaneDurationSummary(t *testing.T) {
 // Task 2.3: the duration ring is bounded, so a long-lived lane does not grow
 // without limit.
 func TestDurationRingIsBounded(t *testing.T) {
+	p := New(Config{MaintenanceSize: 1, MaintenanceQueue: 4})
+	defer p.Shutdown()
 	st := &laneStat{}
 	for i := range durationRingSize * 3 {
 		st.observe(time.Duration(i)*time.Millisecond, nil)
@@ -180,6 +182,7 @@ func TestDurationRingIsBounded(t *testing.T) {
 	if len(st.durations) != durationRingSize {
 		t.Fatalf("ring holds %d durations, want %d", len(st.durations), durationRingSize)
 	}
+	_ = p.LaneStates()
 	if st.completed.Load() != int64(durationRingSize*3) {
 		t.Errorf("completed=%d, want %d (counters are not bounded)",
 			st.completed.Load(), durationRingSize*3)

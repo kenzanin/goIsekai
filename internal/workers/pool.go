@@ -23,6 +23,7 @@ const (
 	LaneFetch
 	LaneImage
 	LaneMaintenance
+	LaneCDP // anti-bot challenge solving (Phase 4)
 )
 
 func (l Lane) String() string {
@@ -35,6 +36,8 @@ func (l Lane) String() string {
 		return "image"
 	case LaneMaintenance:
 		return "maintenance"
+	case LaneCDP:
+		return "cdp"
 	}
 	return fmt.Sprintf("lane(%d)", int(l))
 }
@@ -154,7 +157,7 @@ type poolLane struct {
 	queue chan *jobHandle
 }
 
-// Pool owns the four lanes and the job registry.
+// Pool owns the five lanes and the job registry.
 type Pool struct {
 	cfg Config
 
@@ -163,6 +166,7 @@ type Pool struct {
 	imageHigh   *poolLane
 	imageLow    *poolLane
 	maintenance *poolLane
+	cdp         *poolLane
 
 	// fetchInUse enforces per-plugin fairness: at most one running job per
 	// PluginKey (design: FetchWorker).
@@ -180,12 +184,13 @@ type Pool struct {
 	regMu    sync.Mutex
 
 	// stats is one block per Lane, indexed by the Lane constant. See stats.go.
-	stats [4]laneStat
+	stats [5]laneStat
 
 	nInteractive atomic.Int64
 	nFetch       atomic.Int64
 	nImage       atomic.Int64
 	nMaintenance atomic.Int64
+	nCDP         atomic.Int64
 
 	seq     atomic.Uint64
 	closed  atomic.Bool
