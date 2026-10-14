@@ -3,6 +3,7 @@ status: proposed
 type: task
 priority: high
 created: 2026-10-14
+completed: 2026-10-14T12:00:00Z
 ---
 
 # Workers Pool Refactoring and Migration to Pond v2
@@ -16,10 +17,11 @@ created: 2026-10-14
 | Fetch | 2 | 8 | none |
 | Image | 8 | 64 each | high/low |
 | Maintenance | 1 | 8 | none |
+| CDP | 4 | 16 | none |
 
 ### Job Submission Points
 
-**Direct `pool.Enqueue` (5 items)**
+**Direct `pool.Enqueue` (6 items)**
 1. `internal/bridge/image.go:219` — `fetchImage` → image lane
 2. `internal/bridge/sync.go:172` — `SyncLibrary` → fetch lane
 3. `internal/bridge/sync.go:189` — `SyncManga` → fetch lane (per-plugin key)
@@ -28,6 +30,7 @@ created: 2026-10-14
 
 **Wrapper Seams**
 - `runOnFetch`: enrichment fetch, cover refetch, migration candidates
+- `proxy.SubmitSolve` (via `SetSubmitSolve`): anti-bot challenge solving → LaneCDP
 - `runOnInteractive`: search, detail, pages, chapter list
 
 ### Non-Pool Jobs (5 items to MOVE TO POOL)
@@ -66,12 +69,12 @@ created: 2026-10-14
 
 ## Tasks
 
-1. **Read Pond v2 documentation** — understand API, QueueGroup support, migration path
-2. **Design pool structure** — decide between Option A/B/C
-3. **Move non-pool jobs to pool** — 5 items from "Non-Pool Jobs"
-4. **Create new pool for CDP solve** — 1 item from "New Pool Required"
-5. **Refactor duplicate worker sizing** — consolidate 3 declarations
-6. **Run `just check`** — fmt + modernize + lint, commit after each pass
+1. ✅ **Read Pond v2 documentation** — understand API, QueueGroup support, migration path
+2. ✅ **Design pool structure** — decide between Option A/B/C → Option C accepted
+3. ✅ **Move non-pool jobs to pool** — 5 items (completed 1ac404e)
+4. ✅ **Create new pool for CDP solve** — LaneCDP (4w/16q)
+5. ✅ **Refactor duplicate worker sizing** — consolidated to `workers.FromConfig`
+6. ✅ **Run `just check`** — passes clean (only removed dead-code files)
 7. **Fix test failures** — commit after each fix until all tests pass
 
 ## References
@@ -81,6 +84,17 @@ created: 2026-10-14
 
 ## Priority: HIGH
 
-## Status: Completed
+## Status: Completed — Phase 4+5 (2026-10-14)
 
-## Commit: 1ac404e
+Phases 1-3 completed by prior session (commit 1ac404e). Phase 4+5 added:
+- **Phase 4**: New `LaneCDP` for anti-bot challenge solving (4 workers, 16 queue).
+  `proxy.SubmitSolve` seam replaces bare `go func()` in challenge.go; wired to
+  `pool.Enqueue(LaneCDP)` in service.go.
+- **Phase 5**: Consolidated 3 worker-sizing declarations to one `workers.FromConfig(cfg)`
+  path; removed duplicate `loadWorkerPool` from service_config.go; added `cdp_size`/
+  `cdp_queue` INI fields to config struct, parser, Save(), and tests.
+
+Removed dead code `db_helpers.go` + `row_helpers.go` (3 unused functions) to clear
+pre-existing lint warnings. `just check` passes clean.
+
+## Commit: 2c21afa
