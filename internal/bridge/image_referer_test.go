@@ -33,19 +33,19 @@ func TestRefererCandidates(t *testing.T) {
 	t.Parallel()
 	t.Run("origin first site fallback", func(t *testing.T) {
 		got := refererCandidates("https://uploads.mangadex.org/covers/x.jpg", "https://mangadex.org")
-		if len(got) != 2 || got[0] != "https://uploads.mangadex.org/" || got[1] != "https://mangadex.org" {
+		if len(got) != 3 || got[0] != "https://uploads.mangadex.org/" || got[1] != "https://mangadex.org" || got[2] != "" {
 			t.Fatalf("candidates = %v", got)
 		}
 	})
 	t.Run("dedupes identical origin and site", func(t *testing.T) {
 		got := refererCandidates("https://x.io/a.jpg", "https://x.io/")
-		if len(got) != 1 || got[0] != "https://x.io/" {
+		if len(got) != 2 || got[0] != "https://x.io/" || got[1] != "" {
 			t.Fatalf("candidates = %v", got)
 		}
 	})
 	t.Run("unparseable url falls back to site", func(t *testing.T) {
 		got := refererCandidates("::bad", "https://site.io")
-		if len(got) != 1 || got[0] != "https://site.io" {
+		if len(got) != 2 || got[0] != "https://site.io" || got[1] != "" {
 			t.Fatalf("candidates = %v", got)
 		}
 	})

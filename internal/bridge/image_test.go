@@ -30,6 +30,11 @@ func newTestServiceWithCache(t *testing.T) *AppService {
 	if err != nil {
 		t.Fatalf("open db: %v", err)
 	}
+	for _, id := range []string{"p", "plugin-x", "test", "plugin-cancel", "plugin-dead", "opted-out"} {
+		if err := db.RegisterPlugin(database.Plugin{ID: id, Name: id, IsActive: true}); err != nil {
+			t.Fatalf("register plugin %s: %v", id, err)
+		}
+	}
 	t.Cleanup(func() { _ = db.Close() })
 	s := NewAppService(db, nil, hostnet.NewProxy(), "", t.TempDir(), nil)
 	t.Cleanup(s.Shutdown)

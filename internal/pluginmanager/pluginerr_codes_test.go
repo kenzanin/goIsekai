@@ -13,6 +13,7 @@ import (
 var knownPluginErrorCodes = []string{
 	"no_pages", "upstream_unavailable", "upstream_auth_failed",
 	"decrypt_key_mismatch", "decrypt_failed", "envelope_unrecognised",
+	"fetch_failed", "no_manga_id", "no_chapters",
 }
 
 // TestPluginsReportCodedErrors stops plugins from inventing their own wording.

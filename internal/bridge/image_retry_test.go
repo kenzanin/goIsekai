@@ -39,8 +39,8 @@ func TestFastFailureStillRetries(t *testing.T) {
 	if _, err := s.GetImage(t.Context(), "p", srv.URL+"/x.png", nil, "m", "c", PrioLow); err == nil {
 		t.Fatal("GetImage succeeded against a 503 server")
 	}
-	if got := hits.Load(); got != 3 {
-		t.Errorf("upstream hits = %d, want 3; a fast 503 must still use the whole ladder", got)
+	if got := hits.Load(); got != 6 {
+		t.Errorf("upstream hits = %d, want 6 (3 attempts x 2 referer candidates); a fast 503 must still use the whole ladder", got)
 	}
 }
 
