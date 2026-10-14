@@ -58,4 +58,4 @@ ai.sh
 # Browser HAR captures: local reference material, carry session cookies
 *.har
 
-.pi/
+.pi/.compartments/
