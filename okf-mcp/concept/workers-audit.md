@@ -19,6 +19,7 @@
 3. `internal/bridge/sync.go:189` — `SyncManga` → fetch lane (per-plugin key)
 4. `internal/bridge/jobs.go:32` — `ExportCBZ` → image lane
 5. `cmd/goisekai/maintenance.go:111` — batch maintenance → maintenance lane
+6. `internal/bridge/service.go` — CDP solve → CDP lane (via `proxy.SubmitSolve` seam)
 
 **Wrapper Seams**
 - `runOnFetch`: enrichment fetch, cover refetch, migration candidates
@@ -85,19 +86,103 @@ D1. `migrate_candidates.go:135` — `CollectMigrationCandidates` fan-out, 0 call
 D2. `views_migrate.go` — duplicate keys (Page, HasNext, Failures) — ✅ FIXED  
 D3. `db_helpers.go`, `row_helpers.go` — 3 unused generic helpers — ✅ REMOVED (24e5670)
 
-## Migration Plan (pond)
+## Pond v2 Migration Assessment
 
-**Option A**: Pond per lane (4 ponds)  
-**Option B**: Keep current pool, add pond for new jobs only  
-**Option C**: Pond's `QueueGroup` if available
+### Options Evaluated
 
-**Estimated effort**: 11 hours
+| Option | Description | Verdict | Reason |
+|---|---|---|---|
+| A | One Pond per lane (4 ponds) | ❌ Rejected | Unnecessary complexity — 4 separate pools vs. 1 custom pool |
+| B | Keep custom pool, add Pond for new jobs | ❌ Rejected | Mixed implementations, harder to reason about |
+| C | Pond subpools (shared workers, per-lane limits) | ❌ Rejected | goIsekai's image lane uses high/low priority split within one lane — Pond QueueGroup supports only a single FIFO queue per group |
 
-## Migration
+### DeepWiki Findings
 
-Pond v2 subpools (Option C) was assessed via DeepWiki but rejected — goIsekai's
-custom lane design (per-lane queue + image high/low split) doesn't map to Pond's
-single-queue QueueGroup. The custom pool remains permanent.
+1. **QueueGroup API**: Pond v2's `QueueGroup` allows grouping queues under one parent pool with shared workers, but each QueueGroup has exactly one queue. goIsekai's `LaneImage` uses two sub-queues (high/low priority) multiplexed by a single worker — this cannot be expressed as one QueueGroup.
+2. **Subpool isolation**: Subpools in Pond are separate `*pool.Pool` instances with no shared worker pool — they don't provide the "shared workers across lanes" behavior Option C expected.
+3. **Panic recovery**: Pond's default panic handler calls `os.Exit(1)` on panics — goIsekai's custom pool recovers per-job panics and logs them, continuing execution. This is a non-negotiable behavior that Pond's default doesn't match.
+
+### Decision: Keep custom pool, add CDP lane
+
+The custom pool (`internal/workers/`) already provides:
+- Per-lane queue capacity and worker count
+- Priority sub-queues (image high/low)
+- DTX-safe panic recovery per job
+- Lane statistics via `Stats()`
+
+Adding `LaneCDP` was a 4-line change (enum + config + enqueue call). Migrating to Pond would require reimplementing all of the above as Pond middleware — net loss of simplicity.
+
+### Architecture Graph
+
+```mermaid
+graph LR
+    subgraph "goIsekai Worker Pool (custom)"
+        subgraph "Maintenance Lane"
+            LM[LM: 1 worker<br/>queue: 8]
+            SYNC[SyncStaleLibrary]
+            CLEAN[CleanExpired]
+            PROG[MarkChapterComplete]
+        end
+        subgraph "Fetch Lane"
+            LF[LF: 2 workers<br/>queue: 8]
+            MIG[Migration Fan-out]
+            SYNC2[SyncLibrary/Manga]
+        end
+        subgraph "Interactive Lane"
+            LI[LI: 4 workers<br/>queue: 32]
+            SRCH[SearchManga]
+            DTL[GetMangaDetail]
+            CHAP[GetChapterList]
+            PG[GetPageList]
+        end
+        subgraph "Image Lane"
+            LIMG[LIMG: 8 workers<br/>queue: 64 each]
+            HI[High Priority]
+            LO[Low Priority]
+            IMG[fetchImage]
+            CBZ[ExportCBZ]
+        end
+        subgraph "CDP Lane"
+            LCDP[LCDP: 4 workers<br/>queue: 16]
+            CHAL[CDP Challenge Solve]
+        end
+        LM --> LM_Q["LM.Queue"]
+        LF --> LF_Q["LF.Queue"]
+        LI --> LI_Q["LI.Queue"]
+        LIMG --> LIMG_Q["LIMG.Queue"]
+        LCDP --> LCDP_Q["LCDP.Queue"]
+        SYNC --> LM_Q
+        CLEAN --> LM_Q
+        PROG --> LM_Q
+        MIG --> LF_Q
+        SYNC2 --> LF_Q
+        SRCH --> LI_Q
+        DTL --> LI_Q
+        CHAP --> LI_Q
+        PG --> LI_Q
+        HI --> LIMG_Q
+        LO --> LIMG_Q
+        CHAL --> LCDP_Q
+        IMG --> LIMG_Q
+        CBZ --> LIMG_Q
+    end
+    P[Plugin Manager] --> LF
+    H[HTTP Handlers] --> LI
+    S[Scheduler] --> LM
+    C[Cache Cleanup] --> LM
+    PR[Proxy/Challenge] --> LCDP
+```
+
+### Why custom pool wins (summary)
+
+```mermaid
+flowchart LR
+    A[Pond v2 Options] --> B{Custom lane design?}
+    B -->|Yes: image has high/low priority split,<br/>panic recovery per-job| C[Reject Pond]
+    B -->|No| D[Use Pond]
+    C --> E[Keep custom pool<br/>+ add LaneCDP (4 lines)]
+    E --> F[Phase 4 complete]
+```
 
 ## Status: All phases complete
 - **Phase 1-3** (completed 1ac404e): non-pool jobs → pool, 5 migrations
