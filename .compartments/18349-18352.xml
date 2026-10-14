@@ -1,0 +1,12 @@
+<compartment start="18349" end="18352" title="Explored SetChapterProgress and progress tracking" episode_type="investigation" importance="25">
+<p1>
+I explored the `SetChapterProgress` function in the bridge service to understand how chapter progress is tracked. The function is defined in `internal/bridge/progress.go` at line 52-69. It resolves the chapter's internal ID via `ResolveChapterIntID`, then delegates to `s.db.SetChapterProgress(chapterIntID, lastPage)`. An interesting side effect: when `lastPage >= total` (reaching the final page), it enqueues a `MarkChapterComplete` job to write `complete.csv` for offline CBZ exports. The related `RecordRead` function (line 39-48) tracks per-page reading, while `GetChapterProgresses` (line 86-101) retrieves progress with cached page counts from disk.
+</p1>
+<p2>
+I examined `SetChapterProgress` in `internal/bridge/progress.go`. The function resolves the chapter ID and persists progress via database, with a side effect: when reaching the final page (`lastPage >= total`), it enqueues marking the chapter complete for offline CBZ exports. Related functions include `RecordRead` for per-page tracking and `GetChapterProgresses` for retrieval with cached page counts.
+</p2>
+<p3>
+Explored chapter progress tracking in `internal/bridge/progress.go`. `SetChapterProgress` saves last page and triggers complete CSV when final page reached.
+</p3>
+<p4/>
+</compartment>
