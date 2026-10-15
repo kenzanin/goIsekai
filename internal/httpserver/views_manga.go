@@ -26,23 +26,26 @@ func (s *Server) buildMangaDetailData(r *http.Request, pluginID, mangaID string)
 	var err error
 	challenge := false
 	cachedData := false
-	if pluginMeta.NeedsHumanVerify && verifyRow.Cookies == "" {
+	if pluginMeta.NeedsHumanVerify {
 		// Blocked: wizard renders via Challenge below; a reload after the
 		// cookies are saved re-runs the real fetch.
 		challenge = true
-	} else {
-		// Use CachedMangaAndChapters to avoid blocking on interactive lane.
-		// Live data refresh happens in background if needed.
+		// Always use cached data for blocked plugins so the page doesn't blank
+		// out. The wizard renders over the cached data so the user can verify.
+		cachedData = true
+	}
+	if cachedData {
 		manga, chapters, err = s.service.CachedMangaAndChapters(pluginID, mangaID)
 		if err != nil {
-			s.logger.Error("manga detail", "error", err, "plugin", pluginID, "manga", mangaID)
-			return nil
+			s.logger.Debug("manga detail: no cached data, will show wizard", "plugin", pluginID, "manga", mangaID, "error", err)
+			cachedData = false
+		} else if manga.ID == "" {
+			s.logger.Debug("manga detail: empty manga from cache, will show wizard", "plugin", pluginID, "manga", mangaID)
+			cachedData = false
 		}
-		// Challenge check happens after; if cookies expired mid-session, the
-		// wizard will re-render and the user can re-authenticate.
-		if pluginMeta.NeedsHumanVerify && verifyRow.Cookies != "" {
-			// Cookies saved but may have gone stale. Try live fetch to verify.
-			// If it fails (e.g. offline), we keep the cached data.
+		// If cookies exist but may be stale, try live fetch to verify.
+		// If it fails, we keep the cached data.
+		if verifyRow.Cookies != "" && manga.ID != "" {
 			liveManga, liveChapters, liveErr := s.service.GetMangaDetails(pluginID, mangaID)
 			if liveErr == nil && liveManga.ID != "" {
 				manga, chapters = liveManga, liveChapters
