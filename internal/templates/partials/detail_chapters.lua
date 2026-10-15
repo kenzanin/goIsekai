@@ -159,7 +159,7 @@ return function(data)
 			end
 			rowHTML = rowHTML .. "</span></a>"
 
-			-- Toggle read button (marks/unmarks read — green check when read)
+			-- Toggle read button (green check when read, white when not)
 			rowHTML = rowHTML
 				.. '<form method="post" action="/action/toggle-read/'
 				.. h(ue(pluginID))
@@ -175,7 +175,8 @@ return function(data)
 				.. (isDone and "border-emerald-500/50 text-emerald-400 bg-emerald-500/10 hover:bg-emerald-500/20" or "border-neutral-700 hover:bg-neutral-800 text-neutral-500 hover:text-neutral-300")
 				.. '" aria-label="'
 				.. (isDone and "Unmark read" or "Mark read")
-				.. '"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="size-4"><polyline points="20 6 9 17 4 12"/></svg></button>'
+				.. '">' .. (isDone and '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="size-4"><polyline points="20 6 9 17 4 12"/></svg>' or '<span class="text-xs font-medium">Read</span>')
+				.. '</button>'
 				.. "</form>"
 
 			-- CBZ download button
