@@ -153,64 +153,44 @@
     progressLine.style.width = `${pct}%`;
   }
 
-  // Update page jumper with clickable page steps
+  // Update page jumper with progress bar + clickable dots
   function updatePageJumper() {
     var total = pages.length || 1;
     if (!pageJumper || total === 0) return;
 
-    // Clear existing page buttons (keep the container)
-    var existing = pageJumper.querySelectorAll('.page-btn');
-    existing.forEach(function(btn) {
-      btn.remove();
-    });
+    // Clear existing content
+    pageJumper.innerHTML = '';
+    pageProgress.style.width = '0%';
 
-    // Create page step buttons
-    // Limit to max 50 buttons to avoid clutter
-    var maxButtons = Math.min(total, 50);
-    var step = Math.ceil(total / maxButtons);
+    // Calculate dot spacing (max 50 dots total)
+    var maxDots = Math.min(total, 50);
+    var step = Math.ceil(total / maxDots);
     if (step < 1) step = 1;
 
     for (var i = 0; i < total; i += step) {
-      var btn = document.createElement('div');
-      btn.className = 'page-btn h-full flex-1 flex items-center justify-center cursor-pointer hover:bg-indigo-500/30 transition-colors';
-      btn.textContent = (i + 1).toString();
-      btn.dataset.pageIndex = i;
-      btn.addEventListener('click', function(e) {
+      var dot = document.createElement('button');
+      dot.className = 'h-full flex-1 flex items-center justify-center cursor-pointer transition-all duration-200';
+      dot.title = 'Page ' + (i + 1);
+      dot.addEventListener('click', function(e) {
         e.stopPropagation();
-        var pageIndex = parseInt(this.dataset.pageIndex, 10);
-        goToPage(pageIndex);
+        goToPage(parseInt(this.dataset.pageIndex, 10));
       });
-      pageJumper.appendChild(btn);
+      dot.dataset.pageIndex = i;
+
+      // Check if this dot is passed/current
+      var isPassed = i <= current;
+      if (isPassed) {
+        dot.className += ' bg-indigo-500 shadow-[0_0_8px_2px_rgba(99,102,241,0.6)] scale-110';
+      } else {
+        dot.className += ' bg-neutral-600 hover:bg-neutral-500 scale-100';
+      }
+
+      pageJumper.appendChild(dot);
     }
 
     // Update progress bar width
     var progressPct = ((current + 1) / total) * 100;
     pageProgress.style.width = `${progressPct}%`;
-    updatePageDots(total);
-  }
-
-  // Render mini clickable page dots at bottom when bars are hidden
-  function updatePageDots(total) {
-    if (!pageDots || !total) return;
-    pageDots.innerHTML = '';
-    var maxDots = Math.min(total, 30);
-    var step = Math.ceil(total / maxDots);
-    if (step < 1) step = 1;
-    for (var i = 0; i < total; i += step) {
-      var dot = document.createElement('button');
-      var isActive = i === current;
-      dot.className = 'w-2 h-2 rounded-full transition-all duration-150 ' +
-        (isActive
-          ? 'bg-indigo-400 scale-125'
-          : 'bg-neutral-500 hover:bg-neutral-300');
-      dot.title = 'Page ' + (i + 1);
-      dot.addEventListener('click', function(e) {
-        e.stopPropagation();
-        goToPage(parseInt(this.dataset.page, 10));
-      });
-      dot.dataset.page = i;
-      pageDots.appendChild(dot);
-    }
   }
 
   // Start with bars visible during loading so user can cancel
