@@ -127,7 +127,6 @@
   var barsVisible = true;
   var topBar = document.getElementById('top-bar');
   var bottomBar = document.getElementById('bottom-bar');
-  var progressLine = document.getElementById('progress-line');
   var zoneCenter = document.getElementById('zone-center');
 
   function setBarsVisible(visible) {
@@ -135,22 +134,14 @@
     if (visible) {
       topBar.style.transform = 'translateY(0)';
       bottomBar.style.transform = 'translateY(0)';
-      progressLine.style.opacity = '0';
       pageDots.style.opacity = '0';
       pageDots.classList.add('pointer-events-none');
     } else {
       topBar.style.transform = 'translateY(-100%)';
       bottomBar.style.transform = 'translateY(100%)';
-      progressLine.style.opacity = '1';
       pageDots.style.opacity = '1';
       pageDots.classList.remove('pointer-events-none');
     }
-  }
-
-  function updateProgressLine() {
-    var total = pages.length || 1;
-    var pct = ((current + 1) / total) * 100;
-    progressLine.style.width = `${pct}%`;
   }
 
   // Update page jumper with progress bar + clickable numbered steps
@@ -221,6 +212,12 @@
 
   // Start with bars visible during loading so user can cancel
   setBarsVisible(true);
+
+  // Unified page-jumper + dots indicator (shown when bars hidden)
+  function updateUnifiedPageIndicator(total) {
+    // Update the page-jumper step bar (shows when bars hidden)
+    updatePageJumper();
+  }
 
   function imageUrl(p, chapterID, prio) {
     var h = p.headers || {};
@@ -688,7 +685,6 @@
         if (current !== k && k < pages.length) {
           current = k % Math.max(pages.length, 1);
           updateCounter();
-          updateProgressLine();
           reportProgress();
         }
         break;
@@ -702,7 +698,6 @@
     current = i;
     showError(false);
     updateCounter();
-    updateProgressLine();
     reportProgress();
     prefetch();
     if (stripMode && !stripImgs.length) populateStrip();

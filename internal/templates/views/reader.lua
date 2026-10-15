@@ -114,19 +114,17 @@ return function(data)
   <div id="bottom-bar" class="absolute bottom-0 left-0 right-0 z-30 flex items-center gap-3 bg-neutral-950/85 backdrop-blur-sm px-3 py-2 text-sm transition-transform duration-300 ease-in-out">
     <a id="btn-prev-ch" href="/view/read/]] .. h(pluginID) .. [[" class="border border-neutral-700 hover:bg-neutral-800 active:scale-95 transition rounded-md px-3 py-1.5" ]] .. prevStyle .. [[>← Prev ch.</a>
     <button id="btn-prev-page" class="border border-neutral-700 hover:bg-neutral-800 active:scale-95 transition rounded-md px-3 py-1.5">‹</button>
-    <div id="page-jumper" class="flex-1 h-8 flex items-center justify-center gap-0.5 cursor-pointer" title="Click to jump to page">
-      <div class="flex-1 h-full relative bg-neutral-800 rounded overflow-hidden">
-        <div id="page-progress" class="absolute top-0 left-0 h-full bg-indigo-500 transition-all duration-200"></div>
-      </div>
+    <!-- Unified progress+jump bar — shows page steps when bars hidden -->
+    <div id="page-jumper" class="flex-1 h-8 flex items-center justify-center gap-0.5 cursor-pointer relative" title="Click to jump to page">
+      <div class="absolute inset-0 bg-neutral-800 rounded"></div>
+      <div id="page-progress" class="absolute top-0 left-0 h-full bg-indigo-500 transition-all duration-200 rounded"></div>
+      <div class="relative flex items-center gap-0.5 h-full w-full px-1 page-steps"></div>
     </div>
     <button id="btn-next-page" class="border border-neutral-700 hover:bg-neutral-800 active:scale-95 transition rounded-md px-3 py-1.5">›</button>
     <a id="btn-next-ch" href="/view/read/]] .. h(pluginID) .. [[" class="border border-neutral-700 hover:bg-neutral-800 active:scale-95 transition rounded-md px-3 py-1.5" ]] .. nextStyle .. [[>Next ch. →</a>
   </div>
 
-  <!-- Progress line -->
-  <div id="progress-line" class="absolute bottom-0 left-0 right-0 z-40 h-2 bg-indigo-500 shadow-[0_0_8px_2px_rgba(99,102,241,0.55)] transition-opacity duration-300 ease-in-out opacity-0"></div>
-
-  <!-- Mini page dots — visible when bars are hidden, clickable page jumpers -->
+  <!-- Mini dot indicator — shown when bars hidden (unified with page-jumper above) -->
   <div id="page-dots" class="absolute bottom-1 left-0 right-0 z-30 flex items-center justify-center gap-1 px-4 transition-opacity duration-300 opacity-0 pointer-events-none">
   </div>
 
