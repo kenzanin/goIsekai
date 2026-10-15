@@ -50,21 +50,13 @@ func (s *Server) buildMangaDetailData(r *http.Request, pluginID, mangaID string)
 			}
 		}
 	} else {
-		// Not blocked: use cached data first to avoid blocking on interactive lane.
-		cachedData = true
+		// Not blocked: serve cached data immediately, no live fetch that
+		// would block on the interactive lane. The cache is refreshed on
+		// background enqueues (library sync, search, etc.).
 		manga, chapters, err = s.service.CachedMangaAndChapters(pluginID, mangaID)
 		if err != nil {
-			s.logger.Debug("manga detail: no cached data, falling back to live", "plugin", pluginID, "manga", mangaID, "error", err)
-			cachedData = false
-		} else if manga.ID == "" {
-			cachedData = false
-		}
-		if !cachedData {
-			manga, chapters, err = s.service.GetMangaDetails(pluginID, mangaID)
-			if err != nil {
-				s.logger.Error("manga detail", "error", err, "plugin", pluginID, "manga", mangaID)
-				return nil
-			}
+			s.logger.Error("manga detail", "error", err, "plugin", pluginID, "manga", mangaID)
+			return nil
 		}
 	}
 	// If no data was loaded and no challenge wizard is shown, return nil
