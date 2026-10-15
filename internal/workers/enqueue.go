@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"sync"
 	"time"
+
+	"goisekai/internal/logger"
 )
 
 // New creates a Pool with the given sizing and starts all workers.
@@ -179,6 +181,7 @@ func (p *Pool) Enqueue(ctx context.Context, job *Job) (*Future, error) {
 	}
 	p.registry[job.ID] = h
 	p.regMu.Unlock()
+	logger.Debug("worker: enqueued", "jobID", job.ID, "lane", job.Lane.String(), "plugin", job.PluginKey)
 	h.setStatus(StatusQueued) // triggers callback if set
 
 	var lane *poolLane
@@ -204,6 +207,7 @@ func (p *Pool) Enqueue(ctx context.Context, job *Job) (*Future, error) {
 
 	// Wrap Run with retry + registry bookkeeping once, here.
 	wrapped := func(ctx context.Context) error {
+		logger.Debug("worker: running", "jobID", job.ID, "lane", job.Lane.String(), "plugin", job.PluginKey)
 		h.setStatus(StatusRunning)
 		var err error
 		for attempt := 1; attempt <= job.MaxAttempts; attempt++ {
@@ -215,6 +219,7 @@ func (p *Pool) Enqueue(ctx context.Context, job *Job) (*Future, error) {
 			}
 			err = job.Run(ctx)
 			if err == nil {
+				logger.Debug("worker: done", "jobID", job.ID, "lane", job.Lane.String(), "plugin", job.PluginKey)
 				h.setStatus(StatusDone)
 				h.setErr(nil)
 				return nil
@@ -224,6 +229,7 @@ func (p *Pool) Enqueue(ctx context.Context, job *Job) (*Future, error) {
 			}
 			if attempt < job.MaxAttempts {
 				h.setStatus(StatusFailed)
+				logger.Debug("worker: failed, retrying", "jobID", job.ID, "lane", job.Lane.String(), "plugin", job.PluginKey, "attempt", attempt)
 				// Small linear backoff; transient-only.
 				select {
 				case <-time.After(time.Duration(attempt) * 50 * time.Millisecond):
@@ -235,6 +241,7 @@ func (p *Pool) Enqueue(ctx context.Context, job *Job) (*Future, error) {
 			}
 		}
 		h.setStatus(StatusDead)
+		logger.Debug("worker: dead", "jobID", job.ID, "lane", job.Lane.String(), "plugin", job.PluginKey, "lastErr", err)
 		h.setErr(err)
 		return err
 	}
