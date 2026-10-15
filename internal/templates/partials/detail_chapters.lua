@@ -121,27 +121,6 @@ return function(data)
 				.. "</span>"
 				.. '<span class="flex items-center gap-2 shrink-0">'
 
-			-- Page info
-			if totalPages > 0 then
-				rowHTML = rowHTML
-					.. '<span class="text-xs px-2 py-0.5 rounded-full bg-neutral-800 text-neutral-400">'
-					.. h(tostring(lastPageRead))
-					.. "/"
-					.. h(tostring(totalPages))
-					.. " read"
-					.. (cachedPages > 0 and (" · " .. h(tostring(cachedPages)) .. " cached") or "")
-					.. "</span>"
-			elseif cachedPages > 0 then
-				rowHTML = rowHTML
-					.. '<span class="text-xs px-2 py-0.5 rounded-full bg-neutral-800 text-neutral-400">'
-					.. h(tostring(cachedPages))
-					.. " cached</span>"
-			end
-
-			if isDone then
-				rowHTML = rowHTML .. '<span class="text-emerald-400 text-xs">✓</span>'
-			end
-
 			-- Release date
 			if c.ReleasedAt then
 				local rawDate = ""
