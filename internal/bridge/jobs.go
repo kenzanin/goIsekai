@@ -11,9 +11,14 @@ import (
 
 // interactiveEnqueueTimeout bounds how long a UI invoke waits for a queue
 // slot before the handler surfaces 503 (design D6) — the request never
-// blocks indefinitely on a full lane. Job execution itself is not cancelled
-// by it. 5s: shorter than a reader's patience, longer than a queue blip.
+// blocks indefinitely on a full lane. 5s: shorter than a reader's patience, longer than a queue blip.
 const interactiveEnqueueTimeout = 5 * time.Second
+
+// interactiveExecTimeout bounds how long the plugin call itself may run inside
+// the worker. This is independent of enqueue timeout: a job may wait in queue
+// < enqueue timeout, but once running it must not hog the lane. 30s covers a
+// worst-case CDP challenge solve; anything longer is treated as hung.
+const interactiveExecTimeout = 30 * time.Second
 
 // EnqueueExportCBZ queues a CBZ export on the image lane. Returns a job ID for
 // tracking; the finished path is announced via the job status callback so the
@@ -59,14 +64,26 @@ func (s *AppService) runOnFetch(ctx context.Context, pluginKey string, fn func(c
 // its result. Enqueue failures surface workers.ErrEnqueueTimeout/ErrBusy
 // (task 4.2 → 503); plugin failures flow through as ordinary errors so the
 // callers' cache fallbacks keep working.
+//
+// The fn receives an exec-bounded context so a hung plugin call cannot
+// hog an interactive worker forever. If the call exceeds
+// interactiveExecTimeout it returns context.DeadlineExceeded, which the
+// caller treats as a transient failure (cache fallback).
 func (s *AppService) runOnInteractive(ctx context.Context, pluginKey string, fn func(context.Context) error) error {
-	enqueueCtx, cancel := context.WithTimeout(ctx, interactiveEnqueueTimeout)
-	defer cancel()
+	enqueueCtx, enqueueCancel := context.WithTimeout(ctx, interactiveEnqueueTimeout)
+	defer enqueueCancel()
 	fut, err := s.pool.Enqueue(enqueueCtx, &workers.Job{
 		Lane:        workers.LaneInteractive,
 		PluginKey:   pluginKey,
 		MaxAttempts: 1, // request-shaped: fail fast, no lane-level retry
-		Run:         fn,
+		Run: func(ctx context.Context) error {
+			// Bounded execution context: does not inherit the HTTP request
+			// context's lifetime — only the exec timeout. The request context
+			// still gates Enqueue (above) so a cancelled request can't start work.
+			execCtx, execCancel := context.WithTimeout(context.Background(), interactiveExecTimeout)
+			defer execCancel()
+			return fn(execCtx)
+		},
 	})
 	if err != nil {
 		return err

@@ -12,6 +12,7 @@ import (
 
 	"goisekai/internal/bridge"
 	"goisekai/internal/database"
+	"goisekai/internal/logger"
 )
 
 // writeJSON encodes v as JSON with the given HTTP status code.
@@ -100,6 +101,7 @@ func (s *Server) registerAPIRoutes(r chi.Router) {
 	r.Get("/plugins", s.apiPlugins)
 	r.Get("/stats", s.apiStats)
 	r.Get("/workers", s.apiWorkers)
+	r.Get("/worker-log", s.apiWorkerLog)
 	r.Post("/library/toggle/{pluginID}/{mangaID}", s.apiToggleLibrary)
 	r.Post("/shutdown", s.apiShutdown)
 	r.Post("/chapters/read/{pluginID}/{mangaID}/{chapterID}", s.apiMarkChapterRead)
@@ -186,4 +188,28 @@ func (s *Server) apiStats(w http.ResponseWriter, r *http.Request) {
 func (s *Server) apiShutdown(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]string{"status": "shutting down"})
 	go s.service.TriggerShutdown()
+}
+
+// apiWorkerLog returns recent worker-job log lines, optionally filtered by
+// lane via the ?lane= query parameter. Reads from logger.GetLines (in-memory
+// ring buffer). Example: /api/worker-log?lane=interactive
+func (s *Server) apiWorkerLog(w http.ResponseWriter, r *http.Request) {
+	laneFilter := r.URL.Query().Get("lane")
+	lines := logger.GetLines()
+	out := make([]string, 0, len(lines))
+	if laneFilter == "" {
+		out = lines
+	} else {
+		needle := "lane=" + laneFilter
+		for _, l := range lines {
+			if strings.Contains(l, needle) {
+				out = append(out, l)
+			}
+		}
+	}
+	writeJSON(w, http.StatusOK, map[string]any{
+		"lane":  laneFilter,
+		"count": len(out),
+		"lines": out,
+	})
 }
