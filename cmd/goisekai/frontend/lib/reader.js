@@ -1270,6 +1270,8 @@
             canvas.style.display = 'none';
             stripView.classList.remove('hidden');
           }
+          current = initial;
+          updateCounter();
           drawPage(initial);
         });
       })
