@@ -125,7 +125,7 @@ return function(data)
   </div>
 
   <!-- Mini dot indicator — shown when bars hidden (unified with page-jumper above) -->
-  <div id="page-dots" class="absolute bottom-1 left-0 right-0 z-30 flex items-center justify-center gap-1 px-4 transition-opacity duration-300 opacity-0 pointer-events-none">
+  <div id="page-dots" class="absolute bottom-1 left-0 right-0 z-30 flex items-center justify-center gap-2 px-4 transition-opacity duration-300 opacity-0 pointer-events-none">
   </div>
 
 </div>

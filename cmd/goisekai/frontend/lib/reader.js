@@ -189,17 +189,20 @@
   function updatePageDots(total) {
     if (!pageDots || !total) return;
     pageDots.innerHTML = '';
-    var maxDots = Math.min(total, 30);
+    // Full width with larger dots
+    var maxDots = Math.min(total, 50);
     var step = Math.ceil(total / maxDots);
     if (step < 1) step = 1;
     for (var i = 0; i < total; i += step) {
       var dot = document.createElement('button');
-      dot.className = 'w-2 h-2 rounded-full transition-all duration-150 ' +
+      dot.className =
+        'w-4 h-4 rounded-full transition-all duration-150 flex items-center justify-center text-[9px] leading-none ' +
         (i === current
-          ? 'bg-indigo-400 scale-125 shadow-[0_0_6px_1px_rgba(129,140,248,0.7)]'
+          ? 'bg-indigo-500 scale-125 shadow-[0_0_8px_2px_rgba(99,102,241,0.7)] text-white'
           : i <= current
             ? 'bg-indigo-600'
-            : 'bg-neutral-600 hover:bg-neutral-400');
+            : 'bg-neutral-600 hover:bg-neutral-500 text-neutral-300');
+      dot.textContent = String(i + 1);
       dot.title = 'Page ' + (i + 1);
       dot.dataset.page = i;
       dot.addEventListener('click', function(e) {
