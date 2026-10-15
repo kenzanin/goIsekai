@@ -80,9 +80,22 @@ func (s *AppService) runOnInteractive(ctx context.Context, pluginKey string, fn 
 			// Bounded execution context: does not inherit the HTTP request
 			// context's lifetime — only the exec timeout. The request context
 			// still gates Enqueue (above) so a cancelled request can't start work.
+			//
+			// Most plugin bodies ignore the ctx they receive, so a plain
+			// WithTimeout cannot free the lane on its own: race the call
+			// against the deadline and give up waiting when it expires. The
+			// abandoned goroutine finishes on its own once the underlying
+			// invoke returns; the lane slot and fairness key are released now.
 			execCtx, execCancel := context.WithTimeout(context.Background(), interactiveExecTimeout)
 			defer execCancel()
-			return fn(execCtx)
+			done := make(chan error, 1)
+			go func() { done <- fn(execCtx) }()
+			select {
+			case err := <-done:
+				return err
+			case <-execCtx.Done():
+				return execCtx.Err()
+			}
 		},
 	})
 	if err != nil {
