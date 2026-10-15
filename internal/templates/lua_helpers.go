@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"html"
 	"net/url"
+	"strings"
 
 	lua "github.com/mmcdole/lunar"
 )
@@ -22,6 +23,7 @@ func luaHelpers(S *lua.State) map[string]lua.NativeFunc {
 		"csrfInput":        csrfInputHelper(S),
 		"urlQuery":         urlQueryHelper(S),
 		"link":             linkHelper(S),
+		"extractLane":      extractLaneHelper(S),
 	}
 }
 
@@ -87,5 +89,30 @@ func csrfInputHelper(S *lua.State) lua.NativeFunc {
 		}
 		return frame.ReturnString(`<input type="hidden" name="csrf_token" value="` +
 			html.EscapeString(tok) + `">`)
+	}
+}
+
+// extractLaneHelper returns the worker lane name from a log line, or "".
+// Looks for "lane= <LaneName>" in the line.
+func extractLaneHelper(S *lua.State) lua.NativeFunc {
+	return func(frame lua.Frame) lua.Outcome {
+		arg, ok := frame.Argument(0)
+		if !ok {
+			return frame.ReturnString("")
+		}
+		tok, err := frame.ToString(arg)
+		if err != nil {
+			tok = arg.String()
+		}
+		idx := strings.Index(tok, "lane= ")
+		if idx == -1 {
+			return frame.ReturnString("")
+		}
+		rest := tok[idx+len("lane= "):]
+		end := strings.IndexFunc(rest, func(r rune) bool { return r == ' ' || r == '\t' })
+		if end == -1 {
+			return frame.ReturnString(html.EscapeString(rest))
+		}
+		return frame.ReturnString(html.EscapeString(rest[:end]))
 	}
 }

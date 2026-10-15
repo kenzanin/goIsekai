@@ -88,6 +88,23 @@ func (s *Server) viewLogs(w http.ResponseWriter, r *http.Request) {
 		}
 		logs = out
 	}
+
+	// Filter by worker lane(s) — query param "lane" may be comma-separated
+	// (e.g. "LaneFetch,LaneImage"). Only logs containing "lane= <LaneName>"
+	// are kept.
+	if laneFilter := r.URL.Query().Get("lane"); laneFilter != "" {
+		lanes := strings.Split(laneFilter, ",")
+		out := logs[:0]
+		for _, l := range logs {
+			for _, ln := range lanes {
+				if strings.Contains(l, "lane= "+ln) {
+					out = append(out, l)
+					break
+				}
+			}
+		}
+		logs = out
+	}
 	if len(logs) > limit {
 		logs = logs[len(logs)-limit:]
 	}
