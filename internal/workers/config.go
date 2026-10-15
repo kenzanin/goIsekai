@@ -26,7 +26,7 @@ type Config struct {
 const (
 	defaultInteractiveSize  = 4
 	defaultInteractiveQueue = 32
-	defaultFetchSize        = 2
+	defaultFetchSize        = 4
 	defaultFetchQueue       = 8
 	defaultImageSize        = 8
 	defaultImageQueue       = 64
