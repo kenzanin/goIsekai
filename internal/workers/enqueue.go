@@ -205,9 +205,11 @@ func (p *Pool) Enqueue(ctx context.Context, job *Job) (*Future, error) {
 		return nil, fmt.Errorf("workers: unknown lane %d", int(job.Lane))
 	}
 
-	// Wrap Run with retry + registry bookkeeping once, here.
+	// Wrap Run with retry + registry bookkeeping once, here. Adds duration
+	// tracking for worker job visibility.
 	wrapped := func(ctx context.Context) error {
-		logger.Debug("worker: running", "jobID", job.ID, "lane", job.Lane.String(), "plugin", job.PluginKey)
+		start := time.Now()
+		logger.Info("worker: running", "jobID", job.ID, "lane", job.Lane.String(), "plugin", job.PluginKey)
 		h.setStatus(StatusRunning)
 		var err error
 		for attempt := 1; attempt <= job.MaxAttempts; attempt++ {
@@ -219,7 +221,7 @@ func (p *Pool) Enqueue(ctx context.Context, job *Job) (*Future, error) {
 			}
 			err = job.Run(ctx)
 			if err == nil {
-				logger.Debug("worker: done", "jobID", job.ID, "lane", job.Lane.String(), "plugin", job.PluginKey)
+				logger.Info("worker: done", "jobID", job.ID, "lane", job.Lane.String(), "plugin", job.PluginKey, "dur_ms", time.Since(start).Milliseconds())
 				h.setStatus(StatusDone)
 				h.setErr(nil)
 				return nil
@@ -241,7 +243,7 @@ func (p *Pool) Enqueue(ctx context.Context, job *Job) (*Future, error) {
 			}
 		}
 		h.setStatus(StatusDead)
-		logger.Debug("worker: dead", "jobID", job.ID, "lane", job.Lane.String(), "plugin", job.PluginKey, "lastErr", err)
+		logger.Warn("worker: dead", "jobID", job.ID, "lane", job.Lane.String(), "plugin", job.PluginKey, "dur_ms", time.Since(start).Milliseconds(), "lastErr", err)
 		h.setErr(err)
 		return err
 	}
