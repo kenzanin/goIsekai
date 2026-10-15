@@ -20,6 +20,13 @@ const interactiveEnqueueTimeout = 5 * time.Second
 // worst-case CDP challenge solve; anything longer is treated as hung.
 const interactiveExecTimeout = 30 * time.Second
 
+// interactiveAwaitTimeout bounds how long a caller blocks on the job's future:
+// enqueue (5s) + exec (30s) + 5s queue slack. Without it a request whose job is
+// parked behind a hung same-plugin sibling waits forever — that is exactly how
+// one stuck plugin invoke used to hang the whole UI. Expiry surfaces as
+// context.DeadlineExceeded, which callers map to their cache fallback.
+const interactiveAwaitTimeout = interactiveEnqueueTimeout + interactiveExecTimeout + 5*time.Second
+
 // EnqueueExportCBZ queues a CBZ export on the image lane. Returns a job ID for
 // tracking; the finished path is announced via the job status callback so the
 // WS/toast surface can point the user at the file.
@@ -101,7 +108,13 @@ func (s *AppService) runOnInteractive(ctx context.Context, pluginKey string, fn 
 	if err != nil {
 		return err
 	}
-	return fut.Await(ctx)
+	// Bound the wait: a job parked behind a hung same-plugin sibling must
+	// not translate into an unbounded request hang. Expiry cancels the
+	// queued job (Await semantics) and surfaces ctx.DeadlineExceeded,
+	// which callers map to their cache fallback.
+	awaitCtx, awaitCancel := context.WithTimeout(ctx, interactiveAwaitTimeout)
+	defer awaitCancel()
+	return fut.Await(awaitCtx)
 }
 
 // IsQueueFull reports lane-level backpressure (interactive enqueue timeout or
