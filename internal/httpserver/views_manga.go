@@ -1,9 +1,7 @@
 package httpserver
 
 import (
-	"errors"
 	"goisekai/internal/database"
-	"goisekai/internal/hostnet"
 	"goisekai/pkg/types"
 	"net/http"
 	"strconv"
@@ -33,21 +31,21 @@ func (s *Server) buildMangaDetailData(r *http.Request, pluginID, mangaID string)
 		// cookies are saved re-runs the real fetch.
 		challenge = true
 	} else {
-		manga, chapters, err = s.service.GetMangaDetails(pluginID, mangaID)
+		// Use CachedMangaAndChapters to avoid blocking on interactive lane.
+		// Live data refresh happens in background if needed.
+		manga, chapters, err = s.service.CachedMangaAndChapters(pluginID, mangaID)
 		if err != nil {
-			if _, ok := errors.AsType[*hostnet.ChallengeError](err); ok {
-				challenge = true
-				s.logger.Warn("manga detail blocked by challenge", "plugin", pluginID, "manga", mangaID)
-			} else {
-				// Plugin unreachable (e.g. offline): the reader already prefers
-				// the persisted copy, so the detail page should too instead of
-				// blanking out. Serve it with a notice when a copy exists.
-				cachedData = true
-				manga, chapters, err = s.service.CachedMangaAndChapters(pluginID, mangaID)
-				if err != nil {
-					s.logger.Error("manga detail", "error", err, "plugin", pluginID, "manga", mangaID)
-					return nil
-				}
+			s.logger.Error("manga detail", "error", err, "plugin", pluginID, "manga", mangaID)
+			return nil
+		}
+		// Challenge check happens after; if cookies expired mid-session, the
+		// wizard will re-render and the user can re-authenticate.
+		if pluginMeta.NeedsHumanVerify && verifyRow.Cookies != "" {
+			// Cookies saved but may have gone stale. Try live fetch to verify.
+			// If it fails (e.g. offline), we keep the cached data.
+			liveManga, liveChapters, liveErr := s.service.GetMangaDetails(pluginID, mangaID)
+			if liveErr == nil && liveManga.ID != "" {
+				manga, chapters = liveManga, liveChapters
 			}
 		}
 	}
