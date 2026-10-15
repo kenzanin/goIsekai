@@ -27,20 +27,18 @@ func (s *Server) buildMangaDetailData(r *http.Request, pluginID, mangaID string)
 	challenge := false
 	cachedData := false
 	if pluginMeta.NeedsHumanVerify {
-		// Blocked: wizard renders via Challenge below; a reload after the
-		// cookies are saved re-runs the real fetch.
+		// Blocked: wizard renders via Challenge; reload after cookies saved
+		// re-runs the real fetch.
 		challenge = true
-		// Always use cached data for blocked plugins so the page doesn't blank
-		// out. The wizard renders over the cached data so the user can verify.
+		// Use cached data for blocked plugins so the page doesn't blank out.
+		// The wizard renders over the cached data so the user can verify.
 		cachedData = true
-	}
-	if cachedData {
 		manga, chapters, err = s.service.CachedMangaAndChapters(pluginID, mangaID)
 		if err != nil {
-			s.logger.Debug("manga detail: no cached data, will show wizard", "plugin", pluginID, "manga", mangaID, "error", err)
+			s.logger.Debug("manga detail: no cached data for blocked plugin", "plugin", pluginID, "manga", mangaID, "error", err)
 			cachedData = false
 		} else if manga.ID == "" {
-			s.logger.Debug("manga detail: empty manga from cache, will show wizard", "plugin", pluginID, "manga", mangaID)
+			s.logger.Debug("manga detail: empty manga from cache for blocked plugin", "plugin", pluginID, "manga", mangaID)
 			cachedData = false
 		}
 		// If cookies exist but may be stale, try live fetch to verify.
@@ -51,18 +49,28 @@ func (s *Server) buildMangaDetailData(r *http.Request, pluginID, mangaID string)
 				manga, chapters = liveManga, liveChapters
 			}
 		}
-	}
-	// Offline-first: a blocked plugin must not blank out a manga we already hold
-	// a copy of — the reader prefers the persisted copy, so the detail page does
-	// too. Covers both block paths above (no cookies saved yet, and cookies that
-	// went stale mid-session). challenge stays true so the wizard still renders
-	// over the data; with no copy the page degrades to the wizard alone rather
-	// than returning nil.
-	if challenge && manga.ID == "" {
-		if cachedManga, cachedChapters, cerr := s.service.CachedMangaAndChapters(pluginID, mangaID); cerr == nil {
-			manga, chapters = cachedManga, cachedChapters
-			cachedData = true
+	} else {
+		// Not blocked: use cached data first to avoid blocking on interactive lane.
+		cachedData = true
+		manga, chapters, err = s.service.CachedMangaAndChapters(pluginID, mangaID)
+		if err != nil {
+			s.logger.Debug("manga detail: no cached data, falling back to live", "plugin", pluginID, "manga", mangaID, "error", err)
+			cachedData = false
+		} else if manga.ID == "" {
+			cachedData = false
 		}
+		if !cachedData {
+			manga, chapters, err = s.service.GetMangaDetails(pluginID, mangaID)
+			if err != nil {
+				s.logger.Error("manga detail", "error", err, "plugin", pluginID, "manga", mangaID)
+				return nil
+			}
+		}
+	}
+	// If no data was loaded and no challenge wizard is shown, return nil
+	// (handler will 502). This covers nonexistent plugin or manga.
+	if manga.ID == "" && !challenge {
+		return nil
 	}
 	// Source plugins rarely supply an author; fall back to the one captured by
 	// an enrichment provider, if any.
