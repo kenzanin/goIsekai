@@ -48,6 +48,19 @@ func (s *Server) handleMarkChapterRead(w http.ResponseWriter, r *http.Request) {
 	s.hxRedirect(w, r, "/view/manga/"+pluginID+"/"+mangaID)
 }
 
+// handleToggleChapterRead toggles the read status of a single chapter.
+func (s *Server) handleToggleChapterRead(w http.ResponseWriter, r *http.Request) {
+	pluginID := param(r, "pluginID")
+	mangaID := param(r, "mangaID")
+	chapterID := param(r, "chapterID")
+	if err := s.service.ToggleChapterRead(pluginID, mangaID, chapterID); err != nil {
+		s.logger.Error("toggle chapter read", "pluginID", pluginID, "mangaID", mangaID, "chapterID", chapterID, "error", err)
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	s.hxRedirect(w, r, "/view/manga/"+pluginID+"/"+mangaID)
+}
+
 // handleResetChapterProgress clears a single chapter's read progress.
 func (s *Server) handleResetChapterProgress(w http.ResponseWriter, r *http.Request) {
 	pluginID := param(r, "pluginID")

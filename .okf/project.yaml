@@ -1,0 +1,5 @@
+project: goisekai
+bundles:
+  - id: okf-mcp
+    root: ~/.local/share/okf/okf/okf-mcp
+    include: ["*.md", "**/*.md"]

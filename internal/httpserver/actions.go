@@ -51,6 +51,7 @@ func (s *Server) registerActionPostRoutes(r chi.Router) {
 	r.Post("/reset-enrichment/{pluginID}/{mangaID}", s.handleResetEnrichment)
 	r.Post("/set-chapter-progress", s.handleSetChapterProgress)
 	r.Post("/mark-read/{pluginID}/{mangaID}/{chapterID}", s.handleMarkChapterRead)
+	r.Post("/toggle-read/{pluginID}/{mangaID}/{chapterID}", s.handleToggleChapterRead)
 	r.Post("/reset-progress/{pluginID}/{mangaID}/{chapterID}", s.handleResetChapterProgress)
 	r.Post("/toggle-skip/{pluginID}/{mangaID}/{chapterID}", s.handleToggleChapterSkip)
 	r.Post("/toggle-cover-dim/{pluginID}/{mangaID}", s.handleToggleCoverDim)

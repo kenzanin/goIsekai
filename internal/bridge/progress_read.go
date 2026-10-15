@@ -14,6 +14,18 @@ func (s *AppService) MarkChapterRead(pluginID, mangaID, chapterID string) error 
 	return nil
 }
 
+// ToggleChapterRead toggles the read status of a single chapter, addressed by source ids.
+func (s *AppService) ToggleChapterRead(pluginID, mangaID, chapterID string) error {
+	chapterIntID, err := s.db.ResolveChapterIntID(pluginID, mangaID, chapterID)
+	if err != nil {
+		return fmt.Errorf("bridge: resolve chapter: %w", err)
+	}
+	if err := s.db.ToggleChapterRead(chapterIntID); err != nil {
+		return fmt.Errorf("bridge: toggle chapter read: %w", err)
+	}
+	return nil
+}
+
 // SetChaptersRead marks (read=true) or unmarks (read=false) the given chapters,
 // addressed by source ids.
 func (s *AppService) SetChaptersRead(pluginID, mangaID string, chapterIDs []string, read bool) error {

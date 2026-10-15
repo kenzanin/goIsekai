@@ -31,6 +31,21 @@ return function(data)
 		chapterDisplay = h(chTitle)
 	end
 
+	-- Build chapter menu items
+	local chapterMenuItems = ""
+	for _, c in ipairs(data.Chapters or {}) do
+		local num = c.ChapterNum or 0
+		local title = c.Title or ""
+		local display = num > 0 and "Ch. " .. num or title
+		if title ~= "" and num <= 0 then
+			display = title
+		elseif title ~= "" then
+			display = display .. " — " .. title
+		end
+		local isSelected = c.ID == chapterID and "bg-indigo-600/20" or ""
+		chapterMenuItems = chapterMenuItems .. '<button class="block w-full text-left px-3 py-2 hover:bg-indigo-600/20 ' .. isSelected .. '" data-chapter-id="' .. h(c.ID) .. '">' .. h(display) .. '</button>'
+	end
+
 	return [[<div id="reader" class="relative w-full h-screen"
   data-plugin-id="]] .. h(pluginID) .. [["
   data-manga-id="]] .. h(mangaID) .. [["
@@ -46,7 +61,14 @@ return function(data)
     <span class="text-neutral-500 truncate max-w-[25%]">]] .. h(mangaTitle) .. [[</span>
     <span id="page-counter" class="text-neutral-400">– / –</span>
     <div class="flex-1 flex justify-center min-w-0">
-      <span id="chapter-title" class="text-neutral-300 truncate">]] .. chapterDisplay .. [[</span>
+      <div class="relative group">
+        <button id="chapter-jumper" class="text-neutral-300 truncate text-left cursor-pointer hover:bg-neutral-800 rounded px-2 py-1">
+          ]] .. chapterDisplay .. [[
+        </button>
+        <div id="chapter-menu" class="absolute top-full left-0 mt-1 w-64 bg-neutral-900 border border-neutral-700 rounded-md shadow-xl z-50 hidden max-h-[60vh] overflow-y-auto">
+          ]] .. chapterMenuItems .. [[
+        </div>
+      </div>
     </div>
     <div class="flex items-center gap-1">
       <button id="btn-fit" title="Fit mode" class="border border-neutral-700 hover:bg-neutral-800 active:scale-95 transition rounded-md px-3 py-1.5 text-xs">Fit W</button>
@@ -92,13 +114,21 @@ return function(data)
   <div id="bottom-bar" class="absolute bottom-0 left-0 right-0 z-30 flex items-center gap-3 bg-neutral-950/85 backdrop-blur-sm px-3 py-2 text-sm transition-transform duration-300 ease-in-out">
     <a id="btn-prev-ch" href="/view/read/]] .. h(pluginID) .. [[" class="border border-neutral-700 hover:bg-neutral-800 active:scale-95 transition rounded-md px-3 py-1.5" ]] .. prevStyle .. [[>← Prev ch.</a>
     <button id="btn-prev-page" class="border border-neutral-700 hover:bg-neutral-800 active:scale-95 transition rounded-md px-3 py-1.5">‹</button>
-    <input id="page-slider" type="range" min="1" value="1" class="h-2 flex-1 accent-indigo-500" />
+    <div id="page-jumper" class="flex-1 h-8 flex items-center justify-center gap-0.5 cursor-pointer" title="Click to jump to page">
+      <div class="flex-1 h-full relative bg-neutral-800 rounded overflow-hidden">
+        <div id="page-progress" class="absolute top-0 left-0 h-full bg-indigo-500 transition-all duration-200"></div>
+      </div>
+    </div>
     <button id="btn-next-page" class="border border-neutral-700 hover:bg-neutral-800 active:scale-95 transition rounded-md px-3 py-1.5">›</button>
     <a id="btn-next-ch" href="/view/read/]] .. h(pluginID) .. [[" class="border border-neutral-700 hover:bg-neutral-800 active:scale-95 transition rounded-md px-3 py-1.5" ]] .. nextStyle .. [[>Next ch. →</a>
   </div>
 
   <!-- Progress line -->
   <div id="progress-line" class="absolute bottom-0 left-0 right-0 z-40 h-2 bg-indigo-500 shadow-[0_0_8px_2px_rgba(99,102,241,0.55)] transition-opacity duration-300 ease-in-out opacity-0"></div>
+
+  <!-- Mini page dots — visible when bars are hidden, clickable page jumpers -->
+  <div id="page-dots" class="absolute bottom-1 left-0 right-0 z-30 flex items-center justify-center gap-1 px-4 transition-opacity duration-300 opacity-0 pointer-events-none">
+  </div>
 
 </div>
 

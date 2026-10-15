@@ -40,6 +40,12 @@ func (d *DB) MarkChapterRead(chapterRowID int64) error {
 	return err
 }
 
+// ToggleChapterRead toggles the is_read flag for a single chapter.
+func (d *DB) ToggleChapterRead(chapterRowID int64) error {
+	_, err := d.db.Exec(`UPDATE chapters SET is_read = 1 - is_read WHERE id = ?`, chapterRowID)
+	return err
+}
+
 // CountChaptersForManga returns how many chapter rows exist for a manga.
 func (d *DB) CountChaptersForManga(mangaIntID int64) (int, error) {
 	var out []struct{ N int64 }

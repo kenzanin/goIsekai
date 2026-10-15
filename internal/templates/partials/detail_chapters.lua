@@ -159,9 +159,9 @@ return function(data)
 			end
 			rowHTML = rowHTML .. "</span></a>"
 
-			-- Mark read button
+			-- Toggle read button (marks/unmarks read — green check when read)
 			rowHTML = rowHTML
-				.. '<form method="post" action="/action/mark-read/'
+				.. '<form method="post" action="/action/toggle-read/'
 				.. h(ue(pluginID))
 				.. "/"
 				.. h(ue(mangaID))
@@ -169,20 +169,13 @@ return function(data)
 				.. h(ue(cID))
 				.. '">'
 				.. csrfInput(data.csrf_token or "")
-				.. '<button type="submit" title="Mark read" class="size-7 inline-flex items-center justify-center rounded-md border border-neutral-700 hover:bg-neutral-800 text-sm" aria-label="Mark read"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="size-4"><polyline points="20 6 9 17 4 12"/></svg></button>'
-				.. "</form>"
-
-			-- Reset progress button
-			rowHTML = rowHTML
-				.. '<form method="post" action="/action/reset-progress/'
-				.. h(ue(pluginID))
-				.. "/"
-				.. h(ue(mangaID))
-				.. "/"
-				.. h(ue(cID))
-				.. '">'
-				.. csrfInput(data.csrf_token or "")
-				.. '<button type="submit" title="Reset progress" class="size-7 inline-flex items-center justify-center rounded-md border border-neutral-700 hover:bg-neutral-800 text-sm" aria-label="Reset progress" data-confirm="Are you sure?"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="size-4"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg></button>'
+				.. '<button type="submit" title="'
+				.. (isDone and "Unmark read" or "Mark read")
+				.. '" class="size-7 inline-flex items-center justify-center rounded-md border transition text-sm '
+				.. (isDone and "border-emerald-500/50 text-emerald-400 bg-emerald-500/10 hover:bg-emerald-500/20" or "border-neutral-700 hover:bg-neutral-800 text-neutral-500 hover:text-neutral-300")
+				.. '" aria-label="'
+				.. (isDone and "Unmark read" or "Mark read")
+				.. '"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="size-4"><polyline points="20 6 9 17 4 12"/></svg></button>'
 				.. "</form>"
 
 			-- CBZ download button

@@ -5,7 +5,11 @@
   var spinner = document.getElementById('spinner');
   var errPanel = document.getElementById('error-panel');
   var counter = document.getElementById('page-counter');
-  var slider = document.getElementById('page-slider');
+  var pageJumper = document.getElementById('page-jumper');
+  var pageProgress = document.getElementById('page-progress');
+  var pageDots = document.getElementById('page-dots');
+  var chapterJumperBtn = document.getElementById('chapter-jumper');
+  var chapterMenu = document.getElementById('chapter-menu');
 
   // State
   var pid = root.dataset.pluginId,
@@ -67,7 +71,25 @@
   var stripView = document.getElementById('strip-view');
   var stripLoading = false; // strip is appending a neighbor chapter
 
-  // Abort controller for cancelable fetches
+  // Debug logger - sends to both browser console and backend server log
+  var _debugSid = Math.random().toString(36).substring(2, 10);
+  var _logToServer = true;
+  function debugLog(msg, level) {
+    level = level || 'log';
+    var timestamp = new Date().toISOString().substring(11, 23);
+    var formatted = `[${timestamp}] [reader:${_debugSid}] ${msg}`;
+    console.log(formatted);
+    if (_logToServer && typeof fetch !== 'undefined') {
+      fetch('/api/frontend-log', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tag: 'reader', level: level, msg: msg, sid: _debugSid }),
+      }).catch(function() {});
+    }
+  }
+  function debugWarn(msg) { debugLog(msg, 'warn'); }
+  function debugError(msg) { debugLog(msg, 'error'); }
+
   var loadAbortController = null;
   // One controller per read-ahead direction. `new Image()` has no cancellation
   // handle, so read-ahead issues fetch() instead and is abandoned at the network
@@ -114,10 +136,14 @@
       topBar.style.transform = 'translateY(0)';
       bottomBar.style.transform = 'translateY(0)';
       progressLine.style.opacity = '0';
+      pageDots.style.opacity = '0';
+      pageDots.classList.add('pointer-events-none');
     } else {
       topBar.style.transform = 'translateY(-100%)';
       bottomBar.style.transform = 'translateY(100%)';
       progressLine.style.opacity = '1';
+      pageDots.style.opacity = '1';
+      pageDots.classList.remove('pointer-events-none');
     }
   }
 
@@ -125,6 +151,66 @@
     var total = pages.length || 1;
     var pct = ((current + 1) / total) * 100;
     progressLine.style.width = `${pct}%`;
+  }
+
+  // Update page jumper with clickable page steps
+  function updatePageJumper() {
+    var total = pages.length || 1;
+    if (!pageJumper || total === 0) return;
+
+    // Clear existing page buttons (keep the container)
+    var existing = pageJumper.querySelectorAll('.page-btn');
+    existing.forEach(function(btn) {
+      btn.remove();
+    });
+
+    // Create page step buttons
+    // Limit to max 50 buttons to avoid clutter
+    var maxButtons = Math.min(total, 50);
+    var step = Math.ceil(total / maxButtons);
+    if (step < 1) step = 1;
+
+    for (var i = 0; i < total; i += step) {
+      var btn = document.createElement('div');
+      btn.className = 'page-btn h-full flex-1 flex items-center justify-center cursor-pointer hover:bg-indigo-500/30 transition-colors';
+      btn.textContent = (i + 1).toString();
+      btn.dataset.pageIndex = i;
+      btn.addEventListener('click', function(e) {
+        e.stopPropagation();
+        var pageIndex = parseInt(this.dataset.pageIndex, 10);
+        goToPage(pageIndex);
+      });
+      pageJumper.appendChild(btn);
+    }
+
+    // Update progress bar width
+    var progressPct = ((current + 1) / total) * 100;
+    pageProgress.style.width = `${progressPct}%`;
+    updatePageDots(total);
+  }
+
+  // Render mini clickable page dots at bottom when bars are hidden
+  function updatePageDots(total) {
+    if (!pageDots || !total) return;
+    pageDots.innerHTML = '';
+    var maxDots = Math.min(total, 30);
+    var step = Math.ceil(total / maxDots);
+    if (step < 1) step = 1;
+    for (var i = 0; i < total; i += step) {
+      var dot = document.createElement('button');
+      var isActive = i === current;
+      dot.className = 'w-2 h-2 rounded-full transition-all duration-150 ' +
+        (isActive
+          ? 'bg-indigo-400 scale-125'
+          : 'bg-neutral-500 hover:bg-neutral-300');
+      dot.title = 'Page ' + (i + 1);
+      dot.addEventListener('click', function(e) {
+        e.stopPropagation();
+        goToPage(parseInt(this.dataset.page, 10));
+      });
+      dot.dataset.page = i;
+      pageDots.appendChild(dot);
+    }
   }
 
   // Start with bars visible during loading so user can cancel
@@ -175,7 +261,11 @@
   function measure() {
     // Canvas must be sized while visible (hard-won lesson): call after paint.
     var rect = canvas.getBoundingClientRect();
-    if (rect.width === 0 || rect.height === 0) return false;
+    debugLog(`[reader] measure: canvas=${rect.width}x${rect.height}, DPR=${window.devicePixelRatio}`);
+    if (rect.width === 0 || rect.height === 0) {
+      debugWarn('[reader] measure: canvas has zero dimensions');
+      return false;
+    }
     dpr = window.devicePixelRatio || 1;
     canvas.width = Math.round(rect.width * dpr);
     canvas.height = Math.round(rect.height * dpr);
@@ -188,9 +278,13 @@
   function render() {
     var rect = canvas.getBoundingClientRect();
     ctx.clearRect(0, 0, rect.width, rect.height);
-    if (!img) return;
+    if (!img) {
+      debugWarn('[reader] render: no image loaded');
+      return;
+    }
     var w = img.width * baseScale * zoom,
       h = img.height * baseScale * zoom;
+    debugLog(`[reader] render: ${img.width}x${img.height} -> ${Math.round(w)}x${Math.round(h)} on ${rect.width}x${rect.height}`);
     // Center when smaller, top-align when overflowing (top must never clip).
     var x = Math.max((rect.width - w) / 2, 0) + panX;
     var y = Math.max((rect.height - h) / 2, 0) + panY;
@@ -339,8 +433,7 @@
   function updateCounter() {
     var total = pages.length || 1;
     counter.textContent = `${current + 1} / ${total}`;
-    slider.max = total;
-    slider.value = current + 1;
+    updatePageJumper();
   }
 
   function reportProgress() {
@@ -599,6 +692,7 @@
   stripView.addEventListener('click', () => setBarsVisible(!barsVisible));
 
   function drawPage(i) {
+    debugLog(`[reader] drawPage: ${i} of ${pages.length}`);
     current = i;
     showError(false);
     updateCounter();
@@ -608,8 +702,10 @@
     if (stripMode && !stripImgs.length) populateStrip();
     if (stripMode) stripView.scrollTop = (i / Math.max(pages.length, 1)) * stripView.scrollHeight;
     var url = imageUrl(pages[i], undefined, 'high');
+    debugLog(`[reader] Image URL: ${url.substring(0, 80)}...`);
     var cached = preloaded[i];
     if (cached?.complete && cached.naturalWidth > 0) {
+      debugLog(`[reader] Using cached image ${cached.naturalWidth}x${cached.naturalHeight}`);
       img = cached;
       afterImage();
       return;
@@ -617,12 +713,14 @@
     showSpinner(true);
     var im = new Image();
     im.onload = () => {
+      debugLog(`[reader] Image loaded: ${im.naturalWidth}x${im.naturalHeight}`);
       img = im;
       preloaded[i] = im;
       showSpinner(false);
       afterImage();
     };
-    im.onerror = () => {
+    im.onerror = (e) => {
+      debugError(`[reader] Image load failed: ${url.substring(0, 80)}`);
       showSpinner(false);
       imgFails++;
       if (imgFails >= 4) {
@@ -657,15 +755,18 @@
     imgFails = 0;
     if (initialLoad) {
       initialLoad = false;
+      debugLog('[reader] First image loaded, hiding bars');
       setBarsVisible(false);
     }
     if (!measure()) {
+      debugWarn('[reader] measure() failed, retrying in nextFrame');
       nextFrame(() => {
         measure();
         restoreZoom();
       });
       return;
     }
+    debugLog('[reader] Rendering image');
     restoreZoom();
   }
 
@@ -715,35 +816,51 @@
   });
 
   function goToPage(i) {
-    if (i < 0 || i >= pages.length) return;
+    debugLog(`goToPage: ${i} (of ${pages.length})`);
+    if (i < 0 || i >= pages.length) {
+      debugWarn(`goToPage: invalid page index ${i}, pages.length=${pages.length}`);
+      return;
+    }
     drawPage(i);
   }
 
   function next() {
-    if (stripMode) return; // scrolling is the navigation in strip mode
+    if (stripMode) {
+      debugLog('next: strip mode, scrolling');
+      return;
+    }
     if (current < pages.length - 1) {
+      debugLog(`next: page ${current + 1} -> ${current + 2}`);
       goToPage(current + 1);
       return;
     }
     // Last page → auto-advance to next chapter, unless we're at the end of the
     // series (no next chapter, or backend returned the current chapter as next).
     if (nextChID && nextChID !== cid) {
+      debugLog(`next: last page, switching to next chapter: ${nextChID}`);
       switchChapter(nextChID, 1);
       return;
     }
+    debugWarn('next: no more chapters');
     showEndOfSeries();
   }
   function prev() {
-    if (stripMode) return;
+    if (stripMode) {
+      debugLog('prev: strip mode, scrolling');
+      return;
+    }
     if (current > 0) {
+      debugLog(`prev: page ${current + 1} -> ${current}`);
       goToPage(current - 1);
       return;
     }
     // First page → auto-retreat to prev chapter last page
     if (prevChID) {
+      debugLog(`prev: first page, switching to prev chapter: ${prevChID}`);
       switchChapter(prevChID, 'last');
       return;
     }
+    debugWarn('prev: no previous chapter');
     showNotice('First page');
   }
 
@@ -751,31 +868,41 @@
   // A warmed neighbor commits instantly — no fetch, no spinner — so switching
   // chapters feels like switching pages.
   function switchChapter(targetCID, targetPage) {
-    if (loading) return;
+    if (loading) {
+      debugWarn(`switchChapter: already loading, ignoring ${targetCID}`);
+      return;
+    }
+    debugLog(`switchChapter: ${targetCID}, page=${targetPage}`);
     if (targetCID === nextChID && nextData && (nextData.pages || []).length) {
+      debugLog('switchChapter: using warmed next chapter');
       commitChapter(nextData, targetCID, targetPage);
       return;
     }
     if (targetCID === prevChID && prevData && (prevData.pages || []).length) {
+      debugLog('switchChapter: using warmed prev chapter');
       commitChapter(prevData, targetCID, targetPage);
       return;
     }
+    debugLog('switchChapter: cold fetch required');
     showSpinner(true);
     _lastFailedRetry = () => {
       switchChapter(targetCID, targetPage);
     };
     fetch(`/api/reader-data/${[pid, mid, targetCID].map(encodeURIComponent).join('/')}`)
       .then((r) => {
+        debugLog(`switchChapter: response status=${r.status}`);
         if (!r.ok) return readerDataFailure(r).then((msg) => Promise.reject(new Error(msg)));
         return r.json();
       })
       .then((data) => {
         if (data.error) {
+          debugError(`switchChapter: API error: ${data.error}`);
           showReaderError(data.error);
           showSpinner(false);
           return;
         }
         if (!(data.pages || []).length) {
+          debugWarn('switchChapter: empty page list');
           showReaderError(
             'This chapter has no pages. The plugin returned an empty page list — ' +
               'the site may have changed how it names them. Check the log for the reason.',
@@ -783,9 +910,11 @@
           showSpinner(false);
           return;
         }
+        debugLog(`switchChapter: loaded ${data.pages.length} pages`);
         commitChapter(data, targetCID, targetPage);
       })
       .catch((err) => {
+        debugError(`switchChapter: ${err.message}`);
         showReaderError(friendlyError(err));
         showSpinner(false);
       });
@@ -793,6 +922,7 @@
 
   // Commit a chapter's fetched-or-warmed state and draw the target page.
   function commitChapter(data, targetCID, targetPage) {
+    debugLog(`commitChapter: cid=${targetCID}, page=${targetPage}, pages=${data.pages?.length}`);
     // Leaving the old chapter: drop its in-flight read-ahead before the page
     // bookkeeping is reset, so nothing keeps warming bytes nobody will read.
     abortAllWarm();
@@ -1018,9 +1148,32 @@
   });
   syncDirLabel();
 
-  slider.addEventListener('input', () => {
-    goToPage(parseInt(slider.value, 10) - 1);
-  });
+  // Chapter jumper dropdown
+  if (chapterJumperBtn && chapterMenu) {
+    chapterJumperBtn.addEventListener('click', function(e) {
+      e.stopPropagation();
+      chapterMenu.classList.toggle('hidden');
+    });
+
+    // Close menu when clicking outside
+    document.addEventListener('click', function(e) {
+      if (!chapterJumperBtn.contains(e.target) && !chapterMenu.contains(e.target)) {
+        chapterMenu.classList.add('hidden');
+      }
+    });
+
+    // Handle chapter selection
+    chapterMenu.addEventListener('click', function(e) {
+      var btn = e.target.closest('button[data-chapter-id]');
+      if (btn) {
+        var targetCID = btn.dataset.chapterId;
+        if (targetCID && targetCID !== cid) {
+          chapterMenu.classList.add('hidden');
+          window.location.href = `/view/read/${encodeURIComponent(pid)}/${encodeURIComponent(mid)}/${encodeURIComponent(targetCID)}`;
+        }
+      }
+    });
+  }
 
   document.addEventListener('keydown', (e) => {
     if (e.target.matches('input, select, textarea')) return;
@@ -1077,6 +1230,7 @@
 
   // Boot: fetch page data, then first draw after the canvas is visible.
   function loadChapter(resume) {
+    debugLog('[reader] loadChapter:', { pid, mid, cid, resume });
     preloaded = {}; // stale at-home URLs 404 — drop cached Image objects
     _lastFailedRetry = () => {
       loadChapter(resume);
@@ -1086,19 +1240,24 @@
       signal: loadAbortController.signal,
     })
       .then((r) => {
+        debugLog('[reader] API response:', { ok: r.ok, status: r.status });
         if (!r.ok) throw new Error(`HTTP ${r.status}`);
         return r.json();
       })
       .then((data) => {
+        debugLog('[reader] API data:', { chapterID: data.chapterID, pages: data.pages?.length, error: data.error });
         if (data.error) {
+          debugError('[reader] API error:', data.error);
           showReaderError(data.error);
           return;
         }
         pages = data.pages || [];
         if (!pages.length) {
+          debugWarn('[reader] No pages found');
           showReaderError('Empty chapter (plugin failed to fetch pages) — try Retry');
           return;
         }
+        debugLog('[reader] Pages loaded:', pages.length);
         _lastFailedRetry = null;
         nextFrame(() => {
           // Honor ?page=N (or ?page=last from chapter advance); a retry keeps
@@ -1106,6 +1265,7 @@
           var sp = resume ? current + 1 : startPage;
           if (window.location.search.indexOf('page=last') >= 0) sp = pages.length;
           var initial = sp ? Math.max(1, Math.min(sp, pages.length)) - 1 : 0;
+          debugLog('[reader] Drawing initial page:', initial);
           if (stripMode) {
             canvas.style.display = 'none';
             stripView.classList.remove('hidden');
@@ -1114,6 +1274,7 @@
         });
       })
       .catch((err) => {
+        debugError(`[reader] loadChapter fetch failed: ${err.name} - ${err.message}`);
         if (err.name === 'AbortError') return;
         showReaderError(friendlyError(err));
       });

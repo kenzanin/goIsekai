@@ -1,6 +1,7 @@
 package httpserver
 
 import (
+	"fmt"
 	"github.com/goccy/go-json"
 	"net/http"
 
@@ -15,6 +16,38 @@ import (
 func (s *Server) registerReaderRoutes(r chi.Router) {
 	s.Router.Get("/view/read/{pluginID}/{mangaID}/{chapterID}", s.viewReader)
 	r.Get("/reader-data/{pluginID}/{mangaID}/{chapterID}", s.readerData)
+	r.Post("/frontend-log", s.handleFrontendLog)
+}
+
+// handleFrontendLog receives log messages from the frontend and writes them to the server log.
+// This allows tracking JS runtime behavior in the application logs alongside Go logs.
+func (s *Server) handleFrontendLog(w http.ResponseWriter, r *http.Request) {
+	var payload struct {
+		Tag   string `json:"tag"`   // e.g. "reader", "ui", "network"
+		Level string `json:"level"` // "log", "warn", "error"
+		Msg   string `json:"msg"`
+		SID   string `json:"sid"` // session/correlation ID
+	}
+	if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+		writeErr(w, http.StatusBadRequest, "invalid payload")
+		return
+	}
+	tag := payload.Tag
+	if tag == "" {
+		tag = "frontend"
+	}
+	// Fire-and-forget log — don't block the client.
+	msg := fmt.Sprintf("[%s] %s", tag, payload.Msg)
+	switch payload.Level {
+	case "warn":
+		s.logger.Warn(msg, "sid", payload.SID)
+	case "error":
+		s.logger.Error(msg, "sid", payload.SID)
+	default:
+		s.logger.Info(msg, "sid", payload.SID)
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusNoContent)
 }
 
 // chapterNeighbors returns the chapter IDs before/after chapterID in the
@@ -83,6 +116,7 @@ func (s *Server) viewReader(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "missing route params", http.StatusBadRequest)
 		return
 	}
+	s.logger.Info("viewReader", "plugin", pluginID, "manga", mangaID, "chapter", chapterID)
 	manga, chapters, err := s.readerChapters(pluginID, mangaID)
 	if err != nil {
 		if s.serviceQueueFull(w, err, "reader") {
@@ -92,6 +126,7 @@ func (s *Server) viewReader(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "failed to load manga: "+err.Error(), http.StatusBadGateway)
 		return
 	}
+	s.logger.Debug("reader chapters loaded", "count", len(chapters), "plugin", pluginID, "manga", mangaID)
 	progress, err := s.service.GetChapterProgresses(pluginID, mangaID)
 	if err != nil {
 		s.logger.Warn("reader chapter progress", "error", err, "plugin", pluginID, "manga", mangaID)
@@ -136,6 +171,7 @@ func (s *Server) readerData(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusBadRequest, "missing route params")
 		return
 	}
+	s.logger.Info("readerData", "plugin", pluginID, "manga", mangaID, "chapter", chapterID)
 	pages, err := s.service.GetPageListCached(pluginID, chapterID)
 	if err != nil {
 		if s.serviceQueueFull(w, err, "reader-pages") {
@@ -145,6 +181,7 @@ func (s *Server) readerData(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusBadGateway, err.Error())
 		return
 	}
+	s.logger.Debug("reader pages fetched", "count", len(pages), "plugin", pluginID, "chapter", chapterID)
 	// Record the chapter's page count so the detail-page progress badges can
 	// render "N/M". Best-effort — a failure here must not fail the read.
 	if len(pages) > 0 {
