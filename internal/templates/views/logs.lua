@@ -31,20 +31,20 @@ return function(data)
       <button id="log-pause" class="bg-neutral-800 border border-neutral-600 rounded-md px-3 py-1.5 text-xs font-medium text-neutral-200 hover:bg-neutral-700">Pause</button>
       <select id="log-limit" class="bg-neutral-900 border border-neutral-700 rounded-md px-2 py-1.5 text-xs">]=] .. limitOpts .. [=[</select>
       <select id="log-filter" class="bg-neutral-900 border border-neutral-700 rounded-md px-2 py-1.5 text-xs">
-        <option value="all"]=] .. (filter == "all" and " selected" or "") .. [=["All sources</option>
-        <option value="app"]=] .. (filter == "app" and " selected" or "") .. [=["App only</option>
-        <option value="plugins"]=] .. (filter == "plugins" and " selected" or "") .. [=["Plugins</option>
-        <option value="warn"]=] .. (filter == "warn" and " selected" or "") .. [=["Warnings</option>
-        <option value="error"]=] .. (filter == "error" and " selected" or "") .. [=["Errors</option>
-        <option value="lane-fetch"]=] .. (filter == "lane-fetch" and " selected" or "") .. [=["Fetch lane</option>
-        <option value="lane-image"]=] .. (filter == "lane-image" and " selected" or "") .. [=["Image lane</option>
-        <option value="lane-interactive"]=] .. (filter == "lane-interactive" and " selected" or "") .. [=["Interactive lane</option>
-        <option value="lane-maintenance"]=] .. (filter == "lane-maintenance" and " selected" or "") .. [=["Maintenance lane</option>
+        <option value="all"]=] .. (filter == "all" and " selected" or "") .. [=[>All sources</option>
+        <option value="app"]=] .. (filter == "app" and " selected" or "") .. [=[>App only</option>
+        <option value="plugins"]=] .. (filter == "plugins" and " selected" or "") .. [=[>Plugins</option>
+        <option value="warn"=] .. (filter == "warn" and " selected" or "") .. [=[>Warnings</option>
+        <option value="error"]=] .. (filter == "error" and " selected" or "") .. [=[>Errors</option>
+        <option value="lane-fetch"]=] .. (filter == "lane-fetch" and " selected" or "") .. [=[>Fetch lane</option>
+        <option value="lane-image"]=] .. (filter == "lane-image" and " selected" or "") .. [=[>Image lane</option>
+        <option value="lane-interactive"=] .. (filter == "lane-interactive" and " selected" or "") .. [=[>Interactive lane</option>
+        <option value="lane-maintenance"=] .. (filter == "lane-maintenance" and " selected" or "") .. [=[>Maintenance lane</option>
       </select>
     </div>
   </div>
 
-  <div class="grid grid-cols-2 md:grid-cols-4 gap-2 mb-4 text-xs" id="lane-cards">
+  <div class="grid grid-cols-2 md:grid-cols-4 gap-2 mb-4 text-xs">
     <div id="worker-lanes" class="contents">
       <div class="bg-neutral-900 border border-neutral-700 rounded-md px-3 py-2">loading lanes…</div>
     </div>
@@ -198,7 +198,8 @@ return function(data)
   function fmtMs(ms) { return ms >= 1000 ? (ms / 1000).toFixed(2) + "s" : ms + "ms"; }
 
   function updateLaneCardHighlight() {
-    var cards = document.querySelectorAll("#worker-lanes > div");
+    if (!lanesEl) return;
+    var cards = lanesEl.querySelectorAll("div[ data-lane] , div[data-lane]");
     for (var i = 0; i < cards.length; i++) {
       var card = cards[i];
       var laneName = card.dataset.lane;
