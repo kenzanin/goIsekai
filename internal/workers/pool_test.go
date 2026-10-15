@@ -367,7 +367,7 @@ func TestFetchPluginFairness(t *testing.T) {
 // task 1.4: defaults apply when no config present.
 func TestConfigDefaults(t *testing.T) {
 	c := Config{}.withDefaults()
-	if c.InteractiveSize != 4 || c.FetchSize != 2 || c.ImageSize != 8 || c.MaintenanceSize != 1 {
+	if c.InteractiveSize != 4 || c.FetchSize != 4 || c.ImageSize != 8 || c.MaintenanceSize != 1 {
 		t.Fatalf("unexpected defaults: %+v", c)
 	}
 	if c.InteractiveQueue != 32 || c.ImageQueue != 64 {
