@@ -189,18 +189,19 @@ func (s *AppService) GetPageList(pluginID, chapterID string) ([]types.Page, erro
 }
 
 // GetPageListCached returns the cached page list from the database immediately
-// without blocking on the interactive lane.
+// without blocking on the interactive lane. Returns nil pages for empty result
+// (plugin returned no pages) so caller can handle gracefully.
 func (s *AppService) GetPageListCached(pluginID, chapterID string) ([]types.Page, error) {
 	chapterIntID, _ := s.resolveChapterIntID(pluginID, "", chapterID)
 	if chapterIntID == 0 {
-		return nil, fmt.Errorf("bridge: chapter not found: %s", chapterID)
+		return nil, nil // chapter not found in DB - will fallback to live fetch
 	}
 	cached, err := s.db.GetChapterPages(chapterIntID)
 	if err != nil {
 		return nil, fmt.Errorf("bridge: get chapter pages: %w", err)
 	}
 	if cached == nil {
-		return nil, fmt.Errorf("bridge: no cached pages for chapter: %s", chapterID)
+		return nil, nil // no cached pages - will fallback to live fetch
 	}
 	var pages []types.Page
 	if uerr := json.Unmarshal(cached, &pages); uerr != nil {

@@ -181,6 +181,15 @@ func (s *Server) readerData(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusBadGateway, err.Error())
 		return
 	}
+	// If no cached pages (nil = not found), try live fetch from plugin
+	if pages == nil {
+		pages, err = s.service.GetPageList(pluginID, chapterID)
+		if err != nil {
+			s.logger.Error("reader page list live fetch", "error", err, "plugin", pluginID, "chapter", chapterID)
+			writeErr(w, http.StatusBadGateway, err.Error())
+			return
+		}
+	}
 	s.logger.Debug("reader pages fetched", "count", len(pages), "plugin", pluginID, "chapter", chapterID)
 	// Record the chapter's page count so the detail-page progress badges can
 	// render "N/M". Best-effort — a failure here must not fail the read.
