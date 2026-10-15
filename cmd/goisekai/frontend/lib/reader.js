@@ -701,6 +701,8 @@
     current = i;
     showError(false);
     updateCounter();
+    // Hide spinner immediately before image load so user sees page faster
+    showSpinner(false);
     reportProgress();
     prefetch();
     if (stripMode && !stripImgs.length) populateStrip();
@@ -720,12 +722,10 @@
       debugLog(`[reader] Image loaded: ${im.naturalWidth}x${im.naturalHeight}`);
       img = im;
       preloaded[i] = im;
-      showSpinner(false);
       afterImage();
     };
     im.onerror = (e) => {
       debugError(`[reader] Image load failed: ${url.substring(0, 80)}`);
-      showSpinner(false);
       imgFails++;
       if (imgFails >= 4) {
         showReaderError('Failed to load image — try Retry');
