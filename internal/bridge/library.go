@@ -53,6 +53,14 @@ func (s *AppService) ClearMangaNew(pluginID, mangaID string) error {
 	return s.db.ClearMangaNewString(pluginID, mangaID)
 }
 
+// GetMangaDetailsCached returns cached manga/chapters immediately without
+// blocking on the interactive lane. Use this for initial page render where
+// stale data is acceptable; follow up with a background refresh if needed.
+func (s *AppService) GetMangaDetailsCached(pluginID, mangaID string) (types.Manga, []types.Chapter, error) {
+	mangaIntID, _ := s.db.ResolveMangaIntID(pluginID, mangaID)
+	return s.cachedMangaFallback(pluginID, mangaID, mangaIntID)
+}
+
 // GetMangaDetails fetches a manga and its chapter list from a plugin.
 // The plugin invoke rides the interactive lane (task 4.1); the body keeps
 // calling s.mgr.* directly — routing s.GetChapterList from inside would nest
