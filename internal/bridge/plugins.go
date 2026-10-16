@@ -64,3 +64,23 @@ func (s *AppService) ListPlugins() ([]database.Plugin, error) {
 	}
 	return list, nil
 }
+
+// PluginIDs returns the set of registered plugin ids (both DB rows and the
+// runtime registry), so callers can iterate every known plugin without a
+// full ListPlugins copy.
+func (s *AppService) PluginIDs() []string {
+	ids := make(map[string]struct{})
+	if db, err := s.db.ListPlugins(); err == nil {
+		for _, p := range db {
+			ids[p.ID] = struct{}{}
+		}
+	}
+	for _, p := range s.mgr.LoadedPlugins() {
+		ids[p.ID] = struct{}{}
+	}
+	out := make([]string, 0, len(ids))
+	for id := range ids {
+		out = append(out, id)
+	}
+	return out
+}

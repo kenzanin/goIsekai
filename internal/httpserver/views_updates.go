@@ -41,7 +41,7 @@ func (s *Server) viewUpdates(w http.ResponseWriter, r *http.Request) {
 			pluginNameMap[pid] = m.Name
 		}
 		if m.Logo != "" {
-			pluginIconMap[pid] = resolveLogoURL(m.Logo, pid)
+			pluginIconMap[pid] = s.resolveLogoURL(m.Logo, pid)
 		}
 	}
 

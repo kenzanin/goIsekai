@@ -54,11 +54,11 @@ func (s *Server) viewPlugins(w http.ResponseWriter, r *http.Request) {
 				v.Name = m.Name // override DB name if plugin declares one
 			}
 			if m.Logo != "" {
-				v.IconURL = resolveLogoURL(m.Logo, p.ID)
+				v.IconURL = s.resolveLogoURL(m.Logo, p.ID)
 			} else if m.Kind == "wasm" {
 				// go:embed wasm plugins can't export Init/PluginMeta — every wasm
 				// plugin ships logo.png beside main.wasm, so fall back to it.
-				v.IconURL = resolveLogoURL("logo.png", p.ID)
+				v.IconURL = s.resolveLogoURL("logo.png", p.ID)
 			}
 		}
 		if row, ok, err := s.service.GetPluginVerifyState(p.ID); err == nil && ok {
@@ -102,7 +102,7 @@ func (s *Server) pluginDisplayMaps() (map[string]string, map[string]string) {
 		} else if p.WasmPath != "" {
 			// wasm plugins can't export Init/PluginMeta — every wasm plugin
 			// ships logo.png beside main.wasm, so fall back to it.
-			icons[p.ID] = resolveLogoURL("logo.png", p.ID)
+			icons[p.ID] = s.resolveLogoURL("logo.png", p.ID)
 		}
 	}
 	for pid, m := range s.service.PluginMetas() {
@@ -110,16 +110,22 @@ func (s *Server) pluginDisplayMaps() (map[string]string, map[string]string) {
 			names[pid] = m.Name
 		}
 		if m.Logo != "" {
-			icons[pid] = resolveLogoURL(m.Logo, pid)
+			icons[pid] = s.resolveLogoURL(m.Logo, pid)
 		}
 	}
 	return names, icons
 }
 
 // resolveLogoURL maps a plugin's Logo field to a URL. Bare filenames become
-// /plugin-static/{id}/{file}; absolute URLs and data URIs pass through as-is.
-func resolveLogoURL(logo, pluginID string) string {
+// /plugin-static/{id}/{file}; absolute URLs and data URIs pass through as-is,
+// EXCEPT when the logo has already been materialised into the per-plugin cache
+// (<cacheDir>/images/plugins/{id}/) — then the stable cache URL is returned so
+// the browser hits our cache instead of a live fetch / data payload.
+func (s *Server) resolveLogoURL(logo, pluginID string) string {
 	if strings.HasPrefix(logo, "http://") || strings.HasPrefix(logo, "https://") || strings.HasPrefix(logo, "data:") {
+		if cached := s.service.LogoCacheURL(pluginID); cached != "" {
+			return cached
+		}
 		return logo
 	}
 	return "/plugin-static/" + pluginID + "/" + logo

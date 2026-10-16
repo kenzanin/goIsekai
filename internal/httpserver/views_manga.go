@@ -128,7 +128,7 @@ func (s *Server) buildMangaDetailData(r *http.Request, pluginID, mangaID string)
 			pluginName = m.Name
 		}
 		if m.Logo != "" {
-			pluginIcon = resolveLogoURL(m.Logo, pluginID)
+			pluginIcon = s.resolveLogoURL(m.Logo, pluginID)
 		}
 	}
 	altTitles, _ := s.service.ListAltTitles(pluginID, mangaID)

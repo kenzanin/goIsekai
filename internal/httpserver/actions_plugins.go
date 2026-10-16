@@ -159,6 +159,16 @@ func (s *Server) handleRefreshPlugins(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
+	// Reset the per-plugin logo cache so the next view re-resolves each logo
+	// from its declared source (file / URL / inline) instead of a stale copy.
+	if err := s.service.ClearAllPluginLogos(); err != nil {
+		s.logger.Warn("refresh: clear logo cache failed", "error", err)
+	}
+	// Best-effort re-cache every known plugin's logo so the reset page still
+	// renders immediately without a live fetch.
+	for _, id := range s.service.PluginIDs() {
+		s.service.CachePluginLogo(id)
+	}
 	s.hxRedirect(w, r, fmt.Sprintf("/view/plugins?refreshed=%d-%d-%d-%d", sum.Added, sum.Deactivated, sum.Updated, sum.Purged))
 }
 
