@@ -71,8 +71,54 @@ func (s *Server) viewLibrary(w http.ResponseWriter, r *http.Request) {
 		statusFilter = "all"
 	}
 	tagFilter := strings.TrimSpace(r.URL.Query().Get("tag"))
+	// ?view=duplicate filters the grid to only manga that belong to a
+	// duplicate group; the sidebar duplicate card renders just the count
+	// when this filter is active (thumbnails are redundant here).
+	viewFilter := strings.TrimSpace(r.URL.Query().Get("view"))
+	if viewFilter != "duplicate" {
+		viewFilter = ""
+	}
 
+	// Duplicate detection is always computed so the grid can be filtered to
+	// it, regardless of search — but it is skipped when q is set AND the
+	// view filter is not "duplicate" (keeps search cheap).
+	var (
+		duplicateCount  int
+		duplicateGroups []database.DuplicateGroup
+	)
+	if q == "" || viewFilter == "duplicate" {
+		groups, dupErr := s.service.FindPotentialDuplicates()
+		if dupErr != nil {
+			s.logger.Warn("library duplicates", "error", dupErr)
+		}
+		duplicateGroups = groups
+		seen := make(map[string]struct{}, len(groups)*2)
+		for _, g := range groups {
+			for _, m := range g.Members {
+				seen[strconv.FormatInt(m.ID, 10)] = struct{}{}
+			}
+		}
+		duplicateCount = len(seen)
+	}
+
+	// Apply the status/tag filter over the whole library, then optionally
+	// narrow to duplicate-group members when ?view=duplicate is set.
 	mangas = filterLibrary(mangas, statsForSort, categories, statusFilter, tagFilter)
+	if viewFilter == "duplicate" {
+		dupIDs := make(map[string]struct{}, duplicateCount)
+		for _, g := range duplicateGroups {
+			for _, m := range g.Members {
+				dupIDs[strconv.FormatInt(m.ID, 10)] = struct{}{}
+			}
+		}
+		kept := make([]database.Manga, 0, len(mangas))
+		for _, m := range mangas {
+			if _, ok := dupIDs[strconv.FormatInt(m.ID, 10)]; ok {
+				kept = append(kept, m)
+			}
+		}
+		mangas = kept
+	}
 	sortLibrary(mangas, statsForSort, sortKey)
 
 	// Host-side pagination: slice the sorted/filtered library so the grid
@@ -124,26 +170,6 @@ func (s *Server) viewLibrary(w http.ResponseWriter, r *http.Request) {
 		s.logger.Warn("library overview", "error", err)
 	}
 	statusLine, readLine, readingTime, mostLine, fewestLine := buildOverviewStrings(overview)
-	// Duplicate detection is skipped on search (keeps it cheap on filter);
-	// keys are still passed (empty) so the template always has them.
-	var (
-		duplicateCount  int
-		duplicateGroups []database.DuplicateGroup
-	)
-	if q == "" {
-		groups, dupErr := s.service.FindPotentialDuplicates()
-		if dupErr != nil {
-			s.logger.Warn("library duplicates", "error", dupErr)
-		}
-		duplicateGroups = groups
-		seen := make(map[string]struct{}, len(groups)*2)
-		for _, g := range groups {
-			for _, m := range g.Members {
-				seen[strconv.FormatInt(m.ID, 10)] = struct{}{}
-			}
-		}
-		duplicateCount = len(seen)
-	}
 	// Per-plugin title counts for the sidebar card.
 	var pluginCounts []map[string]any
 	if q == "" {
@@ -180,6 +206,7 @@ func (s *Server) viewLibrary(w http.ResponseWriter, r *http.Request) {
 		"HasPrev":         page > 1,
 		"Sort":            sortKey,
 		"Status":          statusFilter,
+		"View":            viewFilter,
 		"Tag":             tagFilter,
 		"CategoryCounts":  s.service.LibraryCategoryCountsOrEmpty(),
 		"DuplicateCount":  duplicateCount,

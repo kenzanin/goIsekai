@@ -34,6 +34,9 @@ return function(data)
 		DuplicateGroups = duplicateGroups,
 		PluginCounts = pluginCounts,
 		PluginID = pluginID,
+		Status = statusFilter,
+		View = data.View or "",
+		Tag = tagFilter,
 	})
 
 	local mangaCards = libraryCards({

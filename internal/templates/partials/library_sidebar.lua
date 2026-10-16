@@ -11,6 +11,30 @@ return function(data)
 	local duplicateCount = data.DuplicateCount or 0
 	local duplicateGroups = data.DuplicateGroups or {}
 	local pluginCounts = data.PluginCounts or {}
+	local statusFilter = data.Status or "all"
+	local viewFilter = data.View or ""
+	local tagFilter = data.Tag or ""
+
+	-- Build a sidebar link that preserves the current q/pluginID/sort/status/tag/view
+	-- params and overrides one or more of them, so a param can never appear twice
+	-- (same rebuild-the-query pattern as libraryLink in views/library.lua).
+	local function sidebarLink(overrides)
+		local params = {
+			q = (q ~= "" and q or nil),
+			pluginID = ((data.PluginID or "") ~= "" and data.PluginID or nil),
+			status = (statusFilter ~= "all" and statusFilter or nil),
+			tag = (tagFilter ~= "" and tagFilter or nil),
+			view = (viewFilter ~= "" and viewFilter or nil),
+		}
+		for key, val in pairs(overrides or {}) do
+			if val == nil or val == "" or val == "all" then
+				params[key] = nil
+			else
+				params[key] = val
+			end
+		end
+		return link("/view/library", urlQuery(params))
+	end
 
 	local showSidebar = (#pluginCounts > 0)
 		or (#mangas > 0 and q == "")
@@ -47,6 +71,33 @@ return function(data)
 				.. "</div>"
 		end
 
+		-- addStatLink renders the same card shape but wraps the value+label in an
+		-- <a> so the card is clickable. Used for the "updates" card which filters
+		-- to ?status=new.
+		local function addStatLink(value, label, color, href)
+			local active = (statusFilter == "new")
+			local cls = (color and color ~= "") and (' class="text-sm font-medium ' .. h(color) .. '"')
+				or ' class="text-lg font-semibold"'
+			local outer = active
+				and "bg-neutral-900 border border-indigo-500/30 rounded-lg px-4 py-3"
+				or "bg-neutral-900 border border-neutral-800 rounded-lg px-4 py-3 hover:border-indigo-500/30 transition"
+			statCards = statCards
+				.. '<a href="'
+				.. h(href)
+				.. '" class="'
+				.. outer
+				.. '">'
+				.. "<div"
+				.. cls
+				.. ">"
+				.. h(tostring(value))
+				.. "</div>"
+				.. '<div class="text-xs text-neutral-400">'
+				.. h(label)
+				.. "</div>"
+				.. "</a>"
+		end
+
 		if stats.TotalTitles then
 			addStat(stats.TotalTitles, "titles", "", false, true)
 		end
@@ -57,7 +108,10 @@ return function(data)
 			addStat(stats.ReadLine, "read", "", true)
 		end
 		if stats.HasUpdates and stats.HasUpdates > 0 then
-			addStat(stats.HasUpdates, "updates", "text-indigo-400", false)
+			-- Clickable: filters the grid to only titles with the [New] badge.
+			local activeNew = (statusFilter == "new")
+			local updatesHref = activeNew and sidebarLink({}) or sidebarLink({ status = "new" })
+			addStatLink(stats.HasUpdates, "updates", "text-indigo-400", updatesHref)
 		end
 		if stats.ReadingTime and stats.ReadingTime ~= "" then
 			addStat(stats.ReadingTime, "reading time", "", true)
@@ -70,9 +124,27 @@ return function(data)
 		end
 
 		-- Duplicate groups
+		-- When view=duplicate is active the grid already shows every duplicate
+		-- title, so the card collapses to a count-only display (no thumbnails).
+		local showThumbnails = (viewFilter ~= "duplicate")
 		local dupItems = ""
 		if duplicateCount == 0 then
 			dupItems = '<div class="text-xs text-neutral-500">Tidak ada judul yang berpotensi duplikat.</div>'
+		elseif not showThumbnails then
+			-- Count-only: just the group titles, no per-member thumbnails.
+			for _, g in ipairs(duplicateGroups) do
+				dupItems = dupItems
+					.. '<div class="flex items-center justify-between gap-2">'
+					.. '<span class="text-xs font-medium text-neutral-300 line-clamp-2" title="'
+					.. h(g.Title or "")
+					.. '">'
+					.. h(g.Title or "")
+					.. "</span>"
+					.. '<span class="text-xs text-indigo-400 font-semibold shrink-0">'
+					.. h(tostring(#(g.Members or {})))
+					.. "</span>"
+					.. "</div>"
+			end
 		else
 			for _, g in ipairs(duplicateGroups) do
 				local members = ""
@@ -122,15 +194,44 @@ return function(data)
         <div class="flex flex-col gap-3">]] .. statCards .. [[</div>
     </div>
 
-    <details class="bg-neutral-900 border border-neutral-800 rounded-lg overflow-hidden]] .. (duplicateCount == 0 and " open" or "") .. [[">
+]]
+	-- Duplicate card: the <details> summary is clickable. Clicking it toggles the
+	-- ?view=duplicate grid filter; when the filter is active the card also drops
+	-- the per-member thumbnails and shows just the per-group count.
+		if viewFilter == "duplicate" then
+			-- Active: summary links back to the unfiltered library (clears view).
+			sidebarHTML = sidebarHTML .. [[
+    <details class="bg-neutral-900 border border-indigo-500/30 rounded-lg overflow-hidden open">
         <summary class="px-4 py-3 cursor-pointer select-none text-xs font-medium text-neutral-200 hover:bg-neutral-800/60 transition list-none flex items-center justify-between gap-2">
-                <span>Duplicate <span class="text-indigo-400 font-semibold">]] .. h(tostring(duplicateCount)) .. [[</span></span>
-                <svg class="w-4 h-4 text-neutral-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+]]
+			.. '<a href="' .. h(sidebarLink({})) .. '" class="w-full flex items-center justify-between gap-2">'
+			.. '<span>Duplicate <span class="text-indigo-400 font-semibold">' .. h(tostring(duplicateCount)) .. '</span></span>'
+			.. '<span class="text-xs text-indigo-400">clear</span>'
+			.. "</a>"
+			.. [[
         </summary>
-        <div class="border-t border-neutral-800 px-3 py-3 flex flex-col gap-4">
-]] .. dupItems .. [[
+        <div class="border-t border-neutral-800 px-3 py-3 flex flex-col gap-2">]]
+			.. dupItems
+			.. [[
         </div>
     </details>]]
+		else
+			sidebarHTML = sidebarHTML .. [[
+    <details class="bg-neutral-900 border border-neutral-800 rounded-lg overflow-hidden]] .. (duplicateCount == 0 and " open" or "") .. [[" >
+        <summary class="px-4 py-3 cursor-pointer select-none text-xs font-medium text-neutral-200 hover:bg-neutral-800/60 transition list-none flex items-center justify-between gap-2">
+]]
+			.. '<a href="' .. h(sidebarLink({ view = "duplicate" })) .. '" class="w-full flex items-center justify-between gap-2">'
+			.. '<span>Duplicate <span class="text-indigo-400 font-semibold">' .. h(tostring(duplicateCount)) .. '</span></span>'
+			.. '<svg class="w-4 h-4 text-neutral-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>'
+			.. "</a>"
+			.. [[
+        </summary>
+        <div class="border-t border-neutral-800 px-3 py-3 flex flex-col gap-4">]]
+			.. dupItems
+			.. [[
+        </div>
+    </details>]]
+		end
 
 		-- Plugin counts — always visible so All can reset even on empty filter results
 		if #pluginCounts > 0 then

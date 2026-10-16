@@ -19,7 +19,9 @@ var librarySorts = []string{"updated", "title", "read", "progress", "recent_read
 
 // libraryStatuses are the accepted values of ?status=, which answers "which of
 // these did I actually read" - the question a source migration starts from.
-var libraryStatuses = []string{"all", "reading", "unread", "done"}
+// "new" is special: it filters to manga with an unread [New] badge
+// (HasNew from sync), not a reading-progress state.
+var libraryStatuses = []string{"all", "reading", "unread", "done", "new"}
 
 // statsByManga flattens the row-ID-keyed progress stats into the
 // pluginID:sourceMangaID key the manga list uses, so sorting and filtering can
@@ -100,6 +102,7 @@ func ratio(read, total int) float64 {
 // filterLibrary keeps the mangas matching status and tag. Empty means no filter.
 // A manga with no chapters is only ever "all": calling an empty series finished
 // or unread would be a claim the data cannot support.
+// "new" keeps only manga with the [New] badge (HasNew from a recent sync).
 func filterLibrary(mangas []database.Manga, stats map[string]database.LibraryMangaStats, categories map[string][]string, status, tag string) []database.Manga {
 	keep := make([]database.Manga, 0, len(mangas))
 	for _, m := range mangas {
@@ -116,6 +119,11 @@ func filterLibrary(mangas []database.Manga, stats map[string]database.LibraryMan
 			}
 		case "done":
 			if total == 0 || read < total {
+				continue
+			}
+		case "new":
+			key := strconv.FormatInt(m.ID, 10)
+			if !stats[key].HasNew {
 				continue
 			}
 		}
