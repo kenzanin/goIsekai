@@ -1,12 +1,15 @@
 package httpserver
 
 import (
-	"goisekai/internal/database"
-	"goisekai/pkg/types"
+	"errors"
 	"net/http"
 	"strconv"
 	"strings"
 	"time"
+
+	"goisekai/internal/database"
+	"goisekai/internal/hostnet"
+	"goisekai/pkg/types"
 )
 
 // buildMangaDetailData assembles the data map for a manga detail view.
@@ -54,9 +57,44 @@ func (s *Server) buildMangaDetailData(r *http.Request, pluginID, mangaID string)
 		// would block on the interactive lane. The cache is refreshed on
 		// background enqueues (library sync, search, etc.).
 		manga, chapters, err = s.service.CachedMangaAndChapters(pluginID, mangaID)
-		if err != nil {
-			s.logger.Error("manga detail", "error", err, "plugin", pluginID, "manga", mangaID)
-			return nil
+		// Chapters are persisted only for library manga (persistMangaDetails
+		// skips them otherwise, and PruneOrphans deletes non-library rows),
+		// while the manga row itself IS cached by any open. So the cache can
+		// legitimately answer with a row and an empty chapter list — exactly
+		// what the add-to-library redirect sees. The contract in
+		// persistMangaDetails is that a non-library row's chapters are
+		// "re-fetched from the plugin on open", so fetch live in that case
+		// instead of rendering "No chapters".
+		if err == nil && manga.ID != "" && len(chapters) == 0 {
+			s.logger.Debug("manga detail: cached copy has no chapters, fetching live", "plugin", pluginID, "manga", mangaID)
+			liveManga, liveChapters, liveErr := s.service.GetMangaDetails(pluginID, mangaID)
+			if liveErr == nil && len(liveChapters) > 0 {
+				manga, chapters = liveManga, liveChapters
+			} else if liveErr != nil {
+				// Keep the cached copy; a plugin outage must not blank a
+				// page the cache can already render (sans chapters).
+				s.logger.Warn("manga detail: live chapter fetch failed, keeping cached copy", "plugin", pluginID, "manga", mangaID, "error", liveErr)
+				cachedData = true
+				if _, ok := errors.AsType[*hostnet.ChallengeError](liveErr); ok {
+					challenge = true
+					s.logger.Warn("manga detail blocked by challenge", "plugin", pluginID, "manga", mangaID)
+				}
+			}
+		} else if err != nil {
+			// Nothing persisted yet (e.g. a fresh search result the host
+			// never saved): fall back to the live fetch instead of blanking
+			// the page with a 502.
+			s.logger.Debug("manga detail: no cached copy, fetching live", "plugin", pluginID, "manga", mangaID, "error", err)
+			manga, chapters, err = s.service.GetMangaDetails(pluginID, mangaID)
+			if err != nil {
+				if _, ok := errors.AsType[*hostnet.ChallengeError](err); ok {
+					challenge = true
+					s.logger.Warn("manga detail blocked by challenge", "plugin", pluginID, "manga", mangaID)
+				} else {
+					s.logger.Error("manga detail", "error", err, "plugin", pluginID, "manga", mangaID)
+					return nil
+				}
+			}
 		}
 	}
 	// If no data was loaded and no challenge wizard is shown, return nil
