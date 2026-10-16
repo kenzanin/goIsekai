@@ -207,9 +207,10 @@ func (p *Pool) Enqueue(ctx context.Context, job *Job) (*Future, error) {
 
 	// Wrap Run with retry + registry bookkeeping once, here. Adds duration
 	// tracking for worker job visibility.
-	wrapped := func(ctx context.Context) error {
+	// All worker logs now carry [lane] prefix and include start, stop, dur_ms.
+	h.run = p.track(h, wrappedJob(lane.Name(), job.ID, func(ctx context.Context) error {
 		start := time.Now()
-		logger.Info("worker: running", "jobID", job.ID, "lane", job.Lane.String(), "plugin", job.PluginKey)
+		fmt.Printf("%s [%s] jobID=%s running\n", start.Format("15:04:05"), lane.Name(), job.ID)
 		h.setStatus(StatusRunning)
 		var err error
 		for attempt := 1; attempt <= job.MaxAttempts; attempt++ {
@@ -221,7 +222,8 @@ func (p *Pool) Enqueue(ctx context.Context, job *Job) (*Future, error) {
 			}
 			err = job.Run(ctx)
 			if err == nil {
-				logger.Info("worker: done", "jobID", job.ID, "lane", job.Lane.String(), "plugin", job.PluginKey, "dur_ms", time.Since(start).Milliseconds())
+				dur := time.Since(start)
+				fmt.Printf("%s [%s] jobID=%s done dur_ms=%d\n", time.Now().Format("15:04:05"), lane.Name(), job.ID, dur.Milliseconds())
 				h.setStatus(StatusDone)
 				h.setErr(nil)
 				return nil
@@ -231,7 +233,7 @@ func (p *Pool) Enqueue(ctx context.Context, job *Job) (*Future, error) {
 			}
 			if attempt < job.MaxAttempts {
 				h.setStatus(StatusFailed)
-				logger.Debug("worker: failed, retrying", "jobID", job.ID, "lane", job.Lane.String(), "plugin", job.PluginKey, "attempt", attempt)
+				fmt.Printf("%s [%s] jobID=%s failed, retrying attempt=%d\n", time.Now().Format("15:04:05"), lane.Name(), job.ID, attempt)
 				// Small linear backoff; transient-only.
 				select {
 				case <-time.After(time.Duration(attempt) * 50 * time.Millisecond):
@@ -242,16 +244,12 @@ func (p *Pool) Enqueue(ctx context.Context, job *Job) (*Future, error) {
 				}
 			}
 		}
+		dur := time.Since(start)
+		fmt.Printf("%s [%s] jobID=%s dead dur_ms=%d lastErr=%v\n", time.Now().Format("15:04:05"), lane.Name(), job.ID, dur.Milliseconds(), err)
 		h.setStatus(StatusDead)
-		logger.Warn("worker: dead", "jobID", job.ID, "lane", job.Lane.String(), "plugin", job.PluginKey, "dur_ms", time.Since(start).Milliseconds(), "lastErr", err)
 		h.setErr(err)
 		return err
-	}
-
-	// Store wrapped on the handle so the worker calls it. track() records the
-	// lane's running count and duration; it sits outside the retry wrapper so
-	// the duration measured is wall-clock including retries.
-	h.run = p.track(h, wrapped)
+	}))
 
 	if job.Lane == LaneInteractive {
 		// Block until queued or ctx deadline (task 1.3).

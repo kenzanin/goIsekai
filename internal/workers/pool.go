@@ -157,6 +157,11 @@ type poolLane struct {
 	queue chan *jobHandle
 }
 
+// Name returns the string name of the lane for logging.
+func (l *poolLane) Name() string {
+	return l.name.String()
+}
+
 // Pool owns the five lanes and the job registry.
 type Pool struct {
 	cfg Config
