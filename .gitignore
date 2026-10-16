@@ -58,4 +58,7 @@ ai.sh
 # Browser HAR captures: local reference material, carry session cookies
 *.har
 
+# Logs: runtime output, not committed
+*.log
+
 .pi/.compartments/

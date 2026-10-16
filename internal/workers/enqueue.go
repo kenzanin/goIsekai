@@ -209,8 +209,13 @@ func (p *Pool) Enqueue(ctx context.Context, job *Job) (*Future, error) {
 	// tracking for worker job visibility.
 	// All worker logs now carry [lane] prefix and include start, stop, dur_ms.
 	h.run = p.track(h, wrappedJob(lane.Name(), job.ID, func(ctx context.Context) error {
+		// Store job info in context for detailed logging
+		ctx = context.WithValue(ctx, "jobInfo", job)
 		start := time.Now()
-		fmt.Printf("%s [%s] jobID=%s running\n", start.Format("15:04:05"), lane.Name(), job.ID)
+		laneName := lane.Name()
+		msg := fmt.Sprintf("%s [%s] jobID=%s plugin=%s running", start.Format("15:04:05"), laneName, job.ID, job.PluginKey)
+		fmt.Println(msg) // stdout for goisekai.log
+		logger.Info(msg) // Also log via logger to capture in ring buffer
 		h.setStatus(StatusRunning)
 		var err error
 		for attempt := 1; attempt <= job.MaxAttempts; attempt++ {
@@ -223,7 +228,9 @@ func (p *Pool) Enqueue(ctx context.Context, job *Job) (*Future, error) {
 			err = job.Run(ctx)
 			if err == nil {
 				dur := time.Since(start)
-				fmt.Printf("%s [%s] jobID=%s done dur_ms=%d\n", time.Now().Format("15:04:05"), lane.Name(), job.ID, dur.Milliseconds())
+				msg := fmt.Sprintf("%s [%s] jobID=%s done dur_ms=%d", time.Now().Format("15:04:05"), lane.Name(), job.ID, dur.Milliseconds())
+				fmt.Println(msg) // stdout for goisekai.log
+				logger.Info(msg) // Also log via logger to capture in ring buffer
 				h.setStatus(StatusDone)
 				h.setErr(nil)
 				return nil
@@ -233,7 +240,9 @@ func (p *Pool) Enqueue(ctx context.Context, job *Job) (*Future, error) {
 			}
 			if attempt < job.MaxAttempts {
 				h.setStatus(StatusFailed)
-				fmt.Printf("%s [%s] jobID=%s failed, retrying attempt=%d\n", time.Now().Format("15:04:05"), lane.Name(), job.ID, attempt)
+				msg := fmt.Sprintf("%s [%s] jobID=%s failed, retrying attempt=%d", time.Now().Format("15:04:05"), lane.Name(), job.ID, attempt)
+				fmt.Println(msg) // stdout for goisekai.log
+				logger.Info(msg) // Also log via logger to capture in ring buffer
 				// Small linear backoff; transient-only.
 				select {
 				case <-time.After(time.Duration(attempt) * 50 * time.Millisecond):
@@ -245,7 +254,9 @@ func (p *Pool) Enqueue(ctx context.Context, job *Job) (*Future, error) {
 			}
 		}
 		dur := time.Since(start)
-		fmt.Printf("%s [%s] jobID=%s dead dur_ms=%d lastErr=%v\n", time.Now().Format("15:04:05"), lane.Name(), job.ID, dur.Milliseconds(), err)
+		durMsg := fmt.Sprintf("%s [%s] jobID=%s dead dur_ms=%d lastErr=%v", time.Now().Format("15:04:05"), lane.Name(), job.ID, dur.Milliseconds(), err)
+		fmt.Println(durMsg) // stdout for goisekai.log
+		logger.Info(durMsg) // Also log via logger to capture in ring buffer
 		h.setStatus(StatusDead)
 		h.setErr(err)
 		return err
