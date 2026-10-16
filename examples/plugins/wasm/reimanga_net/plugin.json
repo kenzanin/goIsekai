@@ -1,3 +1,5 @@
 {
-  "site_url": "https://reimanga.net"
+  "name": "ReiManga",
+  "site_url": "https://reimanga.net",
+  "logo": "logo.png"
 }

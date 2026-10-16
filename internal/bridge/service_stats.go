@@ -27,14 +27,23 @@ func (s *AppService) PluginDir(pluginID string) string {
 
 // SyncPluginMeta persists a loaded plugin's identity metadata (name, logo)
 // to the database so deferred plugins show correct data on the next page view.
+// Every logo shape (file, URL, inline) is first materialised into the
+// per-plugin cache (<cacheDir>/images/plugins/<id>/logo.<ext>); the DB row
+// stores the stable cache URL so all runtimes render identically without a
+// live fetch or a loaded VM at next startup.
 func (s *AppService) SyncPluginMeta(id string) {
 	meta := s.PluginMeta(id)
 	if meta.Name == "" && meta.Logo == "" {
 		return
 	}
-	iconURL := meta.Logo
-	if iconURL != "" && !strings.HasPrefix(iconURL, "http") && !strings.HasPrefix(iconURL, "data:") {
-		iconURL = "/plugin-static/" + id + "/" + iconURL
+	// Best-effort: cache the declared source, then point the row at it.
+	s.CachePluginLogo(id)
+	iconURL := s.LogoCacheURL(id)
+	if iconURL == "" {
+		iconURL = meta.Logo
+		if iconURL != "" && !strings.HasPrefix(iconURL, "http") && !strings.HasPrefix(iconURL, "data:") {
+			iconURL = "/plugin-static/" + id + "/" + iconURL
+		}
 	}
 	if err := s.db.UpdatePluginIdentity(id, meta.Name, iconURL); err != nil {
 		logger.Warn("sync plugin meta", "id", id, "error", err)

@@ -116,16 +116,18 @@ func (s *Server) pluginDisplayMaps() (map[string]string, map[string]string) {
 	return names, icons
 }
 
-// resolveLogoURL maps a plugin's Logo field to a URL. Bare filenames become
-// /plugin-static/{id}/{file}; absolute URLs and data URIs pass through as-is,
-// EXCEPT when the logo has already been materialised into the per-plugin cache
-// (<cacheDir>/images/plugins/{id}/) — then the stable cache URL is returned so
-// the browser hits our cache instead of a live fetch / data payload.
+// resolveLogoURL maps a plugin's Logo field to a URL. When the logo has been
+// materialised into the per-plugin cache (<cacheDir>/images/plugins/{id}/)
+// the stable cache URL is returned for every shape (file, URL, inline) so the
+// browser hits our cache instead of a live fetch / data payload. Otherwise
+// bare filenames become /plugin-static/{id}/{file} (servePluginStatic still
+// prefers a cached copy when one appears) and absolute URLs / data URIs pass
+// through as-is.
 func (s *Server) resolveLogoURL(logo, pluginID string) string {
+	if cached := s.service.LogoCacheURL(pluginID); cached != "" {
+		return cached
+	}
 	if strings.HasPrefix(logo, "http://") || strings.HasPrefix(logo, "https://") || strings.HasPrefix(logo, "data:") {
-		if cached := s.service.LogoCacheURL(pluginID); cached != "" {
-			return cached
-		}
 		return logo
 	}
 	return "/plugin-static/" + pluginID + "/" + logo

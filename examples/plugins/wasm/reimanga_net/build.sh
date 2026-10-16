@@ -1,19 +1,6 @@
 #!/usr/bin/env bash
-# Build TinyGo WASM plugins for goIsekai
+# Build this plugin's main.wasm (delegates to tools/build-wasm.sh:
+# TinyGo pinned to Go 1.26.9, standard-Go wasip1 fallback).
 set -e
-
-# TinyGo requires Go 1.19-1.26, but we have Go 1.27.
-# Workaround: use go build with -buildmode=c-shared instead
-# TinyGo's wasip1 build uses wasip1-go which is compatible with c-shared
-
-echo "=== Building reimanga_net plugin ==="
-cd /home/kenzanin/tmp/goIsekai/examples/plugins/wasm/reimanga_net
-
-# TinyGo build for wasip1
-tinygo build -o main.wasm -target wasip1 -buildmode=c-shared main.go 2>&1 || {
-  echo "TinyGo failed, trying alternative build..."
-  # Fallback: use standard Go with tinygo's wasip1 toolchain
-  GOOS=wasip1 GOARCH=wasm tinygo build -o main.wasm main.go
-}
-
-ls -la main.wasm
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../../.." && pwd)"
+exec "$ROOT/tools/build-wasm.sh" "$(basename "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)")"

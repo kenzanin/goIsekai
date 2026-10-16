@@ -201,12 +201,12 @@ return function(data)
 		if viewFilter == "duplicate" then
 			-- Active: summary links back to the unfiltered library (clears view).
 			sidebarHTML = sidebarHTML .. [[
-    <details class="bg-neutral-900 border border-indigo-500/30 rounded-lg overflow-hidden open">
+    <details class="bg-neutral-900 border border-indigo-500 rounded-lg overflow-hidden open">
         <summary class="px-4 py-3 cursor-pointer select-none text-xs font-medium text-neutral-200 hover:bg-neutral-800/60 transition list-none flex items-center justify-between gap-2">
 ]]
-			.. '<a href="' .. h(sidebarLink({})) .. '" class="w-full flex items-center justify-between gap-2">'
+			.. '<a href="' .. h(sidebarLink({ view = "" })) .. '" onclick="try{localStorage.removeItem(\'gsk:library-view\')}catch(e){}" class="w-full flex items-center justify-between gap-2">'
 			.. '<span>Duplicate <span class="text-indigo-400 font-semibold">' .. h(tostring(duplicateCount)) .. '</span></span>'
-			.. '<span class="text-xs text-indigo-400">clear</span>'
+			.. '<span class="text-xs text-indigo-400">active ✓</span>'
 			.. "</a>"
 			.. [[
         </summary>

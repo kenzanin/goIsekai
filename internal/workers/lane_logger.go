@@ -6,6 +6,9 @@ import (
 	"time"
 )
 
+// jobInfoKey is the context key for the running *Job (SA1029: no bare string keys).
+type jobInfoKey struct{}
+
 // wrappedJob wraps job execution with lane-qualified logging.
 // All worker logs now carry [lane] prefix and include start, stop, dur_ms.
 func wrappedJob(laneName string, jobID string, run func(context.Context) error) func(context.Context) error {
@@ -13,7 +16,7 @@ func wrappedJob(laneName string, jobID string, run func(context.Context) error) 
 		start := time.Now()
 		// Extract job metadata from context for detailed logging
 		var details string
-		if jctx, ok := ctx.Value("jobInfo").(*Job); ok && jctx != nil {
+		if jctx, ok := ctx.Value(jobInfoKey{}).(*Job); ok && jctx != nil {
 			details = fmt.Sprintf(" plugin=%s", jctx.PluginKey)
 		}
 		// start log

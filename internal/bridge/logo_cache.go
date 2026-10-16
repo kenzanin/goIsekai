@@ -214,11 +214,11 @@ func parseDataURI(s string) (body []byte, mime string, ok bool) {
 	if !found {
 		return nil, "", false
 	}
-	comma := strings.IndexByte(rest, ',')
-	if comma < 0 {
+	before, after, ok := strings.Cut(rest, ",")
+	if !ok {
 		return nil, "", false
 	}
-	header, payload := rest[:comma], rest[comma+1:]
+	header, payload := before, after
 	parts := strings.Split(header, ";")
 	mime = parts[0]
 	if len(parts) < 2 || parts[1] != "base64" {

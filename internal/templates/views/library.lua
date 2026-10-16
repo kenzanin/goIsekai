@@ -180,12 +180,6 @@ return function(data)
 	sortCarried = sortCarried
 		.. (viewFilter ~= "" and '<input type="hidden" name="view" value="' .. h(viewFilter) .. '">' or "")
 
-	local chip = ""
-	if viewFilter == "duplicate" then
-		chip = '<a href="'
-			.. libraryLink({ view = "" })
-			.. '" class="inline-flex items-center gap-1 rounded-md border border-amber-500 bg-amber-500/15 text-amber-200 px-2.5 py-1 text-xs">Duplicates only ✕</a>'
-	end
 	local viewModeHTML = '<div class="view-mode-toggle flex items-center gap-1" role="group" aria-label="View mode" data-view-mode="grid">'
 		.. '<button type="button" id="view-grid-btn" aria-pressed="true" class="p-1.5 rounded-md hover:bg-neutral-800 transition" title="Grid view">'
 		.. '<svg class="w-4 h-4 text-neutral-400" fill="currentColor" viewBox="0 0 16 16"><rect x="1" y="1" width="6" height="6" rx="1"/><rect x="9" y="1" width="6" height="6" rx="1"/><rect x="1" y="9" width="6" height="6" rx="1"/><rect x="9" y="9" width="6" height="6" rx="1"/></svg></button>'
@@ -214,7 +208,6 @@ return function(data)
 		.. '<div class="text-xs text-neutral-500">'
 		.. h(subtitle)
 		.. "</div></div>"
-		.. chip
 		.. '<form method="get" action="/view/library" class="flex-1 min-w-[180px] max-w-md" role="search">'
 		.. searchCarried
 		.. '<div class="flex gap-2">'

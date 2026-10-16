@@ -210,7 +210,7 @@ func (p *Pool) Enqueue(ctx context.Context, job *Job) (*Future, error) {
 	// All worker logs now carry [lane] prefix and include start, stop, dur_ms.
 	h.run = p.track(h, wrappedJob(lane.Name(), job.ID, func(ctx context.Context) error {
 		// Store job info in context for detailed logging
-		ctx = context.WithValue(ctx, "jobInfo", job)
+		ctx = context.WithValue(ctx, jobInfoKey{}, job)
 		start := time.Now()
 		laneName := lane.Name()
 		msg := fmt.Sprintf("%s [%s] jobID=%s plugin=%s running", start.Format("15:04:05"), laneName, job.ID, job.PluginKey)

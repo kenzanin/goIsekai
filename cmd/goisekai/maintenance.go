@@ -3,7 +3,9 @@ package main
 import (
 	"context"
 	"math"
+	"os"
 	"path/filepath"
+	"strings"
 	"sync/atomic"
 	"time"
 
@@ -133,17 +135,52 @@ func preconnectHosts(mgr *pluginmanager.Manager) {
 
 // registerLoadedPlugins persists plugins loaded from the plugins dir so they
 // appear in ListPlugins (Discover only loads them into memory).
+// Name and logo come from plugin.json when the plugin declares them
+// (wasm has no Init export, so plugin.json is its identity file); otherwise
+// the id is the display name and a sibling logo.png becomes the icon URL.
+// is_active is preserved by RegisterPlugin's ON CONFLICT path.
 func registerLoadedPlugins(db *database.DB, mgr *pluginmanager.Manager) {
 	for _, p := range mgr.LoadedPlugins() {
+		name := p.Name
+		if name == "" {
+			name = p.ID
+		}
+		iconURL := ""
+		if p.Logo != "" {
+			if strings.HasPrefix(p.Logo, "http://") || strings.HasPrefix(p.Logo, "https://") || strings.HasPrefix(p.Logo, "data:") {
+				iconURL = p.Logo
+			} else {
+				iconURL = "/plugin-static/" + p.ID + "/" + filepath.Base(p.Logo)
+			}
+		} else if p.WasmPath != "" {
+			dir := p.WasmPath
+			if fi, err := os.Stat(dir); err == nil && !fi.IsDir() {
+				dir = filepath.Dir(dir)
+			}
+			if _, err := os.Stat(filepath.Join(dir, "logo.png")); err == nil {
+				iconURL = "/plugin-static/" + p.ID + "/logo.png"
+			}
+		}
 		if err := db.RegisterPlugin(database.Plugin{
 			ID:         p.ID,
-			Name:       p.ID,
+			Name:       name,
 			Version:    p.Version,
 			WasmPath:   p.WasmPath,
 			IsActive:   true,
+			IconURL:    iconURL,
 			ThumbRatio: p.ThumbRatio,
 		}); err != nil {
 			logger.Error("register discovered plugin", "id", p.ID, "error", err)
+			continue
+		}
+		// RegisterPlugin's ON CONFLICT path only refreshes version/path, so
+		// heal name + icon on existing rows (existing installs registered
+		// before IconURL seeding would otherwise stay blank in the search
+		// dropdown, which reads DB IconURL directly).
+		if name != "" || iconURL != "" {
+			if err := db.UpdatePluginIdentity(p.ID, name, iconURL); err != nil {
+				logger.Error("register plugin identity", "id", p.ID, "error", err)
+			}
 		}
 	}
 }
