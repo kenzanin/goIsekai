@@ -104,13 +104,13 @@ func (s *Server) viewLibrary(w http.ResponseWriter, r *http.Request) {
 	// Apply the status/tag filter over the whole library, then optionally
 	// narrow to duplicate-group members when ?view=duplicate is set.
 	mangas = filterLibrary(mangas, statsForSort, categories, statusFilter, tagFilter)
-	if viewFilter == "duplicate" {
-		dupIDs := make(map[string]struct{}, duplicateCount)
-		for _, g := range duplicateGroups {
-			for _, m := range g.Members {
-				dupIDs[strconv.FormatInt(m.ID, 10)] = struct{}{}
-			}
+	dupIDs := make(map[string]struct{}, duplicateCount)
+	for _, g := range duplicateGroups {
+		for _, m := range g.Members {
+			dupIDs[strconv.FormatInt(m.ID, 10)] = struct{}{}
 		}
+	}
+	if viewFilter == "duplicate" {
 		kept := make([]database.Manga, 0, len(mangas))
 		for _, m := range mangas {
 			if _, ok := dupIDs[strconv.FormatInt(m.ID, 10)]; ok {
@@ -207,6 +207,7 @@ func (s *Server) viewLibrary(w http.ResponseWriter, r *http.Request) {
 		"Sort":            sortKey,
 		"Status":          statusFilter,
 		"View":            viewFilter,
+		"DupIDs":          dupIDs,
 		"Tag":             tagFilter,
 		"CategoryCounts":  s.service.LibraryCategoryCountsOrEmpty(),
 		"DuplicateCount":  duplicateCount,

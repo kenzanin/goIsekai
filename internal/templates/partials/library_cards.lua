@@ -7,6 +7,7 @@ return function(data)
 	local mangas = data.Mangas or {}
 	local libraryStats = data.LibraryStats or {}
 	local ratios = data.Ratios or {}
+	local dupIDs = data.DupIDs or {}
 
 	-- Build manga cards
 	local mangaCards = ""
@@ -95,6 +96,10 @@ return function(data)
 				if total > 0 and read >= total then
 					finishedMark =
 						' <span class="text-xs px-1.5 py-0.5 rounded-full bg-emerald-600 text-white font-medium align-middle">Done</span>'
+				end
+				if dupIDs[mid] then
+					finishedMark = finishedMark
+						.. ' <span class="text-xs px-1.5 py-0.5 rounded-full bg-amber-500 text-white font-medium align-middle">Dup</span>'
 				end
 			end
 

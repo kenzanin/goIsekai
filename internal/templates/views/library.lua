@@ -43,6 +43,7 @@ return function(data)
 		Mangas = mangas,
 		LibraryStats = libraryStats,
 		Ratios = ratios,
+		DupIDs = dupIDs,
 	})
 	local pluginName = data.PluginName or pluginID
 	local titleCount = data.ResultCount
@@ -59,6 +60,8 @@ return function(data)
 	local sortKey = data.Sort or "updated"
 	local statusFilter = data.Status or "all"
 	local tagFilter = data.Tag or ""
+	local viewFilter = data.View or ""
+	local dupIDs = data.DupIDs or {}
 
 	-- Every control on this page changes one parameter and keeps the rest. That
 	-- cannot be done by appending to a base URL: the base already carries the
@@ -73,6 +76,7 @@ return function(data)
 			sort = (sortKey ~= "updated" and sortKey or nil),
 			status = (statusFilter ~= "all" and statusFilter or nil),
 			tag = (tagFilter ~= "" and tagFilter or nil),
+			view = (viewFilter ~= "" and viewFilter or nil),
 		}
 		for key, val in pairs(overrides or {}) do
 			if val == nil or val == "" or val == "all" or val == "updated" then
@@ -162,6 +166,8 @@ return function(data)
 		.. (statusFilter ~= "all" and '<input type="hidden" name="status" value="' .. h(statusFilter) .. '">' or "")
 	searchCarried = searchCarried
 		.. (tagFilter ~= "" and '<input type="hidden" name="tag" value="' .. h(tagFilter) .. '">' or "")
+	searchCarried = searchCarried
+		.. (viewFilter ~= "" and '<input type="hidden" name="view" value="' .. h(viewFilter) .. '">' or "")
 
 	local sortCarried = ""
 	sortCarried = sortCarried .. (q ~= "" and '<input type="hidden" name="q" value="' .. h(q) .. '">' or "")
@@ -171,8 +177,15 @@ return function(data)
 		.. (statusFilter ~= "all" and '<input type="hidden" name="status" value="' .. h(statusFilter) .. '">' or "")
 	sortCarried = sortCarried
 		.. (tagFilter ~= "" and '<input type="hidden" name="tag" value="' .. h(tagFilter) .. '">' or "")
+	sortCarried = sortCarried
+		.. (viewFilter ~= "" and '<input type="hidden" name="view" value="' .. h(viewFilter) .. '">' or "")
 
 	local chip = ""
+	if viewFilter == "duplicate" then
+		chip = '<a href="'
+			.. libraryLink({ view = "" })
+			.. '" class="inline-flex items-center gap-1 rounded-md border border-amber-500 bg-amber-500/15 text-amber-200 px-2.5 py-1 text-xs">Duplicates only ✕</a>'
+	end
 	local viewModeHTML = '<div class="view-mode-toggle flex items-center gap-1" role="group" aria-label="View mode" data-view-mode="grid">'
 		.. '<button type="button" id="view-grid-btn" aria-pressed="true" class="p-1.5 rounded-md hover:bg-neutral-800 transition" title="Grid view">'
 		.. '<svg class="w-4 h-4 text-neutral-400" fill="currentColor" viewBox="0 0 16 16"><rect x="1" y="1" width="6" height="6" rx="1"/><rect x="9" y="1" width="6" height="6" rx="1"/><rect x="1" y="9" width="6" height="6" rx="1"/><rect x="9" y="9" width="6" height="6" rx="1"/></svg></button>'
