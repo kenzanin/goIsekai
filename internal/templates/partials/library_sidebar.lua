@@ -74,8 +74,15 @@ return function(data)
 		-- addStatLink renders the same card shape but wraps the value+label in an
 		-- <a> so the card is clickable. Used for the "updates" card which filters
 		-- to ?status=new.
-		local function addStatLink(value, label, color, href)
-			local active = (statusFilter == "new")
+		local function addStatLink(value, label, color, href, isActive, clearView)
+			local active = isActive
+			if active == nil then
+				active = (statusFilter == "new")
+			end
+			local onclick = ""
+			if clearView then
+				onclick = ' onclick="try{localStorage.removeItem(\'gsk:library-view\')}catch(e){}"'
+			end
 			local cls = (color and color ~= "") and (' class="text-sm font-medium ' .. h(color) .. '"')
 				or ' class="text-lg font-semibold"'
 			local outer = active
@@ -84,7 +91,9 @@ return function(data)
 			statCards = statCards
 				.. '<a href="'
 				.. h(href)
-				.. '" class="'
+				.. '"'
+				.. onclick
+				.. ' class="'
 				.. outer
 				.. '">'
 				.. "<div"
@@ -110,8 +119,8 @@ return function(data)
 		if stats.HasUpdates and stats.HasUpdates > 0 then
 			-- Clickable: filters the grid to only titles with the [New] badge.
 			local activeNew = (statusFilter == "new")
-			local updatesHref = activeNew and sidebarLink({}) or sidebarLink({ status = "new" })
-			addStatLink(stats.HasUpdates, "updates", "text-indigo-400", updatesHref)
+			local updatesHref = activeNew and sidebarLink({ status = "all" }) or sidebarLink({ status = "new" })
+			addStatLink(stats.HasUpdates, activeNew and "updates (active ✓)" or "updates", "text-indigo-400", updatesHref, activeNew, activeNew)
 		end
 		if stats.ReadingTime and stats.ReadingTime ~= "" then
 			addStat(stats.ReadingTime, "reading time", "", true)
@@ -123,71 +132,6 @@ return function(data)
 			addStat(stats.FewestLine, "fewest chapters", "", true)
 		end
 
-		-- Duplicate groups
-		-- When view=duplicate is active the grid already shows every duplicate
-		-- title, so the card collapses to a count-only display (no thumbnails).
-		local showThumbnails = (viewFilter ~= "duplicate")
-		local dupItems = ""
-		if duplicateCount == 0 then
-			dupItems = '<div class="text-xs text-neutral-500">Tidak ada judul yang berpotensi duplikat.</div>'
-		elseif not showThumbnails then
-			-- Count-only: just the group titles, no per-member thumbnails.
-			for _, g in ipairs(duplicateGroups) do
-				dupItems = dupItems
-					.. '<div class="flex items-center justify-between gap-2">'
-					.. '<span class="text-xs font-medium text-neutral-300 line-clamp-2" title="'
-					.. h(g.Title or "")
-					.. '">'
-					.. h(g.Title or "")
-					.. "</span>"
-					.. '<span class="text-xs text-indigo-400 font-semibold shrink-0">'
-					.. h(tostring(#(g.Members or {})))
-					.. "</span>"
-					.. "</div>"
-			end
-		else
-			for _, g in ipairs(duplicateGroups) do
-				local members = ""
-				for _, m in ipairs(g.Members or {}) do
-					local cover = ""
-					if m.CoverURL and m.CoverURL ~= "" then
-						cover = '<img src="/image?pluginID='
-							.. h(m.PluginID or "")
-							.. "&amp;url="
-							.. h(m.CoverURL)
-							.. '" alt="'
-							.. h(m.Title or "")
-							.. '" class="w-8 h-11 object-cover rounded shrink-0" loading="lazy">'
-					else
-						cover = '<div class="w-8 h-11 rounded bg-neutral-800 flex items-center justify-center text-xs text-neutral-500 font-semibold shrink-0">'
-							.. h(getInitials(m.Title or ""))
-							.. "</div>"
-					end
-					members = members
-						.. '<a href="/view/manga/'
-						.. h(m.PluginID or "")
-						.. "/"
-						.. h(m.SourceMangaID or "")
-						.. '" class="flex items-center gap-2 rounded-md px-2 py-1.5 hover:bg-neutral-800/60 transition group">'
-						.. cover
-						.. '<span class="text-xs text-neutral-300 line-clamp-2 group-hover:text-neutral-100">'
-						.. h(m.Title or "")
-						.. "</span></a>"
-				end
-				dupItems = dupItems
-					.. '<div class="flex flex-col gap-2">'
-					.. '<div class="text-xs font-medium text-neutral-300 line-clamp-2" title="'
-					.. h(g.Title or "")
-					.. '">'
-					.. h(g.Title or "")
-					.. "</div>"
-					.. '<div class="flex flex-col gap-1.5">'
-					.. members
-					.. "</div>"
-					.. "</div>"
-			end
-		end
-
 		sidebarHTML = [[<div class="flex flex-col lg:flex-row gap-4 items-start">
 <aside class="lg:w-56 shrink-0 flex flex-col gap-3">
     <div class="bg-neutral-900 border border-neutral-800 rounded-lg px-4 py-3">
@@ -195,45 +139,15 @@ return function(data)
     </div>
 
 ]]
-	-- Duplicate card: the <details> summary is clickable. Clicking it toggles the
-	-- ?view=duplicate grid filter; when the filter is active the card also drops
-	-- the per-member thumbnails and shows just the per-group count.
-		if viewFilter == "duplicate" then
-			-- Active: summary links back to the unfiltered library (clears view).
-			sidebarHTML = sidebarHTML .. [[
-    <details class="bg-neutral-900 border border-indigo-500 rounded-lg overflow-hidden open">
-        <summary class="px-4 py-3 cursor-pointer select-none text-xs font-medium text-neutral-200 hover:bg-neutral-800/60 transition list-none flex items-center justify-between gap-2">
-]]
-			.. '<a href="' .. h(sidebarLink({ view = "" })) .. '" onclick="try{localStorage.removeItem(\'gsk:library-view\')}catch(e){}" class="w-full flex items-center justify-between gap-2">'
-			.. '<span>Duplicate <span class="text-indigo-400 font-semibold">' .. h(tostring(duplicateCount)) .. '</span></span>'
-			.. '<span class="text-xs text-indigo-400">active ✓</span>'
-			.. "</a>"
-			.. [[
-        </summary>
-        <div class="border-t border-neutral-800 px-3 py-3 flex flex-col gap-2">]]
-			.. dupItems
-			.. [[
-        </div>
-    </details>]]
-		else
-			sidebarHTML = sidebarHTML .. [[
-    <details class="bg-neutral-900 border border-neutral-800 rounded-lg overflow-hidden]] .. (duplicateCount == 0 and " open" or "") .. [[" >
-        <summary class="px-4 py-3 cursor-pointer select-none text-xs font-medium text-neutral-200 hover:bg-neutral-800/60 transition list-none flex items-center justify-between gap-2">
-]]
-			.. '<a href="' .. h(sidebarLink({ view = "duplicate" })) .. '" class="w-full flex items-center justify-between gap-2">'
-			.. '<span>Duplicate <span class="text-indigo-400 font-semibold">' .. h(tostring(duplicateCount)) .. '</span></span>'
-			.. '<svg class="w-4 h-4 text-neutral-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>'
-			.. "</a>"
-			.. [[
-        </summary>
-        <div class="border-t border-neutral-800 px-3 py-3 flex flex-col gap-4">]]
-			.. dupItems
-			.. [[
-        </div>
-    </details>]]
-		end
+	-- Duplicate card: plain clickable card, no dropdown. Click toggles the
+	-- ?view=duplicate grid filter; the card only shows the count.
+	if duplicateCount > 0 then
+		local activeDup = (viewFilter == "duplicate")
+		local dupHref = activeDup and sidebarLink({ view = "" }) or sidebarLink({ view = "duplicate" })
+		addStatLink(duplicateCount, activeDup and "duplicates (active ✓)" or "duplicates", "text-indigo-400", dupHref, activeDup, activeDup)
+	end
 
-		-- Plugin counts — always visible so All can reset even on empty filter results
+		-- Plugin counts
 		if #pluginCounts > 0 then
 			local curPluginID = data.PluginID or ""
 			local pluginRows = '<a href="/view/library" onclick="try{localStorage.removeItem(\'gsk:library-view\')}catch(e){}" class="flex items-center justify-between gap-2 text-sm rounded-md px-1.5 py-1 mb-1 border border-dashed '
