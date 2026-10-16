@@ -482,11 +482,11 @@ return function(data)
 		.. coverGrid
 		.. [[</div>
         <div class="mt-4 flex items-center gap-2">
-            <form action="/action/clear-covers/]] .. h(pluginID) .. [[" method="POST" class="inline">
+            <form action="/action/clear-covers/]] .. h(pluginID) .. "/" .. h(mangaID) .. [[" method="POST" class="inline">
                 ]] .. csrfInput(data.csrf_token or "") .. [[
                 <button type="submit" class="text-xs text-red-400 hover:text-red-300 border border-red-600/50 rounded-md px-3 py-1" onclick="return confirm('Clear all cover candidates and fetch fresh?');">Clear Covers</button>
             </form>
-            <form action="/action/fetch-covers/]] .. h(pluginID) .. [[" method="POST" class="inline">
+            <form action="/action/fetch-covers/]] .. h(pluginID) .. "/" .. h(mangaID) .. [[" method="POST" class="inline">
                 ]] .. csrfInput(data.csrf_token or "") .. [[
                 <input type="hidden" name="manga_title" value="]] .. h(currentTitle) .. [[" />
                 <button type="submit" class="text-xs text-blue-400 hover:text-blue-300 border border-blue-600/50 rounded-md px-3 py-1">Refresh Covers</button>
