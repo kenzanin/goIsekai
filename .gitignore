@@ -48,6 +48,8 @@ cmd/goisekai/goisekai
 .aider*
 # Codebase-memory MCP graph artifacts (regenerated per machine)
 .codebase-memory/
+# CodeGraph index (regenerated per machine)
+.codegraph/
 # OpenCode/Echoes session state (local)
 .opencode/echoes-state.json
 # Local helper scripts
