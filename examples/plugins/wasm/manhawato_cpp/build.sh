@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# Build manhawato_cpp main.wasm via wasi-sdk clang++ (C++17 reactor).
+# Build this plugin's main.wasm via wasi-sdk clang++ (C++17 reactor) and verify
+# the exports the host requires.
 #
 # Toolchain: /opt/wasi-sdk (clang 13, wasm32-wasi sysroot).
 # JSON: RapidJSON (system header at /usr/include/rapidjson, header-only).
@@ -29,4 +30,11 @@ fi
     2>&1 | grep -v "no version information available" || true
 
 test -f main.wasm
-ls -la main.wasm
+
+# ── verify the exports the host loads (ABI + reactor CRT) ──
+OBJDUMP="${WASM_OBJDUMP:-/sbin/wasm-objdump}"
+for sym in _initialize contract_version malloc free Search GetMangaDetail GetChapterList GetPageList; do
+    "$OBJDUMP" -x main.wasm | grep -q "\"$sym\"" || { echo "missing export: $sym" >&2; exit 1; }
+done
+
+echo "exports OK ($(stat -c%s main.wasm) bytes)"

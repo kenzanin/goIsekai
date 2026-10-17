@@ -3,7 +3,7 @@
 // Copy this file into a new plugin directory as-is. It provides:
 //   • the env.host_call import (JSON dispatch — see docs/plugin-wasm-helpers.md)
 //   • read_string / pack / reply_json / alloc_mem / free_mem
-//   • host_call_fn / http_body / get_body / get_json
+//   • host_call_fn / http_body / get_body / http_post_body / get_json
 //   • the contract_version export (always 1)
 //
 // The plugin's own main.cpp must export, with extern "C" __attribute__((export_name(...))):
@@ -99,6 +99,19 @@ static bool http_body(const std::string &url, const std::string &headers_json, s
 
 static bool get_body(const std::string &url, std::string &out) {
     return http_body(url, "", out);
+}
+
+// http.post_body returns a JSON string on 200, else null. Args: url, body,
+// headersJSON. WordPress admin-ajax/Madara endpoints need this.
+static bool http_post_body(const std::string &url, const std::string &body, const std::string &headers_json,
+                           std::string &out) {
+    std::string raw = host_call_fn("http.post_body", {url, body, headers_json});
+    if (raw.empty() || raw == "null" || raw[0] == '{') return false;
+    rapidjson::Document d;
+    d.Parse(raw.c_str());
+    if (!d.IsString()) return false;
+    out = d.GetString();
+    return !out.empty();
 }
 
 // Call a one-string host helper (e.g. "text.url_encode") and return its JSON
