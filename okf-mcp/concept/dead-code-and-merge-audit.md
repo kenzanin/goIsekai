@@ -52,7 +52,15 @@ zero rows, while `STARTS WITH` and bare property comparison work.
 
 ## Dead code
 
-### Unreachable even from tests (12)
+### Unreachable even from tests (12) — 10 removed in `ec12590`
+
+**Status 2026-10-17:** the ten symbols outside `migrate_candidates.go` were
+deleted in commit `ec12590`; `deadcode -test ./...` went 12 → 2. Each was
+checked for dynamic dispatch first — no `reflect.MethodByName`, no Wails `Bind`,
+no function name used as a plugin/host-call string — so none was reachable
+through yaegi, wasm or a Lua template. `config.LoadOrInit` took its whole file
+(`internal/config/loader.go`) with it. Remaining: only `CollectMigrationCandidates`
+and `collectCandidatesWithTitle`, both in `migrate_candidates.go` (see below).
 
 | Symbol | Location |
 | --- | --- |
@@ -87,14 +95,15 @@ its own `errAllSourcesFailed`) instead of calling
 duplication together — but `migrate_test.go` and `migrate_candidates_test.go`
 cover `AutoSelectCandidate`, so those tests go with it.
 
-### Two things that look like dead code but are not
+### Two things that looked like dead code but were not
 
-- `AddGenre`/`RemoveGenre` are unused because **both** `handleAddGenre` and
-  `handleRemoveGenre` call `ToggleGenre` — the two routes are behaviourally
-  identical (they are byte-identical apart from the function name and two log
-  strings). Whether that is intended has not been confirmed.
-- `EnrichmentCatalog`, `LoadOrInit`, and `FormatExtension` read as deliberate
-  exported API surface rather than leftovers. Confirm before deleting.
+Resolved 2026-10-17 (commit `ec12590`): `AddGenre`/`RemoveGenre` really were
+leftovers — both routes call `ToggleGenre`, which alone carries the final
+behaviour; `EnrichmentCatalog` and `LoadOrInit` were leftovers too (both real
+callers use `EnrichmentSources` / the `Default()`-then-`Load()` dance), so all
+four were deleted. `ImageFormat.FormatExtension` is the one that still reads as
+deliberate API surface; it is test-only, so leave it unless the export is known
+to be unneeded.
 
 ## A real bug, not dead code
 
