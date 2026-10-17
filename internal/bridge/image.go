@@ -11,6 +11,7 @@ import (
 
 	"goisekai/internal/logger"
 	"goisekai/internal/workers"
+	"goisekai/pkg/types"
 )
 
 // hasHeader reports whether headers already carry the named key (case-insensitive).
@@ -249,4 +250,37 @@ func (s *AppService) GetImage(ctx context.Context, pluginID, url string, headers
 	case <-time.After(imageAbandonGrace):
 	}
 	return call.data, call.err
+}
+
+// warmBatchLimit bounds one read-ahead batch. The reader asks for its own
+// read-ahead window (a handful of pages); the cap keeps a bad caller from
+// fanning out without bound.
+const warmBatchLimit = 32
+
+// WarmPages queues page images for read-ahead and returns at once.
+//
+// Read-ahead used to be issued by the browser, one /image request per page,
+// which capped it at the browser's six connections per origin and put it in
+// competition with the page being displayed. One request here hands the
+// pacing and the ordering to the server, where the lanes already encode both.
+//
+// Each page goes through GetImage, so a page already cached costs nothing and
+// a page the reader is about to display joins this warm through the existing
+// singleflight instead of fetching twice. The priority is low on purpose: the
+// page on screen must never queue behind speculation.
+func (s *AppService) WarmPages(pluginID, mangaID, chapterID string, pages []types.Page) {
+	if len(pages) > warmBatchLimit {
+		pages = pages[:warmBatchLimit]
+	}
+	for _, p := range pages {
+		go func() {
+			// Background context: the caller has already been answered, so its
+			// request context is gone. A fresh deadline still bounds the fetch.
+			ctx, cancel := context.WithTimeout(context.Background(), imageFetchBudget+imageAbandonGrace)
+			defer cancel()
+			if _, err := s.GetImage(ctx, pluginID, p.URL, p.Headers, mangaID, chapterID, PrioLow); err != nil {
+				logger.Debug("read-ahead warm failed", "url", p.URL, "plugin", pluginID, "error", err)
+			}
+		}()
+	}
 }

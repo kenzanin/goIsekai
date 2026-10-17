@@ -476,6 +476,24 @@
       .catch(() => {});
   }
 
+  // Read-ahead, server side. One request hands the whole window to the image
+  // lane, which paces and orders it below the page on screen. The browser
+  // cannot do that for itself: it holds at most six connections per origin and
+  // the displayed page needs one of them, so per-page browser prefetch stalls
+  // at ~5. Best effort — a dropped warm request just means the display path
+  // fetches the page normally.
+  function warmServer(chapterID, from, count) {
+    if (count <= 0) return;
+    fetch(`/api/reader-warm/${[pid, mid, chapterID].map(encodeURIComponent).join('/')}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ from: from, count: count }),
+      credentials: 'same-origin',
+    }).catch(() => {
+      /* warm is best effort */
+    });
+  }
+
   function prefetch() {
     // Read-ahead: keep the next K pages warm in the browser cache.
     // Suwayomi-style spill: near the end of the chapter, the leftover
@@ -486,6 +504,10 @@
       const idx = current + k;
       warmImage(preloaded, idx, imageUrl(pages[idx], undefined, 'high'), 'next');
     }
+    // Ask the server to warm the same window on its own lanes. The browser
+    // requests above are capped at six connections per origin; the server is
+    // not, and once it has the bytes in L2 those requests return instantly.
+    warmServer(cid, current + 1, budget);
     var spill = readAhead - budget;
     // Evict bookkeeping for pages far behind the reading position; the
     // browser HTTP cache keeps the bytes, this only frees the Image handles.
@@ -510,6 +532,7 @@
     for (let k = 0; k < Math.min(n, nextPages.length); k++) {
       warmImage(preloaded, `n${k}`, imageUrl(nextPages[k], nextChID, 'high'), 'next');
     }
+    warmServer(nextChID, 0, n);
   }
 
   function prefetchPrev(n) {
