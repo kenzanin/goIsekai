@@ -1,0 +1,19 @@
+{
+  "enrichment_providers": [
+    {
+      "id": "kitsu",
+      "name": "Kitsu",
+      "kinds": [
+        "titles",
+        "summaries",
+        "categories",
+        "authors",
+        "related"
+      ],
+      "precedence": 100
+    }
+  ],
+  "name": "Kitsu Info",
+  "site_url": "https://kitsu.app",
+  "contract_version": 1
+}

@@ -1,9 +1,7 @@
 package pluginmanager
 
 import (
-	"context"
 	"fmt"
-	"github.com/goccy/go-json"
 	"go/parser"
 	"go/token"
 	"reflect"
@@ -24,7 +22,6 @@ var yaegiABIFns = []string{
 	types.GetMangaDetailFunc,
 	types.GetChapterListFunc,
 	types.GetPageListFunc,
-	types.InitFunc,
 	types.GetGenresFunc,
 }
 
@@ -51,8 +48,6 @@ func (m *Manager) loadYaegi(id, dir string) (*loadedPlugin, error) {
 			return nil, fmt.Errorf("yaegi plugin %s: missing required function %s", id, fn)
 		}
 	}
-
-	hasInit := strings.Contains(srcStr, "func "+types.InitFunc+"(")
 
 	// Verify: reject third-party imports.
 	fset := token.NewFileSet()
@@ -117,12 +112,6 @@ func (m *Manager) loadYaegi(id, dir string) (*loadedPlugin, error) {
 	var wb strings.Builder
 	wb.WriteString("package main\n")
 	for _, fn := range yaegiABIFns {
-		if fn == types.InitFunc {
-			if w := initWrapperSrc(srcStr); w != "" {
-				wb.WriteString(w + "\n")
-			}
-			continue
-		}
 		if !strings.Contains(srcStr, "func "+fn+"(") {
 			continue
 		}
@@ -140,28 +129,26 @@ func (m *Manager) loadYaegi(id, dir string) (*loadedPlugin, error) {
 		plugin: id,
 	}
 
+	// Metadata lives in plugin.json beside the entry point, never in the VM:
+	// the host already read it at discovery, so a plugin never has to execute
+	// just to be listed with its name and logo.
+	meta, err := pluginMetaFor(id, "yaegi", dir)
+	if err != nil {
+		return nil, err
+	}
+	contractVer := meta.ContractVersion
+	if contractVer == 0 {
+		contractVer = types.ContractVersion
+	}
+
 	p := &loadedPlugin{
 		id:              id,
 		wasmPath:        dir,
 		kind:            "yaegi",
 		loaded:          true,
-		contractVersion: 1,
+		contractVersion: contractVer,
 		yaegi:           yp,
-	}
-
-	// Run Init if present to populate metadata.
-	if hasInit {
-		out, err := yp.callWithTimeout(context.Background(), types.InitFunc, "")
-		if err != nil {
-			return nil, fmt.Errorf("yaegi plugin %s: Init: %w", id, err)
-		}
-		if out != "" {
-			var meta types.PluginMeta
-			if err := json.Unmarshal([]byte(out), &meta); err != nil {
-				return nil, fmt.Errorf("yaegi plugin %s: Init returned invalid JSON: %w", id, err)
-			}
-			p.meta = meta
-		}
+		meta:            meta,
 	}
 
 	logger.Info("yaegi plugin loaded", "id", id)

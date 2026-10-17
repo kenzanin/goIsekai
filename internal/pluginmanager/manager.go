@@ -44,7 +44,8 @@ type loadedPlugin struct {
 	wasmFns map[string]api.Function
 	// contractVersion is the plugin's resolved contract_version.
 	contractVersion int32
-	// meta is the metadata the plugin declared in its optional Init export.
+	// meta is the metadata the plugin declared in plugin.json, read at
+	// discovery and again at load.
 	meta types.PluginMeta
 	// infoOnly marks an enrichment script discovered under infoDir. It has no
 	// source ABI and is excluded from the manga-source plugin list.
@@ -61,7 +62,7 @@ type loadedPlugin struct {
 }
 
 // invokeDeadline returns the per-invocation wall-clock budget: the plugin's
-// PLUGIN.timeout (seconds) when declared, else the shared 15 s default.
+// declared timeout (seconds) when set, else the shared 15 s default.
 func (p *loadedPlugin) invokeDeadline() time.Duration {
 	if p.meta.Timeout > 0 {
 		return time.Duration(p.meta.Timeout) * time.Second

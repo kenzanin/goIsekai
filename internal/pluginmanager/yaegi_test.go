@@ -70,7 +70,7 @@ func TestYaegiBato1(t *testing.T) {
 		t.Fatalf("loadYaegi(bato1): %v", err)
 	}
 	if p.meta.Name != "Bato1" || p.meta.SiteURL != "https://bato1.com" {
-		t.Errorf("Init meta = %+v, want Bato1 on https://bato1.com", p.meta)
+		t.Errorf("plugin.json meta = %+v, want Bato1 on https://bato1.com", p.meta)
 	}
 
 	badIDs := map[string]string{ // chapter id -> why it must be refused

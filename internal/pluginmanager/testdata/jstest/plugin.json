@@ -1,0 +1,7 @@
+{
+  "name": "JS test",
+  "verify_url": "https://example.com",
+  "needs_human_verify": true,
+  "thumb_ratio": 0.7,
+  "contract_version": 1
+}

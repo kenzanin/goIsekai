@@ -1,12 +1,17 @@
 package types
 
-// ContractVersion is the current version of the host/plugin ABI. The host
-// reads a plugin's exported contract_version symbol and rejects it when it does
-// not match this value.
+// ContractVersion is the current version of the host/plugin ABI. A plugin
+// declares the version it was written against; the host rejects a mismatch so
+// an incompatible plugin never gets instantiated.
 const ContractVersion int32 = 1
 
 // Host function names exported by every plugin. Each accepts a JSON string
 // argument and returns a JSON string result over WASM memory.
+//
+// The same five entry points exist in every runtime, differing only in case
+// convention: Lua defines snake_case globals (search, get_manga_detail, ...),
+// JavaScript camelCase globals (search, getMangaDetail, ...), and Go, Yaegi and
+// WASM export the PascalCase names below.
 const (
 	// SearchFunc accepts a SearchFilter JSON and returns a JSON array of Manga.
 	SearchFunc = "Search"
@@ -14,20 +19,21 @@ const (
 	GetMangaDetailFunc = "GetMangaDetail"
 	// GetChapterListFunc accepts a manga id and returns a JSON array of Chapter.
 	GetChapterListFunc = "GetChapterList"
-	// GetMangaDetailWithChaptersFunc accepts a manga id and returns both
-	// Manga detail and Chapter list in a single call for efficiency.
-	GetMangaDetailWithChaptersFunc = "GetMangaDetailWithChapters"
 	// GetPageListFunc accepts a chapter id and returns a JSON array of Page.
 	GetPageListFunc = "GetPageList"
-	// ContractVersionFunc is exported by each plugin and returns the ABI
-	// version it was compiled against.
+	// ContractVersionFunc is the per-runtime export carrying the ABI version.
+	// Which symbol answers it differs by runtime: a function for WASM, an
+	// exported int32 variable for compiled Go plugins, PLUGIN.contract_version
+	// for Lua, and nothing at all for JS/Yaegi (they assume the current ABI).
 	ContractVersionFunc = "contract_version"
-	// InitFunc is an optional export. When present, the host calls it once at
-	// load time with no arguments; it returns a PluginMeta JSON object.
+	// InitFunc is a legacy export name. Metadata lives in plugin.json for every
+	// runtime, and no runtime reads an Init export anymore — a plugin that still
+	// defines one is compiled but never called.
 	InitFunc = "Init"
-	// GetEnrichmentFunc is an OPTIONAL enrichment export. When present, the
-	// plugin can fetch enrichment items (titles, summaries, categories,
-	// authors, related) for a manga title. Input: JSON
+	// GetEnrichmentFunc is the entry point an enrichment script (a folder in
+	// the info directory) defines. Such a script serves metadata only — it
+	// never scrapes a site and is never offered as a manga source — so it
+	// exports this instead of the source ABI above. Input: JSON
 	// {"title":string,"kind":string,"source":string}.
 	// Output: JSON array of items [{value,url,cover_url,source}, ...].
 	GetEnrichmentFunc = "GetEnrichment"

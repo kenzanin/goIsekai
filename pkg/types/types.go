@@ -64,10 +64,12 @@ type EnrichmentProvider struct {
 	Enabled *bool `json:"enabled,omitempty"`
 }
 
-// PluginMeta is the metadata a plugin optionally declares in its Init response.
-// All fields are optional; plugins without Init (or an empty response)
-// contribute zero values and the host falls back to defaults (0 thumb_ratio →
-// 2:3 aspect ratio in the UI).
+// PluginMeta is the metadata a plugin declares in plugin.json, beside its entry
+// point. The host reads it at discovery — before any runtime is instantiated —
+// so the plugin list can show a display name and logo, and gated image CDNs can
+// get their Referer, without paying for a VM. All fields are optional; a plugin
+// that declares none contributes zero values and the host falls back to
+// defaults (0 thumb_ratio → 2:3 aspect ratio in the UI).
 type PluginMeta struct {
 	// VerifyURL is where the user must go to solve a challenge for this source.
 	VerifyURL string `json:"verify_url,omitempty"`
@@ -108,6 +110,13 @@ type PluginMeta struct {
 	//   - a data URI ("data:image/png;base64,...") — passed through as-is
 	//   - a bare filename ("logo.png") — resolved to /plugin-static/{id}/{file}
 	Logo string `json:"logo,omitempty"`
+	// Description is a short human-readable blurb about the plugin, shown on
+	// the plugin page.
+	Description string `json:"description,omitempty"`
+	// ContractVersion is the ABI version this plugin was written against.
+	// Checked at discovery, so a plugin built for another ABI is rejected
+	// without instantiating a runtime. Absent means ContractVersion (current).
+	ContractVersion int32 `json:"contract_version,omitempty"`
 }
 
 // HTTPRequest is the request payload a plugin passes to the host-imported

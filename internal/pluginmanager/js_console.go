@@ -15,9 +15,12 @@ import (
 // identical to Lua: the function receives a single JSON string argument and
 // must return a JSON string (or an object that goja will serialize).
 func callJS(p *loadedPlugin, fnName, inputJSON string) (string, error) {
-	jsName, ok := jsFnNames[fnName]
-	if !ok {
+	if _, ok := jsFnNames[fnName]; !ok {
 		return "", fmt.Errorf("js plugin %s: no js mapping for %s", p.id, fnName)
+	}
+	jsName, ok := resolveJSFn(p.id, p.js, fnName)
+	if !ok {
+		return "", fmt.Errorf("js plugin %s: %s is not a function", p.id, jsFnNames[fnName])
 	}
 	fn := p.js.Get(jsName)
 	if fn == nil || goja.IsUndefined(fn) {

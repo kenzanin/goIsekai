@@ -1,0 +1,8 @@
+{
+  "thumb_ratio": 0.703,
+  "name": "MangaTown",
+  "timeout": 60,
+  "site_url": "https://m.mangatown.com",
+  "logo": "logo.png",
+  "contract_version": 1
+}

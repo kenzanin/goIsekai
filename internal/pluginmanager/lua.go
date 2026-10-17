@@ -13,23 +13,83 @@ import (
 	"goisekai/pkg/types"
 )
 
-// luaFnNames maps host ABI function names to the snake_case globals a Lua
-// plugin defines (the Lua-facing ABI; design.md). One map drives both the
-// load-time verification and the call-time dispatch.
+// luaFnNames is the source-plugin ABI: the snake_case globals a plugin that
+// scrapes a site defines. The ABI is normalised — the Lua name is the host name
+// in snake_case — so Search is `search` and GetMangaDetail is
+// `get_manga_detail`. One map drives both the load-time verification and the
+// call-time dispatch.
 var luaFnNames = map[string]string{
-	types.SearchFunc:         "search_manga",
+	types.SearchFunc:         "search",
 	types.GetMangaDetailFunc: "get_manga_detail",
 	types.GetChapterListFunc: "get_chapter_list",
 	types.GetPageListFunc:    "get_page_list",
-	types.GetEnrichmentFunc:  "getEnrichment",
 	types.GetGenresFunc:      "get_genres",
+}
+
+// luaInfoFnNames is the enrichment-script ABI. An info script serves metadata
+// only — it never scrapes a site and is never offered as a manga source — so
+// its entry points are disjoint from a source plugin's. Keeping them in a
+// separate map is what lets a source plugin be verified without ever
+// mentioning enrichment.
+var luaInfoFnNames = map[string]string{
+	types.GetEnrichmentFunc: "get_enrichment",
+}
+
+// luaLegacyNames are the globals shipped before the ABI names were unified.
+// A plugin that defines one still loads and runs, with a deprecation warning,
+// so publishing the normalised ABI breaks nothing. Drop an entry once no
+// shipped plugin uses it.
+var luaLegacyNames = map[string]string{
+	types.SearchFunc:        "search_manga",
+	types.GetEnrichmentFunc: "getEnrichment",
+}
+
+// luaCanonicalName returns the current global name for a host ABI function,
+// looking in the source ABI and then the enrichment ABI.
+func luaCanonicalName(fnName string) (string, bool) {
+	if n, ok := luaFnNames[fnName]; ok {
+		return n, true
+	}
+	if n, ok := luaInfoFnNames[fnName]; ok {
+		return n, true
+	}
+	return "", false
+}
+
+// luaABINames lists the global names to try for a host ABI function, the
+// canonical name first and any legacy alias second.
+func luaABINames(fnName string) []string {
+	names := make([]string, 0, 2)
+	if n, ok := luaCanonicalName(fnName); ok {
+		names = append(names, n)
+	}
+	if n, ok := luaLegacyNames[fnName]; ok {
+		names = append(names, n)
+	}
+	return names
+}
+
+// resolveLuaFn returns the first name for fnName that is a function in state,
+// preferring the canonical name. Callers hold the per-plugin lock.
+func resolveLuaFn(id string, state *lua.State, fnName string) (string, bool) {
+	canonical, _ := luaCanonicalName(fnName)
+	for _, name := range luaABINames(fnName) {
+		fn, err := state.RawGlobal(name)
+		if err != nil || fn.Kind() != lua.FunctionKind {
+			continue
+		}
+		if name != canonical {
+			logger.Warn("plugin uses a legacy ABI name", "plugin", id, "fn", fnName, "legacy", name, "use", canonical)
+		}
+		return name, true
+	}
+	return "", false
 }
 
 // callLua invokes a Lua ABI function with a JSON string argument under timeout,
 // and returns the result as a JSON string.
 func callLua(p *loadedPlugin, fnName, inputJSON string) (string, error) {
-	luaName, ok := luaFnNames[fnName]
-	if !ok {
+	if _, ok := luaCanonicalName(fnName); !ok {
 		return "", fmt.Errorf("lua plugin %s: no lua mapping for %s", p.id, fnName)
 	}
 
@@ -39,13 +99,17 @@ func callLua(p *loadedPlugin, fnName, inputJSON string) (string, error) {
 
 	state := p.lunar
 
-	fnVal, err := state.RawGlobal(luaName)
-	if err != nil || fnVal.Kind() != lua.FunctionKind {
+	luaName, ok := resolveLuaFn(p.id, state, fnName)
+	if !ok {
 		return "", fmt.Errorf("lua plugin %s: %s is not a function", p.id, fnName)
 	}
+	fnVal, err := state.RawGlobal(luaName)
+	if err != nil {
+		return "", fmt.Errorf("lua plugin %s %s: read %s: %w", p.id, fnName, luaName, err)
+	}
 
-	// Set a wall-clock deadline on the State's context (PLUGIN.timeout may
-	// extend the default for round-trip-heavy calls).
+	// Set a wall-clock deadline on the State's context (a plugin's declared
+	// timeout may extend the default for round-trip-heavy calls).
 	budget := p.invokeDeadline()
 	start := time.Now()
 	logger.Debug("plugin invoke start", "plugin", p.id, "fn", fnName, "budget", budget.String())

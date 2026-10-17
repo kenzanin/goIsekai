@@ -16,8 +16,8 @@ import (
 //
 // Each symbol has signature: func(string) (string, error)
 // Expected exported symbols: Search, GetMangaDetail, GetChapterList, GetPageList
-// plus an exported `Meta` variable of type map[string]any (or a
-// ContractVersion int32 + PluginMeta types.PluginMeta struct).
+// (plus optional GetGenres). Metadata is read from plugin.json beside the
+// plugin, exactly like every other runtime.
 //
 // ponytail: the host binary builds with CGO_ENABLED=0, and Go's plugin
 // package requires cgo + matching toolchain at runtime. Loading fails with
@@ -41,29 +41,16 @@ func (m *Manager) loadGo(id, path string) (*loadedPlugin, error) {
 		return nil, fmt.Errorf("go plugin open: %w", err)
 	}
 
-	// Contract version must be an exported int32 variable named
-	// ContractVersion.
-	sym, err := h.Lookup("ContractVersion")
+	// Metadata lives in plugin.json beside the plugin, never in the .so: the
+	// host already read it at discovery, so a plugin never has to be opened
+	// just to be listed with its name and logo.
+	meta, err := pluginMetaFor(id, "go", filepath.Dir(path))
 	if err != nil {
-		return nil, fmt.Errorf("go plugin %s: exported var ContractVersion missing: %w", id, err)
+		return nil, err
 	}
-	verPtr, ok := sym.(*int32)
-	if !ok {
-		return nil, fmt.Errorf("go plugin %s: ContractVersion must be int32", id)
-	}
-	contractVer := *verPtr
-	if err := types.CheckVersion(contractVer); err != nil {
-		return nil, fmt.Errorf("go plugin %s: %w", id, err)
-	}
-
-	// Meta must be an exported types.PluginMeta variable named Meta.
-	metaSym, err := h.Lookup("Meta")
-	if err != nil {
-		return nil, fmt.Errorf("go plugin %s: exported var Meta missing: %w", id, err)
-	}
-	metaPtr, ok := metaSym.(*types.PluginMeta)
-	if !ok {
-		return nil, fmt.Errorf("go plugin %s: Meta must be types.PluginMeta", id)
+	contractVer := meta.ContractVersion
+	if contractVer == 0 {
+		contractVer = types.ContractVersion
 	}
 
 	// Verify every ABI symbol resolves to a func(string) (string, error).
@@ -90,7 +77,7 @@ func (m *Manager) loadGo(id, path string) (*loadedPlugin, error) {
 		kind:            "go",
 		loaded:          true,
 		contractVersion: contractVer,
-		meta:            *metaPtr,
+		meta:            meta,
 		goPlugin:        h,
 		goFns:           fns,
 	}, nil

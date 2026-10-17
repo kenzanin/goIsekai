@@ -93,8 +93,9 @@ func (m *Manager) discoverWasm() error {
 			}
 			lp := &loadedPlugin{id: id, wasmPath: path, kind: "wasm"}
 			if g.folder {
-				// Seed site_url before first load so gated image CDNs get a
-				// Referer without a plugin invoke (lazy plugins stay lazy).
+				// Seed metadata before first load so the plugin list and gated
+				// image CDNs get their Referer without a plugin invoke (lazy
+				// plugins stay lazy).
 				lp.meta = readPluginJSONMeta(filepath.Dir(path))
 			}
 			m.plugins[id] = lp

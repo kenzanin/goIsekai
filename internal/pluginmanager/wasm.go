@@ -121,6 +121,10 @@ func (m *Manager) loadWasm(id, path string) (*loadedPlugin, error) {
 	}
 
 	logger.Info("wasm plugin loaded", "id", id, "path", path)
+	meta, err := pluginMetaFor(id, "wasm", filepath.Dir(path))
+	if err != nil {
+		return nil, err
+	}
 	return &loadedPlugin{
 		id:              id,
 		wasmPath:        path,
@@ -129,7 +133,7 @@ func (m *Manager) loadWasm(id, path string) (*loadedPlugin, error) {
 		wasmMod:         mod,
 		wasmFns:         fns,
 		contractVersion: ver,
-		meta:            readPluginJSONMeta(filepath.Dir(path)),
+		meta:            meta,
 	}, nil
 }
 

@@ -1,0 +1,15 @@
+{
+  "name": "Test Info",
+  "site_url": "https://example.test",
+  "enrichment_providers": [
+    {
+      "id": "testsource",
+      "name": "Test Source",
+      "kinds": [
+        "titles",
+        "authors"
+      ]
+    }
+  ],
+  "contract_version": 1
+}

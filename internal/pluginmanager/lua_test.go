@@ -69,7 +69,7 @@ func TestLuaPluginDiscoveryAndSearch(t *testing.T) {
 		t.Fatalf("unexpected pages: %+v", pages)
 	}
 
-	// Meta from the PLUGIN table must survive into PluginMeta.
+	// Meta declared in testdata/luatest/plugin.json must reach PluginMeta.
 	p := mgr.plugins["luatest"]
 	if p.meta.VerifyURL != "https://example.com" || !p.meta.NeedsHumanVerify || p.meta.ThumbRatio != 0.7 {
 		t.Fatalf("unexpected meta: %+v", p.meta)

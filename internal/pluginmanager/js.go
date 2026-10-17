@@ -2,7 +2,6 @@ package pluginmanager
 
 import (
 	"fmt"
-	"github.com/goccy/go-json"
 	"os"
 	"path/filepath"
 	"strings"
@@ -14,18 +13,51 @@ import (
 )
 
 // jsFnNames maps host ABI function names to the JS global names a JS plugin
-// defines (camelCase). One map drives both the load-time verification and the
-// call-time dispatch.
+// defines. The ABI is normalised: the JS name is the host name in camelCase, so
+// Search is `search` and GetMangaDetail is `getMangaDetail`. One map drives both
+// the load-time verification and the call-time dispatch.
 var jsFnNames = map[string]string{
-	types.SearchFunc:         "searchManga",
+	types.SearchFunc:         "search",
 	types.GetMangaDetailFunc: "getMangaDetail",
 	types.GetChapterListFunc: "getChapterList",
 	types.GetPageListFunc:    "getPageList",
 	types.GetGenresFunc:      "getGenres",
 }
 
+// jsLegacyNames are the globals shipped before the ABI names were unified. A
+// plugin that defines one still loads and runs, with a deprecation warning, so
+// publishing the normalised ABI breaks nothing. Drop an entry once no shipped
+// plugin uses it.
+var jsLegacyNames = map[string]string{
+	types.SearchFunc: "searchManga",
+}
+
+// resolveJSFn returns the first name for fnName that is a function on the VM,
+// preferring the canonical name.
+func resolveJSFn(id string, vm *goja.Runtime, fnName string) (string, bool) {
+	candidates := []string{}
+	if n, ok := jsFnNames[fnName]; ok {
+		candidates = append(candidates, n)
+	}
+	if n, ok := jsLegacyNames[fnName]; ok {
+		candidates = append(candidates, n)
+	}
+	for _, name := range candidates {
+		val := vm.Get(name)
+		if val == nil || goja.IsUndefined(val) {
+			continue
+		}
+		if name != jsFnNames[fnName] {
+			logger.Warn("plugin uses a legacy ABI name", "plugin", id, "fn", fnName, "legacy", name, "use", jsFnNames[fnName])
+		}
+		return name, true
+	}
+	return "", false
+}
+
 // loadJS creates a sandboxed JavaScript VM via goja, loads <dir>/main.js,
-// reads the PLUGIN metadata, and returns a ready-to-call loadedPlugin.
+// verifies the ABI exports, and returns a ready-to-call loadedPlugin. Metadata
+// comes from plugin.json, not from the VM.
 func (m *Manager) loadJS(id, dir string) (*loadedPlugin, error) {
 	vm := goja.New()
 
@@ -124,40 +156,30 @@ func (m *Manager) loadJS(id, dir string) (*loadedPlugin, error) {
 		return nil, fmt.Errorf("js plugin %s: run main.js: %w", id, err)
 	}
 
-	// Read PLUGIN metadata.
-	var meta types.PluginMeta
-	pluginVal := vm.Get("PLUGIN")
-	contractVer := int32(1)
-	if pluginVal == nil || goja.IsUndefined(pluginVal) {
-		logger.Warn("plugin="+id, "msg", "no PLUGIN object; using zero metadata")
-	} else {
-		raw, err := json.Marshal(pluginVal.Export())
-		if err != nil {
-			return nil, fmt.Errorf("js plugin %s: marshal PLUGIN: %w", id, err)
-		}
-		if err := json.Unmarshal(raw, &meta); err != nil {
-			return nil, fmt.Errorf("js plugin %s: parse PLUGIN: %w", id, err)
-		}
-		if err := types.CheckVersion(contractVer); err != nil {
-			return nil, fmt.Errorf("js plugin %s: %w", id, err)
-		}
+	// Metadata lives in plugin.json beside the entry point, never in the VM:
+	// the host already read it at discovery, so a plugin never has to execute
+	// just to be listed with its name and logo.
+	meta, err := pluginMetaFor(id, "js", dir)
+	if err != nil {
+		return nil, err
+	}
+	contractVer := meta.ContractVersion
+	if contractVer == 0 {
+		contractVer = types.ContractVersion
 	}
 
-	// Verify that all required ABI functions exist. Enrichment is optional
-	// and reaches the host through GetEnrichment, which is not required.
-	for abi, jsName := range jsFnNames {
+	// Verify that all required ABI functions exist.
+	for abi := range jsFnNames {
 		// GetGenres is optional; every other mapped export is required.
 		if abi == types.GetGenresFunc {
 			continue
 		}
-		val := vm.Get(jsName)
-		if val == nil || goja.IsUndefined(val) {
-			return nil, fmt.Errorf("js plugin %s: missing function %s (abi: %s)", id, jsName, abi)
+		if _, ok := resolveJSFn(id, vm, abi); !ok {
+			return nil, fmt.Errorf("js plugin %s: missing function %s (abi: %s)", id, jsFnNames[abi], abi)
 		}
 	}
 
 	logger.Info("js plugin loaded", "id", id, "name", meta.Name)
-
 	return &loadedPlugin{
 		id: id,
 		// Folder, not entry file — see the loadLua comment on wasmPath.

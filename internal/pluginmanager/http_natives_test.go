@@ -145,7 +145,7 @@ func TestJSInvokeDeadlineCancelsBlockingFetch(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	pluginCode := `var PLUGIN = { contract_version: 1, name: "JS deadline test", timeout: 1 };
+	pluginCode := `var PLUGIN = { contract_version: 1, name: "JS deadline test" };
 
 function getMangaDetail(a) {
 	var resp = host.http.get("` + srv.URL + `/hang");
@@ -156,6 +156,12 @@ function getChapterList(a) { return "[]"; }
 function getPageList(a) { return "[]"; }`
 
 	if err := os.WriteFile(filepath.Join(dir, "jshost", "main.js"), []byte(pluginCode), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	// The 1 s invoke deadline this test pins is declared in plugin.json: a
+	// plugin's metadata never comes from its own runtime.
+	if err := os.WriteFile(filepath.Join(dir, "jshost", "plugin.json"),
+		[]byte(`{"contract_version":1,"timeout":1}`), 0o644); err != nil {
 		t.Fatal(err)
 	}
 

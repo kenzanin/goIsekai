@@ -59,7 +59,7 @@ func TestJSPluginDiscoveryAndSearch(t *testing.T) {
 		t.Fatalf("unexpected pages: %+v", pages)
 	}
 
-	// Meta from the PLUGIN object must survive into PluginMeta.
+	// Meta declared in testdata/jstest/plugin.json must reach PluginMeta.
 	p := mgr.plugins["jstest"]
 	if p.meta.VerifyURL != "https://example.com" || !p.meta.NeedsHumanVerify || p.meta.ThumbRatio != 0.7 {
 		t.Fatalf("unexpected meta: %+v", p.meta)

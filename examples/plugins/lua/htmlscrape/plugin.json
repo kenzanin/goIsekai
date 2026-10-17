@@ -1,0 +1,7 @@
+{
+  "verify_url": "https://example.invalid",
+  "thumb_ratio": 0.667,
+  "name": "HTML Scrape Demo",
+  "site_url": "https://example.invalid",
+  "contract_version": 1
+}

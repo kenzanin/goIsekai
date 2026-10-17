@@ -5,7 +5,6 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
-	"strings"
 )
 
 // trackKnownHosts extracts hosts from plugin metadata and writes them to known_hosts.json.
@@ -17,7 +16,7 @@ func (m *Manager) TrackKnownHosts() {
 	hosts := make(map[string]bool)
 
 	// Scan plugin directories for site_url in metadata
-	// Lua/JS plugins: try to read plugin.json
+	// Lua/JS/WASM/yaegi plugins: read plugin.json for the declared site_url.
 	luaMatches, _ := filepath.Glob(filepath.Join(m.pluginsDir, "*", "plugin.json"))
 	for _, path := range luaMatches {
 		data, err := os.ReadFile(path)
@@ -29,21 +28,6 @@ func (m *Manager) TrackKnownHosts() {
 		}
 		if err := json.Unmarshal(data, &meta); err == nil && meta.SiteURL != "" {
 			if u, err := url.Parse(meta.SiteURL); err == nil && u.Host != "" {
-				hosts[u.Host] = true
-			}
-		}
-	}
-
-	// JS plugins: parse main.js for PLUGIN object
-	jsMatches, _ := filepath.Glob(filepath.Join(m.pluginsDir, "*", "main.js"))
-	for _, path := range jsMatches {
-		data, err := os.ReadFile(path)
-		if err != nil {
-			continue
-		}
-		// Extract site_url from PLUGIN JSON
-		if strings.Contains(string(data), "site_url") {
-			if u, err := url.Parse(string(data)); err == nil && u.Host != "" {
 				hosts[u.Host] = true
 			}
 		}

@@ -1,0 +1,19 @@
+{
+  "enrichment_providers": [
+    {
+      "id": "mangaupdates",
+      "name": "MangaUpdates",
+      "kinds": [
+        "titles",
+        "summaries",
+        "categories",
+        "authors",
+        "related",
+        "covers"
+      ]
+    }
+  ],
+  "name": "MangaUpdates Info",
+  "site_url": "https://www.mangaupdates.com",
+  "contract_version": 1
+}

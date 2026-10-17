@@ -3,16 +3,14 @@ package pluginmanager
 import (
 	"bytes"
 	"fmt"
-	"github.com/goccy/go-json"
 	"path/filepath"
-
-	lua "github.com/mmcdole/lunar"
 
 	"goisekai/pkg/types"
 )
 
-// loadLua creates a sandboxed Lunar 5.4 VM, loads <dir>/main.lua, reads the
-// PLUGIN metadata table, and returns a ready-to-call loadedPlugin.
+// loadLua creates a sandboxed Lunar 5.4 VM, loads <dir>/main.lua, verifies the
+// source ABI globals, and returns a ready-to-call loadedPlugin. Metadata comes
+// from plugin.json, not from the VM.
 func (m *Manager) loadLua(id, dir string) (*loadedPlugin, error) {
 	state, err := createLuaState(id)
 	if err != nil {
@@ -45,56 +43,31 @@ func (m *Manager) loadLua(id, dir string) (*loadedPlugin, error) {
 		return nil, fmt.Errorf("lua exec %s: %w", mainPath, err)
 	}
 
-	// Read the PLUGIN metadata table.
-	pluginVal, err := state.RawGlobal("PLUGIN")
-	if err != nil || pluginVal.IsNil() || pluginVal.Kind() != lua.TableKind {
-		_ = state.Close()
-		return nil, fmt.Errorf("lua plugin %s: PLUGIN global is not a table", id)
-	}
-	pluginTbl, _ := pluginVal.AsTable()
-
-	metaJSON, err := lunarTableToJSON(state, pluginTbl)
+	// Metadata lives in plugin.json beside the entry point, never in the VM:
+	// the host already read it at discovery, so a plugin never has to execute
+	// just to be listed with its name and logo.
+	meta, err := pluginMetaFor(id, "lua", dir)
 	if err != nil {
 		_ = state.Close()
-		return nil, fmt.Errorf("lua plugin %s: encode PLUGIN: %w", id, err)
+		return nil, err
 	}
-	var meta types.PluginMeta
-	if err := json.Unmarshal(metaJSON, &meta); err != nil {
-		_ = state.Close()
-		return nil, fmt.Errorf("lua plugin %s: decode PLUGIN metadata: %w", id, err)
-	}
-
-	// Resolve contract_version from the PLUGIN table.
-	verVal := pluginTbl.RawGetString("contract_version")
-	if verVal.IsNil() {
-		_ = state.Close()
-		return nil, fmt.Errorf("lua plugin %s: PLUGIN.contract_version missing", id)
-	}
-	verNum, ok := verVal.AsNumber()
-	if !ok {
-		_ = state.Close()
-		return nil, fmt.Errorf("lua plugin %s: PLUGIN.contract_version not a number", id)
-	}
-	contractVer := int32(verNum)
-	if err := types.CheckVersion(contractVer); err != nil {
-		_ = state.Close()
-		return nil, fmt.Errorf("lua plugin %s: %w", id, err)
+	contractVer := meta.ContractVersion
+	if contractVer == 0 {
+		contractVer = types.ContractVersion
 	}
 
 	// Verify the source ABI globals are functions (snake_case Lua names).
-	// An enrichment script serves metadata only, so it has none of
-	// Search/GetMangaDetail/GetChapterList/GetPageList to verify — just
-	// getEnrichment, which is optional everywhere.
+	// luaFnNames holds the source ABI only, so an enrichment script's
+	// get_enrichment is never required of a source plugin.
 	if !isInfoPlugin(id) {
-		for abi, name := range luaFnNames {
-			// GetEnrichment and GetGenres are optional; the rest are required.
-			if abi == types.GetEnrichmentFunc || abi == types.GetGenresFunc {
+		for abi := range luaFnNames {
+			// GetGenres is the one optional export among them.
+			if abi == types.GetGenresFunc {
 				continue
 			}
-			fn, err := state.RawGlobal(name)
-			if err != nil || fn.Kind() != lua.FunctionKind {
+			if _, ok := resolveLuaFn(id, state, abi); !ok {
 				_ = state.Close()
-				return nil, fmt.Errorf("lua plugin %s: global %q is not a function", id, name)
+				return nil, fmt.Errorf("lua plugin %s: global %q is not a function", id, luaFnNames[abi])
 			}
 		}
 	}

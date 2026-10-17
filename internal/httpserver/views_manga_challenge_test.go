@@ -60,9 +60,7 @@ func writeChallengePlugin(t *testing.T, fetchURL string) string {
 	if err := os.MkdirAll(filepath.Join(dir, "blocked"), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	src := `PLUGIN = { contract_version = 1, name = "Blocked", needs_human_verify = true, verify_url = "https://example.com/verify" }
-
-function search_manga(a) return "[]" end
+	src := `function search_manga(a) return "[]" end
 
 function get_manga_detail(a)
   local resp = host.http.get("` + fetchURL + `/manga")
@@ -76,6 +74,12 @@ function get_chapter_list(a) return "[]" end
 function get_page_list(a) return "[]" end
 `
 	if err := os.WriteFile(filepath.Join(dir, "blocked", "main.lua"), []byte(src), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	// The metadata the challenge UI reads — verify_url and needs_human_verify —
+	// is declared in plugin.json, never inside the plugin's own runtime.
+	meta := `{"contract_version":1,"name":"Blocked","needs_human_verify":true,"verify_url":"https://example.com/verify"}`
+	if err := os.WriteFile(filepath.Join(dir, "blocked", "plugin.json"), []byte(meta), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	return dir

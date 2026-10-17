@@ -21,12 +21,6 @@ import (
 	"hostnet"
 )
 
-// Init returns the PluginMeta JSON (optional export). contract_version is
-// assumed 1 by the host, exactly like the JS runtime.
-func Init() string {
-	return `{"name":"Yaegi Demo","site_url":"https://github.com/traefik/yaegi","logo":"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ctext y='28' font-size='28'%3E🧪%3C/text%3E%3C/svg%3E","verify_url":"https://example.com","needs_human_verify":false,"thumb_ratio":0.703}`
-}
-
 // hasPrefix is a tiny local helper — the strings package is not importable.
 func hasPrefix(s, prefix string) bool {
 	return len(s) >= len(prefix) && s[:len(prefix)] == prefix

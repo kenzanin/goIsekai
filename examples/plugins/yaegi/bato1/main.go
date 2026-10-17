@@ -29,15 +29,6 @@ import (
 
 const base = "https://bato1.com"
 
-// Init returns the PluginMeta JSON (optional export).
-func Init() string {
-	// The site logo is a 512x100 wordmark, which would be squashed into the UI's
-	// square slot, so the icon is an inline SVG tile instead.
-	return `{"name":"Bato1","site_url":"https://bato1.com",` +
-		`"logo":"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%232b2f3a'/%3E%3Ctext x='16' y='24' font-family='sans-serif' font-size='20' font-weight='bold' text-anchor='middle' fill='%23ffffff'%3EB%3C/text%3E%3C/svg%3E",` +
-		`"thumb_ratio":0.703}`
-}
-
 // unquote strips the surrounding JSON quotes from a plain-string argument.
 // Manga and chapter ids are site slugs, so no escape handling is needed.
 func unquote(s string) string {

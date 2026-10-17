@@ -15,7 +15,7 @@ type LoadedPlugin struct {
 	Version          string // ABI contract version (e.g. "1")
 	Loaded           bool   // true when the runtime is instantiated
 	WasmPath         string // path to the plugin directory or entry file
-	VerifyURL        string // from the plugin's optional Init metadata
+	VerifyURL        string // from the plugin's declared metadata
 	NeedsHumanVerify bool
 	ThumbRatio       float64
 	NeedsJS          bool

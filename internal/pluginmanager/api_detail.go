@@ -113,39 +113,3 @@ func (m *Manager) GetPageList(pluginID, chapterID string) ([]types.Page, error) 
 	}
 	return result, nil
 }
-
-// GetMangaDetailWithChapters runs a plugins GetMangaDetailWithChapters batch function
-// if available (fallback to separate GetMangaDetail + GetChapterList calls).
-func (m *Manager) GetMangaDetailWithChapters(pluginID, mangaID string) (types.Manga, []types.Chapter, error) {
-	p, err := m.get(pluginID)
-	if err != nil {
-		return types.Manga{}, nil, err
-	}
-
-	// Try batch function first.
-	in, err := json.Marshal(mangaID)
-	if err != nil {
-		return types.Manga{}, nil, err
-	}
-	out, err := m.call(p, types.GetMangaDetailWithChaptersFunc, string(in))
-	if err == nil {
-		// Parse the batch response: {"manga": Manga, "chapters": [Chapter]}
-		var batchResp struct {
-			Manga    types.Manga     `json:"manga"`
-			Chapters []types.Chapter `json:"chapters"`
-		}
-		if err := json.Unmarshal([]byte(out), &batchResp); err == nil {
-			return batchResp.Manga, batchResp.Chapters, nil
-		}
-	}
-	// Fallback to separate calls.
-	manga, err := m.GetMangaDetail(pluginID, mangaID)
-	if err != nil {
-		return types.Manga{}, nil, err
-	}
-	chapters, err := m.GetChapterList(pluginID, mangaID)
-	if err != nil {
-		return types.Manga{}, nil, err
-	}
-	return manga, chapters, nil
-}

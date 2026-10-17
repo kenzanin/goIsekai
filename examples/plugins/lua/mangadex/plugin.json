@@ -1,0 +1,8 @@
+{
+  "verify_url": "https://mangadex.org",
+  "thumb_ratio": 0.703,
+  "name": "MangaDex",
+  "site_url": "https://mangadex.org",
+  "logo": "logo.png",
+  "contract_version": 1
+}
