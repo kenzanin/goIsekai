@@ -2,15 +2,7 @@ package bridge
 
 import (
 	"testing"
-
-	"goisekai/internal/database"
 )
-
-func TestNormalizeTitleExport(t *testing.T) {
-	if got := database.NormalizeTitle("  Solo   Leveling!! "); got != "solo leveling" {
-		t.Fatalf("NormalizeTitle = %q, want %q", got, "solo leveling")
-	}
-}
 
 func TestAutoSelectCandidate(t *testing.T) {
 	cands := []MigrationCandidate{

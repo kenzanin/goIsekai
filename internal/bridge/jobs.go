@@ -5,6 +5,7 @@ import (
 	"errors"
 	"time"
 
+	"goisekai/internal/hostnet"
 	"goisekai/internal/workers"
 	"goisekai/pkg/types"
 )
@@ -27,6 +28,21 @@ const interactiveExecTimeout = 30 * time.Second
 // context.DeadlineExceeded, which callers map to their cache fallback.
 const interactiveAwaitTimeout = interactiveEnqueueTimeout + interactiveExecTimeout + 5*time.Second
 
+// permanentIfFinal marks an error that retrying cannot fix, so the lane's retry
+// loop stops instead of re-running the job to MaxAttempts. Only the anti-bot
+// challenge qualifies today: it needs a human to open VerifyURL, so re-invoking
+// the plugin reproduces it exactly and just hammers the site. Everything else
+// stays retryable, which is why this is the one producer of workers.Permanent.
+func permanentIfFinal(err error) error {
+	if err == nil {
+		return nil
+	}
+	if _, ok := errors.AsType[*hostnet.ChallengeError](err); ok {
+		return workers.Permanent(err)
+	}
+	return err
+}
+
 // EnqueueExportCBZ queues a CBZ export on the image lane. Returns a job ID for
 // tracking; the finished path is announced via the job status callback so the
 // WS/toast surface can point the user at the file.
@@ -40,7 +56,7 @@ func (s *AppService) EnqueueExportCBZ(ctx context.Context, pluginID, mangaID, ch
 		if exportErr == nil {
 			s.pool.SetDetail(job.ID, path)
 		}
-		return exportErr
+		return permanentIfFinal(exportErr)
 	}
 	fut, err := s.pool.Enqueue(ctx, job)
 	if err != nil {
@@ -58,7 +74,9 @@ func (s *AppService) runOnFetch(ctx context.Context, pluginKey string, fn func(c
 	fut, err := s.pool.Enqueue(ctx, &workers.Job{
 		Lane:      workers.LaneFetch,
 		PluginKey: pluginKey,
-		Run:       fn,
+		Run: func(ctx context.Context) error {
+			return permanentIfFinal(fn(ctx))
+		},
 	})
 	if err != nil {
 		return err

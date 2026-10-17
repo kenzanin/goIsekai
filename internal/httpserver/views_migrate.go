@@ -8,11 +8,8 @@ import (
 	"strings"
 
 	"net/http"
-	"sync"
 
-	"goisekai/internal/database"
 	"goisekai/internal/logger"
-	"goisekai/internal/pluginutil"
 	"goisekai/internal/workers"
 	"goisekai/pkg/types"
 )
@@ -110,51 +107,29 @@ func (s *Server) viewMigrate(w http.ResponseWriter, r *http.Request) {
 	var failures []string
 	var searchErr error
 
-	normalizedQ := pluginutil.NormalizeTitle(q)
-
 	if q != "" {
-		// Search every target in parallel via worker pool; no query yet shows empty rather than
-		// hammering servers.
-		var mu sync.Mutex
-		futures := make(map[string]*workers.Future)
-		for _, id := range targets {
-			fut, err := s.service.EnqueueSearchManga(context.Background(), id, types.SearchFilter{Query: q, Page: 1}, func(ctx context.Context, results []types.Manga, err error) {
-				if err != nil {
-					logger.Warn("migrate search failed", "plugin", id, "error", err)
-					mu.Lock()
-					failures = append(failures, id)
-					mu.Unlock()
-					return
-				}
-				if len(results) == 0 {
-					return
-				}
-				name := pluginName(plugins, id)
-				var local []cand
-				for _, r := range results {
-					local = append(local, cand{PluginID: id, PluginName: name, SourceMangaID: r.ID, Title: r.Title, CoverURL: r.CoverURL, IsExactMatch: pluginutil.NormalizeTitle(r.Title) == normalizedQ, ChapterCount: -1})
-				}
-				mu.Lock()
-				cands = append(cands, local...)
-				mu.Unlock()
-			})
-			if err != nil {
-				logger.Warn("migrate search enqueue failed", "plugin", id, "error", err)
-				mu.Lock()
-				failures = append(failures, id)
-				mu.Unlock()
-				continue
-			}
-			futures[id] = fut
+		// The fan-out lives in the bridge: it owns the parallel search over the
+		// fetch lane and the alt-title match keys, so the picker recognises a
+		// source that publishes the series under a different name. An empty query
+		// searches nothing rather than hammering every source.
+		found, failed, err := s.service.CollectMigrationCandidates(pluginID, mangaID, targets, q)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadGateway)
+			return
 		}
-		// Wait for all searches to complete
-		for id, fut := range futures {
-			if err := fut.Await(context.Background()); err != nil {
-				logger.Warn("migrate search future await failed", "plugin", id, "error", err)
-				mu.Lock()
-				failures = append(failures, id)
-				mu.Unlock()
-			}
+		failures = failed
+		for _, c := range found {
+			cands = append(cands, cand{
+				PluginID:      c.PluginID,
+				PluginName:    c.PluginName,
+				SourceMangaID: c.SourceMangaID,
+				Title:         c.Title,
+				CoverURL:      c.CoverURL,
+				IsExactMatch:  c.IsExactMatch,
+				// A search result carries no chapter count; it is asked for per
+				// card below, so a source that cannot be reached stays -1.
+				ChapterCount: -1,
+			})
 		}
 		if len(cands) == 0 && len(failures) > 0 && len(failures) == len(targets) {
 			// Every target failed: distinct from a genuine no-results.
@@ -228,18 +203,6 @@ func (s *Server) viewMigrate(w http.ResponseWriter, r *http.Request) {
 	}
 
 	s.renderPage(w, r, "views/migrate", "", data)
-}
-
-func pluginName(plugins []database.Plugin, id string) string {
-	for _, p := range plugins {
-		if p.ID == id {
-			if p.Name != "" {
-				return p.Name
-			}
-			return p.ID
-		}
-	}
-	return id
 }
 
 var errAllSourcesFailed = errString("sources could not be reached")

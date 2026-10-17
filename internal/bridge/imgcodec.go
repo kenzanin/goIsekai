@@ -44,10 +44,6 @@ func (f ImageFormat) extension() string {
 	}
 }
 
-// FormatExtension is the exported form used by cache readers that live
-// outside the codec path.
-func (f ImageFormat) FormatExtension() string { return f.extension() }
-
 // ImageContentType returns the MIME type for cached image bytes. It is
 // http.DetectContentType plus the formats Go's sniffing table does not know:
 // both JPEG XL signatures and AVIF's ftyp box fall through to

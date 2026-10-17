@@ -19,33 +19,90 @@ type MigrationCandidate struct {
 	PluginName    string
 	SourceMangaID string
 	Title         string
+	CoverURL      string
 	IsExactMatch  bool
 }
 
-// CollectMigrationCandidates searches every active source (except the entry's own)
-// for the entry's display title. Every returned result is a candidate; an empty
-// result set with nil error is not a failure. A per-plugin error skips that
-// source; only when every searched source fails does the method return an
-// error (sources unreachable, distinct from "no candidates").
-func (s *AppService) CollectMigrationCandidates(pluginID, mangaID string) ([]MigrationCandidate, []string, error) {
-	// title resolution happens below
-	// Resolve display title: prefer DB title, fall back to cached manga title.
-	displayTitle := ""
-	if m, err := s.db.GetMangaCached(pluginID, mangaID); err == nil && m.Title != "" {
-		displayTitle = m.Title
+// CollectMigrationCandidates searches each target source for query and returns
+// every result as a candidate. An empty result set with a nil error is not a
+// failure; a per-plugin error goes into failures and skips that source.
+//
+// An empty query searches nothing — the migration picker shows an empty page
+// rather than hammering every source on a page the user has not searched yet.
+//
+// A candidate counts as an exact match when its title equals the query or any of
+// the entry's alternative titles, so a source that publishes the series under a
+// different name is still recognised as the same work.
+func (s *AppService) CollectMigrationCandidates(pluginID, mangaID string, targets []string, query string) ([]MigrationCandidate, []string, error) {
+	if strings.TrimSpace(query) == "" {
+		return nil, nil, nil
 	}
-	if displayTitle == "" {
-		// Try live detail as last resort for title.
-		if s.mgr != nil {
-			if live, lerr := s.mgr.GetMangaDetail(pluginID, mangaID); lerr == nil && live.Title != "" {
-				displayTitle = live.Title
+	if s.mgr == nil {
+		return nil, nil, fmt.Errorf("migration: plugin manager not available")
+	}
+	keys := matchKeys(query, s.altTitlesFor(pluginID, mangaID))
+
+	names := make(map[string]string)
+	for _, p := range s.mgr.LoadedPlugins() {
+		if p.Name != "" {
+			names[p.ID] = p.Name
+			continue
+		}
+		names[p.ID] = p.ID
+	}
+
+	var mu sync.Mutex
+	var candidates []MigrationCandidate
+	var failures []string
+	futures := make(map[string]*workers.Future)
+	for _, id := range targets {
+		// Each source's search rides the fetch lane under its own PluginKey, so
+		// one slow source serializes only its own lookups while the other
+		// sources keep going.
+		fut, err := s.EnqueueSearchManga(context.Background(), id, types.SearchFilter{Query: query, Page: 1}, func(_ context.Context, results []types.Manga, err error) {
+			if err != nil {
+				logger.Warn("migration candidate search failed", "plugin", id, "error", err)
+				mu.Lock()
+				failures = append(failures, id)
+				mu.Unlock()
+				return
 			}
+			if len(results) == 0 {
+				return
+			}
+			local := make([]MigrationCandidate, 0, len(results))
+			for _, r := range results {
+				local = append(local, MigrationCandidate{
+					PluginID:      id,
+					PluginName:    names[id],
+					SourceMangaID: r.ID,
+					Title:         r.Title,
+					CoverURL:      r.CoverURL,
+					IsExactMatch:  isExactMatch(r.Title, keys),
+				})
+			}
+			mu.Lock()
+			candidates = append(candidates, local...)
+			mu.Unlock()
+		})
+		if err != nil {
+			logger.Warn("migration candidate search enqueue failed", "plugin", id, "error", err)
+			mu.Lock()
+			failures = append(failures, id)
+			mu.Unlock()
+			continue
+		}
+		futures[id] = fut
+	}
+	for id, fut := range futures {
+		if err := fut.Await(context.Background()); err != nil {
+			logger.Warn("migration candidate search future await failed", "plugin", id, "error", err)
+			mu.Lock()
+			failures = append(failures, id)
+			mu.Unlock()
 		}
 	}
-	if strings.TrimSpace(displayTitle) == "" {
-		return nil, nil, fmt.Errorf("migration: cannot determine title for %s/%s", pluginID, mangaID)
-	}
-	return s.collectCandidatesWithTitle(pluginID, displayTitle, s.altTitlesFor(pluginID, mangaID))
+	return candidates, failures, nil
 }
 
 // altTitlesFor returns the entry's alternative titles. They come from the
@@ -96,86 +153,6 @@ func isExactMatch(candidateTitle string, keys map[string]struct{}) bool {
 	}
 	_, ok := keys[k]
 	return ok
-}
-
-// collectCandidatesWithTitle searches every source for the entry's title. A
-// candidate is an exact match when its title equals the entry's display title or
-// any of its alternative titles, so a source that publishes the series under a
-// different name is still recognised as the same work.
-func (s *AppService) collectCandidatesWithTitle(currentPluginID, title string, altTitles []string) ([]MigrationCandidate, []string, error) {
-	keys := matchKeys(title, altTitles)
-	var candidates []MigrationCandidate
-	var failures []string
-	searched := 0
-	if s.mgr == nil {
-		return nil, nil, fmt.Errorf("migration: plugin manager not available")
-	}
-	// Active map from DB (is_active only written on insert, DB is source of truth).
-	activeMap := make(map[string]bool)
-	if dbPlugins, err := s.db.ListPlugins(); err == nil {
-		for _, dp := range dbPlugins {
-			activeMap[dp.ID] = dp.IsActive
-		}
-	}
-	var mu sync.Mutex
-	futures := make(map[string]*workers.Future)
-	for _, p := range s.mgr.LoadedPlugins() {
-		if p.ID == currentPluginID {
-			continue
-		}
-		if active, ok := activeMap[p.ID]; ok && !active {
-			continue
-		}
-		searched++
-		// task 3.1: each source's search rides the fetch lane under its own
-		// PluginKey, so one slow source serializes only its own lookups while
-		// the other sources keep going.
-		fut, err := s.EnqueueSearchManga(context.Background(), p.ID, types.SearchFilter{Query: title}, func(_ context.Context, results []types.Manga, err error) {
-			if err != nil {
-				logger.Warn("migration candidate search failed", "plugin", p.ID, "error", err)
-				mu.Lock()
-				failures = append(failures, p.ID)
-				mu.Unlock()
-				return
-			}
-			if len(results) == 0 {
-				return
-			}
-			local := make([]MigrationCandidate, 0, len(results))
-			for _, r := range results {
-				local = append(local, MigrationCandidate{
-					PluginID:      p.ID,
-					PluginName:    p.Name,
-					SourceMangaID: r.ID,
-					Title:         r.Title,
-					IsExactMatch:  isExactMatch(r.Title, keys),
-				})
-			}
-			mu.Lock()
-			candidates = append(candidates, local...)
-			mu.Unlock()
-		})
-		if err != nil {
-			logger.Warn("migration candidate search enqueue failed", "plugin", p.ID, "error", err)
-			mu.Lock()
-			failures = append(failures, p.ID)
-			mu.Unlock()
-			continue
-		}
-		futures[p.ID] = fut
-	}
-	for id, fut := range futures {
-		if err := fut.Await(context.Background()); err != nil {
-			logger.Warn("migration candidate search future await failed", "plugin", id, "error", err)
-			mu.Lock()
-			failures = append(failures, id)
-			mu.Unlock()
-		}
-	}
-	if searched > 0 && len(candidates) == 0 && len(failures) == searched {
-		return nil, failures, fmt.Errorf("migration: sources could not be reached")
-	}
-	return candidates, failures, nil
 }
 
 // AutoSelectCandidate returns the single exact match when there is exactly one,
