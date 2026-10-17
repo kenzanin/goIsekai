@@ -62,8 +62,23 @@ func (s *AppService) cachedMangaFallback(pluginID, mangaID string, mangaIntID in
 	if dbDesc, custom, err := s.db.MangaDescriptionIfCustom(pluginID, mangaID); err == nil && custom {
 		manga.Description = dbDesc
 	}
-	if genres, has, err := s.GetMangaGenres(pluginID, mangaID); err == nil && has && len(genres) > 0 {
+	// Plugin genres have no per-manga column of their own: the enrichment
+	// categories are their persisted mirror (the same source displayedGenres
+	// falls back to). They stand in for RawGenres on this path — without them
+	// the detail page rendered no genre tags at all and the enrichment panel
+	// could not mark any chip as active, so every chip toggled the wrong way.
+	cats, _ := s.db.ListCategories(fmt.Sprint(mangaIntID))
+	names := make([]string, 0, len(cats))
+	for _, c := range cats {
+		if c.Category != "" {
+			names = append(names, c.Category)
+		}
+	}
+	manga.RawGenres = names
+	if genres, has, err := s.db.GetMangaGenres(mangaIntID); err == nil && has && len(genres) > 0 {
 		manga.Genres = genres
+	} else {
+		manga.Genres = names
 	}
 	if dim, has, _ := s.db.GetMangaCoverDim(mangaIntID); has && dim == 1 {
 		manga.CoverDim = dim

@@ -39,7 +39,8 @@ func readFlag(read bool) int64 {
 }
 
 // SetChaptersRead marks (read=true) or unmarks (read=false) the given source
-// chapters of a manga, leaving per-chapter page progress untouched.
+// chapters of a manga. Marking read leaves page progress alone; unmarking also
+// drops the page mark of any fully-read row, see clearFullyReadPages.
 func (d *DB) SetChaptersRead(mangaIntID int64, sourceIDs []string, read bool) error {
 	if len(sourceIDs) == 0 {
 		return nil
@@ -48,11 +49,38 @@ func (d *DB) SetChaptersRead(mangaIntID int64, sourceIDs []string, read bool) er
 	for _, id := range sourceIDs {
 		ids = append(ids, String(id))
 	}
+	where := Chapters.MangaID.EQ(Int(mangaIntID)).AND(Chapters.SourceChapterID.IN(ids...))
+	if !read {
+		if err := d.clearFullyReadPages(where); err != nil {
+			return err
+		}
+	}
 	_, err := Chapters.UPDATE().
 		SET(Chapters.IsRead.SET(Int(readFlag(read)))).
-		WHERE(Chapters.MangaID.EQ(Int(mangaIntID)).AND(Chapters.SourceChapterID.IN(ids...))).
+		WHERE(where).
 		Exec(d.db)
 	return err
+}
+
+// clearFullyReadPages drops the page mark on the rows in where that are done by
+// page count rather than by is_read. The detail page renders the derived
+// ChapterProgress.Done (is_read OR fully read), so un-reading a chapter read to
+// the end has to clear last_page_read as well — otherwise the row keeps its
+// strikethrough and the bulk "unread" actions look like they did nothing. A
+// partially-read chapter keeps its bookmark, since only is_read can make it
+// done. Mirrors the same rule as ToggleChapterRead.
+func (d *DB) clearFullyReadPages(where BoolExpression) error {
+	_, err := Chapters.UPDATE().
+		SET(Chapters.LastPageRead.SET(Int(0))).
+		WHERE(where.AND(fullyReadPages())).
+		Exec(d.db)
+	return err
+}
+
+// fullyReadPages matches chapters whose "done" state comes from the page count:
+// a page total is known and the reader reached it.
+func fullyReadPages() BoolExpression {
+	return Chapters.TotalPages.GT(Int(0)).AND(Chapters.LastPageRead.GT_EQ(Chapters.TotalPages))
 }
 
 // SetChaptersUpTo marks (or unmarks) every chapter of a manga whose chapter_num
@@ -105,19 +133,32 @@ func (d *DB) setChaptersToBound(mangaIntID int64, sourceIDs []string, read, down
 	if down {
 		range_ = Chapters.ChapterNum.GT_EQ(Float(bound))
 	}
+	where := Chapters.MangaID.EQ(Int(mangaIntID)).AND(range_)
+	if !read {
+		if err := d.clearFullyReadPages(where); err != nil {
+			return err
+		}
+	}
 	_, err = Chapters.UPDATE().
 		SET(Chapters.IsRead.SET(Int(readFlag(read)))).
-		WHERE(Chapters.MangaID.EQ(Int(mangaIntID)).AND(range_)).
+		WHERE(where).
 		Exec(d.db)
 	return err
 }
 
 // SetMangaChaptersRead marks (or unmarks) every chapter of a manga, leaving
-// per-chapter page progress untouched.
+// per-chapter page progress untouched when marking read. Unmarking also drops
+// the page mark of fully-read rows, see clearFullyReadPages.
 func (d *DB) SetMangaChaptersRead(mangaIntID int64, read bool) error {
+	where := Chapters.MangaID.EQ(Int(mangaIntID))
+	if !read {
+		if err := d.clearFullyReadPages(where); err != nil {
+			return err
+		}
+	}
 	_, err := Chapters.UPDATE().
 		SET(Chapters.IsRead.SET(Int(readFlag(read)))).
-		WHERE(Chapters.MangaID.EQ(Int(mangaIntID))).
+		WHERE(where).
 		Exec(d.db)
 	return err
 }

@@ -40,9 +40,19 @@ func (d *DB) MarkChapterRead(chapterRowID int64) error {
 	return err
 }
 
-// ToggleChapterRead toggles the is_read flag for a single chapter.
+// ToggleChapterRead flips a single chapter's read state. The detail page renders
+// the derived "done" flag (is_read OR fully read), so flipping only is_read left
+// a fully-read chapter stuck on "done" and the button could not turn it off
+// again. Clear the page mark too whenever the row is done — that is what makes a
+// second click reset it. A partially-read chapter keeps its position, since only
+// is_read can make it done.
 func (d *DB) ToggleChapterRead(chapterRowID int64) error {
-	_, err := d.db.Exec(`UPDATE chapters SET is_read = 1 - is_read WHERE id = ?`, chapterRowID)
+	const fullyRead = `total_pages > 0 AND last_page_read >= total_pages`
+	_, err := d.db.Exec(`
+		UPDATE chapters SET
+		    is_read = CASE WHEN is_read = 1 OR `+fullyRead+` THEN 0 ELSE 1 END,
+		    last_page_read = CASE WHEN `+fullyRead+` THEN 0 ELSE last_page_read END
+		WHERE id = ?`, chapterRowID)
 	return err
 }
 

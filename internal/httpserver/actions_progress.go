@@ -114,8 +114,11 @@ func (s *Server) handleChapterActions(w http.ResponseWriter, r *http.Request) {
 	var err error
 	switch action {
 	case "mark-selected-read", "mark-selected-unread":
-		// Note these write is_read only; they leave last_page_read alone, so a
-		// chapter read to the end stays "done" even after being marked unread.
+		// Marking read writes is_read only, leaving the page bookmark alone.
+		// Unmarking also clears the page mark of a fully-read chapter, because
+		// the detail page renders the derived Done flag (is_read OR fully read)
+		// and would otherwise keep the row struck through — the action would
+		// look inert. See database.SetChaptersRead.
 		if len(chapterIDs) == 0 {
 			http.Error(w, "no chapters selected", http.StatusBadRequest)
 			return

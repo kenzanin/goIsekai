@@ -22,4 +22,6 @@ Progressive disclosure index for this OKF bundle.
 * [Zeroscann search/detail selector findings](concept/zeroscann-search-detail-findings.md) - Vuetify card scoping, slash chapter hrefs, Referer-gated images
 * [Reader two-page view](concept/reader-two-page-view.md) - spread layouts (`side`/`stack`) for pages split into two images, tri-state toggle, step/viewBox contracts, measured render geometry
 * [Library duplicate-group colour bands](concept/library-duplicate-colour-bands.md) - per-group left colour band on library cards, palette rules, and the group-order determinism the colours depend on
+* [Dead code and merge candidates audit](concept/dead-code-and-merge-audit.md) - 19 unreachable functions, the unused migrate_candidates.go, the half-wired workers.Permanent() bug, and six verified merge candidates
+* [Detail-page read toggle, genre tags, and reader-prefs persistence](concept/detail-page-read-genre-readerprefs-fixes.md) - Three bugs that looked frontend-only: the derived Done flag vs toggle-read, cachedMangaFallback dropping genres, and two reader.js faults (no unload flush, stale server zoom snapshot)
 

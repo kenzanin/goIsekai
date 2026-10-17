@@ -151,16 +151,31 @@
   // Debounced server save of the per-manga prefs blob. Wheel-zoom fires
   // per tick, so only the settled value is POSTed (600ms).
   var savePrefsTimer = null;
+  function postPrefs(keepalive) {
+    savePrefsTimer = null;
+    fetch(`/action/reader-prefs/${[pid, mid].map(encodeURIComponent).join('/')}`, {
+      method: 'POST',
+      keepalive: keepalive,
+      headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrfToken },
+      body: JSON.stringify({ viewMode, direction, strip: stripMode, spread: spread, zoom, zoomMode: viewMode }),
+    }).catch(() => {});
+  }
   function savePrefs() {
     clearTimeout(savePrefsTimer);
-    savePrefsTimer = setTimeout(() => {
-      fetch(`/action/reader-prefs/${[pid, mid].map(encodeURIComponent).join('/')}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrfToken },
-        body: JSON.stringify({ viewMode, direction, strip: stripMode, spread: spread, zoom, zoomMode: viewMode }),
-      }).catch(() => {});
-    }, 600);
+    savePrefsTimer = setTimeout(() => postPrefs(false), 600);
   }
+  // Switching chapter reloads the page, which throws away a pending debounce:
+  // the next chapter then opened with the previous settings and the change
+  // looked lost. Flush the settled value before the page goes away.
+  function flushPrefs() {
+    if (savePrefsTimer === null) return;
+    clearTimeout(savePrefsTimer);
+    postPrefs(true);
+  }
+  window.addEventListener('pagehide', flushPrefs);
+  document.addEventListener('visibilitychange', function() {
+    if (document.visibilityState === 'hidden') flushPrefs();
+  });
   var warmCtrl = { next: null, prev: null };
   // key -> true while a read-ahead fetch is in flight. prefetch() runs on every
   // page turn, so without this the same page would be re-requested until its
@@ -933,11 +948,15 @@
     render();
   }
   function restoreZoom() {
+    // Local mirror first: every zoom change writes it immediately, while the
+    // server blob is only as fresh as the last settled POST. Preferring the
+    // server value made every page turn snap the zoom back to whatever the
+    // chapter had opened with.
     var srvZoom = hasSrv('zoom') && srvPrefs.zoomMode === viewMode ? parseFloat(srvPrefs.zoom) : NaN;
     zoom =
-      srvZoom ||
       parseFloat(localStorage.getItem(`gi_zoom_${viewMode}.${scope}`)) ||
       parseFloat(localStorage.getItem(`gi_zoom_${viewMode}`)) ||
+      srvZoom ||
       1;
     panX = 0;
     panY = 0;

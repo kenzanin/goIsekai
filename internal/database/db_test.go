@@ -682,6 +682,212 @@ func TestChapterDoneDerivation(t *testing.T) {
 	}
 }
 
+// TestToggleChapterReadResetsFullyReadChapter covers the detail page's read
+// button. The row renders the derived Done flag, so un-reading a fully-read
+// chapter must clear last_page_read as well — flipping is_read alone left the
+// strikethrough on and a second click could not reset it.
+func TestToggleChapterReadResetsFullyReadChapter(t *testing.T) {
+	db := openTestDB(t)
+
+	mangaID, err := db.UpsertManga(Manga{PluginID: "p1", SourceMangaID: "s1", Title: "T"})
+	if err != nil {
+		t.Fatalf("upsert manga: %v", err)
+	}
+
+	var ids [2]int64
+	for i, c := range []Chapter{
+		{SourceChapterID: "cs1", Title: "A", ChapterNum: 1},
+		{SourceChapterID: "cs2", Title: "B", ChapterNum: 2},
+	} {
+		c.MangaID = mangaID
+		id, err := db.UpsertChapter(c)
+		if err != nil {
+			t.Fatalf("upsert chapter %s: %v", c.SourceChapterID, err)
+		}
+		ids[i] = id
+	}
+	bySrc := func() map[string]ChapterProgress {
+		rows, err := db.GetChapterProgressForManga(mangaID)
+		if err != nil {
+			t.Fatalf("GetChapterProgressForManga: %v", err)
+		}
+		out := map[string]ChapterProgress{}
+		for _, r := range rows {
+			out[r.SourceChapterID] = r
+		}
+		return out
+	}
+
+	// Fully read: Done, but IsRead still false.
+	if err := db.SetChapterTotalPages(ids[0], 10); err != nil {
+		t.Fatalf("set total pages: %v", err)
+	}
+	if err := db.SetChapterProgress(ids[0], 10); err != nil {
+		t.Fatalf("set progress: %v", err)
+	}
+	if p := bySrc()["cs1"]; p.IsRead || !p.Done {
+		t.Fatalf("precondition: cs1 should be Done via page count: %+v", p)
+	}
+
+	// One click un-reads it: Done must fall so the row loses its strikethrough.
+	if err := db.ToggleChapterRead(ids[0]); err != nil {
+		t.Fatalf("toggle off: %v", err)
+	}
+	if p := bySrc()["cs1"]; p.IsRead || p.Done || p.LastPageRead != 0 {
+		t.Fatalf("toggling a fully-read chapter off must clear Done and the page mark: %+v", p)
+	}
+
+	// Clicking again marks it read.
+	if err := db.ToggleChapterRead(ids[0]); err != nil {
+		t.Fatalf("toggle on: %v", err)
+	}
+	if p := bySrc()["cs1"]; !p.IsRead || !p.Done {
+		t.Fatalf("second toggle should mark cs1 read: %+v", p)
+	}
+
+	// A partially-read chapter keeps its bookmark: only is_read can make it
+	// Done, so clearing the page mark would lose the reading position.
+	if err := db.SetChapterTotalPages(ids[1], 20); err != nil {
+		t.Fatalf("set total pages: %v", err)
+	}
+	if err := db.SetChapterProgress(ids[1], 5); err != nil {
+		t.Fatalf("set progress: %v", err)
+	}
+	if err := db.ToggleChapterRead(ids[1]); err != nil {
+		t.Fatalf("toggle partial on: %v", err)
+	}
+	if p := bySrc()["cs2"]; !p.IsRead || p.LastPageRead != 5 {
+		t.Fatalf("marking a partial chapter read must keep its position: %+v", p)
+	}
+	if err := db.ToggleChapterRead(ids[1]); err != nil {
+		t.Fatalf("toggle partial off: %v", err)
+	}
+	if p := bySrc()["cs2"]; p.IsRead || p.Done || p.LastPageRead != 5 {
+		t.Fatalf("un-reading a partial chapter must keep the bookmark: %+v", p)
+	}
+}
+
+// TestBulkUnreadClearsFullyReadChapters covers the chapter-list dropdown's unread
+// actions (mark-selected-unread, set-up-to-unread, mark-all-unread). They used to
+// write only is_read, but the detail page renders the derived Done flag, so a
+// chapter read to the end stayed struck-through and the action looked inert. Each
+// unread path must clear the page mark of a fully-read row while leaving a
+// partially-read chapter's bookmark alone.
+func TestBulkUnreadClearsFullyReadChapters(t *testing.T) {
+	db := openTestDB(t)
+
+	mangaID, err := db.UpsertManga(Manga{PluginID: "p1", SourceMangaID: "s1", Title: "Bulk"})
+	if err != nil {
+		t.Fatalf("upsert manga: %v", err)
+	}
+	var ids [4]int64
+	for i, c := range []Chapter{
+		{SourceChapterID: "cs1", Title: "A", ChapterNum: 1},
+		{SourceChapterID: "cs2", Title: "B", ChapterNum: 2},
+		{SourceChapterID: "cs3", Title: "C", ChapterNum: 3},
+		{SourceChapterID: "cs4", Title: "D", ChapterNum: 4},
+	} {
+		c.MangaID = mangaID
+		id, err := db.UpsertChapter(c)
+		if err != nil {
+			t.Fatalf("upsert chapter %s: %v", c.SourceChapterID, err)
+		}
+		ids[i] = id
+	}
+	bySrc := func() map[string]ChapterProgress {
+		rows, err := db.GetChapterProgressForManga(mangaID)
+		if err != nil {
+			t.Fatalf("GetChapterProgressForManga: %v", err)
+		}
+		out := map[string]ChapterProgress{}
+		for _, r := range rows {
+			out[r.SourceChapterID] = r
+		}
+		return out
+	}
+
+	// Known state before every case: cs1 and cs3 are Done by page count, cs3 also
+	// carries is_read; cs2 is read by hand with a partway bookmark, so its page
+	// mark is the reading position rather than a completion signal; cs4 is
+	// partway and not read at all.
+	seed := func(t *testing.T) {
+		t.Helper()
+		for i, s := range []struct {
+			total, last int
+			read        bool
+		}{
+			{10, 10, false},
+			{20, 5, true},
+			{30, 30, true},
+			{40, 7, false},
+		} {
+			if err := db.SetChapterTotalPages(ids[i], s.total); err != nil {
+				t.Fatalf("set total pages: %v", err)
+			}
+			if err := db.SetChapterProgress(ids[i], s.last); err != nil {
+				t.Fatalf("set progress: %v", err)
+			}
+			if s.read {
+				if err := db.MarkChapterRead(ids[i]); err != nil {
+					t.Fatalf("mark read: %v", err)
+				}
+			}
+		}
+	}
+
+	// check asserts one row's read state and page mark.
+	check := func(t *testing.T, src string, wantRead, wantDone bool, wantLast int) {
+		t.Helper()
+		p := bySrc()[src]
+		if p.IsRead != wantRead || p.Done != wantDone || p.LastPageRead != wantLast {
+			t.Fatalf("%s: got read=%v done=%v last=%d, want read=%v done=%v last=%d",
+				src, p.IsRead, p.Done, p.LastPageRead, wantRead, wantDone, wantLast)
+		}
+	}
+
+	// mark-selected-unread on a fully-read row plus a hand-read one.
+	seed(t)
+	if err := db.SetChaptersRead(mangaID, []string{"cs1", "cs2"}, false); err != nil {
+		t.Fatalf("SetChaptersRead: %v", err)
+	}
+	check(t, "cs1", false, false, 0) // Done by pages: page mark cleared
+	check(t, "cs2", false, false, 5) // hand-read with a bookmark: bookmark kept
+	check(t, "cs3", true, true, 30)  // untouched
+	check(t, "cs4", false, false, 7) // untouched
+
+	// set-up-to-unread covers everything up to the highest ticked chapter.
+	seed(t)
+	if err := db.SetChaptersUpTo(mangaID, []string{"cs3"}, false); err != nil {
+		t.Fatalf("SetChaptersUpTo: %v", err)
+	}
+	check(t, "cs1", false, false, 0)
+	check(t, "cs2", false, false, 5)
+	check(t, "cs3", false, false, 0)
+	check(t, "cs4", false, false, 7) // beyond the bound
+
+	// mark-all-unread covers the whole manga.
+	seed(t)
+	if err := db.SetMangaChaptersRead(mangaID, false); err != nil {
+		t.Fatalf("SetMangaChaptersRead: %v", err)
+	}
+	for _, src := range []string{"cs1", "cs2", "cs3", "cs4"} {
+		if p := bySrc()[src]; p.IsRead || p.Done {
+			t.Fatalf("mark-all-unread should clear every row: %s %+v", src, p)
+		}
+	}
+	check(t, "cs1", false, false, 0)
+	check(t, "cs2", false, false, 5)
+	check(t, "cs3", false, false, 0)
+	check(t, "cs4", false, false, 7)
+
+	// Marking read must still leave the reading position alone.
+	seed(t)
+	if err := db.SetChaptersRead(mangaID, []string{"cs4"}, true); err != nil {
+		t.Fatalf("SetChaptersRead read: %v", err)
+	}
+	check(t, "cs4", true, true, 7)
+}
+
 // TestNewBadgeLifecycle covers the library card's [New] badge: CountChapters
 // grows when a new chapter is stored, MarkMangaNew stamps the badge, and
 // ClearMangaNew (detail opened) clears it.
