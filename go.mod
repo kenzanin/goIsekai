@@ -12,6 +12,7 @@ require (
 	github.com/bogdanfinn/tls-client v1.15.1
 	github.com/coregx/coregex v0.12.25
 	github.com/dop251/goja v0.0.0-20260901132549-43234fa61381
+	github.com/ebitengine/purego v0.10.1
 	github.com/gen2brain/avif v0.6.0
 	github.com/gen2brain/jxl v0.2.0
 	github.com/gen2brain/webp v0.6.4
@@ -39,7 +40,6 @@ require (
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/dlclark/regexp2/v2 v2.5.2 // indirect
 	github.com/dustin/go-humanize v1.0.1 // indirect
-	github.com/ebitengine/purego v0.10.1 // indirect
 	github.com/go-sourcemap/sourcemap v2.1.3+incompatible // indirect
 	github.com/godbus/dbus/v5 v5.1.0 // indirect
 	github.com/golang/groupcache v0.0.0-20210331224755-41bb18bfe9da // indirect

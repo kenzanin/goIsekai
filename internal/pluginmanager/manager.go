@@ -2,7 +2,6 @@ package pluginmanager
 
 import (
 	"context"
-	"plugin"
 	"sync"
 	"time"
 
@@ -30,8 +29,8 @@ type loadedPlugin struct {
 	loaded   bool   // true after the runtime has been instantiated
 	// lunar holds the Lunar VM for lua-kind plugins.
 	lunar *lunar.State
-	// goPlugin holds the opened .so handle for go-kind plugins.
-	goPlugin *plugin.Plugin
+	// goLib is the dlopen'd handle for go-kind (.so) plugins.
+	goLib *nativeLib
 	// goFns caches resolved ABI symbols for go-kind plugins.
 	goFns map[string]any
 	// js holds the goja VM for js-kind plugins.

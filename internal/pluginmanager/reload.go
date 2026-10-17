@@ -33,9 +33,12 @@ func (m *Manager) UnloadPlugin(id string) error {
 	if p.kind == "wasm" && p.wasmMod != nil {
 		_ = p.wasmMod.Close(m.ctx)
 	}
+	if p.kind == "go" && p.goLib != nil {
+		_ = p.goLib.close()
+	}
 	p.lunar = nil
 	p.js = nil
-	p.goPlugin = nil
+	p.goLib = nil
 	p.goFns = nil
 	p.yaegi = nil
 	p.wasmMod = nil

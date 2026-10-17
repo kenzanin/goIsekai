@@ -45,7 +45,7 @@ func (m *Manager) ensureLoaded(id string) error {
 	}
 	p.lunar = loaded.lunar
 	p.js = loaded.js
-	p.goPlugin = loaded.goPlugin
+	p.goLib = loaded.goLib
 	p.goFns = loaded.goFns
 	p.yaegi = loaded.yaegi
 	p.wasmMod = loaded.wasmMod
