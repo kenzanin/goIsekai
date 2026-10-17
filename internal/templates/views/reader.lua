@@ -74,7 +74,7 @@ return function(data)
       <button id="btn-fit" title="Fit mode" class="border border-neutral-700 hover:bg-neutral-800 active:scale-95 transition rounded-md px-3 py-1.5 text-xs">Fit W</button>
       <button id="btn-zoom-out" title="Zoom out" class="border border-neutral-700 hover:bg-neutral-800 active:scale-95 transition rounded-md px-3 py-1.5 text-xs">−</button>
       <button id="btn-zoom-in" title="Zoom in" class="border border-neutral-700 hover:bg-neutral-800 active:scale-95 transition rounded-md px-3 py-1.5 text-xs">＋</button>
-      <button id="btn-strip" title="Vertical strip (continuous scroll)" class="border border-neutral-700 hover:bg-neutral-800 active:scale-95 transition rounded-md px-3 py-1.5 text-xs">⇕</button>
+      <button id="btn-readmode" title="Read mode: A 1 page · B 2 stacked · C 2 side by side · D continuous" class="border border-neutral-700 hover:bg-neutral-800 active:scale-95 transition rounded-md px-3 py-1.5 text-xs">A</button>
       <button id="btn-dir" title="Direction (RTL/LTR)" class="border border-neutral-700 hover:bg-neutral-800 active:scale-95 transition rounded-md px-3 py-1.5 text-xs">LTR</button>
     </div>
   </div>

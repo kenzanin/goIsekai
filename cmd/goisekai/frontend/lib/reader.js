@@ -70,6 +70,53 @@
     : localStorage.getItem(stripKey) === '1' || localStorage.getItem(`gi_stripMode.${mid}`) === '1';
   var stripView = document.getElementById('strip-view');
   var stripLoading = false; // strip is appending a neighbor chapter
+  // Two-page view for sites that split one original page into two images: a
+  // single next/prev shows both halves at once instead of making the reader
+  // click twice per original page. `spread` is the layout:
+  //   ''      one page
+  //   'side'  halves side by side (a page split left/right)
+  //   'stack' one above the other (a page split top/bottom) — reads as one
+  //           continuous page, and next shows the following pair.
+  var spreadKey = `gi_spreadMode.${scope}`;
+  var spreadStored = hasSrv('spread')
+    ? srvPrefs.spread
+    : localStorage.getItem(spreadKey) || localStorage.getItem(`gi_spreadMode.${mid}`);
+  // Older builds stored a boolean ('1'/true) for the side-by-side view.
+  var spread =
+    spreadStored === true || spreadStored === 'true' || spreadStored === '1'
+      ? 'side'
+      : spreadStored === 'stack'
+        ? 'stack'
+        : '';
+  var img2 = null; // second page of a two-page view; null in single-page view
+
+  // Pages on screen, in reading order. Side by side is reversed for rtl manga
+  // so the earlier page sits on the right; a vertical stack keeps its order.
+  function viewPages() {
+    var ims = [];
+    if (img) ims.push(img);
+    if (img2) ims.push(img2);
+    return spread === 'side' && direction === 'rtl' ? ims.reverse() : ims;
+  }
+
+  // Bounding box of the pages on screen, as one unit so both halves scale
+  // together — side by side adds widths, stacked adds heights.
+  function viewBox() {
+    var ims = viewPages();
+    if (!ims.length) return null;
+    var w = 0,
+      h = 0;
+    for (var i = 0; i < ims.length; i++) {
+      if (spread === 'stack') {
+        w = Math.max(w, ims[i].width);
+        h += ims[i].height;
+      } else {
+        w += ims[i].width;
+        h = Math.max(h, ims[i].height);
+      }
+    }
+    return w && h ? { w: w, h: h } : null;
+  }
 
   // Debug logger - sends to both browser console and backend server log
   var _debugSid = Math.random().toString(36).substring(2, 10);
@@ -110,7 +157,7 @@
       fetch(`/action/reader-prefs/${[pid, mid].map(encodeURIComponent).join('/')}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrfToken },
-        body: JSON.stringify({ viewMode, direction, strip: stripMode, zoom, zoomMode: viewMode }),
+        body: JSON.stringify({ viewMode, direction, strip: stripMode, spread: spread, zoom, zoomMode: viewMode }),
       }).catch(() => {});
     }, 600);
   }
@@ -241,10 +288,11 @@
   }
 
   function clampPan() {
-    if (!img) return;
+    var d = viewBox();
+    if (!d) return;
     var rect = canvas.getBoundingClientRect();
-    var w = img.width * baseScale * zoom,
-      h = img.height * baseScale * zoom;
+    var w = d.w * baseScale * zoom,
+      h = d.h * baseScale * zoom;
     var cx = Math.max((rect.width - w) / 2, 0);
     var cy = Math.max((rect.height - h) / 2, 0);
     // Image pos = center + pan. Constrain so both edges are reachable.
@@ -257,10 +305,11 @@
   }
 
   function calcBaseScale() {
-    if (!img) return;
+    var d = viewBox();
+    if (!d) return;
     var rect = canvas.getBoundingClientRect();
-    if (viewMode === 'fitWidth') baseScale = rect.width / img.width;
-    else if (viewMode === 'fitHeight') baseScale = rect.height / img.height;
+    if (viewMode === 'fitWidth') baseScale = rect.width / d.w;
+    else if (viewMode === 'fitHeight') baseScale = rect.height / d.h;
     else baseScale = 1; // original
   }
 
@@ -284,19 +333,38 @@
   function render() {
     var rect = canvas.getBoundingClientRect();
     ctx.clearRect(0, 0, rect.width, rect.height);
-    if (!img) {
+    var d = viewBox();
+    if (!d) {
       debugWarn('[reader] render: no image loaded');
       return;
     }
-    var w = img.width * baseScale * zoom,
-      h = img.height * baseScale * zoom;
-    debugLog(`[reader] render: ${img.width}x${img.height} -> ${Math.round(w)}x${Math.round(h)} on ${rect.width}x${rect.height}`);
+    var w = d.w * baseScale * zoom,
+      h = d.h * baseScale * zoom;
+    debugLog(`[reader] render: ${d.w}x${d.h} -> ${Math.round(w)}x${Math.round(h)} on ${rect.width}x${rect.height}`);
     // Center when smaller, top-align when overflowing (top must never clip).
     var x = Math.max((rect.width - w) / 2, 0) + panX;
     var y = Math.max((rect.height - h) / 2, 0) + panY;
     ctx.imageSmoothingEnabled = smoothing;
     ctx.imageSmoothingQuality = 'high';
-    ctx.drawImage(img, x, y, w, h);
+    // Both pages scale by the same factor. Side by side advances across, a
+    // vertical stack advances down and is centred per row (the halves are the
+    // same width, so the rows line up like one continuous page).
+    var ims = viewPages();
+    var cx = x,
+      cy = y;
+    for (var i = 0; i < ims.length; i++) {
+      var iw = ims[i].width * baseScale * zoom,
+        ih = ims[i].height * baseScale * zoom;
+      if (spread === 'stack') {
+        // Stacked: both halves are the same width, so centring each row lines
+        // them up as one continuous page.
+        ctx.drawImage(ims[i], x + (w - iw) / 2, cy, iw, ih);
+        cy += ih;
+      } else {
+        ctx.drawImage(ims[i], cx, cy, iw, ih);
+        cx += iw;
+      }
+    }
   }
 
   function showSpinner(v) {
@@ -438,7 +506,9 @@
 
   function updateCounter() {
     var total = pages.length || 1;
-    counter.textContent = `${current + 1} / ${total}`;
+    // Two pages are on screen whenever a spread layout is active.
+    var second = spread && !stripMode && current + 1 < total ? current + 2 : null;
+    counter.textContent = second ? `${current + 1}-${second} / ${total}` : `${current + 1} / ${total}`;
     updatePageJumper();
   }
 
@@ -579,19 +649,55 @@
   var stripImgs = []; // pages currently in the column
   var stripChapters = []; // chapter ids already appended
 
-  function stripBtn() {
-    var b = document.getElementById('btn-strip');
-    if (b) {
-      b.classList.toggle('bg-indigo-600/20', stripMode);
-      b.classList.toggle('border-indigo-500/40', stripMode);
+  // Read mode is one cycle button — the current mode is always a single letter
+  // on screen:
+  //   A  1 page per view (default)
+  //   B  2 pages per view, stacked (one above the other, reads as one page)
+  //   C  2 pages per view, side by side
+  //   D  continuous (vertical strip)
+  // Strip and spread are the same choice seen from two axes, so they are
+  // mutually exclusive: picking any non-D mode leaves the strip column first.
+  var READ_MODES = ['A', 'B', 'C', 'D'];
+
+  function currentReadMode() {
+    if (stripMode) return 'D';
+    if (spread === 'stack') return 'B';
+    if (spread === 'side') return 'C';
+    return 'A';
+  }
+
+  function syncReadModeBtn() {
+    var b = document.getElementById('btn-readmode');
+    if (!b) return;
+    var mode = currentReadMode();
+    b.textContent = mode;
+    b.classList.toggle('bg-indigo-600/20', mode !== 'A');
+    b.classList.toggle('border-indigo-500/40', mode !== 'A');
+  }
+
+  function applyReadMode(mode) {
+    if (mode === 'D') {
+      if (!stripMode) enterStrip();
+      syncReadModeBtn();
+      return;
     }
+    // Set the spread first: exitStrip redraws with whatever is in `spread`.
+    spread = mode === 'B' ? 'stack' : mode === 'C' ? 'side' : '';
+    localStorage.setItem(spreadKey, spread);
+    savePrefs();
+    if (stripMode) {
+      exitStrip();
+      return;
+    }
+    syncReadModeBtn();
+    drawPage(current);
   }
 
   function enterStrip() {
     stripMode = true;
     localStorage.setItem(stripKey, '1');
     savePrefs();
-    stripBtn();
+    syncReadModeBtn();
     canvas.style.display = 'none';
     stripView.classList.remove('hidden');
     populateStrip();
@@ -614,12 +720,12 @@
     stripMode = false;
     localStorage.setItem(stripKey, '0');
     savePrefs();
-    stripBtn();
     stripView.classList.add('hidden');
     stripView.innerHTML = '';
     stripImgs = [];
     stripChapters = [];
     canvas.style.display = '';
+    syncReadModeBtn();
     drawPage(current);
   }
 
@@ -719,38 +825,28 @@
   }
   stripView.addEventListener('click', () => setBarsVisible(!barsVisible));
 
-  function drawPage(i) {
-    debugLog(`[reader] drawPage: ${i} of ${pages.length}`);
-    current = i;
-    showError(false);
-    updateCounter();
-    // Hide spinner immediately before image load so user sees page faster
-    showSpinner(false);
-    reportProgress();
-    prefetch();
-    if (stripMode && !stripImgs.length) populateStrip();
-    if (stripMode) stripView.scrollTop = (i / Math.max(pages.length, 1)) * stripView.scrollHeight;
-    var url = imageUrl(pages[i], undefined, 'high');
-    debugLog(`[reader] Image URL: ${url.substring(0, 80)}...`);
-    var cached = preloaded[i];
+  // Load pages[idx] into one slot of the view. Reuses the preloaded Image when
+  // the bytes are already there; `done` fires once the slot is ready so a
+  // spread can wait for both halves before the first paint.
+  function loadSlot(idx, assign, done) {
+    var cached = preloaded[idx];
     if (cached?.complete && cached.naturalWidth > 0) {
       debugLog(`[reader] Using cached image ${cached.naturalWidth}x${cached.naturalHeight}`);
-      img = cached;
-      afterImage();
+      assign(cached);
+      done();
       return;
     }
-    showSpinner(true);
+    var url = imageUrl(pages[idx], undefined, 'high');
+    debugLog(`[reader] Image URL: ${url.substring(0, 80)}...`);
     var im = new Image();
     im.onload = () => {
       debugLog(`[reader] Image loaded: ${im.naturalWidth}x${im.naturalHeight}`);
-      img = im;
-      preloaded[i] = im;
-      showSpinner(false);
-      afterImage();
+      preloaded[idx] = im;
+      assign(im);
+      done();
     };
-    im.onerror = (e) => {
+    im.onerror = () => {
       debugError(`[reader] Image load failed: ${url.substring(0, 80)}`);
-      showSpinner(false);
       imgFails++;
       if (imgFails >= 4) {
         showReaderError('Failed to load image — try Retry');
@@ -765,6 +861,34 @@
       }, 1200);
     };
     im.src = url;
+  }
+
+  function drawPage(i) {
+    debugLog(`[reader] drawPage: ${i} of ${pages.length}`);
+    current = i;
+    showError(false);
+    updateCounter();
+    // Hide spinner immediately before image load so user sees page faster
+    showSpinner(false);
+    reportProgress();
+    prefetch();
+    if (stripMode && !stripImgs.length) populateStrip();
+    if (stripMode) stripView.scrollTop = (i / Math.max(pages.length, 1)) * stripView.scrollHeight;
+    // Spread view shows the facing page too. A trailing odd page stands alone
+    // rather than pairing with the next chapter's first. Strip mode owns its own
+    // column, so it never loads a second page here.
+    var secondIdx = spread && !stripMode && i + 1 < pages.length ? i + 1 : -1;
+    img = null;
+    img2 = null;
+    var pending = secondIdx >= 0 ? 2 : 1;
+    showSpinner(true);
+    var done = () => {
+      if (--pending > 0) return;
+      showSpinner(false);
+      afterImage();
+    };
+    loadSlot(i, (im) => { img = im; }, done);
+    if (secondIdx >= 0) loadSlot(secondIdx, (im) => { img2 = im; }, done);
   }
 
   // rAF never fires in a hidden/background tab (Chrome throttles it), which
@@ -853,14 +977,20 @@
     drawPage(i);
   }
 
+  // One step is one view: two pages with a spread layout, one otherwise.
+  function stepSize() {
+    return spread ? 2 : 1;
+  }
+
   function next() {
     if (stripMode) {
       debugLog('next: strip mode, scrolling');
       return;
     }
     if (current < pages.length - 1) {
-      debugLog(`next: page ${current + 1} -> ${current + 2}`);
-      goToPage(current + 1);
+      var target = Math.min(current + stepSize(), pages.length - 1);
+      debugLog(`next: page ${current + 1} -> ${target + 1}`);
+      goToPage(target);
       return;
     }
     // Last page → auto-advance to next chapter, unless we're at the end of the
@@ -879,8 +1009,9 @@
       return;
     }
     if (current > 0) {
-      debugLog(`prev: page ${current + 1} -> ${current}`);
-      goToPage(current - 1);
+      var target = Math.max(current - stepSize(), 0);
+      debugLog(`prev: page ${current + 1} -> ${target + 1}`);
+      goToPage(target);
       return;
     }
     // First page → auto-retreat to prev chapter last page
@@ -967,6 +1098,7 @@
     prevWarmTried = false;
     imgFails = 0;
     img = null;
+    img2 = null;
     panX = 0;
     panY = 0;
     _lastFailedRetry = null;
@@ -1142,13 +1274,13 @@
     zoomBy(1 / 1.2);
   });
 
-  var stripToggle = document.getElementById('btn-strip');
-  if (stripToggle)
-    stripToggle.addEventListener('click', () => {
-      if (stripMode) exitStrip();
-      else enterStrip();
+  var readModeBtn = document.getElementById('btn-readmode');
+  if (readModeBtn)
+    readModeBtn.addEventListener('click', () => {
+      var i = READ_MODES.indexOf(currentReadMode());
+      applyReadMode(READ_MODES[(i + 1) % READ_MODES.length]);
     });
-  stripBtn();
+  syncReadModeBtn();
 
   var fitBtn = document.getElementById('btn-fit');
   var fitLabels = { fitWidth: 'Fit W', fitHeight: 'Fit H', original: '1:1' };

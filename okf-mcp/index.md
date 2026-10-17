@@ -20,4 +20,6 @@ Progressive disclosure index for this OKF bundle.
 * [Onisaga Cloudflare challenge behavior](concept/onisaga-cloudflare-challenge.md) - Observed Cloudflare blocking on onisaga fetches and the cookie/TLS evidence so far
 * [VioletManga search/detail selector findings](concept/violetmanga-search-detail-findings.md) - Bixbox theme selectors, bare-slug IDs, pure-HTTP pages
 * [Zeroscann search/detail selector findings](concept/zeroscann-search-detail-findings.md) - Vuetify card scoping, slash chapter hrefs, Referer-gated images
+* [Reader two-page view](concept/reader-two-page-view.md) - spread layouts (`side`/`stack`) for pages split into two images, tri-state toggle, step/viewBox contracts, measured render geometry
+* [Library duplicate-group colour bands](concept/library-duplicate-colour-bands.md) - per-group left colour band on library cards, palette rules, and the group-order determinism the colours depend on
 

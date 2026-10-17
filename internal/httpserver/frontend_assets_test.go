@@ -533,3 +533,73 @@ func TestReaderPrefetchURLMatchesDisplay(t *testing.T) {
 		t.Error("prefetch section no longer requests images; display URLs must be reused verbatim")
 	}
 }
+
+// TestReaderTwoPageViewContracts pins the two-page (spread) view. Sources that
+// split one original page into two images must show both halves in one step;
+// that behaviour is spread across several helpers, so a refactor can silently
+// turn it back into one image per step with nothing failing.
+func TestReaderTwoPageViewContracts(t *testing.T) {
+	data, err := os.ReadFile(filepath.Join(frontendLibDir, "reader.js"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	src := string(data)
+
+	// One step is one view: two pages with a spread layout, one otherwise.
+	// Hardcoding a +1 step is exactly the bug this feature fixes.
+	stepStart := strings.Index(src, "function stepSize()")
+	if stepStart < 0 {
+		t.Fatal("reader.js: stepSize() is gone — next/prev no longer know a spread shows two pages")
+	}
+	step := src[stepStart:]
+	if i := strings.Index(step, "}"); i > 0 {
+		step = step[:i]
+	}
+	if !strings.Contains(step, "spread ? 2 : 1") {
+		t.Errorf("stepSize() no longer returns 2 for a spread layout: %s", step)
+	}
+
+	for _, want := range []string{
+		// The second page is loaded, and only outside strip mode (strip owns its
+		// own column).
+		"var secondIdx = spread && !stripMode",
+		"loadSlot(secondIdx",
+		// A trailing odd page stands alone rather than pairing with the next
+		// chapter's first page.
+		"i + 1 < pages.length ? i + 1 : -1",
+		// Both layouts must exist on the canvas: side by side grows the width, a
+		// vertical stack grows the height.
+		"spread === 'stack'",
+		// Older builds stored a boolean ('1'/true) for side by side; without the
+		// normalisation those readers silently drop back to one page.
+		"spreadStored === '1'",
+		// One button cycles every read mode (A 1 page · B stacked · C side by
+		// side · D strip) and shows the current letter. currentReadMode() and
+		// applyReadMode() must stay inverses of each other, or the label stops
+		// matching what is on screen.
+		"var READ_MODES = ['A', 'B', 'C', 'D']",
+		"function currentReadMode()",
+		"function applyReadMode(mode)",
+	} {
+		if !strings.Contains(src, want) {
+			t.Errorf("reader.js lost %q — the two-page view is no longer wired", want)
+		}
+	}
+
+	// Every path that flips the mode must also refresh the button, or the
+	// letter goes stale: enterStrip and exitStrip both change what
+	// currentReadMode() returns.
+	for _, fn := range []string{"function enterStrip()", "function exitStrip()"} {
+		start := strings.Index(src, fn)
+		if start < 0 {
+			t.Fatalf("reader.js: %s is gone", fn)
+		}
+		body := src[start:]
+		if i := strings.Index(body, "\n  }"); i > 0 {
+			body = body[:i]
+		}
+		if !strings.Contains(body, "syncReadModeBtn()") {
+			t.Errorf("%s no longer calls syncReadModeBtn() — the read-mode button keeps the old letter", fn)
+		}
+	}
+}
