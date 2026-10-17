@@ -94,14 +94,6 @@ func (e *LuaEngine) newVM() (*lua.State, error) {
 	return S, nil
 }
 
-// Has returns true if a Lua bytecode exists for the given name (without extension).
-func (e *LuaEngine) Has(name string) bool {
-	e.mu.RLock()
-	defer e.mu.RUnlock()
-	_, ok := e.protos[name]
-	return ok
-}
-
 // Render executes the named template and writes the result to w.
 // name is the path without extension (e.g. "views/library").
 func (e *LuaEngine) Render(w io.Writer, name string, data map[string]any) error {

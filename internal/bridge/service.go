@@ -105,18 +105,6 @@ func (s *AppService) GetPool() *workers.Pool {
 	return s.pool
 }
 
-// Log receives a console message from the frontend and writes it to the Go logger.
-func (s *AppService) Log(level string, msg string) {
-	switch level {
-	case "error":
-		logger.Error("[ui] " + msg)
-	case "warn":
-		logger.Warn("[ui] " + msg)
-	default:
-		logger.Debug("[ui] " + msg)
-	}
-}
-
 // LogEnhanceStatus logs the effective image-enhance configuration at startup.
 func (s *AppService) LogEnhanceStatus() {
 	plugins := s.mgr.LoadedPlugins()

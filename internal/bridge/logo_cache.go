@@ -118,19 +118,6 @@ func (s *AppService) CachePluginLogo(pluginID string) {
 	logger.Debug("logo: cached", "plugin", pluginID, "path", dst)
 }
 
-// ClearPluginLogo removes the plugin's cached logo so the next page view
-// re-resolves it from its declared source.
-func (s *AppService) ClearPluginLogo(pluginID string) error {
-	if s.cacheDir == "" {
-		return nil
-	}
-	dir := s.logoCacheDir(pluginID)
-	if err := os.RemoveAll(dir); err != nil && !os.IsNotExist(err) {
-		return fmt.Errorf("bridge: clear plugin logo: %w", err)
-	}
-	return nil
-}
-
 // ClearAllPluginLogos removes every cached plugin logo (the whole
 // <cacheDir>/images/plugins tree).
 func (s *AppService) ClearAllPluginLogos() error {

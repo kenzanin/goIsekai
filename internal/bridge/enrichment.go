@@ -15,15 +15,6 @@ type EnrichmentResult struct {
 	Related      []database.EnrichmentRow
 }
 
-// EnrichmentCatalogEntry describes one enrichment source for the UI.
-type EnrichmentCatalogEntry struct {
-	ID         string   `json:"id"`
-	Name       string   `json:"name"`
-	Kinds      []string `json:"kinds"`
-	Precedence int      `json:"precedence,omitempty"`
-	Enabled    bool     `json:"enabled"`
-}
-
 // loadInfoProviders instantiates the enrichment scripts so the providers they
 // declare are registered before the catalog or a fetch reads it.
 func (s *AppService) loadInfoProviders() {
@@ -44,32 +35,6 @@ func (s *AppService) EnrichmentSources() []string {
 	out := make([]string, len(entries))
 	for i, e := range entries {
 		out[i] = e.ID
-	}
-	return out
-}
-
-// EnrichmentCatalog returns all registered enrichment sources (built-in +
-// plugin-declared). The caller passes an optional kind filter; empty string
-// returns all.
-func (s *AppService) EnrichmentCatalog(kind string) []EnrichmentCatalogEntry {
-	if s.enrich == nil {
-		return nil
-	}
-	s.loadInfoProviders()
-	entries := s.enrich.Catalog(enrich.Kind(kind))
-	out := make([]EnrichmentCatalogEntry, 0, len(entries))
-	for _, e := range entries {
-		kinds := make([]string, len(e.Kinds))
-		for i, k := range e.Kinds {
-			kinds[i] = string(k)
-		}
-		out = append(out, EnrichmentCatalogEntry{
-			ID:         e.ID,
-			Name:       e.Name,
-			Kinds:      kinds,
-			Precedence: int(e.Precedence),
-			Enabled:    e.Enabled,
-		})
 	}
 	return out
 }

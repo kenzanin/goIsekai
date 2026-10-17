@@ -34,19 +34,6 @@ func (s *AppService) countCachedPages(pluginID, mangaID, chapterID string) int {
 	return n
 }
 
-// RecordRead appends a read-history entry for a chapter's current page,
-// addressed by source identifiers.
-func (s *AppService) RecordRead(pluginID, mangaID, chapterID string, pageNum int) error {
-	chapterIntID, err := s.db.ResolveChapterIntID(pluginID, mangaID, chapterID)
-	if err != nil {
-		return fmt.Errorf("bridge: resolve chapter: %w", err)
-	}
-	if err := s.db.RecordRead(chapterIntID, pageNum); err != nil {
-		return fmt.Errorf("bridge: record read: %w", err)
-	}
-	return nil
-}
-
 // SetChapterProgress records a chapter's last page read, addressed by source
 // identifiers.
 func (s *AppService) SetChapterProgress(pluginID, mangaID, chapterID string, lastPage int) error {
