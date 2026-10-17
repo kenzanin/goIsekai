@@ -15,7 +15,7 @@ import (
 // librarySorts are the accepted values of ?sort=. Anything else keeps the
 // previous behaviour (most recently updated first) rather than erroring, since
 // this is a preference in a URL bar.
-var librarySorts = []string{"updated", "title", "read", "progress", "recent_read"}
+var librarySorts = []string{"updated", "title", "read", "progress", "recent_read", "duplicates"}
 
 // libraryStatuses are the accepted values of ?status=, which answers "which of
 // these did I actually read" - the question a source migration starts from.
@@ -47,8 +47,10 @@ func readState(m database.Manga, stats map[string]database.LibraryMangaStats) (r
 }
 
 // sortLibrary orders the library in place. It keeps the incoming order for ties,
-// so an unknown sort key leaves the caller's ordering untouched.
-func sortLibrary(mangas []database.Manga, stats map[string]database.LibraryMangaStats, key string) {
+// so an unknown sort key leaves the caller's ordering untouched. dupRank maps a
+// manga row-ID to its duplicate-group position; only the "duplicates" sort reads
+// it, and it may be nil when callers have no duplicate data.
+func sortLibrary(mangas []database.Manga, stats map[string]database.LibraryMangaStats, key string, dupRank map[string]int) {
 	switch key {
 	case "title":
 		sort.SliceStable(mangas, func(i, j int) bool {
@@ -88,6 +90,18 @@ func sortLibrary(mangas []database.Manga, stats map[string]database.LibraryManga
 				return true
 			}
 			return si.After(*sj)
+		})
+	case "duplicates":
+		// Group members first, each group's cards adjacent, so a colour band
+		// reads as one block instead of being split across pages. Manga with no
+		// duplicate group sink to the bottom in their existing order.
+		sort.SliceStable(mangas, func(i, j int) bool {
+			ri, iDup := dupRank[strconv.FormatInt(mangas[i].ID, 10)]
+			rj, jDup := dupRank[strconv.FormatInt(mangas[j].ID, 10)]
+			if iDup != jDup {
+				return iDup
+			}
+			return ri < rj
 		})
 	}
 }

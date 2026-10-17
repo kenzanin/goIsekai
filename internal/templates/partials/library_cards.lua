@@ -7,7 +7,9 @@ return function(data)
 	local mangas = data.Mangas or {}
 	local libraryStats = data.LibraryStats or {}
 	local ratios = data.Ratios or {}
-	local dupIDs = data.DupIDs or {}
+	-- mid -> hex colour of its duplicate group. Members of one group share a
+	-- colour, so the left band makes the same story recognisable across the grid.
+	local dupColors = data.DupColors or {}
 
 	-- Build manga cards
 	local mangaCards = ""
@@ -28,6 +30,11 @@ return function(data)
 			local status = m.Status or ""
 			local statsObj = libraryStats[mid]
 			local ratio = ratios[pluginID] or 0
+			-- Left band for duplicate-group members. Inline style, not a Tailwind
+			-- class: the colour comes from the server palette, and Tailwind can
+			-- only generate classes it can see spelled out in the source.
+			local dupColor = dupColors[mid]
+			local dupBand = dupColor and (' style="border-left:3px solid ' .. h(dupColor) .. '"') or ""
 
 			local coverHTML
 			if coverURL ~= "" then
@@ -97,10 +104,6 @@ return function(data)
 					finishedMark =
 						' <span class="text-xs px-1.5 py-0.5 rounded-full bg-emerald-600 text-white font-medium align-middle">Done</span>'
 				end
-				if dupIDs[mid] then
-					finishedMark = finishedMark
-						.. ' <span class="text-xs px-1.5 py-0.5 rounded-full bg-amber-500 text-white font-medium align-middle">Dup</span>'
-				end
 			end
 
 			mangaCards = mangaCards
@@ -108,7 +111,9 @@ return function(data)
 				.. h(pluginID)
 				.. "/"
 				.. h(sourceMangaID)
-				.. '" class="view-item bg-neutral-900 rounded-lg overflow-hidden relative hover:-translate-y-0.5 hover:shadow-lg hover:shadow-black/40 transition flex flex-col">'
+				.. '" class="view-item bg-neutral-900 rounded-lg overflow-hidden relative hover:-translate-y-0.5 hover:shadow-lg hover:shadow-black/40 transition flex flex-col"'
+				.. dupBand
+				.. ">"
 				.. '<div class="relative flex-1 min-w-0">'
 				.. coverHTML
 				.. '<div class="lib-dim" style="display:'

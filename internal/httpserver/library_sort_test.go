@@ -102,13 +102,13 @@ func TestSortReadCountsChaptersAndProgressRanksCompletion(t *testing.T) {
 	}
 
 	byRead := append([]database.Manga(nil), list...)
-	sortLibrary(byRead, st, "read")
+	sortLibrary(byRead, st, "read", nil)
 	if got := titles(byRead)[0]; got != "long nearly done" {
 		t.Errorf("read sort put %q first, want the 315-chapter entry", got)
 	}
 
 	byProgress := append([]database.Manga(nil), list...)
-	sortLibrary(byProgress, st, "progress")
+	sortLibrary(byProgress, st, "progress", nil)
 	if got := titles(byProgress); !equal(got, []string{"short finished", "long nearly done", "barely started"}) {
 		t.Errorf("progress sort: got %v", got)
 	}
@@ -117,13 +117,13 @@ func TestSortReadCountsChaptersAndProgressRanksCompletion(t *testing.T) {
 func TestSortTitleIsCaseInsensitive(t *testing.T) {
 	b := manga(1, "p", "banana")
 	a := manga(2, "p", "Apple")
-	sortLibrary([]database.Manga{b, a}, nil, "title")
+	sortLibrary([]database.Manga{b, a}, nil, "title", nil)
 	if got := titles([]database.Manga{b, a}); got[0] != "banana" {
 		t.Errorf("expected insertion order untouched by the caller's slice, got %v", got)
 	}
 
 	list := []database.Manga{b, a}
-	sortLibrary(list, nil, "title")
+	sortLibrary(list, nil, "title", nil)
 	if got := titles(list); !equal(got, []string{"Apple", "banana"}) {
 		t.Errorf("title sort: got %v, want Apple before banana", got)
 	}
@@ -143,7 +143,7 @@ func TestSortRecentReadPutsRecentlyReadFirst(t *testing.T) {
 		strconv.FormatInt(never.ID, 10):  {MangaID: strconv.FormatInt(never.ID, 10)},
 	}
 	list := []database.Manga{never, old, newest}
-	sortLibrary(list, st, "recent_read")
+	sortLibrary(list, st, "recent_read", nil)
 	if got := titles(list); !equal(got, []string{"read just now", "read yesterday", "never opened"}) {
 		t.Errorf("recent_read sort: got %v", got)
 	}
@@ -153,9 +153,47 @@ func TestUnknownSortKeepsGivenOrder(t *testing.T) {
 	a := manga(1, "p", "a")
 	b := manga(2, "p", "b")
 	list := []database.Manga{b, a}
-	sortLibrary(list, nil, "nonsense")
+	sortLibrary(list, nil, "nonsense", nil)
 	if got := titles(list); !equal(got, []string{"b", "a"}) {
 		t.Errorf("unknown sort reordered the library: %v", got)
+	}
+}
+
+// The "duplicates" sort exists so a group's cards land next to each other: the
+// colour band only reads as one block if the members are adjacent. Non-members
+// must sink below every member rather than interleave.
+func TestSortDuplicatesGroupsMembersAndSinksRest(t *testing.T) {
+	g0a := manga(1, "p", "g0 first")
+	loner := manga(2, "p", "no group")
+	g1a := manga(3, "p", "g1 first")
+	g0b := manga(4, "p", "g0 second")
+	g1b := manga(5, "p", "g1 second")
+	list := []database.Manga{loner, g1b, g0b, g1a, g0a}
+	rank := map[string]int{
+		strconv.FormatInt(g0a.ID, 10): 0,
+		strconv.FormatInt(g0b.ID, 10): 0,
+		strconv.FormatInt(g1a.ID, 10): 1,
+		strconv.FormatInt(g1b.ID, 10): 1,
+	}
+
+	sortLibrary(list, nil, "duplicates", rank)
+	// Group 0 together, then group 1 together, then the ungrouped entry. Within
+	// a group the stable sort keeps the incoming order, so each pair stays as it
+	// arrived rather than being re-sorted by title.
+	if !equal(titles(list), []string{"g0 second", "g0 first", "g1 second", "g1 first", "no group"}) {
+		t.Errorf("duplicates sort: got %v", titles(list))
+	}
+}
+
+// The sort is reachable from the URL bar, so a nil rank map (no duplicate data,
+// e.g. a search that skipped detection) must not panic or reorder silently.
+func TestSortDuplicatesWithoutRankKeepsOrder(t *testing.T) {
+	a := manga(1, "p", "a")
+	b := manga(2, "p", "b")
+	list := []database.Manga{b, a}
+	sortLibrary(list, nil, "duplicates", nil)
+	if !equal(titles(list), []string{"b", "a"}) {
+		t.Errorf("duplicates sort with no rank data reordered: %v", titles(list))
 	}
 }
 
@@ -192,7 +230,7 @@ func TestSortAndFilterCompose(t *testing.T) {
 	list := []database.Manga{b, c, a}
 
 	kept := filterLibrary(append([]database.Manga(nil), list...), st, nil, "done", "")
-	sortLibrary(kept, st, "read")
+	sortLibrary(kept, st, "read", nil)
 	if !equal(titles(kept), []string{"done other source", "done short"}) {
 		t.Errorf("got %v", titles(kept))
 	}

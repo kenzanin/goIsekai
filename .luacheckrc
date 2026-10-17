@@ -23,4 +23,5 @@ read_globals = {
     "formatChapterNum",
     "pageURL",
     "pageWindow",
+    "extractLane",
 }

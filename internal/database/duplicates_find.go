@@ -163,8 +163,15 @@ func (d *DB) FindPotentialDuplicates() ([]DuplicateGroup, error) {
 
 	groups = append(groups, findSimilarSynopses(allManga, grouped)...)
 
-	sort.Slice(groups, func(i, j int) bool {
-		return len(groups[i].Members) > len(groups[j].Members)
+	// Order by member count descending, then by Key. The Key tiebreak matters:
+	// the library grid assigns each group its band colour by position in this
+	// slice, so an unstable tie order would reshuffle the colours between page
+	// loads (and between restarts) for groups of equal size.
+	sort.SliceStable(groups, func(i, j int) bool {
+		if len(groups[i].Members) != len(groups[j].Members) {
+			return len(groups[i].Members) > len(groups[j].Members)
+		}
+		return groups[i].Key < groups[j].Key
 	})
 
 	return groups, nil

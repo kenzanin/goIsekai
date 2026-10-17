@@ -8,6 +8,18 @@ import (
 	"strings"
 )
 
+// dupPalette holds the left-band colours for duplicate groups, assigned by
+// group position and cycling once exhausted. Every entry must be bright enough
+// to read against the neutral-900 card on a dark page — that rules out blacks,
+// greys, and the indigo accent the theme already uses for selection (a group
+// banded in the accent colour would look like a highlighted card).
+var dupPalette = []string{
+	"#ef4444", "#f97316", "#f59e0b", "#eab308",
+	"#84cc16", "#22c55e", "#10b981", "#14b8a6",
+	"#06b6d4", "#0ea5e9", "#3b82f6", "#a855f7",
+	"#d946ef", "#ec4899", "#f43f5e", "#a3e635",
+}
+
 // viewLibrary renders the library grid (also the home page).
 func (s *Server) viewLibrary(w http.ResponseWriter, r *http.Request) {
 	mangas, err := s.service.ListLibrary()
@@ -92,34 +104,42 @@ func (s *Server) viewLibrary(w http.ResponseWriter, r *http.Request) {
 			s.logger.Warn("library duplicates", "error", dupErr)
 		}
 		duplicateGroups = groups
-		seen := make(map[string]struct{}, len(groups)*2)
-		for _, g := range groups {
-			for _, m := range g.Members {
-				seen[strconv.FormatInt(m.ID, 10)] = struct{}{}
-			}
-		}
-		duplicateCount = len(seen)
 	}
 
 	// Apply the status/tag filter over the whole library, then optionally
 	// narrow to duplicate-group members when ?view=duplicate is set.
 	mangas = filterLibrary(mangas, statsForSort, categories, statusFilter, tagFilter)
-	dupIDs := make(map[string]struct{}, duplicateCount)
-	for _, g := range duplicateGroups {
+
+	// dupColors maps a manga row-ID to the colour of its duplicate group. Every
+	// member of a group shares one colour, so the same story is recognisable
+	// across the grid at a glance. dupRank gives the group's position, which the
+	// "duplicates" sort uses to keep a group's members adjacent.
+	//
+	// The colour is indexed by group position, so the group order has to be
+	// deterministic (FindPotentialDuplicates breaks ties on Key) or the bands
+	// would change colour between page loads.
+	dupColors := make(map[string]string, len(duplicateGroups)*2)
+	dupRank := make(map[string]int, len(duplicateGroups)*2)
+	for gi, g := range duplicateGroups {
+		color := dupPalette[gi%len(dupPalette)]
 		for _, m := range g.Members {
-			dupIDs[strconv.FormatInt(m.ID, 10)] = struct{}{}
+			id := strconv.FormatInt(m.ID, 10)
+			dupColors[id] = color
+			dupRank[id] = gi
 		}
 	}
+	duplicateCount = len(dupColors)
+
 	if viewFilter == "duplicate" {
 		kept := make([]database.Manga, 0, len(mangas))
 		for _, m := range mangas {
-			if _, ok := dupIDs[strconv.FormatInt(m.ID, 10)]; ok {
+			if _, ok := dupColors[strconv.FormatInt(m.ID, 10)]; ok {
 				kept = append(kept, m)
 			}
 		}
 		mangas = kept
 	}
-	sortLibrary(mangas, statsForSort, sortKey)
+	sortLibrary(mangas, statsForSort, sortKey, dupRank)
 
 	// Host-side pagination: slice the sorted/filtered library so the grid
 	// renders one page at a time.
@@ -207,7 +227,7 @@ func (s *Server) viewLibrary(w http.ResponseWriter, r *http.Request) {
 		"Sort":            sortKey,
 		"Status":          statusFilter,
 		"View":            viewFilter,
-		"DupIDs":          dupIDs,
+		"DupColors":       dupColors,
 		"Tag":             tagFilter,
 		"CategoryCounts":  s.service.LibraryCategoryCountsOrEmpty(),
 		"DuplicateCount":  duplicateCount,

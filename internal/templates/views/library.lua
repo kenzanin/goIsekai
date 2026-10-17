@@ -6,6 +6,7 @@
 -- data.Stats: {TotalTitles, StatusLine, ReadLine, HasUpdates, ReadingTime, MostLine, HasFewest, FewestLine}
 -- data.LibraryStats: map[string]map[string]any, data.Ratios: map[string]float64
 -- data.DuplicateCount: int, data.DuplicateGroups: []DuplicateGroup
+-- data.DupColors: map[mangaRowID]hex colour of the manga's duplicate group
 -- data.PluginCounts: []PluginCount
 
 local librarySidebar = require("partials.library_sidebar")
@@ -43,7 +44,7 @@ return function(data)
 		Mangas = mangas,
 		LibraryStats = libraryStats,
 		Ratios = ratios,
-		DupIDs = dupIDs,
+		DupColors = data.DupColors or {},
 	})
 	local pluginName = data.PluginName or pluginID
 	local titleCount = data.ResultCount
@@ -61,7 +62,6 @@ return function(data)
 	local statusFilter = data.Status or "all"
 	local tagFilter = data.Tag or ""
 	local viewFilter = data.View or ""
-	local dupIDs = data.DupIDs or {}
 
 	-- Every control on this page changes one parameter and keeps the rest. That
 	-- cannot be done by appending to a base URL: the base already carries the
@@ -242,6 +242,9 @@ return function(data)
 		.. '<option value="recent_read"'
 		.. (sortKey == "recent_read" and " selected" or "")
 		.. ">Recently read</option>"
+		.. '<option value="duplicates"'
+		.. (sortKey == "duplicates" and " selected" or "")
+		.. ">Duplicates first</option>"
 		.. "</select>"
 		.. "</form>"
 		.. tagBar
