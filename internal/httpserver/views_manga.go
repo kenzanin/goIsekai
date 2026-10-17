@@ -121,16 +121,19 @@ func (s *Server) buildMangaDetailData(r *http.Request, pluginID, mangaID string)
 	inLibrary := s.service.IsInLibrary(pluginID, mangaID)
 	lastSynced, _ := s.service.LibrarySyncState(pluginID, mangaID, time.Now())
 
+	// Display name + icon come from the same source every other page uses:
+	// DB rows as the base (they survive restarts and cover plugins whose VM is
+	// still deferred — PluginMetas alone is runtime-only and empty for those,
+	// which renders raw IDs and blank icons), runtime metas overlaid when
+	// fresher, and wasm plugins falling back to their on-disk logo.png because
+	// their plugin.json need not declare one. Resolving here instead of inline
+	// is what makes a wasm plugin's logo show on the detail page at all.
+	names, icons := s.pluginDisplayMaps()
 	pluginName := pluginID
-	pluginIcon := ""
-	if m, ok := s.service.PluginMetas()[pluginID]; ok {
-		if m.Name != "" {
-			pluginName = m.Name
-		}
-		if m.Logo != "" {
-			pluginIcon = s.resolveLogoURL(m.Logo, pluginID)
-		}
+	if n := names[pluginID]; n != "" {
+		pluginName = n
 	}
+	pluginIcon := icons[pluginID]
 	altTitles, _ := s.service.ListAltTitles(pluginID, mangaID)
 	altSummaries, _ := s.service.ListAltSummaries(pluginID, mangaID)
 	cats, _ := s.service.ListCategories(pluginID, mangaID)

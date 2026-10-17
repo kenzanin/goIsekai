@@ -135,3 +135,33 @@ func TestMangaDetailAddToLibraryKeepsChapters(t *testing.T) {
 		t.Errorf("persisted chapters = %d, want 3", n)
 	}
 }
+
+// TestMangaDetailShowsPluginLogo covers the plugin badge image on the detail
+// page. A wasm plugin's plugin.json need not declare a logo and its VM
+// metadata is runtime-only (PluginMetas is empty until the VM is instantiated),
+// so the detail view must resolve the icon from the same DB-first + on-disk
+// logo.png fallback every other view uses. It used to read PluginMetas
+// directly, which left the badge with no image for exactly these plugins.
+func TestMangaDetailShowsPluginLogo(t *testing.T) {
+	dir := writeLivePlugin(t)
+	s, db := challengeTestServer(t, dir)
+	if err := db.RegisterPlugin(database.Plugin{
+		ID:       "live",
+		Name:     "live",
+		Version:  "1",
+		WasmPath: filepath.Join(dir, "live", "main.lua"),
+		IsActive: true,
+	}); err != nil {
+		t.Fatalf("register plugin: %v", err)
+	}
+
+	req := httptest.NewRequest("GET", "/view/manga/live/zdPX2", nil)
+	rec := httptest.NewRecorder()
+	s.Router.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200; body: %s", rec.Code, rec.Body.String())
+	}
+	if !strings.Contains(rec.Body.String(), `<img src="/plugin-static/live/logo.png"`) {
+		t.Errorf("plugin logo missing from detail page; body: %s", rec.Body.String())
+	}
+}
