@@ -39,6 +39,9 @@ return function(data)
 	local showSidebar = (#pluginCounts > 0)
 		or (#mangas > 0 and q == "")
 		or (q ~= "" or (data.PluginID or "") ~= "" or (data.Tag or "") ~= "" or (data.Status or "all") ~= "all")
+		-- The duplicate view is sticky; keep the sidebar (and with it the card
+		-- that clears the view) reachable even when the filter matches nothing.
+		or viewFilter == "duplicate"
 	-- Always show plugin card when we have pluginCounts; otherwise keep previous stats-gating.
 	-- Override: plugin card must stay visible so user can hit All after any filter.
 	if #pluginCounts > 0 then
@@ -134,9 +137,12 @@ return function(data)
 
 		-- Duplicate card: plain clickable card, no dropdown. Click toggles the
 	-- ?view=duplicate grid filter; the card only shows the count.
+	-- Also rendered when the filter is active but the count has dropped to 0:
+	-- the view is sticky (localStorage gsk:library-view), so hiding the card
+	-- would strand the reader on an empty grid with no way back to all titles.
 	-- MUST run before the statCards embed below: addStatLink appends to
 	-- statCards, which is concatenated into sidebarHTML at the embed.
-	if duplicateCount > 0 then
+	if duplicateCount > 0 or viewFilter == "duplicate" then
 		local activeDup = (viewFilter == "duplicate")
 		local dupHref = activeDup and sidebarLink({ view = "" }) or sidebarLink({ view = "duplicate" })
 		addStatLink(duplicateCount, "duplicates", "text-indigo-400", dupHref, activeDup, activeDup)

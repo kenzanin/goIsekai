@@ -143,3 +143,48 @@ func TestSortSelectShowsTheActiveSort(t *testing.T) {
 		t.Errorf("sort select does not mark read as selected:\n%s", block)
 	}
 }
+
+// The duplicate card is the only control that clears ?view=duplicate, and the
+// view is sticky (localStorage gsk:library-view): once a reader is filtered to
+// duplicates, opening a bare /view/library restores it. So when the last
+// duplicate is resolved and the count drops to 0, the card must still render -
+// otherwise the empty grid has no way back to all titles.
+func TestDuplicateCardShowsWhenCountIsZeroButViewActive(t *testing.T) {
+	data := libraryPageData()
+	// Strip every other reason the sidebar would render (no query, no mangas,
+	// no plugin counts, no status/tag/plugin filter) so only the new
+	// `or viewFilter == "duplicate"` clause can keep the card reachable.
+	data["View"] = "duplicate"
+	data["DuplicateCount"] = 0
+	data["Q"] = ""
+	data["PluginID"] = ""
+	data["Status"] = "all"
+	data["Tag"] = ""
+	delete(data, "Mangas")
+	delete(data, "PluginCounts")
+
+	html := renderLibraryPage(t, data)
+	if !strings.Contains(html, ">duplicates<") {
+		t.Fatalf("duplicate card is hidden at count 0, so the active view cannot be cleared")
+	}
+	// The card must link back to a query without view=duplicate.
+	card := regexp.MustCompile(`(?s)<a href="[^"]*"[^>]*>\s*<div[^>]*>\s*0\s*</div>.*?duplicates`).FindString(html)
+	if card == "" {
+		t.Fatal("no duplicate stat card found")
+	}
+	if strings.Contains(card, "view=duplicate") {
+		t.Errorf("duplicate card points back at view=duplicate, so it cannot reset the view:\n%s", card)
+	}
+}
+
+// Without the view filter, a zero count means no duplicates exist: the card is
+// noise and must stay hidden.
+func TestDuplicateCardHiddenWhenNoDuplicatesAndNoView(t *testing.T) {
+	data := libraryPageData()
+	data["View"] = ""
+	data["DuplicateCount"] = 0
+
+	if html := renderLibraryPage(t, data); strings.Contains(html, ">duplicates<") {
+		t.Error("duplicate card rendered with no duplicates and no active view")
+	}
+}
