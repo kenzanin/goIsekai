@@ -86,7 +86,7 @@ return function(data)
 			local cls = (color and color ~= "") and (' class="text-sm font-medium ' .. h(color) .. '"')
 				or ' class="text-lg font-semibold"'
 			local outer = active
-				and "bg-neutral-900 border border-indigo-500/30 rounded-lg px-4 py-3"
+				and "bg-indigo-500/15 border border-indigo-500 rounded-lg px-4 py-3"
 				or "bg-neutral-900 border border-neutral-800 rounded-lg px-4 py-3 hover:border-indigo-500/30 transition"
 			statCards = statCards
 				.. '<a href="'
@@ -120,7 +120,7 @@ return function(data)
 			-- Clickable: filters the grid to only titles with the [New] badge.
 			local activeNew = (statusFilter == "new")
 			local updatesHref = activeNew and sidebarLink({ status = "all" }) or sidebarLink({ status = "new" })
-			addStatLink(stats.HasUpdates, activeNew and "updates (active ✓)" or "updates", "text-indigo-400", updatesHref, activeNew, activeNew)
+			addStatLink(stats.HasUpdates, "updates", "text-indigo-400", updatesHref, activeNew, activeNew)
 		end
 		if stats.ReadingTime and stats.ReadingTime ~= "" then
 			addStat(stats.ReadingTime, "reading time", "", true)
@@ -132,20 +132,23 @@ return function(data)
 			addStat(stats.FewestLine, "fewest chapters", "", true)
 		end
 
-		sidebarHTML = [[<div class="flex flex-col lg:flex-row gap-4 items-start">
+		-- Duplicate card: plain clickable card, no dropdown. Click toggles the
+	-- ?view=duplicate grid filter; the card only shows the count.
+	-- MUST run before the statCards embed below: addStatLink appends to
+	-- statCards, which is concatenated into sidebarHTML at the embed.
+	if duplicateCount > 0 then
+		local activeDup = (viewFilter == "duplicate")
+		local dupHref = activeDup and sidebarLink({ view = "" }) or sidebarLink({ view = "duplicate" })
+		addStatLink(duplicateCount, "duplicates", "text-indigo-400", dupHref, activeDup, activeDup)
+	end
+
+	sidebarHTML = [[<div class="flex flex-col lg:flex-row gap-4 items-start">
 <aside class="lg:w-56 shrink-0 flex flex-col gap-3">
     <div class="bg-neutral-900 border border-neutral-800 rounded-lg px-4 py-3">
         <div class="flex flex-col gap-3">]] .. statCards .. [[</div>
     </div>
 
 ]]
-	-- Duplicate card: plain clickable card, no dropdown. Click toggles the
-	-- ?view=duplicate grid filter; the card only shows the count.
-	if duplicateCount > 0 then
-		local activeDup = (viewFilter == "duplicate")
-		local dupHref = activeDup and sidebarLink({ view = "" }) or sidebarLink({ view = "duplicate" })
-		addStatLink(duplicateCount, activeDup and "duplicates (active ✓)" or "duplicates", "text-indigo-400", dupHref, activeDup, activeDup)
-	end
 
 		-- Plugin counts
 		if #pluginCounts > 0 then

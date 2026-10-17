@@ -34,9 +34,9 @@ return function(data)
 		DuplicateGroups = duplicateGroups,
 		PluginCounts = pluginCounts,
 		PluginID = pluginID,
-		Status = statusFilter,
+		Status = data.Status or "all",
 		View = data.View or "",
-		Tag = tagFilter,
+		Tag = data.Tag or "",
 	})
 
 	local mangaCards = libraryCards({
@@ -184,7 +184,9 @@ return function(data)
 		.. '<button type="button" id="view-grid-btn" aria-pressed="true" class="p-1.5 rounded-md hover:bg-neutral-800 transition" title="Grid view">'
 		.. '<svg class="w-4 h-4 text-neutral-400" fill="currentColor" viewBox="0 0 16 16"><rect x="1" y="1" width="6" height="6" rx="1"/><rect x="9" y="1" width="6" height="6" rx="1"/><rect x="1" y="9" width="6" height="6" rx="1"/><rect x="9" y="9" width="6" height="6" rx="1"/></svg></button>'
 		.. '<button type="button" id="view-list-btn" aria-pressed="false" class="p-1.5 rounded-md hover:bg-neutral-800 transition" title="List view">'
-		.. '<svg class="w-4 h-4 text-neutral-400" fill="currentColor" viewBox="0 0 16 16"><rect x="1" y="1" width="14" height="3" rx="1"/><rect x="1" y="6.5" width="14" height="3" rx="1"/><rect x="1" y="12" width="14" height="3" rx="1"/></svg></button></div>'
+		.. '<svg class="w-4 h-4 text-neutral-400" fill="currentColor" viewBox="0 0 16 16"><rect x="1" y="1" width="14" height="3" rx="1"/><rect x="1" y="6.5" width="14" height="3" rx="1"/><rect x="1" y="12" width="14" height="3" rx="1"/></svg></button>'
+		.. '<button type="button" id="view-reset-btn" class="p-1.5 rounded-md hover:bg-neutral-800 transition" title="Reset view (grid + all filters)">'
+		.. '<svg class="w-4 h-4 text-neutral-400" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg></button></div>'
 	local updateHTML = '<form method="post" action="/action/sync" data-sync-form data-job-action="sync">'
 		.. csrfInput(data.csrf_token or "")
 		.. '<button type="submit" class="bg-indigo-600 hover:bg-indigo-500 text-white rounded-md px-4 py-2 text-sm font-medium inline-flex items-center gap-1.5">'

@@ -154,7 +154,7 @@ return function(data)
 				.. (isDone and "border-emerald-500/50 text-emerald-400 bg-emerald-500/10 hover:bg-emerald-500/20" or "border-neutral-700 hover:bg-neutral-800 text-neutral-500 hover:text-neutral-300")
 				.. '" aria-label="'
 				.. (isDone and "Unmark read" or "Mark read")
-				.. '">' .. (isDone and '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="size-4"><polyline points="20 6 9 17 4 12"/></svg>' or '<span class="text-xs font-medium">Read</span>')
+				.. '">' .. (isDone and '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="size-4"><polyline points="20 6 9 17 4 12"/></svg>' or '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="size-4"><circle cx="12" cy="12" r="9"/><path d="m9 12 2 2 4-4"/></svg>')
 				.. '</button>'
 				.. "</form>"
 
