@@ -3,8 +3,10 @@ package pluginmanager
 import (
 	"context"
 	"fmt"
-	"github.com/goccy/go-json"
+	"strings"
 	"time"
+
+	"github.com/goccy/go-json"
 
 	"github.com/dop251/goja"
 
@@ -85,30 +87,40 @@ func callJS(p *loadedPlugin, fnName, inputJSON string) (string, error) {
 	return string(raw), nil
 }
 
-// jsConsole wraps fmt.Printf-style console output for JS plugins.
-type jsConsole struct{ id string }
-
-func newJSConsole(id string) *jsConsole { return &jsConsole{id: id} }
-
-func (c *jsConsole) Log(args ...goja.Value)   { c.log("info", args...) }
-func (c *jsConsole) Info(args ...goja.Value)  { c.log("info", args...) }
-func (c *jsConsole) Warn(args ...goja.Value)  { c.log("warn", args...) }
-func (c *jsConsole) Error(args ...goja.Value) { c.log("error", args...) }
-func (c *jsConsole) Debug(args ...goja.Value) { c.log("debug", args...) }
-
-func (c *jsConsole) log(level string, args ...goja.Value) {
-	parts := make([]any, len(args))
-	for i, a := range args {
-		parts[i] = a.Export()
+// newJSConsole builds the `console` global as a plain JS object with the
+// lowercase names a JS author expects. Handing goja a Go struct instead leaves
+// it mapping methods by their exported name, so only `console.Log` would
+// resolve while the familiar `console.log(...)` would not exist at all.
+// Arguments are joined with a space, the way console.log formats them.
+func newJSConsole(id string) map[string]any {
+	emit := func(level string, args []goja.Value) {
+		parts := make([]string, len(args))
+		for i, a := range args {
+			parts[i] = fmt.Sprint(a.Export())
+		}
+		msg := strings.Join(parts, " ")
+		switch level {
+		case "debug":
+			logger.Debug("plugin="+id, "msg", msg)
+		case "warn":
+			logger.Warn("plugin="+id, "msg", msg)
+		case "error":
+			logger.Error("plugin="+id, "msg", msg)
+		default:
+			logger.Info("plugin="+id, "msg", msg)
+		}
 	}
-	switch level {
-	case "debug":
-		logger.Debug("plugin="+c.id, "msg", fmt.Sprint(parts...))
-	case "info":
-		logger.Info("plugin="+c.id, "msg", fmt.Sprint(parts...))
-	case "warn":
-		logger.Warn("plugin="+c.id, "msg", fmt.Sprint(parts...))
-	case "error":
-		logger.Error("plugin="+c.id, "msg", fmt.Sprint(parts...))
+	fn := func(level string) func(goja.FunctionCall) goja.Value {
+		return func(call goja.FunctionCall) goja.Value {
+			emit(level, call.Arguments)
+			return goja.Undefined()
+		}
+	}
+	return map[string]any{
+		"log":   fn("info"),
+		"info":  fn("info"),
+		"warn":  fn("warn"),
+		"error": fn("error"),
+		"debug": fn("debug"),
 	}
 }
