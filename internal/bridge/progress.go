@@ -37,22 +37,20 @@ func (s *AppService) countCachedPages(pluginID, mangaID, chapterID string) int {
 // SetChapterProgress records a chapter's last page read, addressed by source
 // identifiers.
 func (s *AppService) SetChapterProgress(pluginID, mangaID, chapterID string, lastPage int) error {
-	chapterIntID, err := s.db.ResolveChapterIntID(pluginID, mangaID, chapterID)
-	if err != nil {
-		return fmt.Errorf("bridge: resolve chapter: %w", err)
-	}
-	if err := s.db.SetChapterProgress(chapterIntID, lastPage); err != nil {
-		return fmt.Errorf("bridge: set chapter progress: %w", err)
-	}
-	// Reaching the final page means the whole chapter is cached — write
-	// complete.csv so a later CBZ export can run fully offline. Best-effort.
-	if total, err := s.db.GetChapterTotalPages(chapterIntID); err == nil && total > 0 && lastPage >= total {
-		_, err := s.EnqueueMarkChapterComplete(context.Background(), pluginID, mangaID, chapterID)
-		if err != nil {
-			logger.Warn("enqueue mark chapter complete failed", "plugin", pluginID, "manga", mangaID, "chapter", chapterID, "error", err)
+	return s.withChapter(pluginID, mangaID, chapterID, "set chapter progress", func(chapterIntID int64) error {
+		if err := s.db.SetChapterProgress(chapterIntID, lastPage); err != nil {
+			return err
 		}
-	}
-	return nil
+		// Reaching the final page means the whole chapter is cached — write
+		// complete.csv so a later CBZ export can run fully offline. Best-effort.
+		if total, err := s.db.GetChapterTotalPages(chapterIntID); err == nil && total > 0 && lastPage >= total {
+			_, err := s.EnqueueMarkChapterComplete(context.Background(), pluginID, mangaID, chapterID)
+			if err != nil {
+				logger.Warn("enqueue mark chapter complete failed", "plugin", pluginID, "manga", mangaID, "chapter", chapterID, "error", err)
+			}
+		}
+		return nil
+	})
 }
 
 // MarkChapterComplete records the chapter's page URLs in complete.csv so a
@@ -165,14 +163,9 @@ func (s *AppService) ToggleCoverDim(pluginID, mangaID string) error {
 // raw must be a JSON object (possibly empty); validation stays minimal so
 // future pref keys need no bridge change.
 func (s *AppService) SaveReaderPrefs(pluginID, mangaID, raw string) error {
-	mangaIntID, err := s.db.ResolveMangaIntID(pluginID, mangaID)
-	if err != nil {
-		return fmt.Errorf("bridge: resolve manga: %w", err)
-	}
-	if err := s.db.SetReaderPrefs(mangaIntID, raw); err != nil {
-		return fmt.Errorf("bridge: set reader_prefs: %w", err)
-	}
-	return nil
+	return s.withManga(pluginID, mangaID, "set reader_prefs", func(mangaIntID int64) error {
+		return s.db.SetReaderPrefs(mangaIntID, raw)
+	})
 }
 
 // GetReaderPrefs returns the stored per-manga reader prefs blob.
@@ -191,12 +184,7 @@ func (s *AppService) GetReaderPrefs(pluginID, mangaID string) (string, bool, err
 
 // SetChaptersSkip sets the skip flag for the given source chapters of a manga.
 func (s *AppService) SetChaptersSkip(pluginID, mangaID string, chapterIDs []string, skip bool) error {
-	mangaIntID, err := s.db.ResolveMangaIntID(pluginID, mangaID)
-	if err != nil {
-		return fmt.Errorf("bridge: resolve manga: %w", err)
-	}
-	if err := s.db.SetChaptersSkip(mangaIntID, chapterIDs, skip); err != nil {
-		return fmt.Errorf("bridge: set chapters skip: %w", err)
-	}
-	return nil
+	return s.withManga(pluginID, mangaID, "set chapters skip", func(mangaIntID int64) error {
+		return s.db.SetChaptersSkip(mangaIntID, chapterIDs, skip)
+	})
 }

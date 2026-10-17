@@ -64,3 +64,8 @@ ai.sh
 *.log
 
 .pi/.compartments/
+
+# RTK token-optimizer local artifacts
+.envrc
+.rtk/
+CLAUDE.md

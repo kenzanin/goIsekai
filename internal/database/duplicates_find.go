@@ -2,6 +2,8 @@ package database
 
 import (
 	"sort"
+
+	"goisekai/internal/pluginutil"
 )
 
 // FindPotentialDuplicates groups in-library manga that look like the same
@@ -94,17 +96,17 @@ func (d *DB) FindPotentialDuplicates() ([]DuplicateGroup, error) {
 	}
 
 	for i, m := range allManga {
-		addTitle(normalizeTitle(m.Title), i)
-		addDesc(normalizeTitle(m.Description), i)
+		addTitle(pluginutil.NormalizeTitle(m.Title), i)
+		addDesc(pluginutil.NormalizeTitle(m.Description), i)
 	}
 	for _, a := range titleAlts {
 		if idx, ok := idIndex[mangaIDFromRowID(a.MangaRowID)]; ok {
-			addTitle(normalizeTitle(a.Value), idx)
+			addTitle(pluginutil.NormalizeTitle(a.Value), idx)
 		}
 	}
 	for _, a := range descAlts {
 		if idx, ok := idIndex[mangaIDFromRowID(a.MangaRowID)]; ok {
-			addDesc(normalizeTitle(a.Value), idx)
+			addDesc(pluginutil.NormalizeTitle(a.Value), idx)
 		}
 	}
 

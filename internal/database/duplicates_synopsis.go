@@ -1,6 +1,10 @@
 package database
 
-import "strings"
+import (
+	"strings"
+
+	"goisekai/internal/pluginutil"
+)
 
 // rareTokenMaxDF is the largest number of library rows a word may appear in
 // and still count as evidence.  Words in two or three rows are almost always
@@ -27,7 +31,7 @@ func findSimilarSynopses(all []Manga, grouped []bool) []DuplicateGroup {
 	// whole library.
 	postings := make(map[string][]int)
 	for i, m := range all {
-		for tok := range strings.FieldsSeq(normalizeTitle(m.Title + " " + m.Description)) {
+		for tok := range strings.FieldsSeq(pluginutil.NormalizeTitle(m.Title + " " + m.Description)) {
 			if len(tok) < 2 {
 				continue
 			}

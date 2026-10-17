@@ -15,8 +15,11 @@ generated:
 
 # Dead code and merge candidates audit
 
-Findings only — nothing in this document has been applied yet. Recorded so the
-work can be picked up without re-running the sweep.
+Sweep of 2026-10-17. **Status:** everything actionable here has been applied
+across `ec12590`, `df349e5` and the follow-up merge session — 19 → 1 dead
+functions, six merge candidates all closed except AutoSelectCandidate (below).
+Kept as the record of what was found, how to reproduce the sweep, and why a few
+things were deliberately left alone.
 
 ## How to reproduce
 
@@ -32,8 +35,8 @@ go install honnef.co/go/tools/cmd/staticcheck@latest
 Then, from the repo root:
 
 ```bash
-deadcode ./...          # 19 hits: reachable only from main
-deadcode -test ./...    # 12 hits: dead even when tests are entry points
+deadcode ./...          # now 1 hit: AutoSelectCandidate (test-only, open finding)
+deadcode -test ./...    # now 0 hits (was 19/12 at sweep time)
 ```
 
 Two indexes cover structural questions and must both be refreshed after a
@@ -55,12 +58,14 @@ zero rows, while `STARTS WITH` and bare property comparison work.
 ### Unreachable even from tests (12) — 10 removed in `ec12590`
 
 **Status 2026-10-17:** the ten symbols outside `migrate_candidates.go` were
-deleted in commit `ec12590`; `deadcode -test ./...` went 12 → 2. Each was
-checked for dynamic dispatch first — no `reflect.MethodByName`, no Wails `Bind`,
-no function name used as a plugin/host-call string — so none was reachable
-through yaegi, wasm or a Lua template. `config.LoadOrInit` took its whole file
-(`internal/config/loader.go`) with it. Remaining: only `CollectMigrationCandidates`
-and `collectCandidatesWithTitle`, both in `migrate_candidates.go` (see below).
+deleted in commit `ec12590`; the last two (`CollectMigrationCandidates`,
+`collectCandidatesWithTitle`) were **wired instead of deleted** in `df349e5` —
+the view now calls them, so their alt-title matching finally runs. Each was
+checked for dynamic dispatch first — no `reflect.MethodByName`, no Wails
+`Bind`, no function name used as a plugin/host-call string — so none was
+reachable through yaegi, wasm or a Lua template. `config.LoadOrInit` took its
+whole file (`internal/config/loader.go`) with it. Current: `deadcode -test`
+reports **0 hits**.
 
 | Symbol | Location |
 | --- | --- |
@@ -77,23 +82,26 @@ and `collectCandidatesWithTitle`, both in `migrate_candidates.go` (see below).
 | `LoadOrInit` | `internal/config/loader.go:8` |
 | `LuaEngine.Has` | `internal/templates/lua_engine.go:98` |
 
-### Reachable only from tests (7)
+### Reachable only from tests (7) — all resolved
 
-`altTitlesFor`, `matchKeys`, `isExactMatch`, `AutoSelectCandidate` (all in
-`internal/bridge/migrate_candidates.go`), `ImageFormat.FormatExtension`
-(`internal/bridge/imgcodec.go:49`), `database.NormalizeTitle`
-(`internal/database/duplicates_match.go:13`), `workers.Permanent`
-(`internal/workers/pool.go:99`).
+`altTitlesFor`, `matchKeys`, `isExactMatch` (in `internal/bridge/migrate_candidates.go`)
+are now reached from production: `df349e5` wired `CollectMigrationCandidates`
+into the migrate view. `workers.Permanent` gained its producer in the same
+commit (`permanentIfFinal` in `jobs.go`). `ImageFormat.FormatExtension` and
+`database.NormalizeTitle` were deleted in `df349e5` (both one-line pass-throughs;
+`TestFormatExtension` stayed because it covers `extension()`, which
+`fetchImage` really uses). The only remaining hit is `AutoSelectCandidate`
+(below).
 
-### The largest single block
+### The largest single block — wired, not deleted
 
-`internal/bridge/migrate_candidates.go` is 198 lines with no production caller.
-`internal/httpserver/views_migrate.go` re-implements the same parallel
-per-plugin search inline (its own `futures` map, its own failure collection,
-its own `errAllSourcesFailed`) instead of calling
-`CollectMigrationCandidates`. Deleting the file removes the dead code and the
-duplication together — but `migrate_test.go` and `migrate_candidates_test.go`
-cover `AutoSelectCandidate`, so those tests go with it.
+`internal/bridge/migrate_candidates.go` was 198 lines with no production
+caller: `internal/httpserver/views_migrate.go` re-implemented the same parallel
+per-plugin search inline. Instead of deleting it, `df349e5` kept the *better*
+half — its alt-title matching (a source publishing the series under another
+name is recognised as the same work, where the view only compared raw titles) —
+and rewired the view to call it. One behavior note: an empty query searches
+nothing, matching what the view already did.
 
 ### Two things that looked like dead code but were not
 
@@ -101,44 +109,62 @@ Resolved 2026-10-17 (commit `ec12590`): `AddGenre`/`RemoveGenre` really were
 leftovers — both routes call `ToggleGenre`, which alone carries the final
 behaviour; `EnrichmentCatalog` and `LoadOrInit` were leftovers too (both real
 callers use `EnrichmentSources` / the `Default()`-then-`Load()` dance), so all
-four were deleted. `ImageFormat.FormatExtension` is the one that still reads as
-deliberate API surface; it is test-only, so leave it unless the export is known
-to be unneeded.
+four were deleted. Follow-up: the two `ToggleGenre` handlers themselves were
+byte-identical except their log text and collapsed into one
+`handleToggleGenre` serving both routes.
 
-## A real bug, not dead code
+## A real bug, not dead code — fixed in `df349e5`
 
 `workers.Permanent()` (`internal/workers/pool.go:99`) wraps an error in
 `ErrPermanent`, and `internal/workers/enqueue.go:238` checks for it to break
-out of the retry loop — but **nothing in production code ever calls
-`Permanent()`**. Only `pool_test.go:151` does. So the documented "do not retry
-rate-limit-exhausted / permanent 404" path is wired at one end only;
-production callbacks wrap their errors with plain `fmt.Errorf`, and those jobs
-retry to `MaxAttempts` as normal.
+out of the retry loop — but **nothing in production code ever called
+`Permanent()`**; only `pool_test.go:151` did. `df349e5` added the producer:
+`permanentIfFinal` in `jobs.go` wraps exactly `*hostnet.ChallengeError` (needs a
+human to open VerifyURL, so retrying only hammers the site) on the two
+retryable seams, `runOnFetch` and `EnqueueExportCBZ`. Covered by
+`TestRunOnFetchDoesNotRetryAChallenge` (1 attempt) and
+`TestRunOnFetchRetriesATransientError` (3 attempts).
 
-## Merge candidates
+## Merge candidates — all six applied
 
 Ordered by payoff. Each was verified by diff, not by eyeball.
 
-1. **`handleAddGenre` / `handleRemoveGenre`** —
-   `internal/httpserver/actions_enrichment.go:36` and `:118`. Identical body;
-   both delegate to `ToggleGenre`. Collapse to one handler and point both
-   routes at it.
-2. **`EnqueueSearchManga` / `EnqueueGetChapterList`** —
-   `internal/bridge/jobs.go:131` and `:148`. Differ only in which bridge method
-   they delegate to (`SearchManga` / `GetChapterList`); `Lane`, `PluginKey`,
-   and the callback plumbing are verbatim. One generic enqueue helper fits both.
-3. **`migrate_candidates.go` vs `views_migrate.go`** — see above. Delete the
-   helper, and the duplication goes with the dead code.
-4. **`NormalizeTitle` in three layers** — `pluginutil.NormalizeTitle`
-   (the real implementation), `database.normalizeTitle` (6 callers, a bare
-   pass-through), and `database.NormalizeTitle` (0 non-test callers, another
-   pass-through of the same thing). The last one is pure noise; the middle one
-   could be an alias.
-5. **31 near-identical `resolve-id → db → wrap` methods** across
-   `internal/bridge/progress.go` (11), `progress_read.go` (10),
-   `alttitles.go` (5), `library_catalog.go` (5). Each is 7–13 lines doing
-   `ResolveMangaIntID`/`ResolveChapterIntID`, one `s.db.*` call, and a
-   `fmt.Errorf` wrap. The `SIMILAR_TO` graph puts most pairs at jaccard ≥ 0.95.
-   A `withManga`/`withChapter` helper collapses the resolve+wrap boilerplate.
-6. **`ImageFormat.FormatExtension()`** — `internal/bridge/imgcodec.go:49` is a
-   one-line alias of `extension()`. Inline it (or unexport `extension`).
+1. ✅ **`handleAddGenre` / `handleRemoveGenre`** — collapsed into one
+   `handleToggleGenre` in `internal/httpserver/actions_enrichment.go`; both
+   routes in `actions.go` point at it (bodies were identical bar the log text).
+2. ✅ **`EnqueueSearchManga` / `EnqueueGetChapterList`** — both are now thin
+   wrappers over one `enqueueFanout[T]` in `internal/bridge/jobs.go` (fetch
+   lane + plugin key + error handed to the callback, job returns nil either
+   way). Public signatures unchanged, so no caller moved.
+3. ✅ **`migrate_candidates.go` vs `views_migrate.go`** — resolved the other
+   way: the view's inline copy was deleted and it calls
+   `CollectMigrationCandidates` (see "wired, not deleted" above).
+4. ✅ **`NormalizeTitle` in three layers** — `database.NormalizeTitle` deleted
+   (`df349e5`), then the middle layer `database.normalizeTitle` deleted in the
+   merge session: `duplicates_find.go` (4 sites) and `duplicates_synopsis.go`
+   (1 site) call `pluginutil.NormalizeTitle` directly.
+5. ✅ **`resolve-id → db → wrap` methods** — `withManga`/`withChapter` added to
+   `internal/bridge/service.go` (resolve labelled `bridge: resolve manga|
+   chapter`, fn labelled `bridge: <stage>` — messages byte-identical to the
+   inline originals). 11 sites converted: 8 in `progress_read.go` (its `fmt`
+   import now gone) and 3 in `progress.go` (`SetChapterProgress`,
+   `SaveReaderPrefs`, `SetChaptersSkip`). Deliberately **not** converted:
+   multi-step methods with several distinct stage labels (`SetMainTitle`,
+   `RemoveAltTitle`, `ToggleCoverDim`), value-returning ones
+   (`GetReaderPrefs`, `GetChapterProgresses`, `ListAltSummaries`),
+   `alttitles.go`'s `MangaRowID` (string row id, different resolver), and
+   `ToggleLibraryItem` (intentionally discards the resolve error) — a
+   single-stage helper would have changed their error shapes. One message
+   nuance: `SetChapterTotalPages`'s db error is now wrapped
+   `bridge: set chapter total pages` where it used to propagate raw; no test
+   or caller matches on that text.
+6. ✅ **`ImageFormat.FormatExtension()`** — deleted in `df349e5` (it was a
+   one-line alias of `extension()`); `TestFormatExtension` still covers
+   `extension()` itself.
+
+## Still open
+
+- **`AutoSelectCandidate`** (`internal/bridge/migrate_candidates.go`) — the
+  single remaining `deadcode ./...` hit. Its helpers now run in production, but
+  no UI path auto-picks a migration target yet. Wire it when the picker grows
+  an auto-select affordance, or delete it with its tests if that never lands.

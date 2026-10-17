@@ -33,17 +33,19 @@ func (s *Server) handleFetchEnrichment(w http.ResponseWriter, r *http.Request) {
 	s.viewMangaDetail(w, r)
 }
 
-func (s *Server) handleRemoveGenre(w http.ResponseWriter, r *http.Request) {
+// handleToggleGenre adds or removes a user-supplied genre: both routes run the
+// same toggle, so /add-genre and /remove-genre share this one handler.
+func (s *Server) handleToggleGenre(w http.ResponseWriter, r *http.Request) {
 	pluginID := param(r, "pluginID")
 	mangaID := param(r, "mangaID")
 	if err := r.ParseForm(); err != nil {
-		s.logger.Error("remove genre: parse form", "error", err)
+		s.logger.Error("toggle genre: parse form", "error", err)
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 	genre := r.FormValue("genre")
 	if err := s.service.ToggleGenre(pluginID, mangaID, genre); err != nil {
-		s.logger.Error("remove genre", "pluginID", pluginID, "mangaID", mangaID, "genre", genre, "error", err)
+		s.logger.Error("toggle genre", "pluginID", pluginID, "mangaID", mangaID, "genre", genre, "error", err)
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
@@ -108,24 +110,6 @@ func (s *Server) handleAddCategory(w http.ResponseWriter, r *http.Request) {
 	}
 	if err := s.service.AddCategory(pluginID, mangaID, category); err != nil {
 		s.logger.Error("add category", "pluginID", pluginID, "mangaID", mangaID, "category", category, "error", err)
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
-	}
-	s.viewMangaDetail(w, r)
-}
-
-// handleAddGenre adds a user-supplied genre to a manga.
-func (s *Server) handleAddGenre(w http.ResponseWriter, r *http.Request) {
-	pluginID := param(r, "pluginID")
-	mangaID := param(r, "mangaID")
-	if err := r.ParseForm(); err != nil {
-		s.logger.Error("add genre: parse form", "error", err)
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
-	}
-	genre := r.FormValue("genre")
-	if err := s.service.ToggleGenre(pluginID, mangaID, genre); err != nil {
-		s.logger.Error("add genre", "pluginID", pluginID, "mangaID", mangaID, "genre", genre, "error", err)
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}

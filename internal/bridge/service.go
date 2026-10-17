@@ -87,6 +87,32 @@ func (s *AppService) Shutdown() {
 	s.pool.Shutdown()
 }
 
+// withManga resolves the source ids to the manga row id and runs fn with it.
+// Both failure paths are labelled so logs and toasts say which stage broke:
+// the resolve step as "bridge: resolve manga", fn's own error as "bridge: <stage>".
+func (s *AppService) withManga(pluginID, mangaID, stage string, fn func(int64) error) error {
+	mangaIntID, err := s.db.ResolveMangaIntID(pluginID, mangaID)
+	if err != nil {
+		return fmt.Errorf("bridge: resolve manga: %w", err)
+	}
+	if err := fn(mangaIntID); err != nil {
+		return fmt.Errorf("bridge: %s: %w", stage, err)
+	}
+	return nil
+}
+
+// withChapter is withManga for the three-part chapter-address resolve.
+func (s *AppService) withChapter(pluginID, mangaID, chapterID, stage string, fn func(int64) error) error {
+	chapterIntID, err := s.db.ResolveChapterIntID(pluginID, mangaID, chapterID)
+	if err != nil {
+		return fmt.Errorf("bridge: resolve chapter: %w", err)
+	}
+	if err := fn(chapterIntID); err != nil {
+		return fmt.Errorf("bridge: %s: %w", stage, err)
+	}
+	return nil
+}
+
 // TriggerShutdown signals the server to begin graceful shutdown.
 // If shutdownFn is set, calls it; otherwise is a no-op.
 func (s *AppService) TriggerShutdown() {
