@@ -3,17 +3,20 @@
 // MangaUno (manga.uno) source plugin for goIsekai — standard-Go WASM reactor
 //
 // https://manga.uno is a Next.js site with JSON API at /api/...
-// Search and genres use /api/search/advanced and /api/genres
-// Manga detail at /api/manga/<slug>, chapters at /api/chapter/<id>
 //
 // From HAR:
-//   search: GET /api/search/advanced?title=isekai&genres=Fantasy&limit=24
-//   genres: GET /api/genres
-//   detail: GET /api/manga/<slug>
-//   chapters: GET /api/chapter/<id>
+//   search:   GET /api/search/advanced?title=...&genres=...&limit=24
+//   genres:   GET /api/genres
+//   detail:   GET /api/manga/<slug>    -> {"manga":{...},"chapters":[...]}
+//   chapters: GET /api/manga/<slug>    -> top-level "chapters" (same response)
+//   pages:    GET /api/chapter/<id>    -> {"chapter":{...},"pages":[...]}
 //
 // ID scheme: Manga.ID = slug, e.g. "mushoku-tensei-jobless-reincarnation"
-//            Chapter.ID = numeric chapter id
+//            Chapter.ID = the site's numeric chapter id
+//
+// Covers and pages resolve against the CDN origin (xz7.fstr-cdn.com), never
+// manga.uno: manga.uno/covers/*.webp answers an HTML shell, which broke every
+// cover and reader image.
 
 package main
 
@@ -31,6 +34,26 @@ import (
 
 const siteURL = "https://manga.uno"
 const apiURL = "https://manga.uno/api"
+const cdnURL = "https://xz7.fstr-cdn.com"
+
+// cdn resolves a site path the way the site itself does — against the CDN
+// origin, because manga.uno serves an HTML shell for /covers/*.webp.
+func cdn(raw string) string {
+	p := strings.TrimSpace(raw)
+	if p == "" {
+		return ""
+	}
+	if strings.HasPrefix(p, "//") {
+		return "https:" + p
+	}
+	if strings.HasPrefix(p, "http://") || strings.HasPrefix(p, "https://") {
+		return p
+	}
+	if strings.HasPrefix(p, "/") {
+		return cdnURL + p
+	}
+	return cdnURL + "/" + p
+}
 
 const acceptJSON = `{"Accept":"application/json","Referer":"https://manga.uno/"}`
 
@@ -142,14 +165,14 @@ func GetGenres(ptr, n uint32) uint64 { return reply(genresImpl()) }
 
 type searchItem struct {
 	ID       int    `json:"id"`
-	Slug     string  `json:"slug"`
-	Title    string  `json:"title"`
-	English  string  `json:"english_title"`
-	Japanese string  `json:"japanese_title"`
-	Cover    string  `json:"cover"`
-	Type     string  `json:"type"`
-	Status   string  `json:"status"`
-	Updated  string  `json:"last_chapter_at"`
+	Slug     string `json:"slug"`
+	Title    string `json:"title"`
+	English  string `json:"english_title"`
+	Japanese string `json:"japanese_title"`
+	Cover    string `json:"cover"`
+	Type     string `json:"type"`
+	Status   string `json:"status"`
+	Updated  string `json:"last_chapter_at"`
 }
 
 type searchResp struct {
@@ -165,24 +188,28 @@ type mangaDetail struct {
 	Type      string `json:"type"`
 	Status    string `json:"status"`
 	TotalChap int    `json:"total_chapters"`
+	Cover     string `json:"cover"`
+	Author    string `json:"author"`
 }
 
 type mangaResp struct {
-	Manga *mangaDetail `json:"manga"`
+	Manga    *mangaDetail  `json:"manga"`
+	Chapters []chapterItem `json:"chapters"`
 }
 
 type chapterItem struct {
-	ID        int     `json:"id"`
-	MangaID   int     `json:"manga_id"`
-	Chapter   float64 `json:"chapter_number"`
-	Title     string  `json:"title"`
-	Language  string  `json:"language"`
-	Pages     []string `json:"pages"`
-	Updated   string  `json:"published_at"`
+	ID            int64  `json:"id"`
+	MangaID       int64  `json:"manga_id"`
+	ChapterNumber string `json:"chapter_number"`
+	Title         string `json:"title"`
+	PageCount     int    `json:"page_count"`
+	PublishedAt   string `json:"published_at"`
+	CreatedAt     string `json:"created_at"`
 }
 
 type chapterResp struct {
 	Chapter *chapterItem `json:"chapter"`
+	Pages   []string     `json:"pages"`
 }
 
 type genresResp struct {
@@ -222,7 +249,7 @@ func searchImpl(arg string) []types.Manga {
 		out = append(out, types.Manga{
 			ID:       it.Slug,
 			Title:    strings.TrimSpace(it.Title),
-			CoverURL: siteURL + it.Cover,
+			CoverURL: cdn(it.Cover),
 			Status:   normalizeStatus(it.Status),
 		})
 	}
@@ -246,6 +273,8 @@ func detailImpl(arg string) types.Manga {
 	return types.Manga{
 		ID:          m.Slug,
 		Title:       strings.TrimSpace(m.Title),
+		CoverURL:    cdn(m.Cover),
+		Author:      strings.TrimSpace(m.Author),
 		Description: strings.TrimSpace(m.Synopsis),
 		Status:      normalizeStatus(m.Status),
 	}
@@ -265,23 +294,27 @@ func chaptersImpl(arg string) []types.Chapter {
 		return nil
 	}
 
-	// Get chapter list via search/advanced with this manga's slug
-	body, ok = getJSON(apiURL + "/search/advanced?title=" + url.PathEscape(slug))
-	if !ok {
-		return nil
-	}
-	var sresp searchResp
-	if json.Unmarshal([]byte(body), &sresp) != nil {
-		return nil
-	}
-	out := make([]types.Chapter, 0, len(sresp.Data))
-	for i, it := range sresp.Data {
+	// The chapter list rides along on the detail response — /search/advanced
+	// returns *other manga*, which is how this used to emit one fake chapter.
+	out := make([]types.Chapter, 0, len(resp.Chapters))
+	for _, c := range resp.Chapters {
+		number := strings.TrimSpace(c.ChapterNumber)
+		title := strings.TrimSpace(c.Title)
+		if title == "" {
+			title = "Chapter " + number
+		}
+		num, _ := strconv.ParseFloat(number, 64)
+		released := c.PublishedAt
+		if released == "" {
+			released = c.CreatedAt
+		}
 		out = append(out, types.Chapter{
-			ID:         strconv.Itoa(i),
+			ID:         strconv.FormatInt(c.ID, 10),
 			MangaID:    slug,
-			Title:      strings.TrimSpace(it.Title),
-			ChapterNum: float64(i),
-			URL:        siteURL + "/" + it.Slug,
+			Title:      title,
+			ChapterNum: num,
+			ReleasedAt: parseTime(released),
+			URL:        siteURL + "/" + slug,
 		})
 	}
 	return out
@@ -297,12 +330,29 @@ func pagesImpl(arg string) []types.Page {
 		return nil
 	}
 	var resp chapterResp
-	if json.Unmarshal([]byte(body), &resp) != nil || resp.Chapter == nil {
+	if json.Unmarshal([]byte(body), &resp) != nil {
 		return nil
 	}
-	out := make([]types.Page, 0, len(resp.Chapter.Pages))
-	for _, p := range resp.Chapter.Pages {
+	// Page URLs sit at the TOP level of the response, not under "chapter".
+	out := make([]types.Page, 0, len(resp.Pages))
+	for _, p := range resp.Pages {
+		if p == "" {
+			continue
+		}
 		out = append(out, types.Page{Index: len(out), URL: p})
+	}
+	if len(out) > 0 || resp.Chapter == nil {
+		return out
+	}
+	// pages omitted (uncached): they resolve to /pages/<manga_id>/<chapter_id>/<n>.webp
+	c := resp.Chapter
+	if c.MangaID <= 0 || c.ID <= 0 || c.PageCount <= 0 {
+		return out
+	}
+	for i := 1; i <= c.PageCount; i++ {
+		out = append(out, types.Page{Index: len(out), URL: cdnURL + "/pages/" +
+			strconv.FormatInt(c.MangaID, 10) + "/" + strconv.FormatInt(c.ID, 10) +
+			"/" + strconv.Itoa(i) + ".webp"})
 	}
 	return out
 }

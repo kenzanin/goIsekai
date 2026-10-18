@@ -1,3 +1,3 @@
 #!/bin/zsh
 
-reasonix --yolo -c "$@"
+reasonix --dangerously-skip-permissions --yolo -c "$@"

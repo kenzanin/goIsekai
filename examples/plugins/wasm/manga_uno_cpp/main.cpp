@@ -5,11 +5,16 @@
 // manga.uno is a Next.js site with a JSON API:
 //   search:   GET /api/search/advanced?title=...&genres=...&limit=24
 //   genres:   GET /api/genres
-//   detail:   GET /api/manga/<slug>
-//   chapters: GET /api/search/advanced?title=<slug>   (mirrors the Go plugin)
-//   pages:    GET /api/chapter/<id>
+//   detail:   GET /api/manga/<slug>       -> {"manga":{...},"chapters":[...]}
+//   chapters: GET /api/manga/<slug>       -> top-level "chapters" (same response)
+//   pages:    GET /api/chapter/<id>       -> {"chapter":{...},"pages":[...]}
 //
-// ID scheme: Manga.ID = slug; Chapter.ID = numeric index (as in the Go plugin).
+// ID scheme: Manga.ID = slug; Chapter.ID = the site's numeric chapter id, so
+// GetPageList can feed it straight back to /api/chapter/<id>.
+//
+// Covers and pages are served from the CDN origin (xz7.fstr-cdn.com), NOT
+// manga.uno: manga.uno/covers/*.webp answers an HTML shell (text/html), which
+// is what made every cover and reader image fail to load.
 //
 // Reuses the shared helpers: wasm_abi.h (host ABI), util.h (text/JSON),
 // html_util.h (scraping). JSON via RapidJSON.
@@ -23,6 +28,18 @@ static const char *kSite = "https://manga.uno";
 static const char *kAPI = "https://manga.uno/api";
 static const char *kJSONHeaders =
     "{\"Accept\":\"application/json\",\"Referer\":\"https://manga.uno/\"}";
+static const char *kCDN = "https://xz7.fstr-cdn.com";
+
+// Resolve a path the way the site itself does: against the CDN origin, never
+// manga.uno (which serves an HTML shell for /covers/*.webp).
+static std::string cdn(const std::string &raw) {
+    std::string p = trim(raw);
+    if (p.empty()) return "";
+    if (p.rfind("http://", 0) == 0 || p.rfind("https://", 0) == 0) return p;
+    if (p.rfind("//", 0) == 0) return "https:" + p;
+    if (p[0] == '/') return std::string(kCDN) + p;
+    return std::string(kCDN) + "/" + p;
+}
 
 // ─── search ─────────────────────────────────────────────────────────────────
 
@@ -55,7 +72,7 @@ static std::string search_impl(const std::string &arg) {
         rapidjson::Value m(rapidjson::kObjectType);
         add_string(m, "id", slug, alloc);
         add_string(m, "title", it.HasMember("title") && it["title"].IsString() ? trim(it["title"].GetString()) : "", alloc);
-        add_string(m, "cover_url", make_abs(kSite, cover), alloc);
+        add_string(m, "cover_url", cdn(cover), alloc);
         add_string(m, "status",
                    it.HasMember("status") && it["status"].IsString() ? normalize_status(it["status"].GetString()) : "", alloc);
         out.PushBack(m, alloc);
@@ -86,6 +103,12 @@ static std::string detail_impl(const std::string &arg) {
                m0.HasMember("synopsis") && m0["synopsis"].IsString() ? trim(m0["synopsis"].GetString()) : "", alloc);
     add_string(m, "status",
                m0.HasMember("status") && m0["status"].IsString() ? normalize_status(m0["status"].GetString()) : "", alloc);
+    // The detail page reads cover_url from here; without it the hero image is
+    // blank even though search shows a cover.
+    add_string(m, "cover_url",
+               cdn(m0.HasMember("cover") && m0["cover"].IsString() ? trim(m0["cover"].GetString()) : ""), alloc);
+    add_string(m, "author", m0.HasMember("author") && m0["author"].IsString() ? trim(m0["author"].GetString()) : "",
+               alloc);
     return to_json(m);
 }
 
@@ -99,31 +122,33 @@ static std::string chapters_impl(const std::string &arg) {
     if (!http_body(std::string(kAPI) + "/manga/" + url_encode(slug), kJSONHeaders, body)) return "[]";
     rapidjson::Document d;
     d.Parse(body.c_str());
-    if (!d.IsObject() || !d.HasMember("manga") || !d["manga"].IsObject()) return "[]";
-
-    // The Go plugin lists chapters via search/advanced keyed on the slug.
-    body.clear();
-    if (!http_body(std::string(kAPI) + "/search/advanced?title=" + url_encode(slug), kJSONHeaders, body)) return "[]";
-    rapidjson::Document sresp;
-    sresp.Parse(body.c_str());
-    if (!sresp.IsObject() || !sresp.HasMember("data") || !sresp["data"].IsArray()) return "[]";
+    // The chapter list rides along on the detail response — /search/advanced
+    // returns *other manga*, which is how this used to emit one fake chapter.
+    if (!d.IsObject() || !d.HasMember("chapters") || !d["chapters"].IsArray()) return "[]";
 
     rapidjson::Document out;
     out.SetArray();
     auto &alloc = out.GetAllocator();
-    int i = 0;
-    for (auto &it : sresp["data"].GetArray()) {
-        if (!it.IsObject()) continue;
-        std::string title = it.HasMember("title") && it["title"].IsString() ? trim(it["title"].GetString()) : "";
-        std::string islug = it.HasMember("slug") && it["slug"].IsString() ? trim(it["slug"].GetString()) : "";
+    for (auto &c : d["chapters"].GetArray()) {
+        if (!c.IsObject()) continue;
+        long cid = 0;
+        if (c.HasMember("id") && c["id"].IsInt64()) cid = (long)c["id"].GetInt64();
+        std::string number =
+            c.HasMember("chapter_number") && c["chapter_number"].IsString() ? trim(c["chapter_number"].GetString()) : "";
+        std::string title = c.HasMember("title") && c["title"].IsString() ? trim(c["title"].GetString()) : "";
+        if (title.empty()) title = "Chapter " + number;
+        std::string rel;
+        if (c.HasMember("published_at") && c["published_at"].IsString()) rel = c["published_at"].GetString();
+        if (rel.empty() && c.HasMember("created_at") && c["created_at"].IsString()) rel = c["created_at"].GetString();
+
         rapidjson::Value ch(rapidjson::kObjectType);
-        add_string(ch, "id", std::to_string(i), alloc);
+        add_string(ch, "id", std::to_string(cid), alloc);
         add_string(ch, "manga_id", slug, alloc);
         add_string(ch, "title", title, alloc);
-        ch.AddMember("chapter_num", (double)i, alloc);
-        add_string(ch, "url", std::string(kSite) + "/" + islug, alloc);
+        ch.AddMember("chapter_num", number.empty() ? 0 : std::strtod(number.c_str(), nullptr), alloc);
+        add_string(ch, "released_at", parse_time(rel), alloc);
+        add_string(ch, "url", std::string(kSite) + "/" + slug, alloc);
         out.PushBack(ch, alloc);
-        i++;
     }
     return to_json(out);
 }
@@ -139,20 +164,42 @@ static std::string pages_impl(const std::string &arg) {
 
     rapidjson::Document resp;
     resp.Parse(body.c_str());
-    if (!resp.IsObject() || !resp.HasMember("chapter") || !resp["chapter"].IsObject()) return "[]";
-    auto &c = resp["chapter"];
-    if (!c.HasMember("pages") || !c["pages"].IsArray()) return "[]";
+    if (!resp.IsObject()) return "[]";
 
     rapidjson::Document out;
     out.SetArray();
     auto &alloc = out.GetAllocator();
-    int idx = 0;
-    for (auto &p : c["pages"].GetArray()) {
-        if (!p.IsString() || p.GetStringLength() == 0) continue;
-        rapidjson::Value pg(rapidjson::kObjectType);
-        pg.AddMember("index", idx++, alloc);
-        add_string(pg, "url", p.GetString(), alloc);
-        out.PushBack(pg, alloc);
+
+    // Page URLs sit at the TOP level of the response, not under "chapter".
+    if (resp.HasMember("pages") && resp["pages"].IsArray()) {
+        for (auto &p : resp["pages"].GetArray()) {
+            if (!p.IsString() || p.GetStringLength() == 0) continue;
+            rapidjson::Value pg(rapidjson::kObjectType);
+            pg.AddMember("index", (int)out.Size(), alloc);
+            add_string(pg, "url", p.GetString(), alloc);
+            out.PushBack(pg, alloc);
+        }
+    }
+    if (out.Size() > 0) return to_json(out);
+
+    // pages omitted (uncached): those URLs all resolve to
+    // /pages/<manga_id>/<chapter_id>/<n>.webp on the CDN, so synthesize them.
+    if (resp.HasMember("chapter") && resp["chapter"].IsObject()) {
+        auto &c = resp["chapter"];
+        long mid = c.HasMember("manga_id") && c["manga_id"].IsInt64() ? (long)c["manga_id"].GetInt64() : -1;
+        long cid = c.HasMember("id") && c["id"].IsInt64() ? (long)c["id"].GetInt64() : -1;
+        int n = c.HasMember("page_count") && c["page_count"].IsInt() ? c["page_count"].GetInt() : 0;
+        if (mid > 0 && cid > 0 && n > 0) {
+            for (int i = 1; i <= n; i++) {
+                rapidjson::Value pg(rapidjson::kObjectType);
+                pg.AddMember("index", (int)out.Size(), alloc);
+                add_string(pg, "url",
+                           std::string(kCDN) + "/pages/" + std::to_string(mid) + "/" + std::to_string(cid) + "/" +
+                               std::to_string(i) + ".webp",
+                           alloc);
+                out.PushBack(pg, alloc);
+            }
+        }
     }
     return to_json(out);
 }
