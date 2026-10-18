@@ -336,17 +336,18 @@ func Search(arg string) (string, error) {
 
 ABI functions take one string arg and return `(string, error)`. Metadata lives in a sibling `plugin.json`, not in the source — an `Init()` export is compiled but never called. Networking goes through the synthetic `hostnet` package (`hostnet.Get`/`hostnet.Post`), which routes through the same TLS-fingerprinted per-plugin proxy. Sandbox: the Go stdlib is available, but any third-party (`github.com/...`) or `goisekai/...` import is rejected at load time. See `examples/plugins/yaegi/yaegidemo/` for a complete example.
 
-### WASM plugins (Go or C++, wasip1)
+### WASM plugins (Go, C++ or Odin, wasip1)
 
 One folder per site under `app_data/plugins/<id>/` with `main.wasm` (or a single `<id>.wasm` at the plugins root), plus a `plugin.json` for metadata — every runtime reads metadata from there, so wasm needs no `Init`/`PLUGIN` export. The host runs the module with **wazero**; it must export `contract_version`, `Search`, `GetMangaDetail`, `GetChapterList`, `GetPageList`, and a `malloc`/`free` pair. Networking and the shared helper library go through the single `env.host_call` import (`env.host_http_request` remains for the raw HTTP ABI). See `docs/plugin-wasm-helpers.md` and `examples/plugins/wasm/` for full examples.
 
-What a backend costs in binary size (same plugin logic, `manhawato`):
+The same source plugin (`manga_uno`) is implemented three times, so the size
+difference is measured rather than estimated:
 
 | backend | size | notes |
 | --- | --- | --- |
-| **C++17** (wasi-sdk clang) | **~0.3 MB** | no runtime, `-fno-exceptions -fno-rtti`; RapidJSON is header-only |
-| **TinyGo** (`-target wasi`) | ~1.9 MB | small runtime + LLVM; still ~6× the C++ build |
-| **standard Go** (`-buildmode=c-shared`) | 3.9–5.2 MB | full Go runtime + reflection type table that DCE cannot strip |
+| **C++17** (wasi-sdk clang) | **108 KB** | no runtime, `-fno-exceptions -fno-rtti`; RapidJSON is header-only |
+| **Odin** (`-target:wasi_wasm32`) | **416 KB** | stdlib `core:encoding/json`; exports come free (no `-Wl,--export`) |
+| **standard Go** (`-buildmode=c-shared`) | 3.7 MB | full Go runtime + reflection type table that DCE cannot strip |
 
 Standard Go (full runtime, `//go:wasmexport`/`//go:wasmimport`):
 
@@ -354,13 +355,7 @@ Standard Go (full runtime, `//go:wasmexport`/`//go:wasmimport`):
 GOOS=wasip1 GOARCH=wasm CGO_ENABLED=0 go build -buildmode=c-shared -o main.wasm .
 ```
 
-TinyGo (smaller, `-target wasi`):
-
-```sh
-tinygo build -o main.wasm -target wasm ./main.go
-```
-
-C++17 (wasi-sdk clang, ~10× smaller than Go; see `examples/plugins/wasm/komix_to_cpp/`):
+C++17 (wasi-sdk clang, smallest; see `examples/plugins/wasm/manga_uno_cpp/`):
 
 ```sh
 /opt/wasi-sdk/bin/clang++ -std=c++17 -O2 -fno-exceptions -fno-rtti \
@@ -368,10 +363,55 @@ C++17 (wasi-sdk clang, ~10× smaller than Go; see `examples/plugins/wasm/komix_t
   main.cpp -o main.wasm -Wl,--export=malloc -Wl,--export=free -Wl,-z,stack-size=1048576
 ```
 
-> Note: TinyGo already exports its own `malloc`/`free`, so plugin sources that
-> also declare `//go:wasmexport malloc`/`free` fail with `duplicate export name`;
-> and its `-target wasi` is command-style (`_start`), not the `_initialize`
-> reactor the host loads. See `okf-mcp/concept/wasm-cpp-plugin-toolchain.md`.
+Odin (no wasi-sdk, no RapidJSON, no manual exports; see
+`examples/plugins/wasm/manga_uno_odin/`):
+
+```sh
+odin build . -target:wasi_wasm32 -no-entry-point -out:main.wasm
+```
+
+> Note: TinyGo is **not usable** for this ABI. Its `-target wasi` is
+> command-style (`_start`), not the reactor the host loads, and a module that
+> declares `//go:wasmexport malloc`/`free` fails with `duplicate export name`
+> in `wasm-opt` — verified even on a go1.26.9 toolchain via goup, so it is not a
+> Go-version problem. Use standard Go, C++ or Odin. See
+> `okf-mcp/concept/wasm-cpp-plugin-toolchain.md`.
+
+#### Authoring in Odin
+
+`abi/wasm_abi.odin` is the reusable glue (the counterpart of the C++ plugin's
+`wasm_abi.h`), and a plugin is then just its own `main.odin`:
+
+```
+examples/plugins/wasm/atsumaru_odin/
+├── abi/wasm_abi.odin   ← copy as-is; provides host_call, malloc/free,
+│                         contract_version, http_body, to_json, host_str
+├── main.odin           ← exports Search / GetMangaDetail / GetChapterList /
+│                         GetPageList (+ optional GetGenres)
+├── build.sh            ← builds, then asserts the exports and env.host_call
+└── plugin.json
+```
+
+Five Odin-specific rules, all of which cost a build to learn:
+
+- **Do not `foreign import libc "system:c"`** for `malloc`/`free`. It emits a
+  `system:c.malloc` import the host does not provide, so the module never
+  instantiates. Allocate with `core:mem` (`runtime.default_wasm_allocator`)
+  so the host's `malloc` and your replies share one allocator.
+- A `foreign` block on a wasm target **requires**
+  `@(default_calling_convention="c")`.
+- A `proc "c"` has no `context`: set `context = runtime.default_context()`
+  before calling `mem.alloc`/`mem.free`, or the plugin traps on its first reply.
+  (`abi.reply_json` already does this for you.)
+- `json.unmarshal` **rejects pointer struct fields** with
+  `Unsupported_Type_Error`. A `^T` member silently fails the whole decode, so
+  wire structs must use value fields.
+- `core:runtime` is `base:runtime` now, and two `package` declarations cannot
+  share one directory — hence the `abi/` subdirectory.
+
+Working examples: `atsumaru_odin` (JSON API + Typesense search, numeric genre
+ids) and `comicasura_odin` (HTML scraping, composite `slug:chapter` ids), both
+live-verified end to end.
 
 ### Native plugins (C/C++ `.so`, no cgo)
 
