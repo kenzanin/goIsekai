@@ -88,7 +88,7 @@ func (s *AppService) SyncStaleLibrary(cutoff time.Time) error {
 	if len(stale) == 0 {
 		return nil
 	}
-	logger.Info("scheduled library refresh", "stale", len(stale))
+	logger.Debug("scheduled library refresh", "stale", len(stale))
 	return s.syncMangas(stale)
 }
 

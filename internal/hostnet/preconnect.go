@@ -32,7 +32,7 @@ func (p *Proxy) Preconnect(host string) {
 		logger.Debug("transport request completed", "host", host, "status", resp.StatusCode)
 		return
 	}
-	logger.Info("preconnected", "host", host, "status", resp.StatusCode)
+	logger.Debug("preconnected", "host", host, "status", resp.StatusCode)
 }
 
 // GetTransportStats returns current transport stats (idle connections count).

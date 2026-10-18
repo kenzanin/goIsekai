@@ -151,6 +151,6 @@ func (m *Manager) loadYaegi(id, dir string) (*loadedPlugin, error) {
 		meta:            meta,
 	}
 
-	logger.Info("yaegi plugin loaded", "id", id)
+	logger.Debug("yaegi plugin loaded", "id", id)
 	return p, nil
 }

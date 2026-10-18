@@ -39,7 +39,7 @@ func (s *AppService) storeEnrichment(pluginID, mangaID, rowID string, items map[
 				if err != nil {
 					logger.Warn("store titles", "error", err)
 				} else {
-					logger.Info("enrich titles stored", "count", len(srcTitles), "inserted", n, "source", src)
+					logger.Debug("enrich titles stored", "count", len(srcTitles), "inserted", n, "source", src)
 				}
 			}
 		}
@@ -59,7 +59,7 @@ func (s *AppService) storeEnrichment(pluginID, mangaID, rowID string, items map[
 				if err != nil {
 					logger.Warn("store summaries", "error", err)
 				} else {
-					logger.Info("enrich summaries stored", "count", len(srcSummaries), "inserted", n, "source", src)
+					logger.Debug("enrich summaries stored", "count", len(srcSummaries), "inserted", n, "source", src)
 				}
 			}
 		}
@@ -82,7 +82,7 @@ func (s *AppService) storeEnrichment(pluginID, mangaID, rowID string, items map[
 					if err != nil {
 						logger.Warn("store categories", "error", err)
 					} else {
-						logger.Info("enrich categories stored", "count", len(srcCats), "inserted", n, "source", src)
+						logger.Debug("enrich categories stored", "count", len(srcCats), "inserted", n, "source", src)
 					}
 				}
 			}
@@ -110,7 +110,7 @@ func (s *AppService) storeEnrichment(pluginID, mangaID, rowID string, items map[
 					if err := s.db.SetMangaAuthor(mangaIntID, a.Value); err != nil {
 						logger.Warn("store author", "error", err)
 					} else {
-						logger.Info("enrich author stored", "author", a.Value, "source", p.ID())
+						logger.Debug("enrich author stored", "author", a.Value, "source", p.ID())
 					}
 					goto authorStored
 				}
@@ -131,7 +131,7 @@ func (s *AppService) storeEnrichment(pluginID, mangaID, rowID string, items map[
 		if err != nil {
 			logger.Warn("store alt covers", "error", err)
 		} else {
-			logger.Info("enrich covers stored", "count", len(covers), "inserted", n)
+			logger.Debug("enrich covers stored", "count", len(covers), "inserted", n)
 		}
 	}
 
@@ -147,7 +147,7 @@ func (s *AppService) storeEnrichment(pluginID, mangaID, rowID string, items map[
 				if err != nil {
 					logger.Warn("store related", "error", err)
 				} else {
-					logger.Info("enrich related stored", "count", len(srcRels), "inserted", n, "source", src)
+					logger.Debug("enrich related stored", "count", len(srcRels), "inserted", n, "source", src)
 				}
 			}
 		}

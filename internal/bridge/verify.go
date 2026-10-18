@@ -66,7 +66,7 @@ func (s *AppService) SeedVerifyCookies() {
 			logger.Warn("verify: seed cookies failed", "plugin", row.PluginID, "error", err)
 			continue
 		}
-		logger.Info("verify: seeded cookies from DB", "plugin", row.PluginID, "domain", domain, "updated", time.Unix(row.UpdatedAt, 0).Format(time.RFC3339))
+		logger.Debug("verify: seeded cookies from DB", "plugin", row.PluginID, "domain", domain, "updated", time.Unix(row.UpdatedAt, 0).Format(time.RFC3339))
 	}
 }
 

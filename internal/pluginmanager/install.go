@@ -150,7 +150,7 @@ func (m *Manager) LoadPlugin(path string) (string, error) {
 			return "", err
 		}
 		m.registerLoaded(id, p)
-		logger.Info("plugin loaded (hot)", "id", id, "kind", "lua")
+		logger.Debug("plugin loaded (hot)", "id", id, "kind", "lua")
 		return id, nil
 	}
 
@@ -165,7 +165,7 @@ func (m *Manager) LoadPlugin(path string) (string, error) {
 			return "", err
 		}
 		m.registerLoaded(id, p)
-		logger.Info("plugin loaded (hot)", "id", id, "kind", "js")
+		logger.Debug("plugin loaded (hot)", "id", id, "kind", "js")
 		return id, nil
 	}
 
@@ -180,7 +180,7 @@ func (m *Manager) LoadPlugin(path string) (string, error) {
 			return "", err
 		}
 		m.registerLoaded(id, p)
-		logger.Info("plugin loaded (hot)", "id", id, "kind", "yaegi")
+		logger.Debug("plugin loaded (hot)", "id", id, "kind", "yaegi")
 		return id, nil
 	}
 
@@ -195,7 +195,7 @@ func (m *Manager) LoadPlugin(path string) (string, error) {
 			return "", err
 		}
 		m.registerLoaded(id, p)
-		logger.Info("plugin loaded (hot)", "id", id, "kind", "wasm")
+		logger.Debug("plugin loaded (hot)", "id", id, "kind", "wasm")
 		return id, nil
 	}
 
@@ -210,7 +210,7 @@ func (m *Manager) LoadPlugin(path string) (string, error) {
 			return "", err
 		}
 		m.registerLoaded(id, p)
-		logger.Info("plugin loaded (hot)", "id", id, "kind", "go")
+		logger.Debug("plugin loaded (hot)", "id", id, "kind", "go")
 		return id, nil
 	}
 

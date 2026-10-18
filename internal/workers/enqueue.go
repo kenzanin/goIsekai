@@ -207,15 +207,17 @@ func (p *Pool) Enqueue(ctx context.Context, job *Job) (*Future, error) {
 
 	// Wrap Run with retry + registry bookkeeping once, here. Adds duration
 	// tracking for worker job visibility.
-	// All worker logs now carry [lane] prefix and include start, stop, dur_ms.
-	h.run = p.track(h, wrappedJob(lane.Name(), job.ID, func(ctx context.Context) error {
-		// Store job info in context for detailed logging
-		ctx = context.WithValue(ctx, jobInfoKey{}, job)
+	//
+	// Every lifecycle record carries the lane as a structured attr
+	// ("lane=fetch"), so the log viewer's lane filter has a single shape to
+	// match. Only terminal states are loud: running/done are per-job chatter
+	// at Debug, a retry is a Warn, and a job that exhausted its attempts is an
+	// Error. Logging here is the sole output path — the old fmt.Println/stdout
+	// copies wrote every job twice into the same file.
+	h.run = p.track(h, func(ctx context.Context) error {
 		start := time.Now()
 		laneName := lane.Name()
-		msg := fmt.Sprintf("%s [%s] jobID=%s plugin=%s running", start.Format("15:04:05"), laneName, job.ID, job.PluginKey)
-		fmt.Println(msg) // stdout for goisekai.log
-		logger.Info(msg) // Also log via logger to capture in ring buffer
+		logger.Debug("worker: running", "jobID", job.ID, "lane", laneName, "plugin", job.PluginKey)
 		h.setStatus(StatusRunning)
 		var err error
 		for attempt := 1; attempt <= job.MaxAttempts; attempt++ {
@@ -227,10 +229,7 @@ func (p *Pool) Enqueue(ctx context.Context, job *Job) (*Future, error) {
 			}
 			err = job.Run(ctx)
 			if err == nil {
-				dur := time.Since(start)
-				msg := fmt.Sprintf("%s [%s] jobID=%s done dur_ms=%d", time.Now().Format("15:04:05"), lane.Name(), job.ID, dur.Milliseconds())
-				fmt.Println(msg) // stdout for goisekai.log
-				logger.Info(msg) // Also log via logger to capture in ring buffer
+				logger.Debug("worker: done", "jobID", job.ID, "lane", laneName, "dur_ms", time.Since(start).Milliseconds())
 				h.setStatus(StatusDone)
 				h.setErr(nil)
 				return nil
@@ -240,9 +239,7 @@ func (p *Pool) Enqueue(ctx context.Context, job *Job) (*Future, error) {
 			}
 			if attempt < job.MaxAttempts {
 				h.setStatus(StatusFailed)
-				msg := fmt.Sprintf("%s [%s] jobID=%s failed, retrying attempt=%d", time.Now().Format("15:04:05"), lane.Name(), job.ID, attempt)
-				fmt.Println(msg) // stdout for goisekai.log
-				logger.Info(msg) // Also log via logger to capture in ring buffer
+				logger.Warn("worker: failed, retrying", "jobID", job.ID, "lane", laneName, "attempt", attempt)
 				// Small linear backoff; transient-only.
 				select {
 				case <-time.After(time.Duration(attempt) * 50 * time.Millisecond):
@@ -253,14 +250,11 @@ func (p *Pool) Enqueue(ctx context.Context, job *Job) (*Future, error) {
 				}
 			}
 		}
-		dur := time.Since(start)
-		durMsg := fmt.Sprintf("%s [%s] jobID=%s dead dur_ms=%d lastErr=%v", time.Now().Format("15:04:05"), lane.Name(), job.ID, dur.Milliseconds(), err)
-		fmt.Println(durMsg) // stdout for goisekai.log
-		logger.Info(durMsg) // Also log via logger to capture in ring buffer
+		logger.Error("worker: dead", "jobID", job.ID, "lane", laneName, "dur_ms", time.Since(start).Milliseconds(), "lastErr", err)
 		h.setStatus(StatusDead)
 		h.setErr(err)
 		return err
-	}))
+	})
 
 	if job.Lane == LaneInteractive {
 		// Block until queued or ctx deadline (task 1.3).

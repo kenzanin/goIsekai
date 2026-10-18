@@ -113,7 +113,7 @@ func (m *Manager) Discover() error {
 				kind:     "lua",
 				infoOnly: true,
 			}
-			logger.Info("info script registered", "id", id, "path", path)
+			logger.Debug("info script registered", "id", id, "path", path)
 		}
 	}
 
@@ -131,7 +131,7 @@ func (m *Manager) Discover() error {
 		if !m.registerFolderPlugin(id, filepath.Dir(path), "lua") {
 			continue
 		}
-		logger.Info("lua plugin registered", "id", id, "path", path)
+		logger.Debug("lua plugin registered", "id", id, "path", path)
 	}
 
 	// JS plugins: one folder per plugin, main.js entry, folder name = id.
@@ -148,7 +148,7 @@ func (m *Manager) Discover() error {
 		if !m.registerFolderPlugin(id, filepath.Dir(path), "js") {
 			continue
 		}
-		logger.Info("js plugin registered", "id", id, "path", path)
+		logger.Debug("js plugin registered", "id", id, "path", path)
 	}
 
 	// Wasm plugins: one folder with main.wasm, or a single *.wasm file.
@@ -176,7 +176,7 @@ func (m *Manager) Discover() error {
 		if !m.registerFolderPlugin(id, filepath.Dir(path), "yaegi") {
 			continue
 		}
-		logger.Info("yaegi plugin registered", "id", id, "path", path)
+		logger.Debug("yaegi plugin registered", "id", id, "path", path)
 	}
 
 	// Go native plugins: one .so file per plugin, filename (minus .so) = id.

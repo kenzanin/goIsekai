@@ -75,7 +75,9 @@ func (s *Server) handleFrontendLog(w http.ResponseWriter, r *http.Request) {
 	if tag == "" {
 		tag = "frontend"
 	}
-	// Fire-and-forget log — don't block the client.
+	// Fire-and-forget log — don't block the client. Plain client chatter is
+	// Debug: reader.js emits a line per rendered page, which would otherwise
+	// bury the server's own INFO records. Warnings and errors keep their level.
 	msg := fmt.Sprintf("[%s] %s", tag, payload.Msg)
 	switch payload.Level {
 	case "warn":
@@ -83,7 +85,7 @@ func (s *Server) handleFrontendLog(w http.ResponseWriter, r *http.Request) {
 	case "error":
 		s.logger.Error(msg, "sid", payload.SID)
 	default:
-		s.logger.Info(msg, "sid", payload.SID)
+		s.logger.Debug(msg, "sid", payload.SID)
 	}
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusNoContent)
@@ -155,7 +157,7 @@ func (s *Server) viewReader(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "missing route params", http.StatusBadRequest)
 		return
 	}
-	s.logger.Info("viewReader", "plugin", pluginID, "manga", mangaID, "chapter", chapterID)
+	s.logger.Debug("viewReader", "plugin", pluginID, "manga", mangaID, "chapter", chapterID)
 	manga, chapters, err := s.readerChapters(pluginID, mangaID)
 	if err != nil {
 		if s.serviceQueueFull(w, err, "reader") {
@@ -210,7 +212,7 @@ func (s *Server) readerData(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusBadRequest, "missing route params")
 		return
 	}
-	s.logger.Info("readerData", "plugin", pluginID, "manga", mangaID, "chapter", chapterID)
+	s.logger.Debug("readerData", "plugin", pluginID, "manga", mangaID, "chapter", chapterID)
 	pages, err := s.service.GetPageListCached(pluginID, chapterID)
 	if err != nil {
 		if s.serviceQueueFull(w, err, "reader-pages") {

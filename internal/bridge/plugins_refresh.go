@@ -153,6 +153,6 @@ func (s *AppService) PurgeRemovedPlugins() (string, error) {
 	if err := s.db.Vacuum(); err != nil {
 		logger.Warn("purge: vacuum failed", "error", err)
 	}
-	logger.Info("purged removed plugins", "count", len(removed))
+	logger.Debug("purged removed plugins", "count", len(removed))
 	return strings.TrimSpace(strings.TrimSuffix(b.String(), "; ")), nil
 }

@@ -22,8 +22,8 @@ import (
 // host/port/cdp_engine need a restart, so they are deliberately not applied here.
 func startConfigWatch(cfgPath string, proxy *hostnet.Proxy, maxCacheGB *atomic.Int64) {
 	_ = config.Watch(cfgPath, 5*time.Second, func(updated *config.Config) {
-		if err := logger.Init(updated.LogLevel); err == nil {
-			logger.Info("config reloaded", "log_level", updated.LogLevel)
+		if err := logger.Init(updated.LogLevel); err != nil {
+			logger.Warn("config reload: bad log level", "log_level", updated.LogLevel, "error", err)
 		}
 		proxy.SetDefaultHeader("User-Agent", updated.UserAgent)
 		proxy.SetDefaultHeader("Referer", updated.Referer)
@@ -122,7 +122,7 @@ func startMaintenance(ctx context.Context, db *database.DB, cfg *config.Config, 
 // preconnectHosts warms the connection pool for every known plugin host.
 func preconnectHosts(mgr *pluginmanager.Manager) {
 	hosts := mgr.GetKnownHosts()
-	logger.Info("preconnecting to known hosts", "count", len(hosts))
+	logger.Debug("preconnecting to known hosts", "count", len(hosts))
 	sem := make(chan struct{}, 4) // concurrency limit 4
 	for _, host := range hosts {
 		sem <- struct{}{}

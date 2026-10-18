@@ -99,7 +99,7 @@ func (m *Manager) discoverWasm() error {
 				lp.meta = readPluginJSONMeta(filepath.Dir(path))
 			}
 			m.plugins[id] = lp
-			logger.Info("wasm plugin registered", "id", id, "path", path)
+			logger.Debug("wasm plugin registered", "id", id, "path", path)
 		}
 	}
 	return nil

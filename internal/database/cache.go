@@ -135,7 +135,7 @@ func (d *DB) StartCacheCleanupWithPool(maintenanceStop <-chan struct{}, pool *wo
 							if err != nil {
 								logger.Error("cache cleanup", "error", err)
 							} else if n > 0 {
-								logger.Info("cleaned expired cache entries", "count", n)
+								logger.Debug("cleaned expired cache entries", "count", n)
 							}
 							return nil
 						},
@@ -148,7 +148,7 @@ func (d *DB) StartCacheCleanupWithPool(maintenanceStop <-chan struct{}, pool *wo
 					if err != nil {
 						logger.Error("cache cleanup", "error", err)
 					} else if n > 0 {
-						logger.Info("cleaned expired cache entries", "count", n)
+						logger.Debug("cleaned expired cache entries", "count", n)
 					}
 				}
 			}

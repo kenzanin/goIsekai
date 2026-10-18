@@ -179,7 +179,7 @@ func (m *Manager) loadJS(id, dir string) (*loadedPlugin, error) {
 		}
 	}
 
-	logger.Info("js plugin loaded", "id", id, "name", meta.Name)
+	logger.Debug("js plugin loaded", "id", id, "name", meta.Name)
 	return &loadedPlugin{
 		id: id,
 		// Folder, not entry file — see the loadLua comment on wasmPath.

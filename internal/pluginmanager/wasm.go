@@ -120,7 +120,7 @@ func (m *Manager) loadWasm(id, path string) (*loadedPlugin, error) {
 		fns[types.GetGenresFunc] = fn
 	}
 
-	logger.Info("wasm plugin loaded", "id", id, "path", path)
+	logger.Debug("wasm plugin loaded", "id", id, "path", path)
 	meta, err := pluginMetaFor(id, "wasm", filepath.Dir(path))
 	if err != nil {
 		return nil, err

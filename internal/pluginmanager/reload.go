@@ -46,7 +46,7 @@ func (m *Manager) UnloadPlugin(id string) error {
 	p.contractVersion = 0
 	p.meta = types.PluginMeta{}
 	p.loaded = false
-	logger.Info("plugin unloaded", "id", id)
+	logger.Debug("plugin unloaded", "id", id)
 	return nil
 }
 
@@ -75,7 +75,7 @@ func (m *Manager) ReloadPlugin(id string) (string, error) {
 		logger.Warn("plugin reload failed", "id", id, "error", err)
 		return "", fmt.Errorf("reload %s: %w", id, err)
 	}
-	logger.Info("plugin reloaded", "id", id)
+	logger.Debug("plugin reloaded", "id", id)
 	return id, nil
 }
 

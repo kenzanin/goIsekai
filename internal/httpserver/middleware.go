@@ -122,7 +122,9 @@ func (s *Server) loggingMiddleware(next http.Handler) http.Handler {
 		case sw.status >= 400:
 			s.logger.LogAttrs(r.Context(), slog.LevelWarn, "http", attrs...)
 		default:
-			s.logger.LogAttrs(r.Context(), slog.LevelInfo, "http", attrs...)
+			// Successful requests are per-request chatter: at Debug so the log
+			// page reads as events, not a request stream. Failures stay loud.
+			s.logger.LogAttrs(r.Context(), slog.LevelDebug, "http", attrs...)
 		}
 	})
 }

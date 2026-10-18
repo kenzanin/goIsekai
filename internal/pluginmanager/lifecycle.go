@@ -59,7 +59,7 @@ func (m *Manager) ensureLoaded(id string) error {
 	if p.meta.Timeout > 0 {
 		m.proxy.SetPluginCDPTimeout(id, time.Duration(p.meta.Timeout)*time.Second)
 	}
-	logger.Info("plugin loaded (lazy)", "id", id, "kind", p.kind, "version", p.contractVersion)
+	logger.Debug("plugin loaded (lazy)", "id", id, "kind", p.kind, "version", p.contractVersion)
 
 	// Register plugin-declared enrichment providers so they're visible
 	// in the catalog as soon as the plugin is first invoked.

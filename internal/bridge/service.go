@@ -138,7 +138,7 @@ func (s *AppService) LogEnhanceStatus() {
 	for i, p := range plugins {
 		ids[i] = p.ID
 	}
-	logger.Info(s.enhance.formatEnhanceStatus(ids))
+	logger.Debug(s.enhance.formatEnhanceStatus(ids))
 }
 
 // GetConfigPath returns the path to goisekai.ini.
