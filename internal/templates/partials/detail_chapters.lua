@@ -121,6 +121,27 @@ return function(data)
 				.. "</span>"
 				.. '<span class="flex items-center gap-2 shrink-0">'
 
+			-- Page info: read progress + cached page count, per chapter. Was
+			-- dropped in 0560b51 and read state moved to the row's tick, which
+			-- lost the "N/M read" and cache signal. Restored for every plugin;
+			-- total pages is only known once the reader has fetched the chapter,
+			-- so an unopened chapter with nothing cached shows no badge.
+			if totalPages > 0 then
+				rowHTML = rowHTML
+					.. '<span class="text-xs px-2 py-0.5 rounded-full bg-neutral-800 text-neutral-400">'
+					.. h(tostring(lastPageRead))
+					.. "/"
+					.. h(tostring(totalPages))
+					.. " read"
+					.. (cachedPages > 0 and (" · " .. h(tostring(cachedPages)) .. " cached") or "")
+					.. "</span>"
+			elseif cachedPages > 0 then
+				rowHTML = rowHTML
+					.. '<span class="text-xs px-2 py-0.5 rounded-full bg-neutral-800 text-neutral-400">'
+					.. h(tostring(cachedPages))
+					.. " cached</span>"
+			end
+
 			-- Release date
 			if c.ReleasedAt then
 				local rawDate = ""
