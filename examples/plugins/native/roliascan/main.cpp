@@ -1,34 +1,22 @@
 // roliascan — native .so plugin for goIsekai (C++17).
 //
-// Uses libraries rather than hand-rolled parsing:
-//   libcurl    HTTP (http_util.h)
-//   rapidjson  JSON in/out (json_util.h)
-//   libxml2    HTML -> text and the page's JSON-LD block (html_util.h)
-//   OpenSSL    MD5, for the site's chapter-list token (text_util.h)
+// Everything external goes through the host bridge (native_abi.h): HTTP, text
+// stripping, the page's JSON-LD block and the chapter-list MD5 token. So the
+// plugin links only header-only RapidJSON — no libcurl, libxml2 or OpenSSL —
+// and the helper vocabulary matches the Lua/JS/WASM runtimes exactly.
 //
-// Native plugins get no host_call import the way wasm ones do (a .so has no
-// import table), so everything the wasm plugins ask the host for — HTTP, text
-// stripping, JSON — is done here with libraries.
-//
-// ABI (see internal/pluginmanager/goplug.go): every entry point takes a
+// ABI (see internal/pluginmanager/goplug.go): each entry point takes a
 // NUL-terminated JSON string and returns one. The returned buffer belongs to
-// this library — the host copies it, then calls plugin_free on it.
+// this library: the host copies it, then calls plugin_free on that pointer.
 //
-// Endpoints, cross-checked against roliascan.har and the Tachiyomi source
-// (extension-source/lib-multisrc/mangataro):
+// Endpoints, cross-checked against roliascan.har:
 //   POST /wp-json/manga/v1/load            search / browse
-//   GET  /wp-json/wp/v2/manga/{id}?_embed  detail (terms are embedded)
+//   GET  /wp-json/wp/v2/manga/{id}?_embed  detail (terms embedded)
 //   GET  /manga/{slug}/                    JSON-LD, the only place status lives
-//   GET  /auth/manga-chapters              chapter list, needs an md5 _t token
+//   GET  /auth/manga-chapters              chapter list, needs the md5 _t token
 //   GET  /auth/chapter-content             page images
+#include "util.h"
 
-#include "abi.h"
-#include "html_util.h"
-#include "http_util.h"
-#include "json_util.h"
-#include "text_util.h"
-
-#include <cstdlib>
 #include <ctime>
 #include <string>
 #include <vector>
@@ -40,8 +28,13 @@ struct GenreTag {
 #include "roliascan_genres.h"
 
 static const char *kBase = "https://roliascan.com";
-static const char *kReferer = "https://roliascan.com/";
 static const char *kJSONType = "Content-Type: application/json";
+
+// The host proxy sends an empty Referer unless the plugin sets one, so every
+// request here names the site explicitly (the older libcurl helper did the
+// same through its referer argument).
+static const char *kRefHeader = R"re({"Referer":"https://roliascan.com/"})re";
+static const char *kRefJSONHeader = R"re({"Referer":"https://roliascan.com/","Content-Type":"application/json"})re";
 
 static int genre_id_for(const std::string &name) {
 	for (const auto &g : kGenres) {
@@ -52,8 +45,9 @@ static int genre_id_for(const std::string &name) {
 
 EXPORT void plugin_free(char *p) { free(p); }
 
-// Search maps types.SearchFilter to the site's browse payload. genres are the
-// slugs GetGenres advertised (the tag names), resolved to the ids the API wants.
+// Search maps types.SearchFilter onto the site's browse payload. The genres
+// arrive as the slug names GetGenres advertised, and are resolved to the ids
+// the API wants.
 EXPORT char *Search(const char *json) {
 	rapidjson::Document in;
 	in.Parse(json ? json : "");
@@ -105,8 +99,7 @@ EXPORT char *Search(const char *json) {
 	w.String("any");
 	w.EndObject();
 
-	HttpResult r = http_request(std::string(kBase) + "/wp-json/manga/v1/load", kReferer,
-	                            sb.GetString(), kJSONType);
+	HttpResult r = http_post(std::string(kBase) + "/wp-json/manga/v1/load", sb.GetString(), kRefJSONHeader);
 	if (!r.ok()) return error_json(r.status == 404 ? "not_found" : "upstream_unavailable");
 
 	rapidjson::Document doc;
@@ -138,8 +131,7 @@ EXPORT char *GetMangaDetail(const char *json) {
 	std::string id = parse_string_arg(json);
 	if (id.empty()) return error_json("bad_input");
 
-	HttpResult r = http_request(std::string(kBase) + "/wp-json/wp/v2/manga/" + id + "?_embed",
-	                            kReferer, nullptr, nullptr);
+	HttpResult r = http_get(std::string(kBase) + "/wp-json/wp/v2/manga/" + id + "?_embed", kRefHeader);
 	if (!r.ok()) return error_json("not_found");
 
 	rapidjson::Document d;
@@ -154,13 +146,13 @@ EXPORT char *GetMangaDetail(const char *json) {
 	std::string title;
 	if (auto it = d.FindMember("title"); it != d.MemberEnd() && it->value.IsObject())
 		title = jstr(it->value, "rendered");
-	std::string plain = html_to_text(title);
+	std::string plain = clean(title);
 	add_str(out, "title", plain.empty() ? title : plain, alloc);
 
 	std::string content;
 	if (auto it = d.FindMember("content"); it != d.MemberEnd() && it->value.IsObject())
 		content = jstr(it->value, "rendered");
-	add_str(out, "description", html_to_text(content), alloc);
+	add_str(out, "description", clean(content), alloc);
 
 	std::string cover;
 	std::vector<std::string> genres, authors;
@@ -216,8 +208,13 @@ EXPORT char *GetMangaDetail(const char *json) {
 	// to an empty status instead of failing the whole call.
 	std::string status;
 	if (!page_url.empty()) {
-		HttpResult page = http_request(page_url, kReferer, nullptr, nullptr);
-		if (page.ok()) status = ld_json_field(page.body, "status");
+		HttpResult page = http_get(page_url, kRefHeader);
+		if (page.ok()) {
+			std::string blob = host_str2("text.json_blob", page.body, "application/ld+json");
+			rapidjson::Document ld;
+			ld.Parse(blob.c_str());
+			if (!ld.HasParseError() && ld.IsObject()) status = jstr(ld, "status");
+		}
 	}
 	add_str(out, "status", status, alloc);
 
@@ -237,11 +234,11 @@ EXPORT char *GetChapterList(const char *json) {
 	char hour[16];
 	strftime(hour, sizeof hour, "%Y%m%d%H", &tm);
 
-	std::string token = md5_hex(std::to_string(ts) + "mng_ch_" + hour).substr(0, 16);
+	std::string token = host_str("crypto.md5_hex", std::to_string(ts) + "mng_ch_" + hour).substr(0, 16);
 	std::string url = std::string(kBase) + "/auth/manga-chapters?manga_id=" + id +
 	                  "&offset=0&limit=9999&order=DESC&_t=" + token + "&_ts=" + std::to_string(ts);
 
-	HttpResult r = http_request(url, kReferer, nullptr, nullptr);
+	HttpResult r = http_get(url, kRefHeader);
 	if (!r.ok()) return error_json("upstream_unavailable");
 
 	rapidjson::Document d;
@@ -261,7 +258,7 @@ EXPORT char *GetChapterList(const char *json) {
 		std::string num = jstr(c, "chapter");
 		std::string label = jstr(c, "title");
 		std::string title = "Chapter " + num;
-		if (!label.empty() && label != "N/A" && label != "-") title += ": " + html_to_text(label);
+		if (!label.empty() && label != "N/A" && label != "-") title += ": " + clean(label);
 
 		rapidjson::Value o(rapidjson::kObjectType);
 		add_str(o, "id", jstr(c, "id"), alloc);
@@ -269,7 +266,7 @@ EXPORT char *GetChapterList(const char *json) {
 		add_str(o, "title", title, alloc);
 		// chapter_num is a JSON number in types.Chapter, not a string.
 		o.AddMember("chapter_num", rapidjson::Value(strtod(num.c_str(), nullptr)), alloc);
-		std::string iso = relative_to_iso(jstr(c, "date"));
+		std::string iso = parse_time(jstr(c, "date"));
 		if (!iso.empty()) add_str(o, "released_at", iso, alloc);
 		add_str(o, "url", jstr(c, "url"), alloc);
 		out.PushBack(o, alloc);
@@ -277,14 +274,13 @@ EXPORT char *GetChapterList(const char *json) {
 	return document_json(out);
 }
 
-// GetPageList takes the chapter id returned above and asks the content endpoint
-// for the image list.
+// GetPageList takes the chapter id returned above and asks the content
+// endpoint for its image list.
 EXPORT char *GetPageList(const char *json) {
 	std::string id = parse_string_arg(json);
 	if (id.empty()) return error_json("bad_input");
 
-	HttpResult r = http_request(std::string(kBase) + "/auth/chapter-content?chapter_id=" + id,
-	                            kReferer, nullptr, nullptr);
+	HttpResult r = http_get(std::string(kBase) + "/auth/chapter-content?chapter_id=" + id, kRefHeader);
 	if (!r.ok()) return error_json("upstream_unavailable");
 
 	rapidjson::Document d;
