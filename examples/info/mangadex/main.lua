@@ -15,10 +15,14 @@
 --   related     recommended manga (what the site's Recommendations tab lists)
 --   covers      alternative cover image URLs
 --
--- One title maps to two upstream requests (search, then detail). The detail
--- response carries every field, so it is memoized in the VM and reused by the
--- remaining kinds of the same title; MangaDex rate-limits aggressively and
--- five kinds would otherwise mean ten requests.
+-- Reference expansion keeps this to three upstream requests per title:
+--   search  (+includes[])          the winning record carries every field
+--   /recommendation (+includes[])  related titles arrive inline
+--   /cover?manga[]=                the full cover catalogue (no inline form)
+-- The search record is byte-identical to /manga/{id} under the same includes
+-- (verified across titles), so the separate detail fetch is gone. The result
+-- is memoized in the VM and reused by all six kinds; MangaDex rate-limits
+-- aggressively, so the request count is worth keeping down.
 
 PLUGIN = {
 	contract_version = 1,
@@ -161,7 +165,12 @@ local function titleMatchScore(record, searchedTitle)
 	return best
 end
 
--- detail fetches the full record for the best search match, memoized.
+-- detail resolves a title to its full MangaDex record, memoized.
+--
+-- Reference expansion collapses search + detail into the search request: with
+-- includes[] the matched record already carries author/artist/cover_art and
+-- the plot relations inline, byte-identical to what /manga/{id} returns. One
+-- request instead of two; the previous separate detail fetch is gone.
 local function detail(title)
 	if memoTitle == title then
 		return memoDetail
@@ -183,7 +192,12 @@ local function detail(title)
 		if query == "" then
 			break
 		end
-		search = get(API .. "/manga?limit=10&order[relevance]=desc&title=" .. host.text.url_encode(query))
+		search = get(
+			API
+				.. "/manga?limit=10&order[relevance]=desc&title="
+				.. host.text.url_encode(query)
+				.. "&includes[]=cover_art&includes[]=author&includes[]=artist&includes[]=manga"
+		)
 		if search and type(search.data) == "table" and #search.data > 0 then
 			break
 		end
@@ -212,14 +226,7 @@ local function detail(title)
 		return nil
 	end
 
-	local id = record.id
-	local full =
-		get(API .. "/manga/" .. id .. "?includes[]=cover_art&includes[]=author&includes[]=artist&includes[]=manga")
-	if not full or not full.data then
-		return nil
-	end
-
-	memoDetail = full.data
+	memoDetail = record
 	return memoDetail
 end
 
@@ -281,70 +288,40 @@ local function authors(data)
 	return items(out)
 end
 
--- relatedTitles resolves relation ids to their display titles in one batch
--- request: MangaDex lists related manga as bare ids with no attributes.
-local function relatedTitles(ids)
-	if #ids == 0 then
-		return {}
-	end
-	local query = {}
-	for _, id in ipairs(ids) do
-		query[#query + 1] = "ids[]=" .. id
-	end
-	local body = get(API .. "/manga?limit=100&" .. table.concat(query, "&"))
-	if not body or type(body.data) ~= "table" then
-		return {}
-	end
-	local byID = {}
-	for _, manga in ipairs(body.data) do
-		byID[manga.id] = pick(manga.attributes.title)
-	end
-	return byID
-end
-
--- recommendedIDs fetches the list behind the site's Recommendations tab.
--- /manga/{id}/recommendation scores every other manga against this one and
--- returns bare ids, so the titles still need the batch lookup below. It takes
--- no limit or offset, so its first 50 are all it will ever hand back.
-local function recommendedIDs(id)
-	local body = get(API .. "/manga/" .. id .. "/recommendation")
-	if not body or type(body.data) ~= "table" then
-		return {}
-	end
-	local ids, seen = {}, {}
-	for _, rec in ipairs(body.data) do
-		for _, rel in ipairs(rec.relationships or {}) do
-			if rel.type == "manga" and rel.id ~= id and not seen[rel.id] then
-				seen[rel.id] = true
-				ids[#ids + 1] = rel.id
-			end
-		end
-	end
-	return ids
-end
-
 -- related: the recommendations are the main list, matching what the MangaDex
--- page shows. The plot relations from the detail response are the fallback,
--- since only a minority of series have any.
+-- page shows; the plot relations from the record are the fallback, since only
+-- a minority of series have any. includes[]=manga makes BOTH carry titles
+-- inline, so the ids[] batch lookup the old code needed is gone. The API's own
+-- ranking order is preserved (it takes no limit/offset, so its first 50 are
+-- all it hands back).
 local function related(data)
-	local ids = recommendedIDs(data.id)
-	if #ids == 0 then
-		local seen = {}
-		for _, rel in ipairs(data.relationships or {}) do
-			if rel.type == "manga" and rel.id ~= data.id and not seen[rel.id] then
-				seen[rel.id] = true
-				ids[#ids + 1] = rel.id
-			end
-		end
-	end
-	local byID = relatedTitles(ids)
-	local out = {}
-	for _, id in ipairs(ids) do
-		local title = byID[id]
-		if title and title ~= "" then
+	local out, seen = {}, {}
+	local function add(id, title)
+		if id and id ~= data.id and title and title ~= "" and not seen[id] then
+			seen[id] = true
 			out[#out + 1] = { value = title, url = SITE .. "/title/" .. id }
 		end
 	end
+
+	local rec = get(API .. "/manga/" .. data.id .. "/recommendation?includes[]=manga")
+	for _, entry in ipairs(rec and rec.data or {}) do
+		for _, rel in ipairs(entry.relationships or {}) do
+			if rel.type == "manga" and rel.attributes then
+				add(rel.id, pick(rel.attributes.title))
+			end
+		end
+	end
+
+	-- No recommendations (or the call failed): fall back to the plot relations
+	-- that arrived inline with the record.
+	if #out == 0 then
+		for _, rel in ipairs(data.relationships or {}) do
+			if rel.type == "manga" and rel.attributes then
+				add(rel.id, pick(rel.attributes.title))
+			end
+		end
+	end
+
 	return items(out)
 end
 
