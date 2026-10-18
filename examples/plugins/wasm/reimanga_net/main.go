@@ -142,51 +142,60 @@ func GetGenres(ptr, n uint32) uint64 { return reply(genresImpl()) }
 
 type searchResult struct {
 	Data []struct {
-		ID          int    `json:"id"`
-		Title       string `json:"title"`
-		AltTitle    string `json:"alt_title"`
-		NameURL     string `json:"name_url"`
-		CoverURL    string `json:"cover_url"`
-		ViewCount   int    `json:"view_count"`
-		Rating      float64 `json:"rating"`
-		IsAdult     bool   `json:"is_adult"`
-		Status      int    `json:"status"`
-		ChapterNum  string `json:"chapter_number"`
-		ChapterTitle string `json:"chapter_title"`
-		Updated     string `json:"chapter_updated_at"`
+		ID           int     `json:"id"`
+		Title        string  `json:"title"`
+		AltTitle     string  `json:"alt_title"`
+		NameURL      string  `json:"name_url"`
+		CoverURL     string  `json:"cover_url"`
+		ViewCount    int     `json:"view_count"`
+		Rating       float64 `json:"rating"`
+		IsAdult      bool    `json:"is_adult"`
+		Status       int     `json:"status"`
+		ChapterNum   string  `json:"chapter_number"`
+		ChapterTitle string  `json:"chapter_title"`
+		Updated      string  `json:"chapter_updated_at"`
 	} `json:"data"`
 }
 
+type named struct {
+	Name string `json:"name"`
+}
+
+// /api/manga/<id> answers {"manga":{...},"similar":[...]} — there is no "data"
+// envelope here (that is the /api/chapters/manga/<id> shape).
 type detailResp struct {
-	Data struct {
-		ID        int      `json:"id"`
-		Title     string   `json:"title"`
-		AltTitle  string   `json:"alt_title"`
-		NameURL   string   `json:"name_url"`
-		CoverURL  string   `json:"cover_url"`
-		Summary   string   `json:"summary"`
-		IsAdult   bool     `json:"is_adult"`
-		Status    int      `json:"status"`
-		Completed bool     `json:"completed"`
-		Authors   []string `json:"authors"`
-		Genres    []string `json:"genres"`
-		Updated   string   `json:"updated_at"`
-	} `json:"data"`
+	Manga struct {
+		ID          int     `json:"id"`
+		Title       string  `json:"title"`
+		AltTitle    string  `json:"alt_title"`
+		NameURL     string  `json:"name_url"`
+		CoverURL    string  `json:"cover_url"`
+		Description string  `json:"description"`
+		IsAdult     bool    `json:"is_adult"`
+		Status      int     `json:"status"`
+		Completed   bool    `json:"completed"`
+		Authors     []named `json:"authors"`
+		Genres      []named `json:"genres"`
+		Updated     string  `json:"updated_at"`
+	} `json:"manga"`
 }
 
+// Chapters come from /api/chapters/manga/<id> as {"data":[...],"pagination":{...}}.
 type chaptersResp struct {
-	Chapters []struct {
-		ID     int    `json:"id"`
-		Number string `json:"number"`
-		Title  string `json:"title"`
-		Num    int    `json:"num"`
-	} `json:"chapters"`
+	Data []struct {
+		ID            int    `json:"id"`
+		ChapterNumber string `json:"chapter_number"`
+		Name          string `json:"name"`
+		CreatedAt     string `json:"created_at"`
+	} `json:"data"`
 }
 
+// Page URLs come from /api/chapters/<id>/images; a bare /api/chapters/<id>
+// returns chapter metadata with no page list at all.
 type pageResp struct {
-	Data struct {
-		Pages []string `json:"pages"`
-	} `json:"data"`
+	Images []struct {
+		ImageURL string `json:"image_url"`
+	} `json:"images"`
 }
 
 // ─── search ──────────────────────────────────────────────────────────────────
@@ -246,15 +255,27 @@ func detailImpl(arg string) types.Manga {
 	if json.Unmarshal([]byte(body), &resp) != nil {
 		return types.Manga{}
 	}
-	d := resp.Data
+	d := resp.Manga
+	genres := make([]string, 0, len(d.Genres))
+	for _, g := range d.Genres {
+		if n := strings.TrimSpace(g.Name); n != "" {
+			genres = append(genres, n)
+		}
+	}
+	authors := make([]string, 0, len(d.Authors))
+	for _, a := range d.Authors {
+		if n := strings.TrimSpace(a.Name); n != "" {
+			authors = append(authors, n)
+		}
+	}
 	m := types.Manga{
 		ID:          strconv.Itoa(d.ID),
 		Title:       strings.TrimSpace(d.Title),
 		CoverURL:    siteURL + "/covers/" + strconv.Itoa(d.ID) + "/thumbnail.png",
-		Description: strings.TrimSpace(d.Summary),
+		Description: strings.TrimSpace(d.Description),
 		Status:      normalizeStatus(d.Status),
-		Genres:      d.Genres,
-		Author:      strings.Join(d.Authors, ", "),
+		Genres:      genres,
+		Author:      strings.Join(authors, ", "),
 	}
 	return m
 }
@@ -264,7 +285,9 @@ func chaptersImpl(arg string) []types.Chapter {
 	if mangaID == "" {
 		return nil
 	}
-	body, ok := getJSON(siteURL + "/api/manga/" + url.PathEscape(mangaID) + "/chapters")
+	// limit=1000 because the default page is 50: a partial list looks like the
+	// manga ends there (144 chapters would arrive as 3 pages of 50).
+	body, ok := getJSON(siteURL + "/api/chapters/manga/" + url.PathEscape(mangaID) + "?limit=1000")
 	if !ok {
 		return nil
 	}
@@ -272,17 +295,19 @@ func chaptersImpl(arg string) []types.Chapter {
 	if json.Unmarshal([]byte(body), &resp) != nil {
 		return nil
 	}
-	out := make([]types.Chapter, 0, len(resp.Chapters))
-	for _, c := range resp.Chapters {
-		title := strings.TrimSpace(c.Title)
+	out := make([]types.Chapter, 0, len(resp.Data))
+	for _, c := range resp.Data {
+		title := strings.TrimSpace(c.Name)
 		if title == "" {
-			title = "Chapter " + c.Number
+			title = "Chapter " + c.ChapterNumber
 		}
+		num, _ := strconv.ParseFloat(strings.TrimSpace(c.ChapterNumber), 64)
 		out = append(out, types.Chapter{
-			ID:        mangaID + ":" + strconv.Itoa(c.ID),
-			MangaID:   mangaID,
-			Title:     title,
-			ChapterNum: float64(c.Num),
+			ID:         mangaID + ":" + strconv.Itoa(c.ID),
+			MangaID:    mangaID,
+			Title:      title,
+			ChapterNum: num,
+			ReleasedAt: parseTime(c.CreatedAt),
 		})
 	}
 	return out
@@ -293,7 +318,7 @@ func pagesImpl(arg string) []types.Page {
 	if !ok || mangaID == "" || chID == "" {
 		return nil
 	}
-	body, ok := getJSON(siteURL + "/api/chapters/" + url.PathEscape(chID))
+	body, ok := getJSON(siteURL + "/api/chapters/" + url.PathEscape(chID) + "/images")
 	if !ok {
 		return nil
 	}
@@ -301,9 +326,13 @@ func pagesImpl(arg string) []types.Page {
 	if json.Unmarshal([]byte(body), &resp) != nil {
 		return nil
 	}
-	out := make([]types.Page, 0, len(resp.Data.Pages))
-	for _, p := range resp.Data.Pages {
-		out = append(out, types.Page{Index: len(out), URL: p})
+	out := make([]types.Page, 0, len(resp.Images))
+	for _, p := range resp.Images {
+		u := strings.TrimSpace(p.ImageURL)
+		if u == "" {
+			continue
+		}
+		out = append(out, types.Page{Index: len(out), URL: u})
 	}
 	return out
 }
@@ -314,8 +343,33 @@ type genre struct {
 }
 
 func genresImpl() []genre {
-	// reimanga doesn't have a dedicated genres endpoint in the HAR we saw.
-	// Return a known list as fallback.
+	// There *is* a genres endpoint; the old hardcoded list made the filter row
+	// a different set from what the site actually filters on.
+	if body, ok := getJSON(siteURL + "/api/genres"); ok {
+		var raw []struct {
+			Name string `json:"name"`
+			Slug string `json:"slug"`
+		}
+		if json.Unmarshal([]byte(body), &raw) == nil {
+			out := make([]genre, 0, len(raw))
+			for _, g := range raw {
+				name := strings.TrimSpace(g.Name)
+				if name == "" {
+					continue
+				}
+				slug := strings.TrimSpace(g.Slug)
+				if slug == "" {
+					slug = strings.ToLower(strings.ReplaceAll(name, " ", "-"))
+				}
+				out = append(out, genre{Name: name, Slug: slug})
+			}
+			if len(out) > 0 {
+				return out
+			}
+		}
+	}
+
+	// Fallback when /api/genres is unreachable, so the filter row is never empty.
 	names := []string{
 		"Fantasy", "Action", "Adventure", "Comedy", "Drama",
 		"Romance", "Mystery", "Thriller", "Horror", "Isekai",

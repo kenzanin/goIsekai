@@ -4,9 +4,9 @@
 //
 // reimanga.net exposes a clean JSON API — no HTML scraping:
 //   search:   GET /api/manga/search/advanced?esOnly=1&page=N&limit=24&sort=viewed&order=desc&title=...&genres=...
-//   detail:   GET /api/manga/<id>
-//   chapters: GET /api/manga/<id>/chapters
-//   pages:    GET /api/chapters/<chapterID>
+//   detail:   GET /api/manga/<id>                  → {"manga":{...},"similar":[...]}
+//   chapters: GET /api/chapters/manga/<id>?limit=N → {"data":[...],"pagination":{...}}
+//   pages:    GET /api/chapters/<chapterID>/images → {"chapter_id":..,"images":[...]}
 //
 // ID scheme: Manga.ID = numeric id as string ("82201")
 //            Chapter.ID = "<mangaID>:<chapterID>"
@@ -97,8 +97,10 @@ static std::string detail_impl(const std::string &arg) {
 
     rapidjson::Document resp;
     resp.Parse(body.c_str());
-    if (!resp.IsObject() || !resp.HasMember("data") || !resp["data"].IsObject()) return "{}";
-    auto &d = resp["data"];
+    // /api/manga/<id> answers {"manga":{...},"similar":[...]}. There is no
+    // "data" envelope here — that is the /api/chapters/manga/<id> shape.
+    if (!resp.IsObject() || !resp.HasMember("manga") || !resp["manga"].IsObject()) return "{}";
+    auto &d = resp["manga"];
 
     long mid = d.HasMember("id") && d["id"].IsInt() ? d["id"].GetInt() : 0;
     rapidjson::Document m;
@@ -108,23 +110,29 @@ static std::string detail_impl(const std::string &arg) {
     add_string(m, "title", d.HasMember("title") && d["title"].IsString() ? trim(d["title"].GetString()) : "", alloc);
     add_string(m, "cover_url", cover_of(mid), alloc);
     add_string(m, "description",
-               d.HasMember("summary") && d["summary"].IsString() ? trim(d["summary"].GetString()) : "", alloc);
+               d.HasMember("description") && d["description"].IsString() ? trim(d["description"].GetString()) : "", alloc);
     add_string(m, "status",
                d.HasMember("status") && d["status"].IsInt() ? status_from_int(d["status"].GetInt()) : "", alloc);
 
+    // genres/tags are objects ({"id","name","slug"}), not bare strings.
     rapidjson::Value garr(rapidjson::kArrayType);
     if (d.HasMember("genres") && d["genres"].IsArray()) {
-        for (auto &g : d["genres"].GetArray())
-            if (g.IsString()) garr.PushBack(rapidjson::Value(g.GetString(), (rapidjson::SizeType)strlen(g.GetString()), alloc), alloc);
+        for (auto &g : d["genres"].GetArray()) {
+            if (!g.IsObject() || !g.HasMember("name") || !g["name"].IsString()) continue;
+            std::string n = trim(g["name"].GetString());
+            if (!n.empty()) garr.PushBack(rapidjson::Value(n.c_str(), (rapidjson::SizeType)n.size(), alloc), alloc);
+        }
     }
     m.AddMember("genres", garr, alloc);
 
     std::string author;
     if (d.HasMember("authors") && d["authors"].IsArray()) {
         for (auto &a : d["authors"].GetArray()) {
-            if (!a.IsString()) continue;
+            if (!a.IsObject() || !a.HasMember("name") || !a["name"].IsString()) continue;
+            std::string n = trim(a["name"].GetString());
+            if (n.empty()) continue;
             if (!author.empty()) author += ", ";
-            author += a.GetString();
+            author += n;
         }
     }
     add_string(m, "author", author, alloc);
@@ -137,30 +145,38 @@ static std::string chapters_impl(const std::string &arg) {
     std::string mangaID = trim(decode_string(arg));
     if (mangaID.empty()) return "[]";
 
+    // Chapters live at /api/chapters/manga/<id>, not under /api/manga/<id>.
+    // limit=1000 because the default page is 50: a partial list looks like the
+    // manga ends there (144 chapters would arrive as 3 pages of 50).
     std::string body;
-    if (!http_body(std::string(kSite) + "/api/manga/" + url_encode(mangaID) + "/chapters", kJSONHeaders, body))
+    if (!http_body(std::string(kSite) + "/api/chapters/manga/" + url_encode(mangaID) + "?limit=1000", kJSONHeaders,
+                   body))
         return "[]";
 
     rapidjson::Document resp;
     resp.Parse(body.c_str());
-    if (!resp.IsObject() || !resp.HasMember("chapters") || !resp["chapters"].IsArray()) return "[]";
+    if (!resp.IsObject() || !resp.HasMember("data") || !resp["data"].IsArray()) return "[]";
 
     rapidjson::Document out;
     out.SetArray();
     auto &alloc = out.GetAllocator();
-    for (auto &c : resp["chapters"].GetArray()) {
+    for (auto &c : resp["data"].GetArray()) {
         if (!c.IsObject()) continue;
         long cid = c.HasMember("id") && c["id"].IsInt() ? c["id"].GetInt() : 0;
-        std::string number = c.HasMember("number") && c["number"].IsString() ? trim(c["number"].GetString()) : "";
-        std::string title = c.HasMember("title") && c["title"].IsString() ? trim(c["title"].GetString()) : "";
+        std::string number =
+            c.HasMember("chapter_number") && c["chapter_number"].IsString() ? trim(c["chapter_number"].GetString()) : "";
+        std::string title = c.HasMember("name") && c["name"].IsString() ? trim(c["name"].GetString()) : "";
         if (title.empty()) title = "Chapter " + number;
-        double num = c.HasMember("num") && c["num"].IsNumber() ? c["num"].GetDouble() : 0;
+        double num = number.empty() ? 0 : std::strtod(number.c_str(), nullptr);
 
         rapidjson::Value ch(rapidjson::kObjectType);
         add_string(ch, "id", mangaID + ":" + std::to_string(cid), alloc);
         add_string(ch, "manga_id", mangaID, alloc);
         add_string(ch, "title", title, alloc);
         ch.AddMember("chapter_num", num, alloc);
+        add_string(ch, "released_at",
+                   c.HasMember("created_at") && c["created_at"].IsString() ? parse_time(c["created_at"].GetString()) : "",
+                   alloc);
         out.PushBack(ch, alloc);
     }
     return to_json(out);
@@ -174,24 +190,27 @@ static std::string pages_impl(const std::string &arg) {
     if (colon == std::string::npos || colon == 0 || colon + 1 >= chID.size()) return "[]";
     std::string chapter = chID.substr(colon + 1);
 
+    // Page URLs come from /api/chapters/<id>/images — a bare /api/chapters/<id>
+    // returns chapter metadata with no "pages" array at all.
     std::string body;
-    if (!http_body(std::string(kSite) + "/api/chapters/" + url_encode(chapter), kJSONHeaders, body)) return "[]";
+    if (!http_body(std::string(kSite) + "/api/chapters/" + url_encode(chapter) + "/images", kJSONHeaders, body))
+        return "[]";
 
     rapidjson::Document resp;
     resp.Parse(body.c_str());
-    if (!resp.IsObject() || !resp.HasMember("data") || !resp["data"].IsObject()) return "[]";
-    auto &d = resp["data"];
-    if (!d.HasMember("pages") || !d["pages"].IsArray()) return "[]";
+    if (!resp.IsObject() || !resp.HasMember("images") || !resp["images"].IsArray()) return "[]";
 
     rapidjson::Document out;
     out.SetArray();
     auto &alloc = out.GetAllocator();
     int idx = 0;
-    for (auto &p : d["pages"].GetArray()) {
-        if (!p.IsString() || p.GetStringLength() == 0) continue;
+    for (auto &p : resp["images"].GetArray()) {
+        if (!p.IsObject() || !p.HasMember("image_url") || !p["image_url"].IsString()) continue;
+        std::string u = trim(p["image_url"].GetString());
+        if (u.empty()) continue;
         rapidjson::Value pg(rapidjson::kObjectType);
         pg.AddMember("index", idx++, alloc);
-        add_string(pg, "url", p.GetString(), alloc);
+        add_string(pg, "url", u, alloc);
         out.PushBack(pg, alloc);
     }
     return to_json(out);
@@ -200,7 +219,31 @@ static std::string pages_impl(const std::string &arg) {
 // ─── genres ─────────────────────────────────────────────────────────────────
 
 static std::string genres_impl() {
-    // reimanga has no dedicated genres endpoint; mirror the Go plugin's fallback list.
+    // There *is* a genres endpoint; the old hardcoded list made the filter row
+    // a different set from what the site actually filters on.
+    std::string body;
+    if (http_body(std::string(kSite) + "/api/genres", kJSONHeaders, body)) {
+        rapidjson::Document resp;
+        resp.Parse(body.c_str());
+        if (resp.IsArray()) {
+            rapidjson::Document out;
+            out.SetArray();
+            auto &alloc = out.GetAllocator();
+            for (auto &g : resp.GetArray()) {
+                if (!g.IsObject() || !g.HasMember("name") || !g["name"].IsString()) continue;
+                std::string name = trim(g["name"].GetString());
+                if (name.empty()) continue;
+                std::string slug = g.HasMember("slug") && g["slug"].IsString() ? trim(g["slug"].GetString()) : "";
+                rapidjson::Value v(rapidjson::kObjectType);
+                add_string(v, "name", name, alloc);
+                add_string(v, "slug", slug.empty() ? genre_slug(name) : slug, alloc);
+                out.PushBack(v, alloc);
+            }
+            if (out.Size() > 0) return to_json(out);
+        }
+    }
+
+    // Fallback when /api/genres is unreachable, so the filter row is never empty.
     std::vector<std::string> names = {"Fantasy", "Action",     "Adventure", "Comedy",  "Drama",
                                       "Romance", "Mystery",    "Thriller",  "Horror",  "Isekai",
                                       "Sci-Fi",  "Slice of Life", "Supernatural"};
