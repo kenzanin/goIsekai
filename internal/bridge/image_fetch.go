@@ -93,6 +93,16 @@ func (s *AppService) fetchImage(ctx context.Context, pluginID, url string, heade
 				Headers: withReferer(headers, ref),
 			})
 			if ctx.Err() == nil && err == nil && resp.Status >= 200 && resp.Status < 300 {
+				// MangaDex serves a deterministic placeholder (59480 B, 600x642,
+				// SHA256 699b7af3...) with HTTP 200 when a foreign Referer is sent.
+				// It is a valid JPEG so validateImageFull passes it; reject it
+				// explicitly and don't memoize the ref that returned it.
+				if isPlaceholderImage([]byte(resp.Body)) {
+					logger.Warn("image placeholder rejected", "url", url, "ref", ref, "bytes", len(resp.Body))
+					resp = types.HTTPResponse{Status: 0}
+					err = fmt.Errorf("placeholder image")
+					continue
+				}
 				won = ref
 				break
 			}

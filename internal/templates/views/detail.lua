@@ -13,6 +13,20 @@ local detailAlt = require("partials.detail_alt")
 local detailChapters = require("partials.detail_chapters")
 local verifyWizard = require("partials.verify_wizard")
 
+-- thumbURL returns the MangaDex thumbnail variant (.256.jpg) for a cover URL.
+-- The full-size cover is ~545KB; the 256px thumbnail is ~60KB and is what the
+-- alt-cover grid (w-32 = 128px) actually displays. Using the thumbnail reduces
+-- CDN load and avoids the rate-limit that triggers placeholder responses.
+local function thumbURL(url)
+	if url:match("https://uploads%.mangadex%.org/covers/") then
+		local base = url:match("^(https://uploads%.mangadex%.org/covers/[^/]+/[^/]+)")
+		if base then
+			return base .. ".256.jpg"
+		end
+	end
+	return url
+end
+
 return function(data)
 	local pluginID = data.PluginID or ""
 	local pluginName = data.PluginName or ""
@@ -458,7 +472,7 @@ return function(data)
 				.. '<img src="/image?pluginID='
 				.. h(pluginID)
 				.. "&url="
-				.. h(c.url)
+				.. h(thumbURL(c.url))
 				.. "&prio=high"
 				.. (coverVersions[c.url] and coverVersions[c.url] ~= "" and ("&cb=" .. h(coverVersions[c.url])) or "")
 				.. '" alt="cover" loading="lazy" class="w-32 aspect-[2/3] rounded-lg object-cover border-2 transition cursor-pointer '
