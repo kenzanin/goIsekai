@@ -283,3 +283,67 @@ func TestCString(t *testing.T) {
 		t.Fatalf("cString = %q, want %q", got, "hello")
 	}
 }
+
+// Rewriting a loaded native plugin's .so in place — exactly what a plain `cp`
+// or an installer's os.Create does — must not take the host down.
+//
+// This is the regression for the SIGSEGV that killed the server: dlopen keeps
+// the file mmap'd, so an in-place O_TRUNC zeroes the same inode's pages, and
+// the next call into the plugin (or the dlclose during ReloadPlugin) jumps
+// into the hole. The fix loads the library from a private copy, leaving the
+// on-disk file free to be rewritten.
+//
+// The failure mode is the process dying, so a regression shows up as a crashed
+// test binary rather than a failed assertion — which a run of this test still
+// catches.
+func TestNativePluginSurvivesInPlaceOverwriteOfItsSo(t *testing.T) {
+	dir := nativeFixtureDir(t)
+	mgr := NewManager(hostnet.NewProxy(), dir)
+	if err := mgr.Discover(); err != nil {
+		t.Fatalf("Discover: %v", err)
+	}
+	defer func() { _ = mgr.Close() }()
+
+	// Load it once, so the library is mapped for the rest of the test.
+	if _, err := mgr.Search("dummy", types.SearchFilter{Query: "before"}); err != nil {
+		t.Fatalf("Search before overwrite: %v", err)
+	}
+
+	soPath := filepath.Join(dir, "dummy", "main.so")
+	body, err := os.ReadFile(soPath)
+	if err != nil {
+		t.Fatalf("read %s: %v", soPath, err)
+	}
+	before, err := os.Stat(soPath)
+	if err != nil {
+		t.Fatalf("stat %s: %v", soPath, err)
+	}
+	if err := os.WriteFile(soPath, body, 0o755); err != nil {
+		t.Fatalf("overwrite in place: %v", err)
+	}
+	after, err := os.Stat(soPath)
+	if err != nil {
+		t.Fatalf("restat %s: %v", soPath, err)
+	}
+	// os.WriteFile opens with O_TRUNC on the same inode, which is the whole
+	// point: if it ever stopped doing that, this test would prove nothing.
+	if !os.SameFile(before, after) {
+		t.Fatalf("overwrite replaced the inode; test no longer reproduces the bug")
+	}
+
+	// The mapped library must still be callable...
+	if _, err := mgr.Search("dummy", types.SearchFilter{Query: "after"}); err != nil {
+		t.Fatalf("Search after in-place overwrite: %v", err)
+	}
+	// ...and a reload (which dlcloses and reloads) must not crash either.
+	if _, err := mgr.ReloadPlugin("dummy"); err != nil {
+		t.Fatalf("ReloadPlugin after in-place overwrite: %v", err)
+	}
+	results, err := mgr.Search("dummy", types.SearchFilter{Query: "reloaded"})
+	if err != nil {
+		t.Fatalf("Search after reload: %v", err)
+	}
+	if want := "dummy result:reloaded"; len(results) != 1 || results[0].Title != want {
+		t.Fatalf("after reload: %+v, want one %q", results, want)
+	}
+}

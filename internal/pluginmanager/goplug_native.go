@@ -2,18 +2,61 @@
 
 package pluginmanager
 
-import "github.com/ebitengine/purego"
+import (
+	"io"
+	"os"
+	"path/filepath"
+
+	"github.com/ebitengine/purego"
+)
 
 // nativeLib is a dlopen'd shared object (a C/C++ .so plugin). purego opens it
 // through the platform loader directly, so the host keeps building
 // CGO_ENABLED=0 — which stdlib `plugin` could never do.
 type nativeLib struct{ handle uintptr }
 
+// openNativeLib maps the plugin from a PRIVATE copy of its file, not the file
+// itself.
+//
+// dlopen keeps that file mmap'd for as long as the library is loaded, so
+// writing the original in place later — an installer's os.Create, a plain
+// `cp`, anything that opens with O_TRUNC — truncates the SAME inode and zeroes
+// the pages the loader mapped. The next call into the plugin, or the dlclose
+// during ReloadPlugin, then jumps into the hole and takes the whole host down
+// with a SIGSEGV. Mapping a copy makes the live library immune to whatever
+// happens to the file on disk.
+//
+// The copy sits beside the original (so a plugin that resolves sibling files
+// relative to its own path still finds them) and is unlinked right after
+// dlopen: on these platforms the inode survives while it stays mapped, so
+// nothing is left behind even if the process dies later.
 func openNativeLib(path string) (*nativeLib, error) {
-	h, err := purego.Dlopen(path, purego.RTLD_NOW|purego.RTLD_LOCAL)
+	src, err := os.Open(path)
 	if err != nil {
 		return nil, err
 	}
+	defer func() { _ = src.Close() }()
+
+	tmp, err := os.CreateTemp(filepath.Dir(path), "."+filepath.Base(path)+".loaded-*")
+	if err != nil {
+		return nil, err
+	}
+	tmpName := tmp.Name()
+	defer func() { _ = os.Remove(tmpName) }() // no-op once the rename below runs
+
+	if _, err := io.Copy(tmp, src); err != nil {
+		_ = tmp.Close()
+		return nil, err
+	}
+	if err := tmp.Close(); err != nil {
+		return nil, err
+	}
+
+	h, err := purego.Dlopen(tmpName, purego.RTLD_NOW|purego.RTLD_LOCAL)
+	if err != nil {
+		return nil, err
+	}
+	_ = os.Remove(tmpName)
 	return &nativeLib{handle: h}, nil
 }
 

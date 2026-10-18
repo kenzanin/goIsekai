@@ -124,20 +124,39 @@ func (m *Manager) Close() error {
 	return nil
 }
 
-// copyFile copies src to dst, truncating dst if it exists.
+// copyFile copies src to dst by writing a sibling temp file and renaming it
+// into place, so dst is never truncated in place.
+//
+// That rename is what keeps a reinstall of a native .so from killing the host:
+// os.Create(dst) opens with O_TRUNC on the SAME inode, and dlopen has that
+// inode mmap'd, so truncating it zeroes the very pages the loader mapped. The
+// next call into the plugin — or the dlclose during ReloadPlugin — then jumps
+// into the hole and SIGSEGVs the process. Rename swaps in a new inode and
+// leaves the old mapping intact until it is unmapped.
 func copyFile(src, dst string) error {
 	in, err := os.Open(src)
 	if err != nil {
 		return err
 	}
 	defer func() { _ = in.Close() }()
-	out, err := os.Create(dst)
+
+	tmp, err := os.CreateTemp(filepath.Dir(dst), "."+filepath.Base(dst)+".tmp-*")
 	if err != nil {
 		return err
 	}
-	if _, err := io.Copy(out, in); err != nil {
-		_ = out.Close()
+	tmpName := tmp.Name()
+	defer func() { _ = os.Remove(tmpName) }() // no-op once the rename succeeds
+
+	if _, err := io.Copy(tmp, in); err != nil {
+		_ = tmp.Close()
 		return err
 	}
-	return out.Close()
+	if err := tmp.Close(); err != nil {
+		return err
+	}
+	// CreateTemp is 0600; keep the source's mode so a copied .so stays loadable.
+	if info, err := os.Stat(src); err == nil {
+		_ = os.Chmod(tmpName, info.Mode().Perm())
+	}
+	return os.Rename(tmpName, dst)
 }
