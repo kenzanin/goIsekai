@@ -9,7 +9,7 @@
 local KIND_BADGE = {
 	lua = { label = "Lua", class = "bg-indigo-500/15 text-indigo-400", title = "Lua plugin (main.lua)" },
 	js = { label = "JS", class = "bg-amber-500/15 text-amber-400", title = "JavaScript plugin (main.js)" },
-	go = { label = "Go", class = "bg-sky-500/15 text-sky-400", title = "Native Go plugin (.so)" },
+	go = { label = "Native", class = "bg-sky-500/15 text-sky-400", title = "Native plugin, shared library (.so/.dll) — C/C++, no cgo" },
 	yaegi = { label = "Yaegi", class = "bg-emerald-500/15 text-emerald-400", title = "Yaegi-interpreted Go plugin" },
 	wasm = { label = "Wasm", class = "bg-blue-500/15 text-sky-400", title = "WebAssembly plugin (main.wasm)" },
 }
