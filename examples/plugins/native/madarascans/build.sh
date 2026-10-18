@@ -7,7 +7,9 @@
 set -euo pipefail
 cd "$(dirname "$0")"
 
-g++ -std=c++17 -O2 -fPIC -shared -fvisibility=hidden \
+# -s strips the symbol/relocation tables the loader never reads (~11% smaller,
+# and the ABI exports live in .dynsym, so they survive).
+g++ -std=c++17 -O2 -fPIC -shared -fvisibility=hidden -Wl,-s \
 	main.cpp -o main.so
 
 echo "built main.so ($(stat -c%s main.so) bytes)"
