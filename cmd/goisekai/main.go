@@ -4,8 +4,6 @@ import (
 	"context"
 	"errors"
 	"flag"
-	"fmt"
-	"log"
 	"log/slog"
 	"math"
 	"net/http"
@@ -46,7 +44,7 @@ func main() {
 	flag.Parse()
 
 	if *showVersion {
-		fmt.Println(version.String())
+		logger.Info(version.String())
 		return
 	}
 
@@ -59,22 +57,22 @@ func main() {
 
 	if *genIni {
 		if err := config.Default().Save(cfgPath); err != nil {
-			log.Fatalf("generate config: %v", err)
+			logger.Fatal("generate config", "error", err)
 		}
-		log.Printf("wrote default config to %s", cfgPath)
+		logger.Info("wrote default config", "path", cfgPath)
 		return
 	}
 
 	// Auto-generate a default config on first run so there is a file to edit.
 	if _, err := os.Stat(cfgPath); os.IsNotExist(err) {
 		if err := config.Default().Save(cfgPath); err != nil {
-			log.Fatalf("generate config: %v", err)
+			logger.Fatal("generate config", "error", err)
 		}
 	}
 
 	cfg, err := config.Load(cfgPath)
 	if err != nil {
-		log.Fatalf("load config: %v", err)
+		logger.Fatal("load config", "error", err)
 	}
 
 	// CLI flags override config values.
@@ -100,7 +98,7 @@ func main() {
 		level = *logLevel
 	}
 	if err := logger.Init(level); err != nil {
-		log.Fatalf("init logger: %v", err)
+		logger.Fatal("init logger", "error", err)
 	}
 	logger.Info("starting goIsekai", "log_level", level, "data_dir", cfg.DataDir, "addr", cfg.Host, "port", cfg.Port)
 
@@ -178,7 +176,7 @@ func main() {
 	// the template tree.
 	eng, err := templates.New(os.DirFS(cfg.TemplatesDir), cfg.HotReload)
 	if err != nil {
-		log.Fatalf("init templates: %v", err)
+		logger.Fatal("init templates", "error", err)
 	}
 
 	srv := httpserver.New(cfg.Host, cfg.Port, cfg.APIKey, os.DirFS(cfg.FrontendDir), svc, nil, slog.Default(), eng)

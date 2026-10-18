@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"log"
 	"os"
 	"path/filepath"
@@ -10,9 +9,12 @@ import (
 	"syscall"
 
 	"goisekai/internal/config"
+	"goisekai/internal/logger"
 )
 
-// runStop reads the PID file from the data directory and sends SIGTERM.
+// runStop reads the PID file from the data directory and sends SIGTERM. Its
+// outcome goes through the same logger the server uses, so `goisekai stop`
+// leaves a record in the log path instead of a bare stdout line.
 func runStop() {
 	cfgPath := os.Getenv("GOISEKAI_CONFIG")
 	if cfgPath == "" {
@@ -22,26 +24,30 @@ func runStop() {
 	if err != nil {
 		log.Fatalf("load config: %v", err)
 	}
+	// The logger needs a level; the config supplies it, same as the server.
+	if err := logger.Init(cfg.LogLevel); err != nil {
+		log.Fatalf("init logger: %v", err)
+	}
 
 	pidPath := filepath.Join(cfg.DataDir, "goisekai.pid")
 	data, err := os.ReadFile(pidPath)
 	if err != nil {
-		log.Fatalf("read PID file: %v", err)
+		logger.Fatal("read PID file", "path", pidPath, "error", err)
 	}
 
 	pidStr := strings.TrimSpace(string(data))
 	pid, err := strconv.Atoi(pidStr)
 	if err != nil {
-		log.Fatalf("invalid PID %q: %v", pidStr, err)
+		logger.Fatal("invalid PID", "value", pidStr, "error", err)
 	}
 
 	proc, err := os.FindProcess(pid)
 	if err != nil {
-		log.Fatalf("find process %d: %v", pid, err)
+		logger.Fatal("find process", "pid", pid, "error", err)
 	}
 	if err := proc.Signal(syscall.SIGTERM); err != nil {
-		log.Fatalf("send SIGTERM to %d: %v", pid, err)
+		logger.Fatal("send SIGTERM", "pid", pid, "error", err)
 	}
 
-	fmt.Printf("sent SIGTERM to process %d\n", pid)
+	logger.Info("sent SIGTERM", "pid", pid)
 }

@@ -11,7 +11,6 @@
 package main
 
 import (
-	"fmt"
 	"net"
 	"os"
 	"os/exec"
@@ -24,6 +23,7 @@ import (
 
 	"fyne.io/systray"
 	"goisekai/internal/config"
+	"goisekai/internal/logger"
 )
 
 type app struct {
@@ -42,8 +42,7 @@ type app struct {
 func main() {
 	exe, err := os.Executable()
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "locate executable: %v\n", err)
-		os.Exit(1)
+		logger.Fatal("locate executable", "error", err)
 	}
 	exeDir := filepath.Dir(exe)
 
@@ -56,7 +55,7 @@ func main() {
 	}
 	cfg, err := config.Load(cfgPath)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "load %s: %v (using defaults)\n", cfgPath, err)
+		logger.Warn("load config, using defaults", "path", cfgPath, "error", err)
 		cfg = config.Default()
 	}
 
@@ -80,12 +79,10 @@ func main() {
 
 	icon, err := os.ReadFile(iconPath)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "read icon: %v\n", err)
-		os.Exit(1)
+		logger.Fatal("read icon", "path", iconPath, "error", err)
 	}
 	if _, err := os.Stat(a.serverBin); err != nil {
-		fmt.Fprintf(os.Stderr, "server binary missing: %s (run `just build`)\n", a.serverBin)
-		os.Exit(1)
+		logger.Fatal("server binary missing (run `just build`)", "path", a.serverBin)
 	}
 	a.iconB = icon
 	sigCh := make(chan os.Signal, 1)

@@ -14,6 +14,8 @@ import (
 	_ "modernc.org/sqlite"
 
 	sqlitegen "github.com/go-jet/jet/v2/generator/sqlite"
+
+	"goisekai/internal/logger"
 )
 
 // ddl mirrors internal/database/schema.go's migrations slice exactly so the
@@ -114,10 +116,10 @@ func main() {
 		fatal(err)
 	}
 
-	fmt.Println("generated internal/database/.gen")
+	logger.Info("generated internal/database/.gen")
 }
 
 func fatal(err error) {
-	fmt.Fprintln(os.Stderr, "jetgen:", err)
+	logger.Error("jetgen", "error", err)
 	os.Exit(1)
 }
