@@ -6,6 +6,7 @@ import (
 	"strconv"
 
 	"goisekai/internal/database"
+	"goisekai/internal/logger"
 	"goisekai/internal/version"
 	"strings"
 )
@@ -89,18 +90,14 @@ func (s *Server) viewLogs(w http.ResponseWriter, r *http.Request) {
 		logs = out
 	}
 
-	// Filter by worker lane(s) — query param "lane" may be comma-separated
-	// (e.g. "LaneFetch,LaneImage"). Only logs containing "lane= <LaneName>"
-	// are kept.
+	// Filter by worker lane — the query param "lane" names one lane (the value
+	// of the line's lane= attr, e.g. "fetch"). Parsing lives in logger.LaneOf
+	// so this and /api/worker-log cannot drift from how jobs tag their lines.
 	if laneFilter := r.URL.Query().Get("lane"); laneFilter != "" {
-		lanes := strings.Split(laneFilter, ",")
 		out := logs[:0]
 		for _, l := range logs {
-			for _, ln := range lanes {
-				if strings.Contains(l, "lane= "+ln) {
-					out = append(out, l)
-					break
-				}
+			if logger.LaneOf(l) == laneFilter {
+				out = append(out, l)
 			}
 		}
 		logs = out

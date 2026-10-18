@@ -21,7 +21,23 @@ var (
 	lines = make([]string, 0, bufSize)
 )
 
-// appendLine stores one formatted log line in the ring buffer, evicting the
+// LaneOf returns the worker lane recorded on a log line — the value of the
+// "lane=" attribute — or "" when the line carries none. It is the single
+// parser for lane tagging, so the server-side filter, the /api/worker-log
+// endpoint, and the Lua template helper all agree on one shape.
+//
+// Worker records write the lane as a structured attr, e.g. "lane=fetch"; the
+// value matches workers.Lane.String() (lowercase, no "Lane" prefix).
+func LaneOf(line string) string {
+	for field := range strings.FieldsSeq(line) {
+		if v, ok := strings.CutPrefix(field, "lane="); ok {
+			return v
+		}
+	}
+	return ""
+}
+
+// AppendLine stores one formatted log line in the ring buffer, evicting the
 // oldest when full. Thread-safe; called by the capture handler on every record.
 func appendLine(line string) {
 	mu.Lock()

@@ -4,9 +4,10 @@ import (
 	"fmt"
 	"html"
 	"net/url"
-	"strings"
 
 	lua "github.com/mmcdole/lunar"
+
+	"goisekai/internal/logger"
 )
 
 // luaHelpers returns all helper functions to register as Lua globals.
@@ -93,7 +94,8 @@ func csrfInputHelper(S *lua.State) lua.NativeFunc {
 }
 
 // extractLaneHelper returns the worker lane name from a log line, or "".
-// Looks for "lane= <LaneName>" in the line.
+// It delegates to logger.LaneOf so the template, the view filter, and
+// /api/worker-log all parse the lane the same way (the "lane=" attr).
 func extractLaneHelper(S *lua.State) lua.NativeFunc {
 	return func(frame lua.Frame) lua.Outcome {
 		arg, ok := frame.Argument(0)
@@ -104,15 +106,6 @@ func extractLaneHelper(S *lua.State) lua.NativeFunc {
 		if err != nil {
 			tok = arg.String()
 		}
-		idx := strings.Index(tok, "lane= ")
-		if idx == -1 {
-			return frame.ReturnString("")
-		}
-		rest := tok[idx+len("lane= "):]
-		end := strings.IndexFunc(rest, func(r rune) bool { return r == ' ' || r == '\t' })
-		if end == -1 {
-			return frame.ReturnString(html.EscapeString(rest))
-		}
-		return frame.ReturnString(html.EscapeString(rest[:end]))
+		return frame.ReturnString(html.EscapeString(logger.LaneOf(tok)))
 	}
 }

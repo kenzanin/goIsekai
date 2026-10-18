@@ -200,9 +200,8 @@ func (s *Server) apiWorkerLog(w http.ResponseWriter, r *http.Request) {
 	if laneFilter == "" {
 		out = lines
 	} else {
-		needle := "lane=" + laneFilter
 		for _, l := range lines {
-			if strings.Contains(l, needle) {
+			if logger.LaneOf(l) == laneFilter {
 				out = append(out, l)
 			}
 		}

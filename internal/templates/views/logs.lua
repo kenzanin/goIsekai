@@ -40,6 +40,7 @@ return function(data)
         <option value="lane-image"]=] .. (filter == "lane-image" and " selected" or "") .. [=[>Image lane</option>
         <option value="lane-interactive"=] .. (filter == "lane-interactive" and " selected" or "") .. [=[>Interactive lane</option>
         <option value="lane-maintenance"=] .. (filter == "lane-maintenance" and " selected" or "") .. [=[>Maintenance lane</option>
+        <option value="lane-cdp"]=] .. (filter == "lane-cdp" and " selected" or "") .. [=[>CDP lane</option>
       </select>
     </div>
   </div>
@@ -80,12 +81,16 @@ return function(data)
 
   colorLogLines();
 
+  // Lane values are lowercase, matching workers.Lane.String() and the lane=
+  // attr on log lines. These values drive the ?lane= query param, the
+  // lineMatchesLane test, and the worker-card highlight, so they must agree
+  // with the server's logger.LaneOf exactly.
   var laneMap = {
-    "lane-fetch": "LaneFetch",
-    "lane-image": "LaneImage",
-    "lane-interactive": "LaneInteractive",
-    "lane-maintenance": "LaneMaintenance",
-    "lane-cdp": "LaneCDP"
+    "lane-fetch": "fetch",
+    "lane-image": "image",
+    "lane-interactive": "interactive",
+    "lane-maintenance": "maintenance",
+    "lane-cdp": "cdp"
   };
 
   function getSelectedLaneName() {
@@ -96,7 +101,7 @@ return function(data)
 
   function lineMatchesLane(lineText, laneName) {
     if (!laneName) return true;
-    return lineText.indexOf("lane= " + laneName) !== -1;
+    return lineText.indexOf("lane=" + laneName) !== -1;
   }
 
   function buildFetchURL() {

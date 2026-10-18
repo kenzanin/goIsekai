@@ -137,6 +137,31 @@ func TestFormatRecord(t *testing.T) {
 	}
 }
 
+// TestLaneOf covers the one parser the lane filter, the JSON endpoint, and the
+// template helper all share. The value must be the raw attr value (matching
+// workers.Lane.String()); anything else means the filter stays empty.
+func TestLaneOf(t *testing.T) {
+	cases := []struct {
+		name string
+		line string
+		want string
+	}{
+		{"structured attr", "16:00:54 DEBUG worker: running jobID=fetch-1 lane=fetch plugin=mangataro", "fetch"},
+		{"attr not last", "16:00:54 DEBUG worker: dead jobID=image-2 lane=image dur_ms=12 lastErr=boom", "image"},
+		{"quoted message attr", `time=... level=INFO msg="worker: done" jobID=cdp-1 lane=cdp`, "cdp"},
+		{"no lane attr", "16:00:54 INFO starting goIsekai log_level=debug data_dir=app_data", ""},
+		{"empty line", "", ""},
+		{"bare lane=", "INFO heartbeat lane=", ""},
+		{"lane as substring of another key", "INFO notlane=fetch x=1", ""},
+		{"cleartext bracket form is not a lane", "16:00:54 [interactive] jobID=interactive-2 running", ""},
+	}
+	for _, c := range cases {
+		if got := LaneOf(c.line); got != c.want {
+			t.Errorf("%s: LaneOf(%q) = %q, want %q", c.name, c.line, got, c.want)
+		}
+	}
+}
+
 func contains(s, sub string) bool {
 	return strings.Contains(s, sub)
 }
