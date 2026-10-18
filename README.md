@@ -26,7 +26,7 @@ flowchart TD
             JS[goja<br/>ES5.1]
             YG[yaegi<br/>interpreted Go]
             WASM[wazero<br/>Go or C++ wasm]
-            GO[plugin.Load<br/>`.so`]
+            GO[purego dlopen<br/>C/C++ `.so`]
         end
         HostNet[TLS fingerprint<br/>profile ladder]
         Workers[Worker Pools<br/>interactive/fetch<br/>image/maintenance]
@@ -110,8 +110,8 @@ graph TD
     F -->|yes| G[yaegi interpreter]
     A --> H{main.wasm / *.wasm?}
     H -->|yes| I[wazero]
-    A --> J{plugin.so?}
-    J -->|yes| K[plugin.Load]
+    A --> J{main.so?}
+    J -->|yes| K[purego dlopen]
 
     C --> L[host_http_request]
     E --> L
@@ -239,7 +239,7 @@ Host/port come from CLI flags or `goisekai.ini` (flags win):
 
 ## Plugins
 
-Plugins implement a small ABI (`Init`, plus `Search`, `GetMangaDetail`, `GetChapterList`, `GetPageList`, `GetGenres`, `GetEnrichment`) and call the host function `http_request` for all networking. Lua plugins use snake_case (`search_manga`, `get_manga_detail`, ...), JS plugins use camelCase (`searchManga`, `getMangaDetail`, ...), WASM uses the PascalCase names. All runtimes are interchangeable — pick Lua for quick ones, JS for JSON-heavy ones, Yaegi when Go stdlib matters.
+Plugins implement a small ABI — `Search`, `GetMangaDetail`, `GetChapterList`, `GetPageList`, and the optional `GetGenres` (`Init` is Yaegi-only; `GetEnrichment` belongs to info scripts, not source plugins). Networking goes through the host helper library (or the legacy `http_request` host function). Naming follows each language: Lua uses snake_case (`search`, `get_manga_detail`, ...), JS uses camelCase (`search`, `getMangaDetail`, ...), and Go/WASM use PascalCase (`Search`, `GetMangaDetail`, ...). All runtimes are interchangeable — pick Lua for quick ones, JS for JSON-heavy ones, Yaegi when Go stdlib matters, C++ for the smallest WASM.
 
 ### Reporting failures
 
@@ -267,14 +267,14 @@ local PLUGIN = {
   thumb_ratio = 0.71,
 }
 
-function search_manga(filter_json)
+function search(filter_json)
   local filter = json.decode(filter_json)
   local res = http_request({ url = "https://kaliscan.io/?s=" .. filter.query })
   return results
 end
 ```
 
-`main.lua` declares a `PLUGIN` table and ABI globals (`search_manga`, `get_manga_detail`, `get_chapter_list`, `get_page_list`). Each takes one JSON-string argument and returns a Lua table. Networking goes through `http_request({url=..., method=..., headers=...})`, which rides the same TLS-fingerprinted, cookie-jarred, rate-paced session as all other runtimes. `json.encode`/`json.decode` are provided. Available stdlib: `string`, `table`, `math`, `os.time/date/clock` — no `io`, no `os.execute`.
+`main.lua` defines the ABI globals (`search`, `get_manga_detail`, `get_chapter_list`, `get_page_list`) and lives beside a `plugin.json` holding its metadata. Each takes one JSON-string argument and returns a Lua table. Networking goes through `http_request({url=..., method=..., headers=...})`, which rides the same TLS-fingerprinted, cookie-jarred, rate-paced session as all other runtimes. `json.encode`/`json.decode` are provided. Available stdlib: `string`, `table`, `math`, `os.time/date/clock` — no `io`, no `os.execute`. The legacy name `search_manga` still resolves with a deprecation warning.
 
 Reusable modules (`helpers.lua`) can be copied across plugins for shared utilities. See `examples/plugins/lua/mangabuddy/` for a complete example.
 
@@ -312,7 +312,7 @@ var PLUGIN = {
   thumb_ratio: 0.71,
 };
 
-function search_manga(filterJson) {
+function search(filterJson) {
   var filter = JSON.parse(filterJson);
   var res = JSON.parse(http_request(JSON.stringify({
     url: "https://api.mangadex.org/manga?title=" + encodeURIComponent(filter.query)
@@ -321,28 +321,24 @@ function search_manga(filterJson) {
 }
 ```
 
-Same ABI as Lua — `PLUGIN` metadata + PascalCase globals. `http_request` takes a JSON string, returns a JSON string. `json` is native JS. See `examples/plugins/js/mangzio/` for a complete example.
+Same ABI as Lua — camelCase globals (`search`, `getMangaDetail`, ...) plus a sibling `plugin.json` for metadata. `http_request` takes a JSON string, returns a JSON string. `json` is native JS. See `examples/plugins/js/mangzio/` for a complete example. The legacy name `searchManga` still resolves with a deprecation warning.
 
 ### Yaegi plugins (interpreted Go)
 
 One folder per site under `plugins/yaegi/<id>/`, with `main.go` as the entry point. The host interprets the source with Yaegi — no toolchain required.
 
 ```go
-func Init() string {
-	return `{"name":"Demo","thumb_ratio":0.7}`
-}
-
 func Search(arg string) (string, error) {
 	body, err := hostnet.Get("https://example.com/search?q=" + arg)
 	return body, err
 }
 ```
 
-ABI functions take one string arg and return `(string, error)`; `Init` takes no arg. Networking goes through the synthetic `hostnet` package (`hostnet.Get`/`hostnet.Post`), which routes through the same TLS-fingerprinted per-plugin proxy. Sandbox: the Go stdlib is available, but any third-party (`github.com/...`) or `goisekai/...` import is rejected at load time. See `examples/plugins/yaegi/yaegidemo/` for a complete example.
+ABI functions take one string arg and return `(string, error)`. Metadata lives in a sibling `plugin.json`, not in the source — an `Init()` export is compiled but never called. Networking goes through the synthetic `hostnet` package (`hostnet.Get`/`hostnet.Post`), which routes through the same TLS-fingerprinted per-plugin proxy. Sandbox: the Go stdlib is available, but any third-party (`github.com/...`) or `goisekai/...` import is rejected at load time. See `examples/plugins/yaegi/yaegidemo/` for a complete example.
 
 ### WASM plugins (Go or C++, wasip1)
 
-One folder per site under `app_data/plugins/<id>/` with `main.wasm` (or a single `<id>.wasm` at the plugins root), plus a `plugin.json` for metadata since wasm has no `Init`/`PLUGIN` export. The host runs the module with **wazero**; it must export `contract_version`, `Search`, `GetMangaDetail`, `GetChapterList`, `GetPageList`, and a `malloc`/`free` pair. Networking and the shared helper library go through the single `env.host_call` import (`env.host_http_request` remains for the raw HTTP ABI). See `docs/plugin-wasm-helpers.md` and `examples/plugins/wasm/` for full examples.
+One folder per site under `app_data/plugins/<id>/` with `main.wasm` (or a single `<id>.wasm` at the plugins root), plus a `plugin.json` for metadata — every runtime reads metadata from there, so wasm needs no `Init`/`PLUGIN` export. The host runs the module with **wazero**; it must export `contract_version`, `Search`, `GetMangaDetail`, `GetChapterList`, `GetPageList`, and a `malloc`/`free` pair. Networking and the shared helper library go through the single `env.host_call` import (`env.host_http_request` remains for the raw HTTP ABI). See `docs/plugin-wasm-helpers.md` and `examples/plugins/wasm/` for full examples.
 
 What a backend costs in binary size (same plugin logic, `manhawato`):
 
@@ -377,9 +373,15 @@ C++17 (wasi-sdk clang, ~10× smaller than Go; see `examples/plugins/wasm/komix_t
 > and its `-target wasi` is command-style (`_start`), not the `_initialize`
 > reactor the host loads. See `okf-mcp/concept/wasm-cpp-plugin-toolchain.md`.
 
-### Native Go plugins (.so)
+### Native plugins (C/C++ `.so`, no cgo)
 
-One `.so` per plugin at `app_data/plugins/<id>.so`, built with `go build -buildmode=plugin` against the same Go version and CGO setting as the host. Requires a CGO-enabled host build; the default `CGO_ENABLED=0` binary cannot load them.
+One folder per site under `app_data/plugins/<id>/` with `main.so`, plus a `plugin.json` for metadata. The host opens it with **purego** (`dlopen`/`dlsym`), so a `.so` plugin works on the default `CGO_ENABLED=0` binary — it is not a Go plugin module and needs no matching toolchain. Export the ABI as `char*`-returning functions (`Search`, `GetMangaDetail`, `GetChapterList`, `GetPageList`, optional `GetGenres`) plus `plugin_free`, which the host calls on the buffer your plugin returns. A plugin may also export `plugin_init(host_call_fn)` to receive the host-helper bridge. See `examples/plugins/native/roliascan/` (libcurl + libxml2 + RapidJSON) and `examples/plugins/native/dummy/` for the ABI fixture.
+
+```sh
+examples/plugins/native/dummy/build.sh   # g++ -std=c++17 -shared → libdummy.so
+```
+
+### Bundled examples
 
 ```sh
 just install-lua kaliscan   # copies a Lua plugin → app_data/plugins/

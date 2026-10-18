@@ -5,6 +5,8 @@ package pluginmanager
 import (
 	"os"
 	"path/filepath"
+	"slices"
+	"strings"
 	"testing"
 	"unsafe"
 
@@ -111,10 +113,162 @@ func TestNativePluginCallCrossesABI(t *testing.T) {
 		t.Fatalf("GetChapterList through .so: %v", err)
 	}
 
-	// The fixture returns the error envelope from GetPageList, which must
-	// surface as an error rather than an empty page list.
+	// GetPageList returns the error envelope, which must surface as an error
+	// rather than an empty page list.
 	if _, err := mgr.GetPageList("dummy", "c1"); err == nil {
 		t.Fatal("GetPageList returned no error for the {\"error\"} envelope")
+	}
+}
+
+// The host_call bridge: the fixture's GetMangaDetail asks the host to run
+// text.titlecase and puts the answer in the description. A .so has no import
+// table, so this only works if the host installed the plugin_init callback and
+// the plugin could call back into Go through it.
+func TestNativePluginReachesHostHelpers(t *testing.T) {
+	dir := nativeFixtureDir(t)
+	mgr := NewManager(hostnet.NewProxy(), dir)
+	if err := mgr.Discover(); err != nil {
+		t.Fatalf("Discover: %v", err)
+	}
+	defer func() { _ = mgr.Close() }()
+
+	manga, err := mgr.GetMangaDetail("dummy", "dummy-1")
+	if err != nil {
+		t.Fatalf("GetMangaDetail through .so: %v", err)
+	}
+	// text.titlecase upper-cases the first rune: "host bridge" -> "Host bridge".
+	if want := "Host bridge"; manga.Description != want {
+		t.Fatalf("host helper result = %q, want %q (plugin_init bridge not installed?)",
+			manga.Description, want)
+	}
+}
+
+// ReloadPlugin must keep a native plugin usable. This is the regression that
+// made reload route through UnloadPlugin+ensureLoaded: LoadPlugin has no
+// main.so branch and treats a .so plugin's wasmPath — an entry FILE, not a
+// folder — as a directory, so the old reload could never re-open it.
+func TestReloadNativePluginStaysUsable(t *testing.T) {
+	dir := nativeFixtureDir(t)
+	mgr := NewManager(hostnet.NewProxy(), dir)
+	if err := mgr.Discover(); err != nil {
+		t.Fatalf("Discover: %v", err)
+	}
+	defer func() { _ = mgr.Close() }()
+
+	// First call lazy-loads the .so, so reload has a live dlopen handle to
+	// release. Skipping that dlclose would leave the old library mapped and
+	// dlopen of the same path would hand the stale handle back.
+	if _, err := mgr.Search("dummy", types.SearchFilter{Query: "before"}); err != nil {
+		t.Fatalf("Search before reload: %v", err)
+	}
+
+	id, err := mgr.ReloadPlugin("dummy")
+	if err != nil {
+		t.Fatalf("ReloadPlugin on a native plugin: %v", err)
+	}
+	if id != "dummy" {
+		t.Fatalf("reload returned id %q, want dummy (the id must not change)", id)
+	}
+
+	// The fixture echoes the query back, so this also proves the library
+	// serving the call after reload is the plugin, not a stale mapping.
+	results, err := mgr.Search("dummy", types.SearchFilter{Query: "after"})
+	if err != nil {
+		t.Fatalf("Search after reload: %v", err)
+	}
+	if want := "dummy result:after"; len(results) != 1 || results[0].Title != want {
+		t.Fatalf("after reload: %+v, want one %q", results, want)
+	}
+}
+
+// A reload that cannot load the library must leave the plugin registered, so
+// fixing the file and reloading recovers it. The old implementation deleted the
+// registry entry before loading, which is why a bad reload made a running
+// plugin vanish from the UI until the process restarted.
+//
+// The broken plugin's .so is invalid from the start and is therefore never
+// mmap'd: overwriting a .so that a running process already has mapped can
+// SIGBUS the host (the write truncates pages the loader may still touch), so
+// corrupting the loaded fixture is not a safe way to provoke this.
+func TestFailedNativeReloadKeepsThePluginRegistered(t *testing.T) {
+	dir := nativeFixtureDir(t)
+	broken := filepath.Join(dir, "broken")
+	if err := os.MkdirAll(broken, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(broken, "main.so"), []byte("not an ELF file"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(broken, "plugin.json"),
+		[]byte(`{"contract_version":1}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	mgr := NewManager(hostnet.NewProxy(), dir)
+	if err := mgr.Discover(); err != nil {
+		t.Fatalf("Discover: %v", err)
+	}
+	defer func() { _ = mgr.Close() }()
+
+	if _, err := mgr.ReloadPlugin("broken"); err == nil {
+		t.Fatal("ReloadPlugin succeeded on an invalid .so")
+	}
+	if !slices.ContainsFunc(mgr.LoadedPlugins(), func(p LoadedPlugin) bool { return p.ID == "broken" }) {
+		t.Fatal("a failed reload dropped the native plugin from the registry; it is unrecoverable until restart")
+	}
+
+	// A later call must report a load failure, not "plugin not registered":
+	// the entry has to survive for the file to be fixable and reloaded.
+	_, err := mgr.Search("broken", types.SearchFilter{Query: "x"})
+	if err == nil {
+		t.Fatal("Search on a plugin with an invalid .so succeeded")
+	}
+	if strings.Contains(err.Error(), "not registered") {
+		t.Fatalf("the registry entry was lost: %v", err)
+	}
+}
+
+// A native plugin must be installable and hot-loadable like every other kind.
+// Install and LoadPlugin probed only main.lua/main.js/main.go/main.wasm, so a
+// folder carrying main.so was rejected with "no main.lua, main.js, main.go, or
+// main.wasm found" — a native plugin could be discovered but never installed.
+func TestNativePluginInstallAndHotLoad(t *testing.T) {
+	// nativeFixtureDir already produced a built folder plugin (<dir>/dummy).
+	src := filepath.Join(nativeFixtureDir(t), "dummy")
+
+	base := t.TempDir()
+	mgr := NewManager(hostnet.NewProxy(), filepath.Join(base, "plugins"))
+	if err := mgr.Discover(); err != nil {
+		t.Fatalf("Discover: %v", err)
+	}
+	defer func() { _ = mgr.Close() }()
+
+	path, err := mgr.Install(src)
+	if err != nil {
+		t.Fatalf("Install native folder: %v", err)
+	}
+	if filepath.Base(path) != "main.so" {
+		t.Fatalf("Install should return the main.so path, got %s", path)
+	}
+	if _, err := mgr.Search("dummy", types.SearchFilter{Query: "installed"}); err != nil {
+		t.Fatalf("Search after install: %v", err)
+	}
+
+	// Hot-load a second copy from an external path, which registers under the
+	// folder name rather than the plugin's declared one.
+	second := filepath.Join(base, "src", "dummy2")
+	if err := copyDir(src, second); err != nil {
+		t.Fatalf("stage second copy: %v", err)
+	}
+	id, err := mgr.LoadPlugin(second)
+	if err != nil {
+		t.Fatalf("LoadPlugin native folder: %v", err)
+	}
+	if id != "dummy2" {
+		t.Fatalf("LoadPlugin returned %q, want dummy2", id)
+	}
+	if _, err := mgr.Search("dummy2", types.SearchFilter{Query: "hot"}); err != nil {
+		t.Fatalf("Search after hot-load: %v", err)
 	}
 }
 

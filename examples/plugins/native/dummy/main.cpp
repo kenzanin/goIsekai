@@ -14,6 +14,8 @@
 #include <cstring>
 #include <string>
 
+#include "native_abi.h"
+
 static char *dup_json(const std::string &s) {
 	char *p = static_cast<char *>(std::malloc(s.size() + 1));
 	if (!p) return nullptr;
@@ -41,7 +43,11 @@ char *Search(const char *json) {
 }
 
 char *GetMangaDetail(const char *) {
-	return dup_json(R"({"id":"dummy-1","title":"dummy result"})");
+	// description carries the host's answer to "text.titlecase" so the test can
+	// assert the plugin_init bridge actually reached a helper. An empty value
+	// means the bridge never got installed.
+	std::string probe = host_str("text.titlecase", "host bridge");
+	return dup_json(R"({"id":"dummy-1","title":"dummy result","description":")" + probe + R"("})");
 }
 
 char *GetChapterList(const char *) {

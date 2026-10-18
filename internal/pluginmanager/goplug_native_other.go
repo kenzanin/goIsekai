@@ -17,4 +17,6 @@ func (l *nativeLib) bind(string, any) error {
 	return errors.New("native .so plugins are not supported on this platform")
 }
 
+func (l *nativeLib) wireHostCall(*Manager, *loadedPlugin) {}
+
 func (l *nativeLib) close() error { return nil }

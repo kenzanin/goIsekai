@@ -28,4 +28,23 @@ func (l *nativeLib) bind(name string, fptr any) error {
 	return nil
 }
 
+// wireHostCall installs the host_call bridge, if the plugin exports plugin_init.
+// The export is optional: a plugin that omits it still loads and simply has no
+// host helpers, which is what every native plugin did before this existed.
+//
+// The callback address outlives this call — purego keeps every registered
+// callback alive in its own table — so the plugin may store and use it later.
+//
+// ponytail: one callback slot per load, and purego has no way to release one
+// (its table is append-only, maxCB = 2000), so repeated ReloadPlugin calls
+// would eventually exhaust it. A cache keyed by plugin id would bound that to
+// the number of distinct plugins; add it if reloads ever become frequent.
+func (l *nativeLib) wireHostCall(m *Manager, p *loadedPlugin) {
+	var initFn func(uintptr)
+	if err := l.bind("plugin_init", &initFn); err != nil {
+		return
+	}
+	initFn(purego.NewCallback(hostCallCallback(m, p)))
+}
+
 func (l *nativeLib) close() error { return purego.Dlclose(l.handle) }

@@ -7,6 +7,41 @@ import (
 	"goisekai/internal/hostnet"
 )
 
+// ReloadPlugin must work for wasm too, whose wasmPath is the main.wasm FILE
+// rather than a folder — the same shape a .so plugin has, and the reason the
+// old reload (which passed wasmPath straight to the folder-based LoadPlugin)
+// could load neither of them.
+func TestReloadWasmPluginStaysUsable(t *testing.T) {
+	dir := wasmFixtureDir(t)
+	mgr := NewManager(hostnet.NewProxy(), dir)
+	if err := mgr.Discover(); err != nil {
+		t.Fatalf("Discover: %v", err)
+	}
+	defer func() { _ = mgr.Close() }()
+
+	// This fixture's GetGenres is a static list, so the whole wasm path runs
+	// without touching the network.
+	if _, err := mgr.GetGenres("reimanga_net_cpp"); err != nil {
+		t.Fatalf("GetGenres before reload: %v", err)
+	}
+
+	id, err := mgr.ReloadPlugin("reimanga_net_cpp")
+	if err != nil {
+		t.Fatalf("ReloadPlugin on a wasm plugin: %v", err)
+	}
+	if id != "reimanga_net_cpp" {
+		t.Fatalf("reload returned id %q, want reimanga_net_cpp (the id must not change)", id)
+	}
+
+	genres, err := mgr.GetGenres("reimanga_net_cpp")
+	if err != nil {
+		t.Fatalf("GetGenres after reload: %v", err)
+	}
+	if len(genres) == 0 {
+		t.Fatal("the reloaded wasm plugin returned no genres: the runtime was not re-instantiated")
+	}
+}
+
 // wasmFixtureDir copies the smallest wasm plugin we ship (a C++ build, ~94 KB)
 // into a temp plugins dir. Its GetGenres is a static list, so the whole wasm
 // path — compile, instantiate, _initialize, contract_version, malloc/free and

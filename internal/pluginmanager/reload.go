@@ -50,39 +50,33 @@ func (m *Manager) UnloadPlugin(id string) error {
 	return nil
 }
 
-// ReloadPlugin unloads a plugin and re-loads it from its current path on disk.
+// ReloadPlugin picks up a plugin's current files on disk, keeping the same id.
+//
+// It is deliberately unload-then-load rather than a bespoke re-instantiation:
+// UnloadPlugin already releases every runtime (dlclose for a native .so, Close
+// for a wasm module, Close/Interrupt for the VMs), and ensureLoaded already
+// re-instantiates each kind from p.wasmPath. Reusing both keeps the five kinds
+// on one code path — the hand-rolled version this replaced mis-derived the path
+// for .so and wasm plugins (whose wasmPath is an entry FILE, not a folder) and
+// removed the plugin from the registry before loading, so a failed reload
+// deleted the plugin until restart.
+//
+// The dlclose matters for correctness, not just hygiene: dlopen of an
+// already-loaded path returns the cached handle, so a native plugin would keep
+// executing its old code unless the old handle is released first.
+//
+// On failure the plugin stays registered but unloaded, so the next call
+// lazy-loads it again — a bad edit is recoverable by fixing the file.
 func (m *Manager) ReloadPlugin(id string) (string, error) {
-	m.mu.Lock()
-	old, ok := m.plugins[id]
-	if !ok {
-		m.mu.Unlock()
-		return "", fmt.Errorf("plugin %q not loaded", id)
+	if err := m.UnloadPlugin(id); err != nil {
+		return "", err
 	}
-	// Close the old plugin instance first
-	if old.kind == "lua" && old.lunar != nil {
-		_ = old.lunar.Close()
-	}
-	if old.kind == "js" && old.js != nil {
-		old.js.Interrupt("reloading")
-	}
-	if old.kind == "wasm" && old.wasmMod != nil {
-		_ = old.wasmMod.Close(m.ctx)
-	}
-	// Go native plugins have no explicit unload in pkg/plugin; dropping the
-	// handle leaks the mapped .so until process exit (acceptable on reload).
-	delete(m.plugins, id)
-	m.mu.Unlock()
-
-	// Determine reload path from stored wasmPath.
-	// lua/js/yaegi store their plugin folder directly,
-	// so the stored path is already LoadPlugin-ready for every kind.
-	path := old.wasmPath
-	newID, err := m.LoadPlugin(path)
-	if err != nil {
+	if err := m.ensureLoaded(id); err != nil {
+		logger.Warn("plugin reload failed", "id", id, "error", err)
 		return "", fmt.Errorf("reload %s: %w", id, err)
 	}
-	logger.Info("plugin reloaded", "id", newID)
-	return newID, nil
+	logger.Info("plugin reloaded", "id", id)
+	return id, nil
 }
 
 // copyDir recursively copies src dir to dst (lua plugin folders).

@@ -103,7 +103,30 @@ func (m *Manager) Install(dirPath string) (string, error) {
 		return filepath.Join(destDir, "main.go"), nil
 	}
 
-	return "", fmt.Errorf("no main.lua, main.js, or main.go found at %s", dirPath)
+	// Native plugin: source is a folder containing main.so; copy it recursively.
+	// Probed last, mirroring discoverGo: a native plugin folder holds only
+	// main.so, so nothing above can claim it.
+	mainSo := filepath.Join(dirPath, "main.so")
+	if info, err := os.Stat(mainSo); err == nil && !info.IsDir() {
+		id := filepath.Base(dirPath)
+		destDir := filepath.Join(m.pluginsDir, id)
+		logger.Debug("installing native plugin", "source", dirPath, "dest", destDir)
+		if filepath.Clean(dirPath) != filepath.Clean(destDir) {
+			if err := copyDir(dirPath, destDir); err != nil {
+				return "", fmt.Errorf("copy native plugin %s: %w", id, err)
+			}
+		}
+		p, err := m.loadGo(id, filepath.Join(destDir, "main.so"))
+		if err != nil {
+			logger.Error("native plugin install failed", "id", id, "error", err)
+			return "", fmt.Errorf("install native plugin %s: %w", id, err)
+		}
+		m.registerLoaded(id, p)
+		logger.Debug("native plugin installed", "id", id)
+		return filepath.Join(destDir, "main.so"), nil
+	}
+
+	return "", fmt.Errorf("no main.lua, main.js, main.go, main.wasm, or main.so found at %s", dirPath)
 }
 
 // LoadPlugin hot-loads a single plugin folder (containing main.lua, main.js, or main.go).
@@ -176,5 +199,20 @@ func (m *Manager) LoadPlugin(path string) (string, error) {
 		return id, nil
 	}
 
-	return "", fmt.Errorf("no main.lua, main.js, main.go, or main.wasm found at %s", path)
+	mainSo := filepath.Join(path, "main.so")
+	if info, err := os.Stat(mainSo); err == nil && !info.IsDir() {
+		id := filepath.Base(path)
+		if _, dup := m.plugins[id]; dup {
+			return "", fmt.Errorf("plugin %q already loaded", id)
+		}
+		p, err := m.loadGo(id, mainSo)
+		if err != nil {
+			return "", err
+		}
+		m.registerLoaded(id, p)
+		logger.Info("plugin loaded (hot)", "id", id, "kind", "go")
+		return id, nil
+	}
+
+	return "", fmt.Errorf("no main.lua, main.js, main.go, main.wasm, or main.so found at %s", path)
 }
