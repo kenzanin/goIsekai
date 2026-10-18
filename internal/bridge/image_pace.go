@@ -2,6 +2,7 @@ package bridge
 
 import (
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -109,9 +110,28 @@ func (s *AppService) hostRelease(host string, prio Prio) {
 	lanes.mu.Unlock()
 }
 
+// atHomeDomain is the parent of MangaDex's at-home ("@Home") image node
+// hostnames (e.g. cmdxd98sb0x3yprd.mangadex.network), returned as baseUrl by
+// /at-home/server.
+const atHomeDomain = "mangadex.network"
+
+// hostNeedsPacing reports whether fetches to host must be spaced out at all.
+// Only MangaDex's at-home nodes reject rapid bursts (404); the static cover CDN
+// (uploads.mangadex.org) and every plugin site CDN serve parallel requests
+// fine. Pacing those serialized the cover picker at ~1.1s per image, so N
+// covers took ~N seconds and a click on an already-loaded cover queued behind
+// the whole grid.
+//
+// ponytail: one suffix match, no config table. Add a pattern here if another
+// upstream turns out to burst-reject.
+func hostNeedsPacing(host string) bool {
+	return host == atHomeDomain || strings.HasSuffix(host, "."+atHomeDomain)
+}
+
 // paceImage blocks until at least a second has passed since the previous
-// request to the same host — MD@Home nodes 404 rapid bursts (upstream
-// convention is ~1 request/second per node).
+// request to the same host — at-home nodes 404 rapid bursts (upstream
+// convention is ~1 request/second per node). Callers must gate on
+// hostNeedsPacing: pacing a CDN that tolerates bursts only adds latency.
 func (s *AppService) paceImage(host string) {
 	const gap = 1100 * time.Millisecond
 	s.imgPaceMu.Lock()

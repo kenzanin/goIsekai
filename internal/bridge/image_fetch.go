@@ -33,10 +33,16 @@ func (s *AppService) fetchImage(ctx context.Context, pluginID, url string, heade
 	}
 	logger.Debug("fetching image", "url", url, "plugin", pluginID)
 	// At-home image nodes 404 bursts: a browser's draw+prefetch fires several
-	// fetches at once. Serialize per host and pace requests ~1s apart (the
-	// upstream convention for MD@Home), retrying with backoff before giving
-	// up. The lanes are per host, so covers from site A never queue behind
-	// pages from site B.
+	// fetches at once. Admit two at a time per host and space requests ~1s
+	// apart (the upstream convention for MD@Home), retrying with backoff before
+	// giving up. The lanes are per host, so covers from site A never queue
+	// behind pages from site B.
+	//
+	// Only the ~1s spacing is at-home-specific (see hostNeedsPacing). The
+	// admission cap stays for every host: it is a concurrency bound, not a
+	// delay. Pacing the static cover CDN (uploads.mangadex.org) serialized the
+	// whole cover picker at ~1.1s per image, and a click on an already-loaded
+	// cover then queued its download behind the entire grid.
 	host := func() string {
 		if u, err := neturl.Parse(url); err == nil && u.Host != "" {
 			return u.Host
@@ -45,6 +51,7 @@ func (s *AppService) fetchImage(ctx context.Context, pluginID, url string, heade
 	}()
 	s.hostAcquire(host, prio)
 	defer s.hostRelease(host, prio)
+	pace := hostNeedsPacing(host)
 	// Referer candidates: caller wins when set; otherwise try the image's own
 	// origin first (hotlink guards like mangadex serve the real image there
 	// and a silent placeholder for foreign referers) and fall back to the
@@ -86,7 +93,11 @@ func (s *AppService) fetchImage(ctx context.Context, pluginID, url string, heade
 		}
 		var won string
 		for _, ref := range refs {
-			s.paceImage(host)
+			// Only at-home nodes burst-reject; pacing a CDN that serves bursts
+			// just adds a needless ~1.1s per image to the cover picker.
+			if pace {
+				s.paceImage(host)
+			}
 			resp, err = s.proxy.RequestContext(ctx, pluginID, types.HTTPRequest{
 				Method:  http.MethodGet,
 				URL:     url,
