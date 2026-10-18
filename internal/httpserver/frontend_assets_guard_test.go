@@ -65,6 +65,31 @@ func TestBrotliSiblingsMatchSource(t *testing.T) {
 	}
 }
 
+// TestResetViewWiredFromCardAndToolbar pins the single definition of the
+// library reset action.
+//
+// The sidebar "titles" card and the toolbar reset button both point at
+// window.resetLibraryView. If the function is renamed or dropped, the card's
+// onclick throws and the click silently reloads with the sticky filter still
+// applied — the exact bug the wiring fixes — so the name has to be pinned on
+// both sides.
+func TestResetViewWiredFromCardAndToolbar(t *testing.T) {
+	data, err := os.ReadFile(filepath.Join(frontendLibDir, "alpine-components.js"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	src := string(data)
+
+	if !strings.Contains(src, "window.resetLibraryView =") {
+		t.Fatal("alpine-components.js does not define window.resetLibraryView; " +
+			"the sidebar titles card onclick would throw")
+	}
+	if !strings.Contains(src, "resetBtn.onclick = window.resetLibraryView") {
+		t.Error("the toolbar reset button no longer routes through window.resetLibraryView; " +
+			"the two reset paths can drift apart")
+	}
+}
+
 // TestReaderReadAheadUsesAbortableFetch pins the read-ahead cancellation
 // contract in reader.js.
 //

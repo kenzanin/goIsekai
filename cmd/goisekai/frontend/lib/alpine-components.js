@@ -910,6 +910,15 @@
   // Library view mode: grid ↔ list, persisted in localStorage (gsk:view-mode)
   // Reads the stored mode on load, toggles container + buttons, saves on change.
   // =====================================================================
+  // Reset view: back to grid AND drop the persisted filter/sort state so a bare
+  // /view/library loads unfiltered (same pattern as the sidebar All). On window
+  // so the sidebar "titles" card resets through the same code as the toolbar.
+  window.resetLibraryView = () => {
+    try { localStorage.removeItem('gsk:view-mode'); } catch (e) {}
+    try { localStorage.removeItem('gsk:library-view'); } catch (e) {}
+    window.location.href = '/view/library';
+  };
+
   const syncViewMode = () => {
     const container = document.querySelector('.view-container');
     const toggle = document.querySelector('.view-mode-toggle');
@@ -939,15 +948,10 @@
         setActive(gridBtn, false);
       };
     }
-    // Reset view: back to grid AND drop the persisted filter/sort state so a
-    // bare /view/library loads unfiltered (same pattern as the sidebar All).
+    // Reset view: same action as the sidebar "titles" card.
     const resetBtn = document.getElementById('view-reset-btn');
     if (resetBtn) {
-      resetBtn.onclick = () => {
-        try { localStorage.removeItem('gsk:view-mode'); } catch (e) {}
-        try { localStorage.removeItem('gsk:library-view'); } catch (e) {}
-        window.location.href = '/view/library';
-      };
+      resetBtn.onclick = window.resetLibraryView;
     }
   };
   window.syncViewMode = syncViewMode;

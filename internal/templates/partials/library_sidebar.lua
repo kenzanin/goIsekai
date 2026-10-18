@@ -51,7 +51,10 @@ return function(data)
 	if showSidebar then
 		-- Build stats cards
 		local statCards = ""
-		local function addStat(value, label, color, longText, accent)
+		-- reset renders the card as a link to a bare /view/library that drops the
+		-- persisted filters and view mode too — the same action as the toolbar's
+		-- reset-view button (window.resetLibraryView). Used by the "titles" card.
+		local function addStat(value, label, color, longText, accent, reset)
 			local cls = (color and color ~= "") and (' class="text-sm font-medium ' .. h(color) .. '"')
 				or (
 					longText and ' class="text-sm font-medium"'
@@ -59,8 +62,18 @@ return function(data)
 				)
 			local outer = accent and "bg-neutral-900 border border-indigo-500/30 rounded-lg px-4 py-3"
 				or "bg-neutral-900 border border-neutral-800 rounded-lg px-4 py-3"
+			local tag = "div"
+			local attrs = ""
+			if reset then
+				tag = "a"
+				attrs = ' href="/view/library" onclick="window.resetLibraryView();return false" title="Reset view (grid + all filters)"'
+				outer = outer .. " hover:border-indigo-500 transition"
+			end
 			statCards = statCards
-				.. '<div class="'
+				.. "<"
+				.. tag
+				.. attrs
+				.. ' class="'
 				.. outer
 				.. '">'
 				.. "<div"
@@ -71,7 +84,9 @@ return function(data)
 				.. '<div class="text-xs text-neutral-400">'
 				.. h(label)
 				.. "</div>"
-				.. "</div>"
+				.. "</"
+				.. tag
+				.. ">"
 		end
 
 		-- addStatLink renders the same card shape but wraps the value+label in an
@@ -111,7 +126,7 @@ return function(data)
 		end
 
 		if stats.TotalTitles then
-			addStat(stats.TotalTitles, "titles", "", false, true)
+			addStat(stats.TotalTitles, "titles", "", false, true, true)
 		end
 		if stats.StatusLine and stats.StatusLine ~= "" then
 			addStat(stats.StatusLine, "status", "", true)

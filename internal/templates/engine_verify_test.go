@@ -83,6 +83,35 @@ func TestRenderEnrichmentNoNestedForms(t *testing.T) {
 	}
 }
 
+// TestLibrarySidebarTitlesCardResetsView pins the wiring between the sidebar
+// "titles" card and the toolbar reset-view action.
+//
+// The card is where the reader notices a sticky filter: it shows the count they
+// expect to change, while the state that makes it wrong (a persisted
+// gsk:library-view) is invisible. Rendered as plain text, the only way back was
+// the reset button above the grid. The card must therefore be an <a> calling
+// the one shared window.resetLibraryView — not a <div>, and not a second copy
+// of the reset logic that would drift from the toolbar's.
+func TestLibrarySidebarTitlesCardResetsView(t *testing.T) {
+	e := mustEngine(t)
+	out := renderPartial(t, e, "partials/library_sidebar", map[string]any{
+		"Mangas": []map[string]any{{"Title": "One"}},
+		"Stats":  map[string]any{"TotalTitles": 498},
+	})
+
+	// Self-check: the value really is rendered, so a silent render failure
+	// cannot make the assertions below pass vacuously.
+	if got := strings.Count(out, ">498<"); got != 1 {
+		t.Fatalf("titles value 498 rendered %d times, want 1\n%s", got, out)
+	}
+	if !strings.Contains(out, `href="/view/library"`) {
+		t.Errorf("titles card is not a link to /view/library; it cannot reset the view\n%s", out)
+	}
+	if !strings.Contains(out, "window.resetLibraryView()") {
+		t.Errorf("titles card does not call window.resetLibraryView()\n%s", out)
+	}
+}
+
 func renderPartial(t *testing.T, e *Engine, name string, data map[string]any) string {
 	t.Helper()
 	var buf bytes.Buffer
