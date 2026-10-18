@@ -176,7 +176,7 @@
   };
 
   // Job actions: sync / sync-manga / export-cbz POST JSON {status:"ok",job_id}
-  // then stream progress over /jobs/ws (subscribe {"job_id":"<id>"}).
+  // then stream progress over /api/jobs/ws (subscribe {"job_id":"<id>"}).
   // Contract field is job_id (snake_case). Server pushes
   // {job_id, status: queued|running|done|failed, path?} (path only on
   // export-cbz done). Usage: <form data-job-action="sync" ...> + delegated
@@ -258,8 +258,19 @@
         // exists once the job reports done.
         var resultURL = data?.url || '';
         jobToast(queuedMsg, 'info');
+        var progressKey = 'job:' + jobID;
+        var progressToast = (pct) => {
+          if (typeof Alpine !== 'undefined' && Alpine.store('toast') && Alpine.store('toast').progress) {
+            Alpine.store('toast').progress(progressKey, runningMsg + ' — ' + pct + '%', pct);
+          }
+        };
+        var clearProgressToast = () => {
+          if (typeof Alpine !== 'undefined' && Alpine.store('toast') && Alpine.store('toast').dismissKey) {
+            Alpine.store('toast').dismissKey(progressKey);
+          }
+        };
         var scheme = window.location.protocol === 'https:' ? 'wss://' : 'ws://';
-        var ws = new WebSocket(`${scheme}${window.location.host}/jobs/ws`);
+        var ws = new WebSocket(`${scheme}${window.location.host}/api/jobs/ws`);
         ws.onopen = () => {
           ws.send(JSON.stringify({ job_id: jobID }));
         };
@@ -272,8 +283,11 @@
           }
           if (!msg || msg.job_id !== jobID) return;
           if (msg.status === 'running') {
-            jobToast(runningMsg, 'info');
+            progressToast(typeof msg.progress === 'number' ? msg.progress : 0);
+          } else if (msg.status === 'progress') {
+            progressToast(typeof msg.progress === 'number' ? msg.progress : 0);
           } else if (msg.status === 'done') {
+            clearProgressToast();
             if (kind === 'export-cbz') {
               // Fetch the archive instead of only naming it. Previously this
               // branch toasted msg.path, which is a filesystem path like
@@ -299,12 +313,14 @@
             restoreBtn();
             ws.close();
           } else if (msg.status === 'failed') {
+            clearProgressToast();
             jobToast(failedMsg, 'error');
             restoreBtn();
             ws.close();
           }
         };
         ws.onerror = () => {
+          clearProgressToast();
           jobToast(failedMsg, 'error');
           restoreBtn();
           try {
@@ -392,6 +408,52 @@
         }
       },
 
+      // progress(key, msg, pct) — create-or-update a persistent toast with a
+      // 0-100% bar. No auto-dismiss: the caller dismissKey()s it on job end.
+      progress: function (key, msg, pct) {
+        pct = Math.max(0, Math.min(100, Math.round(pct || 0)));
+        var item = null;
+        var i;
+        for (i = 0; i < this.items.length; i++) {
+          if (this.items[i]._key === key) {
+            item = this.items[i];
+            break;
+          }
+        }
+        if (item) {
+          item.msg = String(msg);
+          item.progress = pct;
+          if (item._el) {
+            var text = item._el.querySelector('[data-toast-text]');
+            if (text) text.textContent = item.msg;
+            if (item._fill) item._fill.style.width = pct + '%';
+          }
+          return;
+        }
+        var id = ++this._id;
+        item = { id: id, _key: key, msg: String(msg), isError: false, progress: pct, _el: null, _fill: null, _timer: null };
+        this.items.push(item);
+        if (this._container) this._append(item, 'info');
+        // Cap stack at 4 (same as show)
+        var old;
+        while (this.items.length > 4) {
+          old = this.items.shift();
+          if (old._timer) clearTimeout(old._timer);
+          if (old._el) old._el.remove();
+        }
+      },
+
+      // dismissKey(key) — remove a progress toast created via progress().
+      dismissKey: function (key) {
+        var i;
+        for (i = 0; i < this.items.length; i++) {
+          if (this.items[i]._key === key) {
+            this.dismiss(this.items[i].id);
+            return;
+          }
+        }
+      },
+
       dismiss: function (id) {
         var idx = -1;
         var i;
@@ -455,8 +517,26 @@
         // Message text (textContent — never innerHTML for user data)
         var text = document.createElement('span');
         text.className = 'text-sm text-neutral-200 leading-snug break-words';
+        text.setAttribute('data-toast-text', '');
         text.textContent = item.msg;
         el.appendChild(text);
+
+        // Progress bar (job toasts created via progress())
+        if (typeof item.progress === 'number') {
+          el.classList.add('flex-wrap');
+          var wrap = document.createElement('div');
+          wrap.className = 'w-full h-1.5 bg-neutral-700 rounded overflow-hidden mt-1.5';
+          wrap.setAttribute('role', 'progressbar');
+          wrap.setAttribute('aria-valuemin', '0');
+          wrap.setAttribute('aria-valuemax', '100');
+          wrap.setAttribute('aria-valuenow', String(item.progress));
+          var fill = document.createElement('div');
+          fill.className = 'h-full bg-indigo-400 transition-all duration-200';
+          fill.style.width = item.progress + '%';
+          wrap.appendChild(fill);
+          el.appendChild(wrap);
+          item._fill = fill;
+        }
 
         var close = document.createElement('button');
         close.type = 'button';

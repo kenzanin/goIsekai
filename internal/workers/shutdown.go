@@ -65,6 +65,21 @@ func (p *Pool) SetDetail(id, detail string) {
 	p.regMu.Unlock()
 }
 
+// SetProgress reports incremental progress (0-100) for a running job through
+// the ProgressChanged callback. Safe to call from inside a job's Run; a nil
+// callback is a no-op. Values are clamped to [0,100].
+func (p *Pool) SetProgress(id string, pct int) {
+	if pct < 0 {
+		pct = 0
+	}
+	if pct > 100 {
+		pct = 100
+	}
+	if cb := p.ProgressChanged; cb != nil {
+		cb(id, pct)
+	}
+}
+
 func (p *Pool) detailOf(id string) string {
 	p.regMu.Lock()
 	defer p.regMu.Unlock()

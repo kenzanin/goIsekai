@@ -12,12 +12,14 @@ import (
 
 // JobStatusWSMessage is the JSON message format for job status WS updates.
 // Field names match design.md's contract: job_id (snake_case), status, and an
-// optional path carried only on done for export jobs.
+// optional path carried only on done for export jobs. Status "progress" is an
+// in-run heartbeat carrying progress (0-100) instead of a lifecycle change.
 type JobStatusWSMessage struct {
-	JobID   string `json:"job_id"`
-	Status  string `json:"status"`
-	Path    string `json:"path,omitempty"`
-	Attempt int    `json:"attempt,omitempty"`
+	JobID    string `json:"job_id"`
+	Status   string `json:"status"`
+	Path     string `json:"path,omitempty"`
+	Attempt  int    `json:"attempt,omitempty"`
+	Progress int    `json:"progress,omitempty"`
 }
 
 // registerWSRoutes mounts the live log stream endpoint on the given router.
@@ -28,6 +30,9 @@ func (s *Server) registerWSRoutes(r chi.Router) {
 	if pool := s.service.GetPool(); pool != nil {
 		pool.StatusChanged = func(id string, status workers.JobStatus, detail string) {
 			s.broadcastJobStatus(id, status.String(), detail)
+		}
+		pool.ProgressChanged = func(id string, pct int) {
+			s.broadcastJobProgress(id, pct)
 		}
 	}
 }
@@ -126,18 +131,28 @@ func (c *jobClients) filterClient(ws *websocket.Conn, jobID string) {
 
 // broadcastJobStatus is called by the pool when job status changes.
 func (s *Server) broadcastJobStatus(id string, statusStr string, path string) {
+	s.broadcastJobMessage(JobStatusWSMessage{JobID: id, Status: statusStr, Path: path})
+}
+
+// broadcastJobProgress is called by the pool when a running job reports
+// incremental progress (0-100).
+func (s *Server) broadcastJobProgress(id string, pct int) {
+	s.broadcastJobMessage(JobStatusWSMessage{JobID: id, Status: "progress", Progress: pct})
+}
+
+func (s *Server) broadcastJobMessage(msg JobStatusWSMessage) {
 	clients.mu.Lock()
 	defer clients.mu.Unlock()
-	msg, _ := json.Marshal(JobStatusWSMessage{JobID: id, Status: statusStr, Path: path})
+	payload, _ := json.Marshal(msg)
 
 	// Send to filtered connections
-	if conns, ok := clients.filtered[id]; ok {
+	if conns, ok := clients.filtered[msg.JobID]; ok {
 		for ws := range conns {
-			_, _ = ws.Write(msg)
+			_, _ = ws.Write(payload)
 		}
 	}
 	// Send to unfiltered connections
 	for ws := range clients.conns {
-		_, _ = ws.Write(msg)
+		_, _ = ws.Write(payload)
 	}
 }

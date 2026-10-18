@@ -52,7 +52,9 @@ func (s *AppService) EnqueueExportCBZ(ctx context.Context, pluginID, mangaID, ch
 		DedupeKey: "export:" + pluginID + ":" + mangaID + ":" + chapterID,
 	}
 	job.Run = func(ctx context.Context) error {
-		path, exportErr := s.ExportCBZ(pluginID, mangaID, chapterID, title)
+		path, exportErr := s.ExportCBZ(pluginID, mangaID, chapterID, title, func(pct int) {
+			s.pool.SetProgress(job.ID, pct)
+		})
 		if exportErr == nil {
 			s.pool.SetDetail(job.ID, path)
 		}

@@ -98,6 +98,49 @@ func TestJobsWSBroadcast(t *testing.T) {
 	}
 }
 
+// TestJobsWSProgress verifies pool.SetProgress flows through the wired
+// ProgressChanged callback to WS subscribers as a "progress" message.
+func TestJobsWSProgress(t *testing.T) {
+	s := testServerFull(t, "", true)
+	if s.service == nil || s.service.GetPool() == nil {
+		t.Skip("service/worker pool not available")
+	}
+	pool := s.service.GetPool()
+
+	httpSrv := httptest.NewServer(s.Router)
+	defer httpSrv.Close()
+
+	conn, err := wsDial(wsURL(httpSrv.URL))
+	if err != nil {
+		t.Fatalf("ws dial: %v", err)
+	}
+	t.Cleanup(func() { conn.Close() })
+
+	// Drive the SAME callback production wires (registerWSRoutes sets pool.ProgressChanged).
+	pool.SetProgress("job-77", 42)
+
+	deadline := time.Now().Add(2 * time.Second)
+	for {
+		if err := conn.SetReadDeadline(deadline); err != nil {
+			t.Fatalf("set read deadline: %v", err)
+		}
+		var msg JobStatusWSMessage
+		if err := json.NewDecoder(conn).Decode(&msg); err != nil {
+			t.Fatalf("decode: %v", err)
+		}
+		if msg.JobID != "job-77" {
+			continue
+		}
+		if msg.Status != "progress" {
+			t.Fatalf("status = %q, want progress", msg.Status)
+		}
+		if msg.Progress != 42 {
+			t.Fatalf("progress = %d, want 42", msg.Progress)
+		}
+		return
+	}
+}
+
 // TestJobsWSUnregister verifies a disconnecting client is removed from the
 // fan-out without panic on the next broadcast.
 func TestJobsWSUnregister(t *testing.T) {

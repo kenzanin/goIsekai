@@ -14,7 +14,10 @@ import (
 // complete.csv exists and every page is still on disk, no plugin/network call
 // is made. Otherwise it fetches (cache-first) via the plugin and records
 // complete.csv for future offline exports.
-func (s *AppService) ExportCBZ(pluginID, mangaID, chapterID, title string) (string, error) {
+//
+// progress, when non-nil, receives deduplicated whole-percent updates (0-100)
+// as pages are processed; it may be called from a worker goroutine.
+func (s *AppService) ExportCBZ(pluginID, mangaID, chapterID, title string, progress func(int)) (string, error) {
 	dir := filepath.Join(s.exportDir(), pluginID, mangaID)
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return "", fmt.Errorf("bridge: export cbz: mkdir: %w", err)
@@ -22,17 +25,33 @@ func (s *AppService) ExportCBZ(pluginID, mangaID, chapterID, title string) (stri
 	name := sanitizeFilename(title) + ".cbz"
 	path := filepath.Join(dir, name)
 
+	// report dedups consecutive identical percents so a 100-page export does
+	// not spam 100 identical WS frames when integer math repeats values.
+	lastPct := -1
+	report := func(done, total int) {
+		if progress == nil || total <= 0 {
+			return
+		}
+		pct := done * 100 / total
+		if pct == lastPct {
+			return
+		}
+		lastPct = pct
+		progress(pct)
+	}
+
 	// Offline path: complete.csv + disk cache, no plugin/network needed.
 	if urls := s.readCompleteCSV(pluginID, mangaID, chapterID); len(urls) > 0 {
 		images := make([][]byte, 0, len(urls))
 		all := true
-		for _, u := range urls {
+		for i, u := range urls {
 			data, ok := s.readCachedImage(pluginID, mangaID, chapterID, u)
 			if !ok {
 				all = false
 				break
 			}
 			images = append(images, data)
+			report(i+1, len(urls))
 		}
 		if all {
 			n, err := zipImages(path, images)
@@ -55,7 +74,7 @@ func (s *AppService) ExportCBZ(pluginID, mangaID, chapterID, title string) (stri
 
 	images := make([][]byte, 0, len(pages))
 	failed := 0
-	for _, p := range pages {
+	for i, p := range pages {
 		// Export is bulk background work, not the reader's per-page path: a cancelled
 		// request must not abort a half-written archive, so this keeps a background
 		// context.
@@ -66,6 +85,7 @@ func (s *AppService) ExportCBZ(pluginID, mangaID, chapterID, title string) (stri
 			continue
 		}
 		images = append(images, data)
+		report(i+1, len(pages))
 	}
 	if len(images) == 0 {
 		return "", fmt.Errorf("bridge: export cbz: all %d pages failed", failed)

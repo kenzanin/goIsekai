@@ -207,4 +207,9 @@ type Pool struct {
 	// ID, status and any result detail are passed; the callback runs synchronously
 	// during the state update.
 	StatusChanged func(id string, status JobStatus, detail string)
+
+	// ProgressChanged is called when a running job reports incremental
+	// progress (0-100). Fire-and-forget: not stored in the registry, so a
+	// subscriber attached mid-job only sees updates from that point on.
+	ProgressChanged func(id string, pct int)
 }
