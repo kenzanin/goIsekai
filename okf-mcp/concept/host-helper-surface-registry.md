@@ -64,9 +64,38 @@ explicitness is the feature.
   `http.*`, `browser.*`).
 - **js** — `registerJSHostNatives` does the same, which is what closes the
   `text.trim` / `text.unescape` / `text.lua_escape` gap.
-- **yaegi** — deliberately not migrated. A Go-dialect plugin calls real Go
-  names (`hostnet.Get`, `pluginutil.StripHTML`), not `"text.url_encode"`, so
-  the table cannot describe it without a rename layer.
+- **yaegi** — has its own table, `yaegi_surface.go` (see below). It was 11
+  hand-written methods before: no codecs, no crypto, no regex, no text
+  sanitising.
+
+## The yaegi twin table
+
+`hostSurface` cannot describe yaegi directly, and not because of naming: the
+call **shapes** differ. A script runtime asks for `"text.url_encode"` and gets a
+dynamic value; interpreted Go calls `hostnet.URLEncode(s)` and needs a
+statically typed function. So each helper is published twice.
+
+What must not differ is behaviour, and that is enforced rather than intended:
+every yaegi entry that names a hostSurface row takes its function **from that
+row** (`yaegiExports()` reads `hostSurfaceIndex`), and
+`TestYaegiSurfaceMatchesHostSurface` compares function pointers — identity, not
+output — so reimplementing a helper on one side cannot leave the other on the
+old code.
+
+Two subtleties the tests forced out:
+
+- Rows hostSurface marks `kindRuntime` **only because Lua and JS disagree on
+  return shape** are fine for Go: `regex.find` is runtime-typed there because
+  Lua returns captures as separate values and JS as arrays, while a Go function
+  signature already says what comes back. Those publish the raw function and
+  each records why in a `note`.
+- `json.decode`/`json.encode`/`regex.gmatch` are genuinely not applicable
+  (an interpreted Go plugin calls `encoding/json` itself; Go ranges over
+  `RegexFindAll`'s slice instead of a Lua iterator). They live in
+  `yaegiNotApplicable` **with a reason**, so a new hostSurface row must be
+  either wired or explicitly explained — never silently skipped.
+
+Net effect: yaegi goes from 11 helpers to 38.
 
 ## The tests that keep it honest
 
@@ -96,7 +125,11 @@ explicitness is the feature.
 
 ## Verified
 
-`CGO_ENABLED=0 go test ./... -count=1` — 17 packages ok. `gofmt -l
-internal/pluginmanager/` clean. Full diff: −76 lines of duplicated map
-literals in `wasm_host_call.go`, +6 −17 in the dispatcher, three runtimes now
-driven by one 200-line declaration.
+`CGO_ENABLED=0 go test ./... -count=1` — all packages ok (17 with tests).
+`gofmt -l internal/pluginmanager/` clean. Measured from the commits: `-59`
+lines of duplicated map literals in `wasm_host_call.go`, `+6 −17` in the
+dispatcher, and the declaration is `host_surface.go` at 199 lines driving lua,
+js and wasm; `yaegi_surface.go` adds 114 lines for 38 yaegi exports.
+
+Counts read out of the running tables, not from grep: `hostSurface` = 61 rows
+(31 `kindPure`, 30 `kindRuntime`); `yaegiHelpers` = `yaegiExports` = 38.
