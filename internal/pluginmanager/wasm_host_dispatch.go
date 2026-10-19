@@ -26,8 +26,6 @@ func (m *Manager) dispatchHostCall(ctx context.Context, id, fn string, args []st
 		}
 	}
 	switch fn {
-	case "text.chapter_num":
-		return pluginutil.ChapterNum(wasmArg(args, 0)), nil
 	case "text.normalize_status":
 		return wasmNormalizeStatus(args)
 	case "json.decode":

@@ -124,6 +124,29 @@ func dispatchReportsUnknown(m *Manager, fn string) bool {
 	return unknown
 }
 
+// TestLuaCoversTheWholeHostSurface is the direction nothing checked before:
+// every row in hostSurface must actually be reachable from the Lua runtime. The
+// other parity tests start from the Lua table, so an over-declared row (a helper
+// listed here that no runtime wires) would sit in the table looking available
+// while being unreachable from every plugin.
+func TestLuaCoversTheWholeHostSurface(t *testing.T) {
+	luaNames := map[string]bool{}
+	for _, n := range luaHostHelpers(t) {
+		luaNames[n] = true
+	}
+
+	var missing []string
+	for _, fn := range hostSurfaceNames() {
+		if !luaNames[fn] {
+			missing = append(missing, fn)
+		}
+	}
+	if len(missing) > 0 {
+		t.Errorf("hostSurface declares helpers the Lua runtime does not wire: %v\n"+
+			"wire them in registerHostNatives, or drop the row", missing)
+	}
+}
+
 // TestWasmHostHelperParity fails when the Lua tree exposes a helper the wasm
 // dispatch cannot reach. Either implement it in dispatchHostCall, or record it
 // in wasmHelperGaps with a reason.
