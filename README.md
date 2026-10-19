@@ -370,12 +370,24 @@ Odin (no wasi-sdk, no RapidJSON, no manual exports; see
 odin build . -target:wasi_wasm32 -no-entry-point -out:main.wasm
 ```
 
-> Note: TinyGo is **not usable** for this ABI. Its `-target wasi` is
-> command-style (`_start`), not the reactor the host loads, and a module that
-> declares `//go:wasmexport malloc`/`free` fails with `duplicate export name`
-> in `wasm-opt` — verified even on a go1.26.9 toolchain via goup, so it is not a
-> Go-version problem. Use standard Go, C++ or Odin. See
-> `okf-mcp/concept/wasm-cpp-plugin-toolchain.md`.
+TinyGo (smallest Go option; pin the toolchain per `tools/build-wasm.sh`):
+
+```sh
+GOROOT=$HOME/.goup/go1.26.9 GOTOOLCHAIN=local \
+  tinygo build -target wasi -buildmode=c-shared -o main.wasm .
+```
+
+> Note: TinyGo **does work**, but needs two adjustments. (1) Build with
+> `-buildmode=c-shared`: plain `-target wasi` is command-style (`_start`), while
+> `c-shared` emits the `_initialize` reactor the host loads. (2) Do **not**
+> declare `//go:wasmexport malloc`/`free` — TinyGo's runtime already exports
+> both, and a plugin that redeclares them aborts in `wasm-opt` with
+> `[parse exception: duplicate export name]`. Read the host's input buffer with
+> `unsafe.Slice` instead of the map-keyed-by-your-own-malloc trick the standard-Go
+> source uses, since the pointer comes from TinyGo's allocator. TinyGo 0.41 wants
+> Go ≤ 1.26, so `tools/build-wasm.sh` pins goup's `$HOME/.goup/go1.26.9`
+> (`GOTOOLCHAIN=local` + explicit `GOROOT`, otherwise `GOTOOLCHAIN=auto` silently
+> upgrades it back to 1.27 to satisfy `go.mod`).
 
 #### Authoring in Odin
 
