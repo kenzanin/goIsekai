@@ -2,12 +2,9 @@ package pluginmanager
 
 import (
 	"context"
-	"strings"
 
 	"github.com/goccy/go-json"
 	"github.com/tetratelabs/wazero/api"
-
-	"goisekai/internal/pluginutil"
 )
 
 // The wasm runtime exposes the Lua/JS `host` object through ONE generic import,
@@ -65,62 +62,6 @@ func writeWasmResult(ctx context.Context, mod api.Module, out []byte) uint64 {
 func wasmHostError(msg string) []byte {
 	b, _ := json.Marshal(map[string]string{"error": msg})
 	return b
-}
-
-// wasmHostStr1 maps every fixed one-string host helper straight to the Go
-// implementation the Lua/JS natives call, keyed by "<namespace>.<name>".
-var wasmHostStr1 = map[string]func(string) string{
-	"text.url_encode":         pluginutil.URLEncode,
-	"text.url_decode":         pluginutil.URLDecode,
-	"text.html_decode":        pluginutil.HTMLDecode,
-	"text.strip_html":         pluginutil.StripHTML,
-	"text.strip_markdown":     pluginutil.StripMarkdown,
-	"text.titlecase":          pluginutil.Titlecase,
-	"text.normalize_title":    pluginutil.NormalizeTitle,
-	"text.strip_link_blocks":  pluginutil.StripLinkBlocks,
-	"text.unescape":           pluginutil.HTMLEntityUnescape,
-	"text.trim":               strings.TrimSpace,
-	"text.lua_escape":         pluginutil.LuaEscape,
-	"text.date_to_iso":        pluginutil.DateToISONow,
-	"codecs.base64_encode":    pluginutil.Base64Encode,
-	"codecs.base64url_encode": pluginutil.Base64URLEncode,
-	"codecs.hex_encode":       pluginutil.HexEncode,
-	"crypto.sha256_hex":       pluginutil.SHA256Hex,
-	"crypto.md5_hex":          pluginutil.MD5Hex,
-	"crypto.utf8_hex":         pluginutil.UTF8Hex,
-	"regex.quote":             pluginutil.RegexQuote,
-}
-
-// wasmHostStr1Err are the one-string helpers whose Go implementation can fail
-// (a bad encoding, a bad hex string) instead of always returning a value.
-var wasmHostStr1Err = map[string]func(string) (string, error){
-	"codecs.base64_decode":     pluginutil.Base64Decode,
-	"codecs.base64url_decode":  pluginutil.Base64URLDecode,
-	"codecs.hex_decode":        pluginutil.HexDecode,
-	"codecs.b64_decode_hex":    pluginutil.B64DecodeHex,
-	"codecs.b64url_encode_hex": pluginutil.B64URLEncodeHex,
-	"codecs.b64url_decode_hex": pluginutil.B64URLDecodeHex,
-}
-
-// wasmHostStr2 are the two-string helpers with no error return.
-var wasmHostStr2 = map[string]func(string, string) string{
-	"text.json_blob":         pluginutil.JSONBlob,
-	"crypto.hmac_sha256_hex": pluginutil.HMACSHA256Hex,
-}
-
-// wasmHostStr2Err are the two-string helpers that can fail.
-var wasmHostStr2Err = map[string]func(string, string) (string, error){
-	"crypto.xor": pluginutil.XORHex,
-}
-
-// wasmHostStr3Err are the three-string helpers that can fail.
-var wasmHostStr3Err = map[string]func(string, string, string) (string, error){
-	"crypto.substitute_cipher": pluginutil.SubstituteCipher,
-}
-
-// wasmHostStr4Err are the four-string helpers that can fail.
-var wasmHostStr4Err = map[string]func(string, string, string, string) (string, error){
-	"crypto.aes_gcm_decrypt": pluginutil.AESGCMDecryptB64,
 }
 
 // wasmArg reads one positional argument, defaulting to "" like the Lua/JS

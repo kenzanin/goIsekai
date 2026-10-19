@@ -1,5 +1,46 @@
 # Bundle Update Log
 
+## 2026-10-19
+
+- Added concept/host-helper-surface-registry.md: every runtime used to hardcode
+  its own helper list (lua_natives.go, js_natives.go, wasm_host_call.go's six
+  per-kind maps, yaegi_host.go) and nothing compared them, so JS had silently
+  fallen behind Lua — `host.text.trim`, `host.text.unescape` and
+  `host.text.lua_escape` were reachable from Lua and wasm but **not** from JS,
+  and the only parity test covered Lua↔wasm. Now
+  `internal/pluginmanager/host_surface.go` is the single definition: one row per
+  helper, `"<namespace>.<helper>"` plus a `helperKind`. `kindPure` rows carry a
+  Go function and every runtime wires them automatically (each supplies only its
+  own wrapper — `luaStr1`, `jsStr1`, or the wasm dispatcher's direct call);
+  `kindRuntime` rows (doc handles, goja objects, `http.*` needing manager+id+ctx,
+  `regex.gmatch`) stay per-runtime but are still declared, each with a `note`
+  saying why. wasm lost all six `wasmHostStr*` maps down to one
+  `hostSurfaceIndex[fn]` lookup (−59 lines), and Lua/JS became table walks.
+  yaegi deliberately not migrated: a Go-dialect plugin calls real Go names
+  (`hostnet.Get`), not `"text.url_encode"`. New tests: `TestJSHostHelperParity`
+  walks the **real** Lua host table and asserts JS reaches every name,
+  `TestHostSurfaceRowsAreComplete` requires a function on `kindPure` and a
+  reason on `kindRuntime`. Traps: `regex.quote` is pure in both runtimes (so it
+  belongs on the table) while `regex.replace` is not, because Lua and JS each
+  accept a per-match *function* replacement; Lua/JS `log.*` is not `host.log`
+  (Lua builds a `log` table, JS registers `console.*` in `js.go:66` via
+  `newJSConsole`), so `jsHelperRenames` records that spelling difference with
+  its reason; and a JS parity test must also install `console`/`http_request`,
+  which `newJS` does and `registerJSHostNatives` does not. Verified
+  `CGO_ENABLED=0 go test ./... -count=1` — 17 packages ok, gofmt clean.
+- Added concept/odin-wasm-plugin-port-candidates.md: tier-ranked list of Lua
+  plugins that are already ported to Odin in examples/plugins/wasm/*_odin/
+  plus the next candidates. 6 buat saat ini terverifikasi A/B identical dengan
+  Lua (atsumaru, comicasura, comizy, mangade, mangadex, manga_uno). Tier A
+  (tanpa regex): mangatown/108 baris, mangahere/159, fanfox/165, mangafreak/161,
+  kaliscan/209, zeroscann/239, weebcentral/283, valirscans/225, mangafire/308.
+  Tier B (pakai browser.*): violetmanga/mangataro/comix. Tier C (perlu rewrite
+  regex.gmatch → regex.find_all): dynastyscan, en-thunderscan, harimanga, lhtranslation,
+  madaradex, mangaread, mangasushi, topmanhua, anisascans, mangabuddy, mangakatana,
+  mangahub, 1manga. Performance truth: di JSON API endpoint (mangadex A/B),
+  wasm ~0.18s vs Lua ~0.075s — wasm tidak lebih cepat di sana, perbedaan terasa
+  di HTML berat + regex di mana Odin kompilasi ungguli interpreter Lua.
+
 ## 2026-10-11
 
 - Bundle initialized with `pi-okf init`.

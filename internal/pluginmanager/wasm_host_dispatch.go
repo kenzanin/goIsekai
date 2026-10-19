@@ -18,23 +18,12 @@ import (
 // invocations that reach the proxy (an HTTP fetch, a CDP solve) so they die
 // with the invoke deadline instead of outliving it.
 func (m *Manager) dispatchHostCall(ctx context.Context, id, fn string, args []string) (any, error) {
-	if f, ok := wasmHostStr1[fn]; ok {
-		return f(wasmArg(args, 0)), nil
-	}
-	if f, ok := wasmHostStr1Err[fn]; ok {
-		return f(wasmArg(args, 0))
-	}
-	if f, ok := wasmHostStr2[fn]; ok {
-		return f(wasmArg(args, 0), wasmArg(args, 1)), nil
-	}
-	if f, ok := wasmHostStr2Err[fn]; ok {
-		return f(wasmArg(args, 0), wasmArg(args, 1))
-	}
-	if f, ok := wasmHostStr3Err[fn]; ok {
-		return f(wasmArg(args, 0), wasmArg(args, 1), wasmArg(args, 2))
-	}
-	if f, ok := wasmHostStr4Err[fn]; ok {
-		return f(wasmArg(args, 0), wasmArg(args, 1), wasmArg(args, 2), wasmArg(args, 3))
+	// Pure helpers come straight from the shared surface table, so the three
+	// runtimes cannot drift on which helpers exist.
+	if h, ok := hostSurfaceIndex[fn]; ok {
+		if v, err, pure := h.invoke(args); pure {
+			return v, err
+		}
 	}
 	switch fn {
 	case "text.chapter_num":

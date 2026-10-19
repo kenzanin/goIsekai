@@ -2,80 +2,58 @@ package pluginmanager
 
 import (
 	"github.com/dop251/goja"
-
-	"goisekai/internal/pluginutil"
 )
 
 // registerJSHostNatives installs the shared `host` object
-// (text/codecs/crypto/json/http) on the goja VM. Mirrors the Lua runtime's surface.
+// (text/codecs/crypto/json/http) on the goja VM.
+//
+// The list of helpers lives in hostSurface (host_surface.go); this function only
+// supplies the JS calling convention. Before the table existed, JS restated the
+// list by hand and quietly fell behind — host.text.trim, host.text.unescape and
+// host.text.lua_escape were reachable from Lua and wasm but not from JS.
 func registerJSHostNatives(vm *goja.Runtime, m *Manager, id string) error {
-	groups := []struct {
-		name string
-		fns  map[string]any
-	}{
-		{"text", map[string]any{
-			"url_encode":        jsStr1(vm, pluginutil.URLEncode),
-			"url_decode":        jsStr1(vm, pluginutil.URLDecode),
-			"html_decode":       jsStr1(vm, pluginutil.HTMLDecode),
-			"strip_html":        jsStr1(vm, pluginutil.StripHTML),
-			"strip_markdown":    jsStr1(vm, pluginutil.StripMarkdown),
-			"titlecase":         jsStr1(vm, pluginutil.Titlecase),
-			"normalize_title":   jsStr1(vm, pluginutil.NormalizeTitle),
-			"strip_link_blocks": jsStr1(vm, pluginutil.StripLinkBlocks),
-			"chapter_num":       jsFloat1(vm, pluginutil.ChapterNum),
-			"json_blob":         jsStr2(vm, pluginutil.JSONBlob),
-			"date_to_iso":       jsStr1(vm, pluginutil.DateToISONow),
-		}},
-		{"codecs", map[string]any{
-			"base64_encode":     jsStr1(vm, pluginutil.Base64Encode),
-			"base64_decode":     jsStr1Err(vm, pluginutil.Base64Decode),
-			"base64url_encode":  jsStr1(vm, pluginutil.Base64URLEncode),
-			"base64url_decode":  jsStr1Err(vm, pluginutil.Base64URLDecode),
-			"hex_encode":        jsStr1(vm, pluginutil.HexEncode),
-			"hex_decode":        jsStr1Err(vm, pluginutil.HexDecode),
-			"b64_decode_hex":    jsStr1Err(vm, pluginutil.B64DecodeHex),
-			"b64url_encode_hex": jsStr1Err(vm, pluginutil.B64URLEncodeHex),
-			"b64url_decode_hex": jsStr1Err(vm, pluginutil.B64URLDecodeHex),
-		}},
-		{"crypto", map[string]any{
-			"sha256_hex":        jsStr1(vm, pluginutil.SHA256Hex),
-			"md5_hex":           jsStr1(vm, pluginutil.MD5Hex),
-			"hmac_sha256_hex":   jsStr2(vm, pluginutil.HMACSHA256Hex),
-			"xor":               jsStr2Err(vm, pluginutil.XORHex),
-			"utf8_hex":          jsStr1(vm, pluginutil.UTF8Hex),
-			"vrf_sign":          jsVrfSign(vm),
-			"aes_gcm_decrypt":   jsStr4Err(vm, pluginutil.AESGCMDecryptB64),
-			"substitute_cipher": jsStr3Err(vm, pluginutil.SubstituteCipher),
-		}},
-		{"json", map[string]any{
-			"decode": jsJSONDecode(vm),
-			"encode": jsJSONEncode(vm),
-		}},
+	host := vm.NewObject()
+	groups := map[string]goja.Value{}
+	groupOf := func(ns string) *goja.Object {
+		if obj, ok := groups[ns].(*goja.Object); ok {
+			return obj
+		}
+		obj := vm.NewObject()
+		groups[ns] = obj
+		return obj
 	}
 
-	host := vm.NewObject()
-	for _, g := range groups {
-		obj := vm.NewObject()
-		for name, fn := range g.fns {
-			if err := obj.Set(name, fn); err != nil {
-				return err
-			}
+	// Pure helpers: the same Go function the Lua natives and the wasm
+	// dispatcher use.
+	for _, h := range hostSurface {
+		if h.kind == kindRuntime {
+			continue
 		}
-		// Special case: host.text.normalize_status needs a .default property.
-		if g.name == "text" {
-			_ = obj.Set("normalize_status", jsNormalizeStatus(vm))
-		}
-		if err := host.Set(g.name, obj); err != nil {
+		ns, fn := splitHostName(h.name)
+		if err := groupOf(ns).Set(fn, jsPure(vm, h)); err != nil {
 			return err
 		}
 	}
 
-	// host.html — HTML parsing helpers with opaque handle.
-	htmlObj, err := htmlGroupJS(vm)
-	if err != nil {
+	// Helpers whose call shape is JS-specific.
+	// host.text.normalize_status also carries a .default property.
+	normalize := jsNormalizeStatus(vm)
+	if err := groupOf("text").Set("normalize_status", normalize); err != nil {
 		return err
 	}
-	if err := host.Set("html", htmlObj); err != nil {
+	if err := groupOf("crypto").Set("vrf_sign", jsVrfSign(vm)); err != nil {
+		return err
+	}
+	if err := groupOf("json").Set("decode", jsJSONDecode(vm)); err != nil {
+		return err
+	}
+	if err := groupOf("json").Set("encode", jsJSONEncode(vm)); err != nil {
+		return err
+	}
+
+	// host.html — HTML parsing helpers with an opaque handle.
+	htmlObj, err := htmlGroupJS(vm)
+	if err != nil {
 		return err
 	}
 
@@ -84,12 +62,13 @@ func registerJSHostNatives(vm *goja.Runtime, m *Manager, id string) error {
 	if err != nil {
 		return err
 	}
-	if err := host.Set("regex", regexObj); err != nil {
-		return err
+	options := map[string]goja.Value{"html": htmlObj, "regex": regexObj}
+	for ns, obj := range options {
+		groups[ns] = obj
 	}
 
-	// host.http — thin wrappers over http_request proxy.
-	httpObj := vm.NewObject()
+	// host.http — thin wrappers over the http_request proxy.
+	httpObj := groupOf("http")
 	if err := httpObj.Set("get", jsHttpGet(vm, m, id)); err != nil {
 		return err
 	}
@@ -102,13 +81,10 @@ func registerJSHostNatives(vm *goja.Runtime, m *Manager, id string) error {
 	if err := httpObj.Set("post_body", jsHTTPPostBody(vm, m, id)); err != nil {
 		return err
 	}
-	if err := host.Set("http", httpObj); err != nil {
-		return err
-	}
 
 	// host.browser — fetch pages through a real browser (CDP) so
 	// client-side JavaScript runs.
-	browserObj := vm.NewObject()
+	browserObj := groupOf("browser")
 	if err := browserObj.Set("fetch", jsBrowserFetch(vm, m, id)); err != nil {
 		return err
 	}
@@ -118,11 +94,35 @@ func registerJSHostNatives(vm *goja.Runtime, m *Manager, id string) error {
 	if err := browserObj.Set("evaluate_with_init", jsBrowserEvaluateWithInit(vm, m, id)); err != nil {
 		return err
 	}
-	if err := host.Set("browser", browserObj); err != nil {
-		return err
-	}
 
+	for ns, obj := range groups {
+		if err := host.Set(ns, obj); err != nil {
+			return err
+		}
+	}
 	return vm.Set("host", host)
+}
+
+// jsPure wraps one table entry as a goja native, picking the wrapper that
+// matches the helper's kind.
+func jsPure(vm *goja.Runtime, h hostHelper) any {
+	switch h.kind {
+	case kindStr1:
+		return jsStr1(vm, h.fn.(func(string) string))
+	case kindStr1Err:
+		return jsStr1Err(vm, h.fn.(func(string) (string, error)))
+	case kindStr2:
+		return jsStr2(vm, h.fn.(func(string, string) string))
+	case kindStr2Err:
+		return jsStr2Err(vm, h.fn.(func(string, string) (string, error)))
+	case kindStr3Err:
+		return jsStr3Err(vm, h.fn.(func(string, string, string) (string, error)))
+	case kindStr4Err:
+		return jsStr4Err(vm, h.fn.(func(string, string, string, string) (string, error)))
+	case kindFloat1:
+		return jsFloat1(vm, h.fn.(func(string) float64))
+	}
+	panic("jsPure: unexpected helper kind for " + h.name)
 }
 
 // jsHTTPHeaders reads an http native's optional trailing object argument.

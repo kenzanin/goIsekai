@@ -1,91 +1,92 @@
 package pluginmanager
 
 import (
-	"strings"
-
 	lua "github.com/mmcdole/lunar"
-
-	"goisekai/internal/pluginutil"
 )
 
 // registerHostNatives installs the shared `host` table
-// (text/codecs/crypto/json/http)
-// on the Lua state. Every plugin runtime exposes the same surface so helpers are
-// written once in Go instead of per plugin per language.
+// (text/codecs/crypto/json/http) on the Lua state.
+//
+// The list of helpers lives in hostSurface (host_surface.go) — this function
+// only supplies the Lua calling convention. Adding a helper means adding a row
+// there, not editing every runtime.
 func registerHostNatives(state *lua.State, m *Manager, id string) {
-	text, _ := state.NewTable()
-	_ = text.RawSetString("url_encode", luaStr1(state, pluginutil.URLEncode))
-	_ = text.RawSetString("url_decode", luaStr1(state, pluginutil.URLDecode))
-	_ = text.RawSetString("html_decode", luaStr1(state, pluginutil.HTMLDecode))
-	_ = text.RawSetString("strip_html", luaStr1(state, pluginutil.StripHTML))
-	_ = text.RawSetString("strip_markdown", luaStr1(state, pluginutil.StripMarkdown))
-	_ = text.RawSetString("titlecase", luaStr1(state, pluginutil.Titlecase))
-	_ = text.RawSetString("normalize_title", luaStr1(state, pluginutil.NormalizeTitle))
-	_ = text.RawSetString("strip_link_blocks", luaStr1(state, pluginutil.StripLinkBlocks))
-	_ = text.RawSetString("normalize_status", luaNormalizeStatus(state))
-	_ = text.RawSetString("unescape", luaStr1(state, pluginutil.HTMLEntityUnescape))
-	_ = text.RawSetString("trim", luaStr1(state, strings.TrimSpace))
-	_ = text.RawSetString("lua_escape", luaStr1(state, pluginutil.LuaEscape))
-	_ = text.RawSetString("chapter_num", luaFloat1(state, pluginutil.ChapterNum))
-	_ = text.RawSetString("json_blob", luaStr2(state, pluginutil.JSONBlob))
-	_ = text.RawSetString("date_to_iso", luaStr1(state, pluginutil.DateToISONow))
-
-	codecs, _ := state.NewTable()
-	_ = codecs.RawSetString("base64_encode", luaStr1(state, pluginutil.Base64Encode))
-	_ = codecs.RawSetString("base64_decode", luaStr1Err(state, pluginutil.Base64Decode))
-	_ = codecs.RawSetString("base64url_encode", luaStr1(state, pluginutil.Base64URLEncode))
-	_ = codecs.RawSetString("base64url_decode", luaStr1Err(state, pluginutil.Base64URLDecode))
-	_ = codecs.RawSetString("hex_encode", luaStr1(state, pluginutil.HexEncode))
-	_ = codecs.RawSetString("hex_decode", luaStr1Err(state, pluginutil.HexDecode))
-	_ = codecs.RawSetString("b64_decode_hex", luaStr1Err(state, pluginutil.B64DecodeHex))
-	_ = codecs.RawSetString("b64url_encode_hex", luaStr1Err(state, pluginutil.B64URLEncodeHex))
-	_ = codecs.RawSetString("b64url_decode_hex", luaStr1Err(state, pluginutil.B64URLDecodeHex))
-
-	crypto, _ := state.NewTable()
-	_ = crypto.RawSetString("sha256_hex", luaStr1(state, pluginutil.SHA256Hex))
-	_ = crypto.RawSetString("md5_hex", luaStr1(state, pluginutil.MD5Hex))
-	_ = crypto.RawSetString("hmac_sha256_hex", luaStr2(state, pluginutil.HMACSHA256Hex))
-	_ = crypto.RawSetString("xor", luaStr2Err(state, pluginutil.XORHex))
-	_ = crypto.RawSetString("utf8_hex", luaStr1(state, pluginutil.UTF8Hex))
-	_ = crypto.RawSetString("vrf_sign", luaVrfSign(state))
-	_ = crypto.RawSetString("aes_gcm_decrypt", luaStr4Err(state, pluginutil.AESGCMDecryptB64))
-	_ = crypto.RawSetString("substitute_cipher", luaStr3Err(state, pluginutil.SubstituteCipher))
-
-	jsonTbl, _ := state.NewTable()
-	_ = jsonTbl.RawSetString("decode", luaJSONDecode(state))
-	_ = jsonTbl.RawSetString("encode", luaJSONEncode(state))
-
 	htmlTbl, err := htmlGroup(state)
 	if err != nil {
 		panic(err)
 	}
+	tables := map[string]*lua.Table{
+		"text":    luaNewTable(state),
+		"codecs":  luaNewTable(state),
+		"crypto":  luaNewTable(state),
+		"json":    luaNewTable(state),
+		"html":    htmlTbl,
+		"regex":   regexGroup(state),
+		"http":    luaNewTable(state),
+		"browser": luaNewTable(state),
+	}
 
-	regexTbl := regexGroup(state)
+	// Pure helpers: same Go function as the wasm dispatcher and the JS object.
+	for _, h := range hostSurface {
+		if h.kind == kindRuntime {
+			continue
+		}
+		ns, fn := splitHostName(h.name)
+		t, ok := tables[ns]
+		if !ok {
+			continue
+		}
+		_ = t.RawSetString(fn, luaPure(state, h))
+	}
 
-	host, _ := state.NewTable()
-	_ = host.RawSetString("text", text.Value())
-	_ = host.RawSetString("codecs", codecs.Value())
-	_ = host.RawSetString("crypto", crypto.Value())
-	_ = host.RawSetString("json", jsonTbl.Value())
-	_ = host.RawSetString("html", htmlTbl.Value())
-	_ = host.RawSetString("regex", regexTbl.Value())
-
-	// host.http — thin wrappers over http_request proxy.
-	http, _ := state.NewTable()
-	_ = http.RawSetString("get", luaHttpGet(state, m, id))
-	_ = http.RawSetString("post", luaHttpPost(state, m, id))
-	_ = http.RawSetString("get_body", luaHTTPGetBody(state, m, id))
-	_ = http.RawSetString("post_body", luaHTTPPostBody(state, m, id))
-
-	_ = host.RawSetString("http", http.Value())
+	// Helpers whose call shape is Lua-specific.
+	_ = tables["text"].RawSetString("normalize_status", luaNormalizeStatus(state))
+	_ = tables["crypto"].RawSetString("vrf_sign", luaVrfSign(state))
+	_ = tables["json"].RawSetString("decode", luaJSONDecode(state))
+	_ = tables["json"].RawSetString("encode", luaJSONEncode(state))
+	_ = tables["http"].RawSetString("get", luaHttpGet(state, m, id))
+	_ = tables["http"].RawSetString("post", luaHttpPost(state, m, id))
+	_ = tables["http"].RawSetString("get_body", luaHTTPGetBody(state, m, id))
+	_ = tables["http"].RawSetString("post_body", luaHTTPPostBody(state, m, id))
 
 	// host.browser — fetch pages through a real browser (CDP) so
 	// client-side JavaScript runs. For sites whose API is signed by their
 	// own front-end code, this is the only way to get a valid response.
-	browser, _ := state.NewTable()
-	_ = browser.RawSetString("fetch", luaBrowserFetch(state, m, id))
-	_ = browser.RawSetString("evaluate", luaBrowserEvaluate(state, m, id))
-	_ = browser.RawSetString("evaluate_with_init", luaBrowserEvaluateWithInit(state, m, id))
-	_ = host.RawSetString("browser", browser.Value())
+	_ = tables["browser"].RawSetString("fetch", luaBrowserFetch(state, m, id))
+	_ = tables["browser"].RawSetString("evaluate", luaBrowserEvaluate(state, m, id))
+	_ = tables["browser"].RawSetString("evaluate_with_init", luaBrowserEvaluateWithInit(state, m, id))
+
+	host, _ := state.NewTable()
+	for ns, t := range tables {
+		_ = host.RawSetString(ns, t.Value())
+	}
 	_ = state.RawSetGlobal("host", host.Value())
+}
+
+// luaNewTable makes one namespace table, discarding lunar's always-nil error.
+func luaNewTable(state *lua.State) *lua.Table {
+	t, _ := state.NewTable()
+	return t
+}
+
+// luaPure wraps one table entry as a Lua native, picking the wrapper that
+// matches the helper's kind.
+func luaPure(state *lua.State, h hostHelper) lua.Value {
+	switch h.kind {
+	case kindStr1:
+		return luaStr1(state, h.fn.(func(string) string))
+	case kindStr1Err:
+		return luaStr1Err(state, h.fn.(func(string) (string, error)))
+	case kindStr2:
+		return luaStr2(state, h.fn.(func(string, string) string))
+	case kindStr2Err:
+		return luaStr2Err(state, h.fn.(func(string, string) (string, error)))
+	case kindStr3Err:
+		return luaStr3Err(state, h.fn.(func(string, string, string) (string, error)))
+	case kindStr4Err:
+		return luaStr4Err(state, h.fn.(func(string, string, string, string) (string, error)))
+	case kindFloat1:
+		return luaFloat1(state, h.fn.(func(string) float64))
+	}
+	panic("luaPure: unexpected helper kind for " + h.name)
 }

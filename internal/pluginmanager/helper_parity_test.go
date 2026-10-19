@@ -6,6 +6,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/dop251/goja"
 	lua "github.com/mmcdole/lunar"
 
 	"goisekai/internal/hostnet"
@@ -172,39 +173,114 @@ func TestWasmHelperGapListStaysHonest(t *testing.T) {
 }
 
 // TestWasmDispatchesEveryHelperItAdvertises is the mirror image: every name in
-// the wasm dispatch tables must resolve, so a typo in a map key (which would
+// the shared host surface must resolve, so a typo in a table key (which would
 // make the helper silently unusable) is caught.
 func TestWasmDispatchesEveryHelperItAdvertises(t *testing.T) {
 	m := NewManager(hostnet.NewProxy(), t.TempDir())
-	for fn := range wasmHostStr1 {
+	for _, fn := range hostSurfaceNames() {
+		if _, gap := wasmHelperGaps[fn]; gap {
+			continue
+		}
 		if dispatchReportsUnknown(m, fn) {
-			t.Errorf("%s is in wasmHostStr1 but the dispatcher rejects it", fn)
+			t.Errorf("%s is in hostSurface but the dispatcher rejects it", fn)
 		}
 	}
-	for fn := range wasmHostStr1Err {
-		if dispatchReportsUnknown(m, fn) {
-			t.Errorf("%s is in wasmHostStr1Err but the dispatcher rejects it", fn)
+}
+
+// TestHostSurfaceDeclaresEveryRuntime helper keeps the table honest about the
+// entries it leaves to each runtime: a kindRuntime row needs a reason, and a
+// kindPure row needs a function, so a half-filled row cannot compile silently.
+func TestHostSurfaceRowsAreComplete(t *testing.T) {
+	for _, h := range hostSurface {
+		ns, fn := splitHostName(h.name)
+		if ns == "" || fn == "" {
+			t.Errorf("%q is not a <namespace>.<helper> name", h.name)
+		}
+		if h.kind == kindRuntime {
+			if h.fn != nil {
+				t.Errorf("%s is kindRuntime but carries a function", h.name)
+			}
+			if strings.TrimSpace(h.note) == "" {
+				t.Errorf("%s is kindRuntime without a note saying why", h.name)
+			}
+			continue
+		}
+		if h.fn == nil {
+			t.Errorf("%s is kindPure but has no function", h.name)
 		}
 	}
-	for fn := range wasmHostStr2 {
-		if dispatchReportsUnknown(m, fn) {
-			t.Errorf("%s is in wasmHostStr2 but the dispatcher rejects it", fn)
+
+	seen := map[string]bool{}
+	for _, h := range hostSurface {
+		if seen[h.name] {
+			t.Errorf("%s appears twice in hostSurface", h.name)
+		}
+		seen[h.name] = true
+	}
+}
+
+// jsHelperRenames records helpers whose JS spelling differs from Lua's for a
+// language reason rather than an oversight. Lua builds a `log` table and calls
+// log.warn(msg); JS spells the same levels console.warn(msg), because `console`
+// is the global a JS author already reaches for.
+var jsHelperRenames = map[string]string{
+	"log.debug": "debug",
+	"log.info":  "info",
+	"log.warn":  "warn",
+	"log.error": "error",
+}
+
+// TestJSHostHelperParity closes the gap the table was introduced for: JS used
+// to restate the helper list by hand and fell behind Lua (text.trim,
+// text.unescape, text.lua_escape were missing). Now every name Lua exposes must
+// also be reachable from JS, either at the same path or through a documented
+// rename.
+func TestJSHostHelperParity(t *testing.T) {
+	names := luaHostHelpers(t)
+
+	vm := goja.New()
+	if err := vm.Set("console", newJSConsole("parity")); err != nil {
+		t.Fatalf("set console: %v", err)
+	}
+	if err := registerJSHostNatives(vm, NewManager(hostnet.NewProxy(), t.TempDir()), "parity"); err != nil {
+		t.Fatalf("registerJSHostNatives: %v", err)
+	}
+	hostVal := vm.Get("host")
+	if hostVal == nil || goja.IsUndefined(hostVal) {
+		t.Fatal("JS runtime did not install a host object")
+	}
+	host := hostVal.ToObject(vm)
+
+	var missing []string
+	for _, fn := range names {
+		if _, gap := wasmHelperGaps[fn]; gap {
+			continue
+		}
+		if renamed, ok := jsHelperRenames[fn]; ok {
+			// console.debug/info/warn/error — see newJSConsole.
+			con := vm.Get("console")
+			if con == nil || goja.IsUndefined(con) {
+				missing = append(missing, fn+" (no console global)")
+				continue
+			}
+			if v := con.ToObject(vm).Get(renamed); v == nil || goja.IsUndefined(v) {
+				missing = append(missing, fn+" (no console."+renamed+")")
+			}
+			continue
+		}
+		ns, field := splitHostName(fn)
+		group := host.Get(ns)
+		if group == nil || goja.IsUndefined(group) {
+			missing = append(missing, fn+" (no host."+ns+")")
+			continue
+		}
+		if v := group.ToObject(vm).Get(field); v == nil || goja.IsUndefined(v) {
+			missing = append(missing, fn)
 		}
 	}
-	for fn := range wasmHostStr2Err {
-		if dispatchReportsUnknown(m, fn) {
-			t.Errorf("%s is in wasmHostStr2Err but the dispatcher rejects it", fn)
-		}
-	}
-	for fn := range wasmHostStr3Err {
-		if dispatchReportsUnknown(m, fn) {
-			t.Errorf("%s is in wasmHostStr3Err but the dispatcher rejects it", fn)
-		}
-	}
-	for fn := range wasmHostStr4Err {
-		if dispatchReportsUnknown(m, fn) {
-			t.Errorf("%s is in wasmHostStr4Err but the dispatcher rejects it", fn)
-		}
+	if len(missing) > 0 {
+		t.Errorf("Lua exposes helpers the JS runtime lacks: %v\n"+
+			"add them to hostSurface, or record the gap in wasmHelperGaps", missing)
 	}
 }
 
