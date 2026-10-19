@@ -421,7 +421,7 @@ GOROOT=$HOME/.govman/versions/go1.26.9 GOTOOLCHAIN=local \
 `wasm_abi.h`), and a plugin is then just its own `main.odin`:
 
 ```
-examples/plugins/wasm/atsumaru/
+examples/plugins/wasm/atsumaru_odin/
 ├── abi/wasm_abi.odin   ← copy as-is; provides host_call, malloc/free,
 │                         contract_version, http_body, to_json, host_str
 ├── main.odin           ← exports Search / GetMangaDetail / GetChapterList /
@@ -447,7 +447,7 @@ Five Odin-specific rules, all of which cost a build to learn:
 - `core:runtime` is `base:runtime` now, and two `package` declarations cannot
   share one directory — hence the `abi/` subdirectory.
 
-Working examples: `atsumaru` (JSON API + Typesense search, numeric genre
+Working examples: `atsumaru_odin` (JSON API + Typesense search, numeric genre
 ids) and `comicasura_odin` (HTML scraping, composite `slug:chapter` ids), both
 live-verified end to end.
 

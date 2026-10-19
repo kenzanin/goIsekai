@@ -1,14 +1,13 @@
 // Atsumaru (atsu.moe) source plugin for goIsekai — Odin wasip1 reactor.
 //
-// Supersedes the Lua implementation (examples/plugins/lua/atsumaru) that used
-// to back this source, keeping the same plugin id so installed libraries and
-// reading progress keep resolving. Site API:
+// 1:1 behavioural port of examples/plugins/lua/atsumaru/main.lua, which is the
+// reference implementation for this source. Site API:
 //   search   GET /collections/manga/documents/search  (Typesense)
 //   chapters GET /api/manga/allChapters?mangaId=<id>  -> {chapters:[...]}
 //   detail   GET /api/manga/page?id=<id>              -> {mangaPage:{...}}
 //   pages    GET /api/read/chapter?mangaId=<id>&chapterId=<id>
 //
-// Three details are load-bearing and were taken from the old Lua plugin, not guessed:
+// Three details are load-bearing and were taken from the Lua plugin, not guessed:
 //
 //  1. The search needs the site's own filter, not just q=:
 //       hidden:!=true && views:>0 && medium:!=[`Novel`]
@@ -25,7 +24,7 @@
 // Network and text work go through abi/ (host_call): http_body plus the host's
 // text.url_encode / text.strip_html / text.chapter_num / text.normalize_status,
 // so no logic here duplicates what every other plugin kind already gets.
-package atsumaru
+package atsumaru_odin
 
 import "abi"
 import "base:runtime"
