@@ -3,5 +3,6 @@
   "description": "Manga, manhwa and manhua catalogue from madarascans.net",
   "site_url": "https://madarascans.net",
   "logo": "logo.png",
-  "contract_version": 1
+  "contract_version": 1,
+  "built_with": "g++ 16.2.1"
 }

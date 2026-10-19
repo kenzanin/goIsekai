@@ -1,5 +1,6 @@
 {
   "name": "KunManga",
   "site_url": "https://www.kunmanga.online",
-  "logo": "logo.png"
+  "logo": "logo.png",
+  "built_with": "tinygo 0.43.0"
 }

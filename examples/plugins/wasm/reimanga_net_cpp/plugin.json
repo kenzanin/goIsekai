@@ -1,5 +1,6 @@
 {
   "name": "ReiManga",
   "site_url": "https://reimanga.net",
-  "logo": "logo.png"
+  "logo": "logo.png",
+  "built_with": "clang 13.0.0"
 }

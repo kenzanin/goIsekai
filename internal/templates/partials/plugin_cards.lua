@@ -28,6 +28,7 @@ return function(data)
 			local iconURL = p.IconURL or ""
 			local siteURL = p.SiteURL or ""
 			local version = p.Version or ""
+			local builtWith = p.BuiltWith or ""
 			local isActive = p.IsActive or false
 			local loaded = p.Loaded or false
 			local needsHumanVerify = p.NeedsHumanVerify or false
@@ -138,6 +139,16 @@ return function(data)
 				cardHTML = cardHTML
 					.. '<span class="text-xs px-2 py-0.5 rounded-full bg-neutral-700/50 text-neutral-400">v'
 					.. h(version)
+					.. "</span>"
+			end
+
+			-- Build toolchain badge (declared as "built_with" in plugin.json)
+			if builtWith ~= "" then
+				cardHTML = cardHTML
+					.. '<span class="text-xs px-2 py-0.5 rounded-full bg-neutral-800 text-neutral-500 font-mono" title="Compiled with '
+					.. h(builtWith)
+					.. '">'
+					.. h(builtWith)
 					.. "</span>"
 			end
 

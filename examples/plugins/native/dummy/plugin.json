@@ -2,5 +2,6 @@
   "name": "Dummy Native",
   "description": "Fixture plugin for the native .so ABI",
   "site_url": "https://example.invalid",
-  "contract_version": 1
+  "contract_version": 1,
+  "built_with": "g++ 16.2.1"
 }

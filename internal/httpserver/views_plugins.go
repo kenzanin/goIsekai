@@ -19,6 +19,7 @@ type PluginView struct {
 	VerifyUserAgent   string
 	ThumbRatio        float64 // runtime meta; shadows database.Plugin.ThumbRatio (0 for bridge-installed plugins)
 	SiteURL           string
+	BuiltWith         string   // toolchain + version that built the artifact, "" = unknown
 	PinnedProfile     string   // current pinned TLS profile name, "" = auto
 	AvailableProfiles []string // selectable profile names for dropdown
 	LibraryCount      int      // in-library manga contributed by this plugin
@@ -50,6 +51,7 @@ func (s *Server) viewPlugins(w http.ResponseWriter, r *http.Request) {
 			v.NeedsHumanVerify = m.NeedsHumanVerify
 			v.ThumbRatio = m.ThumbRatio
 			v.SiteURL = m.SiteURL
+			v.BuiltWith = m.BuiltWith
 			if m.Name != "" {
 				v.Name = m.Name // override DB name if plugin declares one
 			}

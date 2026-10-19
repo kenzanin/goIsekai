@@ -21,6 +21,7 @@ type LoadedPlugin struct {
 	NeedsJS          bool
 	Name             string
 	SiteURL          string
+	BuiltWith        string // toolchain + version stamped at build time, "" = unknown
 	Logo             string
 }
 
@@ -55,6 +56,7 @@ func (m *Manager) LoadedPlugins() []LoadedPlugin {
 			NeedsJS:          p.meta.NeedsJS,
 			Name:             p.meta.Name,
 			SiteURL:          p.meta.SiteURL,
+			BuiltWith:        p.meta.BuiltWith,
 			Logo:             p.meta.Logo,
 		})
 	}

@@ -5,3 +5,7 @@ set -euo pipefail
 cd "$(dirname "$0")"
 g++ -std=c++17 -O2 -fPIC -shared main.cpp -o libdummy.so
 echo "built libdummy.so"
+
+# Record the toolchain + version for the plugins page.
+"../../../../tools/stamp-built-with.sh" . native "$(g++ -dumpfullversion -dumpversion)"
+

@@ -13,3 +13,7 @@ g++ -std=c++17 -O2 -fPIC -shared -fvisibility=hidden -Wl,-s \
 	main.cpp -o main.so
 
 echo "built main.so ($(stat -c%s main.so) bytes)"
+
+# Record the toolchain + version for the plugins page.
+"../../../../tools/stamp-built-with.sh" . native "$(g++ -dumpfullversion -dumpversion)"
+

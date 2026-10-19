@@ -1,5 +1,6 @@
 {
   "name": "Komix",
   "site_url": "https://komix.to",
-  "logo": "logo.png"
+  "logo": "logo.png",
+  "built_with": "tinygo 0.43.0"
 }

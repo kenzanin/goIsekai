@@ -41,6 +41,10 @@ trap restore EXIT INT TERM
 relax "$ROOT/go.mod"
 for d in "$ROOT"/examples/plugins/wasm/*/go.mod; do relax "$d"; done
 
+stamp() { # $1 = plugin dir, $2 = tool, $3 = version
+  "$ROOT/tools/stamp-built-with.sh" "$1" "$2" "$3"
+}
+
 build_one() { # $1 = plugin dir
   local dir="$1"
   echo "=== $(basename "$dir") ==="
@@ -48,10 +52,14 @@ build_one() { # $1 = plugin dir
   # malloc/free come from TinyGo's runtime; abi_tinygo.go stops the plugin from
   # redeclaring them, which is what used to make wasm-opt fail.
   if ( cd "$dir" && tinygo build -target wasi -buildmode=c-shared -o main.wasm . && ls -la main.wasm ); then
+    stamp "$dir" tinygo "$(tinygo version | awk '{print $3}')"
     return 0
   fi
   echo "-- tinygo failed, fallback: standard-go wasip1 c-shared"
   ( cd "$dir" && GOOS=wasip1 GOARCH=wasm go build -buildmode=c-shared -o main.wasm . && ls -la main.wasm )
+  # Record the fallback too: a standard-Go build is 2x the size, and the
+  # plugins page should say so rather than leave built_with claiming TinyGo.
+  stamp "$dir" go "$(go version | awk '{print $3}')"
 }
 
 if [ "$#" -gt 0 ]; then

@@ -38,3 +38,7 @@ for sym in _initialize contract_version malloc free Search GetMangaDetail GetCha
 done
 
 echo "exports OK ($(stat -c%s main.wasm) bytes)"
+
+# Record the toolchain + version for the plugins page.
+"../../../../tools/stamp-built-with.sh" . cpp "$("$WASI_SDK/bin/clang++" --version | head -1 | awk '{print $3}')"
+

@@ -3,5 +3,6 @@
   "description": "Manga and manhwa catalogue from roliascan.com",
   "site_url": "https://roliascan.com",
   "logo": "logo.png",
-  "contract_version": 1
+  "contract_version": 1,
+  "built_with": "g++ 16.2.1"
 }

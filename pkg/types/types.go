@@ -113,6 +113,11 @@ type PluginMeta struct {
 	// Description is a short human-readable blurb about the plugin, shown on
 	// the plugin page.
 	Description string `json:"description,omitempty"`
+	// BuiltWith records the toolchain and version that compiled this plugin's
+	// artifact (e.g. "tinygo 0.43.0"), stamped by the build script so the
+	// plugins page can show how a plugin was built. Free-form; empty means
+	// unknown (a plugin copied in without a build).
+	BuiltWith string `json:"built_with,omitempty"`
 	// ContractVersion is the ABI version this plugin was written against.
 	// Checked at discovery, so a plugin built for another ABI is rejected
 	// without instantiating a runtime. Absent means ContractVersion (current).

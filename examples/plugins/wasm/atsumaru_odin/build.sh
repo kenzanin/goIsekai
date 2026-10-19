@@ -28,3 +28,6 @@ done
 "$OBJDUMP" -x main.wasm | grep -q "env.host_call" || { echo "missing import: env.host_call" >&2; exit 1; }
 
 echo "exports OK ($(stat -c%s main.wasm) bytes)"
+
+# Record the toolchain + version for the plugins page.
+"../../../../tools/stamp-built-with.sh" . odin "$("$ODIN" version | awk '{print $3}')"

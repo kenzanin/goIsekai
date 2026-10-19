@@ -1,5 +1,6 @@
 {
   "name": "MangaKakalot",
   "site_url": "https://www.mangakakalove.com",
-  "logo": "logo.png"
+  "logo": "logo.png",
+  "built_with": "tinygo 0.43.0"
 }

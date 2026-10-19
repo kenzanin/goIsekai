@@ -1,5 +1,6 @@
 {
   "name": "MangaUno (Odin)",
   "site_url": "https://manga.uno",
-  "logo": "logo.png"
+  "logo": "logo.png",
+  "built_with": "odin dev-2026-10:84bc3fc21"
 }
