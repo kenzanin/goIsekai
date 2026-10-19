@@ -22,6 +22,16 @@ func TestReadPluginJSONMeta(t *testing.T) {
 			t.Fatalf("Name = %q", meta.Name)
 		}
 	})
+	t.Run("built_with", func(t *testing.T) {
+		dir := t.TempDir()
+		if err := os.WriteFile(filepath.Join(dir, "plugin.json"),
+			[]byte(`{"name":"E","built_with":"tinygo 0.43.0"}`), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		if meta := readPluginJSONMeta(dir); meta.BuiltWith != "tinygo 0.43.0" {
+			t.Fatalf("BuiltWith = %q", meta.BuiltWith)
+		}
+	})
 	t.Run("missing file", func(t *testing.T) {
 		if meta := readPluginJSONMeta(t.TempDir()); meta.SiteURL != "" {
 			t.Fatalf("want zero meta, got %+v", meta)

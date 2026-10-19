@@ -142,10 +142,12 @@ return function(data)
 					.. "</span>"
 			end
 
-			-- Build toolchain badge (declared as "built_with" in plugin.json)
+			-- Build toolchain badge (declared as "built_with" in plugin.json).
+			-- text-neutral-300 on bg-neutral-800, not the neutral-500/muted
+			-- gray: the muted pair lands at ~2.6:1 contrast and reads as blank.
 			if builtWith ~= "" then
 				cardHTML = cardHTML
-					.. '<span class="text-xs px-2 py-0.5 rounded-full bg-neutral-800 text-neutral-500 font-mono" title="Compiled with '
+					.. '<span class="text-xs px-2 py-0.5 rounded-full bg-neutral-800 text-neutral-300 font-mono" title="Compiled with '
 					.. h(builtWith)
 					.. '">'
 					.. h(builtWith)

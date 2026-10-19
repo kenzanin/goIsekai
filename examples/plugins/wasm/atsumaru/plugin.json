@@ -4,5 +4,6 @@
   "name": "Atsumaru",
   "site_url": "https://atsu.moe",
   "logo": "logo.png",
-  "contract_version": 1
+  "contract_version": 1,
+  "built_with": "odin dev-2026-10:84bc3fc21"
 }
