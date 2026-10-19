@@ -113,6 +113,16 @@ var wasmHostStr2Err = map[string]func(string, string) (string, error){
 	"crypto.xor": pluginutil.XORHex,
 }
 
+// wasmHostStr3Err are the three-string helpers that can fail.
+var wasmHostStr3Err = map[string]func(string, string, string) (string, error){
+	"crypto.substitute_cipher": pluginutil.SubstituteCipher,
+}
+
+// wasmHostStr4Err are the four-string helpers that can fail.
+var wasmHostStr4Err = map[string]func(string, string, string, string) (string, error){
+	"crypto.aes_gcm_decrypt": pluginutil.AESGCMDecryptB64,
+}
+
 // wasmArg reads one positional argument, defaulting to "" like the Lua/JS
 // natives do for a missing one.
 func wasmArg(args []string, i int) string {

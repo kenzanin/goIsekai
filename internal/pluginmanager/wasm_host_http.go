@@ -38,6 +38,9 @@ func (m *Manager) wasmHTTP(ctx context.Context, id, method string, args []string
 	respJSON, err := m.proxy.HandleRequestContext(ctx, id, string(reqJSON))
 	if bodyOnly {
 		if err != nil {
+			// Still park a challenge: the guest only sees nil and would report
+			// an empty result, hiding that the site needs verification.
+			m.parkChallenge(id, err)
 			return nil, nil
 		}
 		var resp map[string]any
@@ -50,6 +53,7 @@ func (m *Manager) wasmHTTP(ctx context.Context, id, method string, args []string
 		return nil, nil
 	}
 	if err != nil {
+		m.parkChallenge(id, err)
 		return map[string]any{"status": 0, "body": err.Error()}, nil
 	}
 	var resp map[string]any

@@ -23,6 +23,10 @@ func (m *Manager) hostHTTPRequest(ctx context.Context, mod api.Module, stack []u
 	respJSON, err := m.proxy.HandleRequestContext(ctx, mod.Name(), string(reqBytes))
 	if err != nil {
 		logger.Warn("wasm host_http_request failed", "plugin", mod.Name(), "error", err)
+		// This low-level import cannot report an error to the guest either, so
+		// park a challenge the same way host.http.* does — otherwise a plugin
+		// built on raw host_http_request stays blind to the verify wizard.
+		m.parkChallenge(mod.Name(), err)
 		stack[0] = pack(0, 0)
 		return
 	}

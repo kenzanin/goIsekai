@@ -9,6 +9,7 @@ import (
 	"github.com/goccy/go-json"
 
 	"goisekai/internal/htmldoc"
+	"goisekai/internal/logger"
 	"goisekai/internal/pluginutil"
 )
 
@@ -28,6 +29,12 @@ func (m *Manager) dispatchHostCall(ctx context.Context, id, fn string, args []st
 	}
 	if f, ok := wasmHostStr2Err[fn]; ok {
 		return f(wasmArg(args, 0), wasmArg(args, 1))
+	}
+	if f, ok := wasmHostStr3Err[fn]; ok {
+		return f(wasmArg(args, 0), wasmArg(args, 1), wasmArg(args, 2))
+	}
+	if f, ok := wasmHostStr4Err[fn]; ok {
+		return f(wasmArg(args, 0), wasmArg(args, 1), wasmArg(args, 2), wasmArg(args, 3))
 	}
 	switch fn {
 	case "text.chapter_num":
@@ -114,8 +121,34 @@ func (m *Manager) dispatchHostCall(ctx context.Context, id, fn string, args []st
 		return m.wasmHTTP(ctx, id, "GET", args, true)
 	case "http.post_body":
 		return m.wasmHTTP(ctx, id, "POST", args, true)
+	case "browser.fetch":
+		return m.wasmBrowserFetch(id, wasmArg(args, 0))
+	case "browser.evaluate":
+		return m.wasmBrowserEvaluate(id, wasmArg(args, 0), wasmArg(args, 1))
+	case "browser.evaluate_with_init":
+		return m.wasmBrowserEvaluateWithInit(id, wasmArg(args, 0), wasmArg(args, 1), wasmArg(args, 2))
+	case "log.debug", "log.info", "log.warn", "log.error":
+		wasmLog(id, fn, wasmArg(args, 0))
+		return nil, nil
 	}
 	return nil, fmt.Errorf("unknown host function %q", fn)
+}
+
+// wasmLog forwards a wasm plugin's log.<level>(msg) to the host logger, tagged
+// with the plugin id exactly like the Lua and JS globals. Without this a wasm
+// plugin had no way to emit a diagnostic at all — the reason a port that
+// misbehaved was silent instead of explaining itself.
+func wasmLog(id, fn, msg string) {
+	switch fn {
+	case "log.debug":
+		logger.Debug(msg, "plugin", id)
+	case "log.info":
+		logger.Info(msg, "plugin", id)
+	case "log.warn":
+		logger.Warn(msg, "plugin", id)
+	case "log.error":
+		logger.Error(msg, "plugin", id)
+	}
 }
 
 // wasmRegexRow shapes one match's captures the way the JS find/find_all do: a

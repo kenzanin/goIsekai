@@ -82,9 +82,12 @@ A malformed input for a `*_decode` returns an error envelope.
 | `crypto.xor` | `s`, `key` | string (hex-XOR keystream) |
 | `crypto.utf8_hex` | `s` | hex string |
 | `crypto.vrf_sign` | `apiPath`, `paramsJSON`, `stagesJSON` | base64 signature string |
+| `crypto.aes_gcm_decrypt` | `keyB64`, `ivB64`, `tagB64`, `ctB64` | plaintext string |
+| `crypto.substitute_cipher` | `data`, `materialJSON`, `direction` | string |
 
 `paramsJSON` is a JSON object of string values. `stagesJSON` is a JSON array of
-`{"iv":"<b64>","key":"<b64>","tbl":"<b64>"}` objects.
+`{"iv":"<b64>","key":"<b64>","tbl":"<b64>"}` objects. A malformed input to
+`aes_gcm_decrypt` or `substitute_cipher` returns an error envelope.
 
 ### `host.json.*`
 
@@ -143,6 +146,34 @@ challenge solving, default headers).
 `headersJSON` is a JSON object of header name to value. On a transport failure
 the plain forms return `{"status":0,"body":"<reason>"}` and the `_body` forms
 return `null`.
+
+When the failure is an anti-bot challenge (Cloudflare and friends) the host
+records it for the invoke, so the human-verify wizard opens even though the
+guest could only see `null`. Any other failure stays a plain error.
+
+### `host.browser.*`
+
+CDP-backed helpers for pages whose content is rendered client-side. They mirror
+the Lua/JS natives: when the engine is off or a navigation fails they return
+`null` rather than an error envelope, so a plugin can fall back.
+
+| fn | args | returns |
+| --- | --- | --- |
+| `browser.fetch` | `url` | rendered HTML, or `null` |
+| `browser.evaluate` | `url`, `js` | string result, or `null` |
+| `browser.evaluate_with_init` | `url`, `initJS`, `js` | string result, or `null` |
+
+`initJS` in `evaluate_with_init` runs before any page script, so it can install
+fetch/XHR hooks that capture the site's own API responses.
+
+### `log.*`
+
+| fn | args | returns |
+| --- | --- | --- |
+| `log.debug` / `log.info` / `log.warn` / `log.error` | `msg` | `null` |
+
+Writes to the host log, tagged with the plugin id. This is a global beside
+`host`, exactly as in Lua and JS.
 
 ## Example plugin
 

@@ -137,10 +137,25 @@ func (m *Manager) loadWasm(id, path string) (*loadedPlugin, error) {
 	}, nil
 }
 
-// callWasm invokes one JSON-in/JSON-out ABI function over wasm linear memory.
-func callWasm(p *loadedPlugin, fnName, inputJSON string) (string, error) {
+// wasmInvokeResult finalises a wasm invocation. A challenge parked by an HTTP
+// helper during the call wins over whatever the guest returned: the guest could
+// only see a nil/error body and would otherwise report an empty result, hiding
+// the fact that the site wants a human to verify. Returning the typed error
+// here is the wasm counterpart of the Lua natives aborting the call.
+func (m *Manager) wasmInvokeResult(id, out string) (string, error) {
+	if err := m.takeChallenge(id); err != nil {
+		return "", err
+	}
+	return out, nil
+}
+
+func (m *Manager) callWasm(p *loadedPlugin, fnName, inputJSON string) (string, error) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
+
+	// Challenges are per-invocation: drop anything an earlier call left behind
+	// so a past block cannot fail this one.
+	m.clearChallenge(p.id)
 
 	if p.wasmMod == nil {
 		return "", fmt.Errorf("wasm plugin %s: not loaded", p.id)
@@ -179,5 +194,5 @@ func callWasm(p *loadedPlugin, fnName, inputJSON string) (string, error) {
 	if !ok {
 		return "", fmt.Errorf("wasm plugin %s %s: result out of range", p.id, fnName)
 	}
-	return string(out), nil
+	return m.wasmInvokeResult(p.id, string(out))
 }
