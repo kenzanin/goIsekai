@@ -75,26 +75,25 @@ func (m *Manager) loadYaegi(id, dir string) (*loadedPlugin, error) {
 		return nil, fmt.Errorf("yaegi plugin %s: stdlib: %w", id, err)
 	}
 
-	// Expose hostnet package with all helper functions. The HTML helpers live in
-	// the same synthetic package as Get/Post: the bridge's shape is plain
-	// functions in one package, and a plugin's only permitted non-stdlib import
-	// is `hostnet`.
+	// Expose the hostnet package. The HTML helpers live in the same synthetic
+	// package as Get/Post: the bridge's shape is plain functions in one package,
+	// and a plugin's only permitted non-stdlib import is `hostnet`. The helper
+	// list lives in yaegi_surface.go, which takes each function from
+	// hostSurface so the two surfaces cannot drift.
 	hp := yaegiHostPkg{proxy: m.proxy, id: id}
-	if err := i.Use(interp.Exports{
-		"hostnet/hostnet": map[string]reflect.Value{
-			"Get":           reflect.ValueOf(hp.Get),
-			"Post":          reflect.ValueOf(hp.Post),
-			"Parse":         reflect.ValueOf(hp.Parse),
-			"FindText":      reflect.ValueOf(hp.FindText),
-			"FindAttr":      reflect.ValueOf(hp.FindAttr),
-			"FindListText":  reflect.ValueOf(hp.FindListText),
-			"FindListAttr":  reflect.ValueOf(hp.FindListAttr),
-			"XPathText":     reflect.ValueOf(hp.XPathText),
-			"XPathAttr":     reflect.ValueOf(hp.XPathAttr),
-			"XPathListText": reflect.ValueOf(hp.XPathListText),
-			"XPathListAttr": reflect.ValueOf(hp.XPathListAttr),
-		},
-	}); err != nil {
+	exports := yaegiExports()
+	exports["Get"] = reflect.ValueOf(hp.Get)
+	exports["Post"] = reflect.ValueOf(hp.Post)
+	exports["Parse"] = reflect.ValueOf(hp.Parse)
+	exports["FindText"] = reflect.ValueOf(hp.FindText)
+	exports["FindAttr"] = reflect.ValueOf(hp.FindAttr)
+	exports["FindListText"] = reflect.ValueOf(hp.FindListText)
+	exports["FindListAttr"] = reflect.ValueOf(hp.FindListAttr)
+	exports["XPathText"] = reflect.ValueOf(hp.XPathText)
+	exports["XPathAttr"] = reflect.ValueOf(hp.XPathAttr)
+	exports["XPathListText"] = reflect.ValueOf(hp.XPathListText)
+	exports["XPathListAttr"] = reflect.ValueOf(hp.XPathListAttr)
+	if err := i.Use(interp.Exports{"hostnet/hostnet": exports}); err != nil {
 		return nil, fmt.Errorf("yaegi plugin %s: host exports: %w", id, err)
 	}
 

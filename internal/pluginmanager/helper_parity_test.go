@@ -2,6 +2,7 @@ package pluginmanager
 
 import (
 	"context"
+	"reflect"
 	"sort"
 	"strings"
 	"testing"
@@ -251,6 +252,130 @@ var jsHelperRenames = map[string]string{
 	"log.info":  "info",
 	"log.warn":  "warn",
 	"log.error": "error",
+}
+
+// TestYaegiSurfaceMatchesHostSurface keeps the two tables from drifting. Every
+// yaegi entry that names a hostSurface row must publish the SAME Go function —
+// compared by pointer identity, not by output — so a helper can be reimplemented
+// on one side without the other silently keeping the old behaviour.
+func TestYaegiSurfaceMatchesHostSurface(t *testing.T) {
+	var bad []string
+	seen := map[string]bool{}
+
+	for _, h := range yaegiHelpers {
+		if seen[h.goName] {
+			t.Errorf("hostnet.%s appears twice in yaegiHelpers", h.goName)
+		}
+		seen[h.goName] = true
+
+		if h.helper == "" {
+			t.Errorf("hostnet.%s names no hostSurface row", h.goName)
+			continue
+		}
+
+		row, ok := hostSurfaceIndex[h.helper]
+		if !ok {
+			t.Errorf("hostnet.%s names %q, which hostSurface does not declare", h.goName, h.helper)
+			continue
+		}
+
+		// The function yaegi actually publishes.
+		published := h.fn
+		if published == nil {
+			published = row.fn
+		}
+		if published == nil {
+			bad = append(bad, h.goName+" (no function on either side)")
+			continue
+		}
+		// A kindRuntime row carries no function (Lua and JS cannot share its
+		// shape), so yaegi supplies its own and there is nothing to compare.
+		// Only a kindPure row must publish the identical function.
+		if row.fn != nil && reflect.ValueOf(published).Pointer() != reflect.ValueOf(row.fn).Pointer() {
+			bad = append(bad, h.goName+" != "+h.helper)
+		}
+	}
+
+	if len(bad) > 0 {
+		t.Errorf("yaegi publishes a different Go function than hostSurface: %v\n"+
+			"point both at the same function instead of reimplementing it", bad)
+	}
+}
+
+// yaegiNotApplicable are hostSurface rows with no yaegi counterpart, each with
+// the reason. Listing them beats skipping silently: a new hostSurface row that
+// is neither wired nor explained makes TestYaegiSurfaceCoversTheScriptAliases
+// fail, so the gap has to be a decision instead of an oversight.
+var yaegiNotApplicable = map[string]string{
+	"json.decode":  "an interpreted Go plugin calls stdlib encoding/json directly",
+	"json.encode":  "an interpreted Go plugin calls stdlib encoding/json directly",
+	"regex.gmatch": "Lua iterator protocol; Go ranges over RegexFindAll's slice",
+}
+
+// TestYaegiSurfaceCoversTheScriptAliases is the coverage direction: every
+// hostSurface row should either be reachable from a yaegi plugin or be listed in
+// yaegiNotApplicable with a reason. yaegi used to expose only 11 hand-written
+// functions, so nothing kept a new helper from being script-runtime-only.
+func TestYaegiSurfaceCoversTheScriptAliases(t *testing.T) {
+	published := map[string]bool{}
+	for _, h := range yaegiHelpers {
+		published[h.helper] = true
+	}
+
+	var missing []string
+	for _, row := range hostSurface {
+		// http/browser/log/html are per-runtime for reasons that apply to yaegi
+		// too (they need the manager, plugin id or an opaque handle).
+		switch splitNamespace(row.name) {
+		case "http", "browser", "log", "html":
+			continue
+		}
+		if published[row.name] {
+			continue
+		}
+		if _, ok := yaegiNotApplicable[row.name]; ok {
+			continue
+		}
+		missing = append(missing, row.name)
+	}
+	if len(missing) > 0 {
+		t.Errorf("hostSurface rows with no yaegi counterpart: %v\n"+
+			"add them to yaegiHelpers, or record why in yaegiNotApplicable", missing)
+	}
+
+	// The exclusion list must not go stale either.
+	for name, reason := range yaegiNotApplicable {
+		if strings.TrimSpace(reason) == "" {
+			t.Errorf("%s: an exclusion needs a reason", name)
+		}
+		if _, ok := hostSurfaceIndex[name]; !ok {
+			t.Errorf("%s is excluded from yaegi but hostSurface does not declare it", name)
+		}
+		if published[name] {
+			t.Errorf("%s is excluded from yaegi but published anyway; remove the exclusion", name)
+		}
+	}
+}
+
+// TestYaegiExportsResolve guards the map actually handed to the interpreter: a
+// row whose helper key no longer exists would be skipped silently.
+func TestYaegiExportsResolve(t *testing.T) {
+	exports := yaegiExports()
+	if len(exports) != len(yaegiHelpers) {
+		t.Errorf("yaegiExports published %d of %d entries; some row did not resolve",
+			len(exports), len(yaegiHelpers))
+	}
+	for _, h := range yaegiHelpers {
+		if _, ok := exports[h.goName]; !ok {
+			t.Errorf("hostnet.%s did not resolve to a function", h.goName)
+		}
+	}
+}
+
+// splitNamespace returns the namespace half of "<namespace>.<helper>".
+func splitNamespace(name string) string {
+	ns, _ := splitHostName(name)
+	return ns
 }
 
 // TestJSHostHelperParity closes the gap the table was introduced for: JS used
