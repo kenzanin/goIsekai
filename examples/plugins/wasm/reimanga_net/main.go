@@ -32,46 +32,21 @@ const siteURL = "https://reimanga.net"
 const acceptJSON = `{"Accept":"application/json","Referer":"https://reimanga.net/"}`
 
 // ─── ABI memory ─────────────────────────────────────────────────────────────
-var buffers = map[uint32][]byte{}
-
-//go:wasmexport malloc
-func malloc(n uint32) uint32 {
-	if n == 0 {
-		n = 1
-	}
-	b := make([]byte, n)
-	ptr := uint32(uintptr(unsafe.Pointer(&b[0])))
-	buffers[ptr] = b
-	return ptr
-}
-
-//go:wasmexport free
-func free(ptr uint32) {
-	delete(buffers, ptr)
-}
+// malloc/free/allocCopy live in abi_std.go / abi_tinygo.go: TinyGo's runtime
+// already exports malloc/free, so that pair is selected by build tag.
 
 //go:wasmimport env host_call
 func hostCallRaw(ptr, length uint32) uint64
 
-func allocCopy(b []byte) uint32 {
-	if len(b) == 0 {
-		return 0
-	}
-	n := uint32(len(b))
-	ptr := malloc(n)
-	copy(buffers[ptr], b)
-	return ptr
-}
-
+// readString reads a string straight out of linear memory. The host allocates
+// the input buffer through the module's malloc and writes it there, so the
+// bytes are always live at ptr — and with TinyGo's malloc that pointer is not
+// in any map of ours, which is why this reads memory instead of a table.
 func readString(ptr, n uint32) string {
-	if n == 0 {
+	if n == 0 || ptr == 0 {
 		return ""
 	}
-	b, ok := buffers[ptr]
-	if !ok {
-		return ""
-	}
-	return string(b[:n])
+	return string(unsafe.Slice((*byte)(unsafe.Pointer(uintptr(ptr))), n))
 }
 
 func pack(ptr, n uint32) uint64 { return uint64(n)<<32 | uint64(ptr) }

@@ -42,7 +42,11 @@ static const std::regex reTime(R"re(datetime="([^"]+)")re");
 static const std::regex reGenre(R"re(<a[^>]*href="/manhwa-genre/([^"/]+)/?"[^>]*>([^<]+)</a>)re");
 static const std::regex reOGImage(R"re(<meta[^>]*property="og:image"[^>]*content="([^"]+)")re");
 static const std::regex reOGDesc(R"re(<meta[^>]*property="og:description"[^>]*content="([^"]+)")re");
-static const std::regex reStatus(R"re(status[^<]{0,80}(ongoing|completed|hiatus|cancelled))re", std::regex::icase);
+// The value is not text after the label but tags: `<small>Status</small>
+// <strong class="ongoing"> Ongoing</strong>`. A `[^<]{0,N}` gap can never
+// cross `</small>`, so anchor on the structure (and avoid the lazy form that
+// hangs TinyGo's regexp engine in the Go twin).
+static const std::regex reStatus(R"re(status\s*</small>\s*<strong[^>]*>\s*(ongoing|completed|hiatus|cancelled))re", std::regex::icase);
 static const std::regex reImg(R"re(<img\b[^>]*>)re", std::regex::icase);
 
 // ─── helpers ────────────────────────────────────────────────────────────────

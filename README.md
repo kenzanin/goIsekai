@@ -340,14 +340,33 @@ ABI functions take one string arg and return `(string, error)`. Metadata lives i
 
 One folder per site under `app_data/plugins/<id>/` with `main.wasm` (or a single `<id>.wasm` at the plugins root), plus a `plugin.json` for metadata — every runtime reads metadata from there, so wasm needs no `Init`/`PLUGIN` export. The host runs the module with **wazero**; it must export `contract_version`, `Search`, `GetMangaDetail`, `GetChapterList`, `GetPageList`, and a `malloc`/`free` pair. Networking and the shared helper library go through the single `env.host_call` import (`env.host_http_request` remains for the raw HTTP ABI). See `docs/plugin-wasm-helpers.md` and `examples/plugins/wasm/` for full examples.
 
-The same source plugin (`manga_uno`) is implemented three times, so the size
-difference is measured rather than estimated:
+The same source plugin (`manga_uno`) is implemented for four backends, so the
+size difference is measured rather than estimated:
 
 | backend | size | notes |
 | --- | --- | --- |
 | **C++17** (wasi-sdk clang) | **108 KB** | no runtime, `-fno-exceptions -fno-rtti`; RapidJSON is header-only |
 | **Odin** (`-target:wasi_wasm32`) | **416 KB** | stdlib `core:encoding/json`; exports come free (no `-Wl,--export`) |
+| **TinyGo** (`-target wasi -buildmode=c-shared`) | **1.5 MB** | same Go source as below; runtime exports malloc/free itself |
 | **standard Go** (`-buildmode=c-shared`) | 3.7 MB | full Go runtime + reflection type table that DCE cannot strip |
+
+TinyGo is the cheapest way to shrink an *existing* Go plugin: the Go sources
+stay as they are, only the build changes. Measured across all eight Go
+plugins:
+
+| plugin | standard Go | TinyGo | saved |
+| --- | ---: | ---: | ---: |
+| `manga_uno` | 3,709,966 | 1,530,371 | 58% |
+| `reimanga_net` | 4,129,582 | 1,834,751 | 55% |
+| `mangak` | 4,223,419 | 1,899,228 | 55% |
+| `komix_to` | 4,337,955 | 2,110,343 | 51% |
+| `kunmanga_online` | 4,354,477 | 2,122,986 | 51% |
+| `mangakakalot` | 4,407,558 | 2,181,593 | 50% |
+| `manhawato` | 4,385,986 | 2,164,253 | 50% |
+| `ksgroupscans` | 4,427,832 | 2,186,868 | 50% |
+
+If a plugin is ever rewritten from scratch, C++ or Odin win on size by another
+order of magnitude — TinyGo only removes about half of the Go runtime.
 
 Standard Go (full runtime, `//go:wasmexport`/`//go:wasmimport`):
 
@@ -373,7 +392,7 @@ odin build . -target:wasi_wasm32 -no-entry-point -out:main.wasm
 TinyGo (smallest Go option; pin the toolchain per `tools/build-wasm.sh`):
 
 ```sh
-GOROOT=$HOME/.goup/go1.26.9 GOTOOLCHAIN=local \
+GOROOT=$HOME/.govman/versions/go1.26.9 GOTOOLCHAIN=local \
   tinygo build -target wasi -buildmode=c-shared -o main.wasm .
 ```
 
@@ -382,12 +401,19 @@ GOROOT=$HOME/.goup/go1.26.9 GOTOOLCHAIN=local \
 > `c-shared` emits the `_initialize` reactor the host loads. (2) Do **not**
 > declare `//go:wasmexport malloc`/`free` — TinyGo's runtime already exports
 > both, and a plugin that redeclares them aborts in `wasm-opt` with
-> `[parse exception: duplicate export name]`. Read the host's input buffer with
-> `unsafe.Slice` instead of the map-keyed-by-your-own-malloc trick the standard-Go
-> source uses, since the pointer comes from TinyGo's allocator. TinyGo 0.41 wants
-> Go ≤ 1.26, so `tools/build-wasm.sh` pins goup's `$HOME/.goup/go1.26.9`
-> (`GOTOOLCHAIN=local` + explicit `GOROOT`, otherwise `GOTOOLCHAIN=auto` silently
-> upgrades it back to 1.27 to satisfy `go.mod`).
+> `[parse exception: duplicate export name]`. Every Go plugin here therefore
+> keeps that pair in `abi_std.go` (`!tinygo`) and drops it in `abi_tinygo.go`
+> (`tinygo`), and `readString` reads linear memory with `unsafe.Slice` instead
+> of the map-keyed-by-your-own-malloc trick, which only works when the plugin
+> owns `malloc`. TinyGo wants Go ≤ 1.26, so `tools/build-wasm.sh` picks
+> `$HOME/.govman/versions/go1.26.9` (`GOTOOLCHAIN=local` + explicit `GOROOT`,
+> otherwise `GOTOOLCHAIN=auto` silently upgrades back to 1.27 to satisfy
+> `go.mod`).
+>
+> If TinyGo starts reporting `method Map.Clear already declared`, the install
+> is a half-finished upgrade: `0.43` moved `Clear` into `src/sync/map.go` but
+> a stale `src/sync/map_go123.go` from `0.41` still declares it too. Extract
+> the new tarball into a clean directory rather than on top of the old one.
 
 #### Authoring in Odin
 

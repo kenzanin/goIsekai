@@ -33,44 +33,21 @@ import (
 const siteURL = "https://www.mangakakalove.com"
 
 // ─── ABI memory ─────────────────────────────────────────────────────────────
-//
-// A wasip1 build exports no malloc/free, so the host reaches guest memory
-// through these two. Buffers stay referenced in the map so the collector
-// cannot reclaim them while the host still holds the pointer; the host frees
-// them through the free export.
-// ponytail: wasm32 keeps every heap address < 4 GiB, so uintptr -> uint32 is safe.
-
-var buffers = map[uint32][]byte{}
-
-//go:wasmexport malloc
-func malloc(n uint32) uint32 {
-	if n == 0 {
-		n = 1 // the host reads a zero pointer as allocation failure
-	}
-	b := make([]byte, n)
-	ptr := uint32(uintptr(unsafe.Pointer(&b[0])))
-	buffers[ptr] = b
-	return ptr
-}
-
-//go:wasmexport free
-func free(ptr uint32) { delete(buffers, ptr) }
+// malloc/free/allocCopy live in abi_std.go / abi_tinygo.go: TinyGo's runtime
+// already exports malloc/free, so that pair is selected by build tag.
 
 //go:wasmimport env host_call
 func hostCallRaw(ptr, length uint32) uint64
 
+// readString reads a string straight out of linear memory. The host allocates
+// the input buffer through the module's malloc and writes it there, so the
+// bytes are always live at ptr — and with TinyGo's malloc that pointer is not
+// in any map of ours, which is why this reads memory instead of a table.
 func readString(ptr, n uint32) string {
-	b, ok := buffers[ptr]
-	if !ok || uint32(len(b)) < n {
+	if n == 0 || ptr == 0 {
 		return ""
 	}
-	return string(b[:n])
-}
-
-func allocCopy(b []byte) uint32 {
-	ptr := malloc(uint32(len(b)))
-	copy(buffers[ptr], b)
-	return ptr
+	return string(unsafe.Slice((*byte)(unsafe.Pointer(uintptr(ptr))), n))
 }
 
 // pack combines pointer and length into the i64 the ABI returns.
