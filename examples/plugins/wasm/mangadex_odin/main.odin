@@ -175,9 +175,7 @@ At_Home_Resp :: struct {
 
 // ─── helpers ─────────────────────────────────────────────────────────────────
 
-url_encode :: proc (s: string) -> string {
-	return abi.host_str("text.url_encode", s)
-}
+url_encode :: proc (s: string) -> string { return abi.url_encode(s) }
 
 // decode_id unwraps the JSON the host passes the single-string ABI.
 decode_id :: proc (arg: string) -> string {
@@ -243,12 +241,7 @@ number :: proc (s: string) -> f64 {
 	return v
 }
 
-date_to_iso :: proc (s: string) -> string {
-	if s == "" {
-		return ""
-	}
-	return abi.host_str("text.date_to_iso", s)
-}
+date_to_iso :: proc (s: string) -> string { return abi.date_to_iso(s) }
 
 // manga_genres collects the tag names into a caller-owned array. The caller
 // must keep it alive until AFTER the reply is marshalled: `return

@@ -186,9 +186,7 @@ Pages_Resp :: struct {
 
 // ─── helpers ─────────────────────────────────────────────────────────────────
 
-url_encode :: proc (s: string) -> string {
-	return abi.host_str("text.url_encode", s)
-}
+url_encode :: proc (s: string) -> string { return abi.url_encode(s) }
 
 // decode_id unwraps the JSON the host passes the single-string ABI: a bare
 // quoted id or an object ({"id":..}) both end up as the string.
@@ -235,12 +233,7 @@ build_id :: proc () -> string {
 
 // date_to_iso normalises the site's timestamp; "" stays "" so the ABI omits
 // released_at rather than emitting an epoch.
-date_to_iso :: proc (s: string) -> string {
-	if s == "" {
-		return ""
-	}
-	return abi.host_str("text.date_to_iso", s)
-}
+date_to_iso :: proc (s: string) -> string { return abi.date_to_iso(s) }
 
 // ─── search ──────────────────────────────────────────────────────────────────
 

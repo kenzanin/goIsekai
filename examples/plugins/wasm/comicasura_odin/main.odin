@@ -43,48 +43,16 @@ import "core:strings"
 kSite :: "https://comicasura.net"
 kHeaders :: `{"Accept":"text/html,application/xhtml+xml","Referer":"https://comicasura.net/"}`
 
-url_encode :: proc (s: string) -> string {
-	return abi.host_str("text.url_encode", s)
-}
+url_encode :: proc (s: string) -> string { return abi.url_encode(s) }
 
 // find_all returns every match of a single-group pattern, in document order.
-find_all :: proc (subject, pattern: string) -> []string {
-	raw := abi.host_args("regex.find_all", {subject, pattern})
-	if raw == "" || raw == "null" {
-		return nil
-	}
-	out: []string
-	if json.unmarshal(transmute([]u8)raw, &out) != nil {
-		return nil
-	}
-	return out
-}
+find_all :: proc (subject, pattern: string) -> []string { return abi.find_all(subject, pattern) }
 
 // find_all_pairs returns every match of a two-group pattern.
-find_all_pairs :: proc (subject, pattern: string) -> [][]string {
-	raw := abi.host_args("regex.find_all", {subject, pattern})
-	if raw == "" || raw == "null" {
-		return nil
-	}
-	out: [][]string
-	if json.unmarshal(transmute([]u8)raw, &out) != nil {
-		return nil
-	}
-	return out
-}
+find_all_pairs :: proc (subject, pattern: string) -> [][]string { return abi.find_all_pairs(subject, pattern) }
 
 // find_one returns the first group of the first match, "" when absent.
-find_one :: proc (subject, pattern: string) -> string {
-	raw := abi.host_args("regex.find", {subject, pattern})
-	if raw == "" || raw == "null" {
-		return ""
-	}
-	v: string
-	if json.unmarshal(transmute([]u8)raw, &v) != nil {
-		return ""
-	}
-	return strings.trim_space(v)
-}
+find_one :: proc (subject, pattern: string) -> string { return abi.find_one(subject, pattern) }
 
 // basename_slug pulls "<slug>" out of ".../thumb/<slug>.webp".
 basename_slug :: proc (url: string) -> string {
@@ -325,17 +293,7 @@ chapters_impl :: proc (arg: string) -> string {
 }
 
 // host_num reads a numeric answer from a host helper.
-host_num :: proc (fn: string, arg: string) -> f64 {
-	raw := abi.host_args(fn, {arg})
-	if raw == "" {
-		return 0
-	}
-	v: f64
-	if json.unmarshal(transmute([]u8)raw, &v) != nil {
-		return 0
-	}
-	return v
-}
+host_num :: proc (fn: string, arg: string) -> f64 { return abi.host_num(fn, arg) }
 
 // ─── pages ───────────────────────────────────────────────────────────────────
 

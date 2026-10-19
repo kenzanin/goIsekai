@@ -49,9 +49,7 @@ cdn :: proc (raw: string) -> string {
 	return strings.concatenate({kCDN, "/", p})
 }
 
-url_encode :: proc (s: string) -> string {
-	return abi.host_str("text.url_encode", s)
-}
+url_encode :: proc (s: string) -> string { return abi.url_encode(s) }
 
 // parse_time converts to RFC3339 in UTC via the host; "" stays "".
 parse_time :: proc (s: string) -> string {

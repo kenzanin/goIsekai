@@ -2,6 +2,91 @@
 
 ## 2026-10-19
 
+- **Normalized the duplicated Odin host-helper wrappers into `abi/`** (8 plugins,
+  `examples/plugins/wasm/*_odin/`). Each `main.odin` used to re-declare the same
+  ~10 wrappers, so every new port rewrote the `[]string` vs `[][]string` JSON
+  branching. 13 procs (`url_encode` — 8 identical copies, 31 call sites;
+  `find_all`, `find_all_pairs`, `find_one`, `find_text`, `find_attr`,
+  `find_list_text`, `find_list_attr`, `sub`, `date_to_iso`, `host_num`,
+  `chapter_num`, `sanitize_title`) now live once in `abi/wasm_abi.odin`, and each
+  plugin keeps a **one-line delegator** so no call site changed.
+  `decode_id` (4 shapes), `normalize_status` (4) and `parse_time` (2) are
+  deliberately left local — they genuinely differ per site.
+  **`using import` is not allowed by Odin** (`'using import' is not allowed,
+  please use the import name explicitly`), so an unqualified name cannot be
+  imported into a plugin's scope — but a **proc alias** works, which is what
+  keeps the local names and the zero-churn property.
+  `find_all` / `find_all_pairs` stay separate because the host answers a
+  1-capture pattern as a flat array and a multi-capture pattern as an
+  array-of-arrays; the wrong shape is a **hard** `Unsupported_Type_Error`, not a
+  silent zero.
+  Kept one `abi/` copy per plugin directory (8 identical copies, one md5) rather
+  than a shared `wasm/abi/`: a shared import would force every `build.sh` and
+  import line to change for no gain given `using import` is out.
+  **Behaviour proof:** the right A/B for a pure refactor is wasm-before vs
+  wasm-after, not wasm-vs-Lua (the ports already carry intentional gains —
+  `chapter_num` 0→N, `manga_id` `''`→id). With `plugin_cache` cleared and the
+  host restarted, `weebcentral` returns **search IDENTICAL (5124 B), detail
+  IDENTICAL (782 B), chapters IDENTICAL (101974 B)** →
+  `normalization is behaviour-preserving`. All 8 rebuild and pass `build.sh`
+  export validation; `CGO_ENABLED=0 go test ./internal/pluginmanager` green.
+  One deliberate delta: canonical `host_num` adds `|| raw == "null"` —
+  behaviourally identical (`null` fails the `f64` unmarshal either way → 0).
+
+- **Ported `mangafire` Lua → Odin wasm** (`examples/plugins/wasm/mangafire_odin/`,
+  428 KB). First Odin port to use `crypto.vrf_sign` (a runtime row taking JSON),
+  so it also proves that path works from wasm. Chosen over `mangatown` because it
+  is the only remaining candidate with **0 `gmatch`** — every other candidate
+  needs 4-8 `gmatch` call sites rewritten to `regex.find_all`, and `gmatch` is
+  the documented `wasmHelperGaps` entry. Swapped in `app_data/plugins/mangafire/`
+  under the same id and name; the Lua original (`main.lua` + `helpers.lua`)
+  stays in `examples/plugins/lua/mangafire/` untouched.
+  A/B with `plugin_cache` cleared: `detail` identical on every field, `chapters`
+  79/79 with identical id set and identical `chapter_num` sequence (79/79
+  `released_at` filled), `pages` 142 URLs carrying the required `Referer`.
+  **Three traps, all of which cost iterations.**
+  (1) **`strings.to_string(sb)` does not copy** — returning it while
+  `defer strings.builder_destroy(&sb)` is armed hands the caller freed memory.
+  The symptom is silent: the URL prints correctly, the fetch fails inside wasm,
+  and the endpoint answers `[]` with nothing in the host log. The builder is now
+  owned by the caller.
+  (2) **JSON struct fields must be exported.** Lowercase `items`/`meta`/`hid`
+  make unmarshal skip those fields with no error at all, so `len(resp.items)==0`
+  and search returns `[]`. Same symptom as (1), different bug — instrument before
+  guessing.
+  (3) **`slice.sort_by` is not stable**; `slice.stable_sort_by` preserves source
+  order for ties (`chapter_num` 37.1 vs 37.1 previously shuffled positions).
+  A/B also exposed **two bugs in the Lua original**, which the port deliberately
+  does not copy: Lua reads `meta.last_page`/`meta.has_next` and `c.created_at`
+  (snake_case) while the API sends `lastPage`/`hasNext`/`createdAt` (camelCase),
+  so Lua stopped after page 1 (50 results vs 479) and emitted
+  `0001-01-01T00:00:00Z` for every chapter date. Lesson recorded: A/B is not
+  "match Lua" — a correct port looks *different* when Lua's bug was masked by a
+  default, so check the raw API payload first.
+
+- **Ported `weebcentral` Lua → Odin wasm** (`examples/plugins/wasm/weebcentral_odin/`,
+  417 KB). First Odin port of an HTML+HTMX source: it uses the `html.*` group
+  plus `regex.find/find_all/replace`. Swapped in `app_data/plugins/weebcentral/`
+  under the **same plugin id and `plugin.json` name**, and the Lua original stays
+  in `examples/plugins/lua/weebcentral/` untouched (examples/ is an archive —
+  only `app_data/` swaps runtimes). A/B against the Lua baseline: `search` 32/32
+  identical (id+title+cover), `detail` identical on every field, `chapters`
+  574/574 identical on id+title+`released_at`. One deliberate improvement:
+  `chapter_num` now 574/574 filled where Lua left every row 0; chapter IDs are
+  unchanged so reading progress survives.
+  **Two traps worth remembering.** (1) **Lua regex is not portable to RE2 as-is:
+  Lua's `.` matches newline, RE2's does not.** The chapter row text wraps across
+  lines, so `\s*Last Read.*$` worked in Lua and matched *nothing* in RE2, leaking
+  the whole raw multi-line row into the title — fixed with `(?s)`. Caught only by
+  comparing all 574 titles, not a sample. (2) **`plugin_cache` makes a port look
+  broken.** After the swap `/chapters` still served the cached **Lua** payload (5
+  `GetChapterList` rows), so `chapter_num` read 0/574 and I nearly filed it as an
+  Odin bug — a host probe proved `text.chapter_num` returns 1/12.5/3 correctly.
+  Always `DELETE FROM plugin_cache WHERE plugin_id='<id>';` **before** A/B.
+  Also recorded in concept/odin-wasm-plugin-port-candidates.md why `zeroscann`
+  (site 500, needs PHP 8) and `valirscans` (returns null) were rejected: check
+  the site before porting, helper ranking alone picks dead sources.
+
 - Added concept/host-helper-surface-registry.md: every runtime used to hardcode
   its own helper list (lua_natives.go, js_natives.go, wasm_host_call.go's six
   per-kind maps, yaegi_host.go) and nothing compared them, so JS had silently

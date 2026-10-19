@@ -23,6 +23,7 @@ package abi
 import "base:runtime"
 import "core:encoding/json"
 import "core:mem"
+import "core:strings"
 
 // env.host_call(ptr, length) -> packed i64 (low 32 = pointer, high 32 = length).
 foreign import env "env"
@@ -182,4 +183,176 @@ to_json :: proc (v: any) -> string {
 		return ""
 	}
 	return string(data)
+}
+
+// ─── shared host-helper wrappers ─────────────────────────────────────────────
+//
+// Every Odin plugin used to re-declare these in its own main.odin. They are
+// generic (no site knowledge) and were byte-identical wherever duplicated, so
+// they live here once. Call them qualified: `abi.find_all(...)`, the same style
+// as abi.host_str / abi.http_body above.
+//
+// `using import "abi"` is NOT allowed by Odin, so an unqualified name cannot be
+// imported into a plugin's scope — qualification is the only option.
+//
+// Site-specific helpers are deliberately NOT here: `decode_id` (4 shapes),
+// `normalize_status` (4 shapes, one reimplements the vocabulary) and
+// `parse_time` (2 shapes) genuinely differ per plugin and stay local.
+
+// url_encode percent-encodes through the host (text.url_encode).
+url_encode :: proc (s: string) -> string {
+	return host_str("text.url_encode", s)
+}
+
+// find_one returns the first capture of the first match, trimmed; "" on no
+// match. Mirrors host.regex.find.
+find_one :: proc (subject, pattern: string) -> string {
+	raw := host_args("regex.find", {subject, pattern})
+	if raw == "" || raw == "null" {
+		return ""
+	}
+	v: string
+	if json.unmarshal_string(raw, &v) != nil {
+		return ""
+	}
+	return strings.trim_space(v)
+}
+
+// find_all returns the first capture of every match, in document order.
+//
+// The host answers a ONE-capture pattern as a flat array and a multi-capture
+// pattern as an array of arrays (see wasmRegexRow host-side). Overloading one
+// name on that shape is the documented wasm substitute for Lua's `gmatch`
+// iterator: `for row in abi.find_all(html, pat)` replaces
+// `for x in host.regex.gmatch(html, pat)`.
+//
+// Unmarshalling a multi-capture answer here is a HARD error, not a silent zero:
+// Odin rejects `[...]` into `[]string` with Unsupported_Type_Error. Pick
+// find_all vs find_all_pairs to match the pattern's capture count.
+find_all :: proc (subject, pattern: string) -> []string {
+	raw := host_args("regex.find_all", {subject, pattern})
+	if raw == "" || raw == "null" {
+		return nil
+	}
+	out: []string
+	if json.unmarshal_string(raw, &out) != nil {
+		return nil
+	}
+	return out
+}
+
+// find_all_pairs returns every match of a TWO-or-more capture pattern as one
+// row per match. See find_all for why the two shapes are separate functions.
+find_all_pairs :: proc (subject, pattern: string) -> [][]string {
+	raw := host_args("regex.find_all", {subject, pattern})
+	if raw == "" || raw == "null" {
+		return nil
+	}
+	out: [][]string
+	if json.unmarshal_string(raw, &out) != nil {
+		return nil
+	}
+	return out
+}
+
+// sub replaces every match of pattern, returning the subject unchanged when the
+// helper is unavailable. Mirrors host.regex.replace.
+sub :: proc (subject, pattern, repl: string) -> string {
+	raw := host_args("regex.replace", {subject, pattern, repl})
+	if raw == "" || raw == "null" {
+		return subject
+	}
+	v: string
+	if json.unmarshal_string(raw, &v) != nil {
+		return subject
+	}
+	return v
+}
+
+// ─── html.* (markup in, no document handle) ─────────────────────────────────
+// In wasm the html helpers are stateless: html.parse only validates the markup
+// and hands the same string back, so each find_* takes the markup as its first
+// argument and no document is carried around.
+
+find_text :: proc (markup, css: string) -> string {
+	raw := host_args("html.find_text", {markup, css})
+	if raw == "" || raw == "null" {
+		return ""
+	}
+	v: string
+	if json.unmarshal_string(raw, &v) != nil {
+		return ""
+	}
+	return strings.trim_space(v)
+}
+
+find_attr :: proc (markup, css, attr: string) -> string {
+	raw := host_args("html.find_attr", {markup, css, attr})
+	if raw == "" || raw == "null" {
+		return ""
+	}
+	v: string
+	if json.unmarshal_string(raw, &v) != nil {
+		return ""
+	}
+	return strings.trim_space(v)
+}
+
+find_list_text :: proc (markup, css: string) -> []string {
+	raw := host_args("html.find_list_text", {markup, css})
+	if raw == "" || raw == "null" {
+		return nil
+	}
+	out: []string
+	if json.unmarshal_string(raw, &out) != nil {
+		return nil
+	}
+	return out
+}
+
+find_list_attr :: proc (markup, css, attr: string) -> []string {
+	raw := host_args("html.find_list_attr", {markup, css, attr})
+	if raw == "" || raw == "null" {
+		return nil
+	}
+	out: []string
+	if json.unmarshal_string(raw, &out) != nil {
+		return nil
+	}
+	return out
+}
+
+// ─── text.* / numeric answers ───────────────────────────────────────────────
+
+// date_to_iso converts a unix-seconds string to RFC3339 via the host; "" stays
+// "" so a missing date never becomes the 1970 timestamp.
+date_to_iso :: proc (s: string) -> string {
+	if s == "" {
+		return ""
+	}
+	return host_str("text.date_to_iso", s)
+}
+
+// host_num reads a numeric answer from any one-argument host helper (0 when the
+// call fails or the answer is not a number).
+host_num :: proc (fn: string, arg: string) -> f64 {
+	raw := host_args(fn, {arg})
+	if raw == "" || raw == "null" {
+		return 0
+	}
+	v: f64
+	if json.unmarshal_string(raw, &v) != nil {
+		return 0
+	}
+	return v
+}
+
+// chapter_num extracts a chapter number from a title/slug (0 when absent).
+chapter_num :: proc (title: string) -> f64 {
+	return host_num("text.chapter_num", title)
+}
+
+// sanitize_title unescapes entities then trims.
+sanitize_title :: proc (s: string) -> string {
+	return strings.trim_space(host_str("text.unescape", s))
 }

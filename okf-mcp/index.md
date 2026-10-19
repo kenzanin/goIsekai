@@ -14,7 +14,7 @@ Progressive disclosure index for this OKF bundle.
 * [Reader loading cancel fix](concept/reader-loading-cancel-fix.md) - AbortController-based cancel during reader loading; nav bar visible, spinner flash prevented
 * [library_fts index sync and auto-heal](concept/library-fts-index-sync.md) - FTS5 sync choke points, CAST key-comparison fix, drift-check auto-heal, scalability ceiling
 * [Wasm plugin local helpers decision](concept/wasm-plugin-local-helpers-decision.md) - Why wasm hot paths keep local helpers instead of per-row hostCall
-* [Odin WASM plugin port candidates](concept/odin-wasm-plugin-port-candidates.md) - Lua-to-Odin migration tiers, built plugins, live A/B, and the next candidate to port
+* [Odin WASM plugin port candidates](concept/odin-wasm-plugin-port-candidates.md) - Lua-to-Odin migration tiers, 8 built plugins, live A/B, rejected dead sources, the Lua-regex/RE2, plugin_cache, dangling-builder and unexported-JSON traps, and the abi/ host-helper normalization (13 wrappers, one-line delegators, behaviour-preserving)
 * [Host helper surface registry](concept/host-helper-surface-registry.md) - One Go table now defines every plugin-callable helper; lua/js/wasm read it, closing the JS text.trim/unescape/lua_escape drift
 * [C++ WASM plugin toolchain (wasi-sdk) and binary-size comparison](concept/wasm-cpp-plugin-toolchain.md) - wasi-sdk clang++ reactor build, RapidJSON, shared headers, host-helper migration, and C++/TinyGo/standard-Go size measurements
 * [Session dailies 2026-08-29 to 2026-09-30](concept/session-dailies-2026-08-29-to-09-30.md) - Roll-up of 8 daily scratchpads: tls-client migration, image burst pacing root cause, wasm ports, decimal-chapter audit, FanFox findings

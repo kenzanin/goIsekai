@@ -143,9 +143,7 @@ Genres_Resp :: struct {
 
 // ─── helpers ─────────────────────────────────────────────────────────────────
 
-url_encode :: proc (s: string) -> string {
-	return abi.host_str("text.url_encode", s)
-}
+url_encode :: proc (s: string) -> string { return abi.url_encode(s) }
 
 // decode_id unwraps the JSON the host passes the single-string ABI: a bare
 // quoted id ("46959") or an object ({"id":"46959"}) both end up as "46959".

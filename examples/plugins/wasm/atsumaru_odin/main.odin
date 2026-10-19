@@ -55,22 +55,10 @@ image_url :: proc (path: string) -> string {
 	return strings.concatenate({kCDN, "/static/", p})
 }
 
-url_encode :: proc (s: string) -> string {
-	return abi.host_str("text.url_encode", s)
-}
+url_encode :: proc (s: string) -> string { return abi.url_encode(s) }
 
 // host_num reads a numeric answer from a host helper (text.chapter_num).
-host_num :: proc (fn: string, arg: string) -> f64 {
-	raw := abi.host_args(fn, {arg})
-	if raw == "" {
-		return 0
-	}
-	v: f64
-	if json.unmarshal(transmute([]u8)raw, &v) != nil {
-		return 0
-	}
-	return v
-}
+host_num :: proc (fn: string, arg: string) -> f64 { return abi.host_num(fn, arg) }
 
 // parse_time converts a unix value to RFC3339. The site reports createdAt in
 // milliseconds while the host helper wants seconds, hence the /1000 at the call
