@@ -2,6 +2,24 @@
 
 ## 2026-10-20
 
+- **Enrichment (info) scripts now run as Odin wasm**, and the plugins page lists
+  them. The "info scripts can't be wasm" answer was wrong on three of four
+  counts: the helper surface (`json`, `http`, `text`, `log`) was already complete
+  and already dispatched by the wasm host. The real blocker was discovery, which
+  built the entry as `main.lua` and hardcoded `kind: "lua"`. It now globs the
+  folder and picks the entry by existence (`main.wasm` wins, matching plugin
+  discovery), and an `info:` id requires `GetEnrichment` instead of the scraper
+  ABI. Both installed scripts ported, source in `examples/info/*_wasm`; A/B
+  against the Lua originals came back byte-identical on all six kinds
+  (mangadex 11/1/4/3/22/9, mangaupdates 11/1/7/4/5/1).
+  Detail: `concept/info-scripts-as-odin-wasm.md`.
+
+- **Bug found in the mangaupdates Lua while A/B-ing:** it only ran
+  `variantMatch(record.title)`, which needs 3+ tokens, and never compared
+  `record.title` for exact equality (only `associated[]` got that check). So
+  `"Solo Leveling"` — a title the API returns verbatim — yielded 0 items for
+  every kind. The wasm port adds the exact comparison.
+
 - **Fixed bulk "set this and before/after as read" marking the whole manga**
   (`internal/database/chapters_read.go`). `setChaptersToBound` filtered on
   `chapter_num` alone, but `comizy` ships **no chapter numbers**, so all 7 rows

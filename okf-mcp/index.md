@@ -32,3 +32,4 @@ Progressive disclosure index for this OKF bundle.
 * [Home reload NS_BINDING_ABORTED (saved-filter redirect)](concept/home-reload-ns-binding-aborted.md) - Why Firefox cancels plugin logo/favicon requests on a library reload (the client-side `location.replace()` that restores the saved filter), why a manual request still returns 200, and the unfixed fix options
 
 * [Chapter bound with chapter_num 0](concept/chapter-bound-zero-chapter-num.md) - Why bulk "set this and before/after as read" marked the whole manga: chapter_num alone is not a key, (chapter_num, id) lexicographic bound fixes comizy-style all-zero sources
+* [Info scripts as Odin wasm](concept/info-scripts-as-odin-wasm.md) - Enrichment scripts run as wasm: the helper surface was already complete, discovery's hardcoded main.lua was the real blocker, required exports switch on the info: prefix, and a Lua-only title-matching bug the port fixed
