@@ -16,9 +16,11 @@
 //
 // Four behaviours are load-bearing and copied from the Lua source, not guessed:
 //
-//  1. `hrefs` carries TWO anchors per card (picture + title) while `imgs` has
-//     ONE per card, so covers are aligned by unique-ULID position, never by
-//     zipping the two lists. Zipping shifts every cover onto the wrong title.
+//  1. `hrefs` carries TWO anchors per card (picture + title) and `imgs` TWO
+//     <img> per card (a desktop and a mobile variant of the same cover), so
+//     covers are matched to their card by the ULID the cover URL carries —
+//     never by position. A positional zip put every cover on the previous
+//     card's title.
 //  2. The clean title lives in `a.line-clamp-1`; the picture anchor's text is
 //     badge noise ("Official..."). Titles never come from the picture anchor.
 //  3. `/full-chapter-list` is newest-first; the reader wants ascending, so the
@@ -164,8 +166,10 @@ search_impl :: proc (arg: string) -> string {
 		}
 	}
 
-	// hrefs has two anchors per card, imgs one: index covers by unique-ULID
-	// position, never by href position.
+	// Every card renders TWO <img> (a desktop and a mobile variant of the same
+	// cover), so covers must NOT be zipped with the card list by position:
+	// that put every cover on the PREVIOUS card's title. The cover URL
+	// carries the series ULID, so a cover is matched to its card by identity.
 	out := make([dynamic]Manga_Out, 0, len(hrefs))
 	defer delete(out)
 	seen := make(map[string]bool)
@@ -176,10 +180,7 @@ search_impl :: proc (arg: string) -> string {
 			continue
 		}
 		seen[ulid] = true
-		cover := ""
-		if len(out) < len(imgs) {
-			cover = imgs[len(out)]
-		}
+		cover := cover_for(imgs, ulid)
 		title, ok_t := clean[ulid]
 		if !ok_t || title == "" {
 			title = ulid
@@ -187,6 +188,22 @@ search_impl :: proc (arg: string) -> string {
 		append(&out, Manga_Out{ID = ulid, Title = title, Cover_URL = cover})
 	}
 	return abi.to_json(out[:])
+}
+
+// cover_for returns the cover image belonging to one series, matched by the
+// ULID the cover URL carries. Identity beats position here: the page renders
+// more than one <img> per card, so a positional zip misplaces every cover.
+//
+// ponytail: the ULID in the cover URL is a property of the CDN's URL scheme.
+// If it ever goes away the cover comes back empty and the title stays right —
+// upgrade path: fall back to one img per picture anchor.
+cover_for :: proc (imgs: []string, ulid: string) -> string {
+	for src in imgs {
+		if strings.contains(src, ulid) {
+			return src
+		}
+	}
+	return ""
 }
 
 // ─── detail ──────────────────────────────────────────────────────────────────

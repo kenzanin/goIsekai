@@ -78,19 +78,28 @@ function search_manga(arg)
         end
     end
 
-    -- hrefs carries 2 anchors per card (picture + title) while imgs has
-    -- 1 per card, so never index imgs by the href position. Collect
-    -- unique ULIDs in card order, align covers by card position.
+    -- hrefs carries 2 anchors per card (picture + title) and imgs carries
+    -- 2 <img> per card (a desktop and a mobile variant of the same cover),
+    -- so covers must NEVER be zipped with the card list by position: that
+    -- put every cover on the PREVIOUS card's title. The cover URL carries
+    -- the series ULID, so a cover is matched to its card by identity.
     local out = {}
-    local idx = {}
+    local seen = {}
     for _, href in ipairs(hrefs) do
         local ulid = href:match("/series/([^/?#]+)")
-        if ulid and not idx[ulid] then
-            idx[ulid] = #out + 1
+        if ulid and not seen[ulid] then
+            seen[ulid] = true
+            local cover = ""
+            for _, src in ipairs(imgs) do
+                if src:find(ulid, 1, true) then
+                    cover = src
+                    break
+                end
+            end
             out[#out + 1] = {
                 id = ulid,
                 title = clean[ulid] or ulid,
-                cover_url = imgs[#out + 1] or "",
+                cover_url = cover,
             }
         end
     end
