@@ -85,9 +85,14 @@ type Manager struct {
 	plugins map[string]*loadedPlugin
 	// runtime is the shared wazero runtime for all wasm plugins, lazily
 	// created by ensureWasmRuntime and closed by Close.
-	runtime wazero.Runtime
-	onLoad  func(id string)  // called after first successful load
-	enrich  *enrich.Registry // optional enrichment registry; plugin providers registered on load
+	//
+	// runtimeMu guards it separately from mu: ensureWasmRuntime is reached
+	// from Install and LoadPlugin, which already hold mu, and sync.RWMutex is
+	// not reentrant — taking it again self-deadlocks the host.
+	runtimeMu sync.Mutex
+	runtime   wazero.Runtime
+	onLoad    func(id string)  // called after first successful load
+	enrich    *enrich.Registry // optional enrichment registry; plugin providers registered on load
 
 	// db is the database handle for caching plugin responses.
 	db *database.DB

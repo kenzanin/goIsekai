@@ -117,6 +117,11 @@ func (m *Manager) Close() error {
 			_ = p.lunar.Close()
 		}
 	}
+	// runtimeMu, not mu: the wasm runtime is created under runtimeMu by
+	// ensureWasmRuntime, so the same lock guards it here. Lock order stays
+	// mu -> runtimeMu, the same order every other path uses.
+	m.runtimeMu.Lock()
+	defer m.runtimeMu.Unlock()
 	if m.runtime != nil {
 		_ = m.runtime.Close(m.ctx)
 		m.runtime = nil

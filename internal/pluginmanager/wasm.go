@@ -37,9 +37,13 @@ var wasmInfoRequiredFns = []string{types.GetEnrichmentFunc}
 // ensureWasmRuntime lazily creates the shared wazero runtime once,
 // instantiating WASI and the host module ("env" exporting host_http_request and
 // the generic host_call that reaches every Lua/JS host helper).
+//
+// It takes runtimeMu, NOT mu: the callers (Install, LoadPlugin) already hold
+// mu, and sync.RWMutex is not reentrant, so taking mu again here would
+// self-deadlock the host on every wasm plugin install.
 func (m *Manager) ensureWasmRuntime() (wazero.Runtime, error) {
-	m.mu.Lock()
-	defer m.mu.Unlock()
+	m.runtimeMu.Lock()
+	defer m.runtimeMu.Unlock()
 	if m.runtime != nil {
 		return m.runtime, nil
 	}
