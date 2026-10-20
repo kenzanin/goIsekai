@@ -9,8 +9,15 @@ tags: [goisekai, plugin, wasm, cpp, wasi-sdk, rapidjson, tinygo, build, size]
 
 Achievement: goIsekai WASM plugins can now be written in **C++17** and built with
 the system **wasi-sdk** clang, alongside the Go (`//go:wasmexport`) path. Shipped:
-`examples/plugins/wasm/komix_to_cpp/` and `examples/plugins/wasm/manhawato_cpp/`
-(the latter replaces the Go wasm in `app_data/plugins/manhawato/`). Commit `a628bd5`.
+`examples/plugins/wasm/komix_to_cpp/` and `examples/plugins/wasm/manhawato_cpp/`.
+Commit `a628bd5`.
+
+**Koreksi 2026-10-20:** dokumen ini dulu menyatakan `manhawato_cpp` "replaces the
+Go wasm in `app_data/plugins/manhawato/`". Itu **tidak benar**. `md5sum` membuktikan
+`app_data/plugins/manhawato/main.wasm` identik dengan versi **Go**
+(`556a3890…` vs C++ `aca7086b…`), dan ukurannya 2 164 283 vs 306 538 bytes. Jadi
+belum ada satu pun C++ twin yang benar-benar dipasang; ketujuhnya masih berupa
+build di `examples/` tanpa bukti A/B live sebagai plugin terpasang.
 
 ## Toolchain
 

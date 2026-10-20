@@ -1,0 +1,9 @@
+{
+  "verify_url": "https://violetmanga.com",
+  "thumb_ratio": 0.667,
+  "name": "VioletManga",
+  "site_url": "https://violetmanga.com",
+  "logo": "logo.png",
+  "contract_version": 1,
+  "built_with": "odin dev-2026-10:84bc3fc21"
+}

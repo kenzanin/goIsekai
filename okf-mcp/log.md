@@ -1,5 +1,66 @@
 # Bundle Update Log
 
+## 2026-10-20
+
+- **Ported `violetmanga` Lua → Odin wasm** (`examples/plugins/wasm/violetmanga_odin/`,
+  301 KB). Smallest remaining candidate (174 LOC). The Lua header claims the
+  reader needs `host.browser.evaluate`, but that plugin **never calls it** — the
+  page list is already in the served HTML inside `ts_reader.run({...})`, so all
+  five endpoints are plain HTTP. A/B with `plugin_cache` cleared: **search
+  identical (2386 B), detail identical (1077 B), pages identical (1125 B)**,
+  chapters 13/13 with identical id+title+url; only `chapter_num` changes (0→13..1),
+  the same deliberate addition as earlier ports (Lua leaves it unset, so every
+  chapter sorted as 0). Swapped in `app_data/plugins/violetmanga/` under the same
+  id and name; the Lua original stays in `examples/plugins/lua/violetmanga/`.
+  **Two traps.** (1) The first build dropped `author` because the Lua comment
+  says the site has no mangaka — but A/B showed Lua emitting
+  `"author":"Serab"` from `.imptdt span.author i`. Lesson: trust the payload, not
+  the source comment. (2) Chapter ids contain `/` (`/slug-chapter-N/`) because
+  the reader route URL-encodes them, so the sandbox `pages/{chapterID}` route
+  (one chi segment) returns `404 page not found` unless the id is URL-encoded.
+  That is a sandbox-route limit, not a plugin bug.
+  `CGO_ENABLED=0 go test ./internal/pluginmanager` green
+  (`TestJSInvokeDeadlineCancelsBlockingFetch` flakes under full-suite load —
+  passes 3/3 alone, suite green with it skipped).
+- **Re-surveyed what is left to migrate, and corrected three claims that had gone
+  stale.** Findings only — no plugin was ported or swapped in this pass.
+  (1) **"Semua `gmatch` itu `host.regex.gmatch`" is wrong.** There are 4 native
+  `gmatch` sites (`1manga:103`, `mangahub:97`, `violetmanga:164`,
+  `weebcentral:116`), and `weebcentral` — already ported — proves it is a
+  non-issue: Lua `body:gmatch('id="tag-([^"]+)"')` became Odin
+  `find_all(body, 'id="tag-([^"]+)"')`, same pattern, one line. What actually
+  matters is the **output shape per capture count** (`pluginutil.RegexFindAll`
+  + `wasmRegexRow`): 0 captures → one-element row (whole match), 1 → flat
+  `[]string`, N → `[][]string`. With `abi.find_all` / `abi.find_all_pairs`
+  centralized, that rewrite now costs **zero helper lines**.
+  (2) **Tier B was mislabelled.** `violetmanga` and `mangataro` never call
+  `host.browser.*` — the word `browser` only appears in comments. Both are pure
+  `host.html.*` + `http.get_body` + `json.*`. So `violetmanga` (174 LOC) is the
+  **smallest remaining candidate** and had never been in the Tier-A table at all.
+  `comix` is now the only true `browser.*` user, so that path still has no live
+  Odin proof.
+  (3) **`kaliscan` is dead** (`kaliscan.me` and `kaliscan.io` both return `000`),
+  so it joins `zeroscann`/`valirscans` in the rejected table.
+  Corrected shortlist: **`violetmanga` → `dynastyscan` → `mangataro` →
+  `lhtranslation` → `mangakatana`**. `mangataro` needs a wall clock and
+  `os.time()` is not in the wasm surface; probe confirms
+  `time.time_to_unix(time.now())` builds for `wasi_wasm32`.
+- **Found a bigger opportunity than any Lua port: 7 TinyGo plugins whose C++
+  twins are already built but not installed.** `komix_to`, `mangak`,
+  `ksgroupscans`, `kunmanga_online`, `mangakakalot`, `manhawato`, `reimanga_net`
+  are still Go in `app_data/` (14 500 052 B total) while their `_cpp` builds sit
+  ready in `examples/` (2 012 491 B total) — **7.2× smaller, no new code**.
+  `reimanga_net` alone is 17.2× (1 834 751 → 106 986).
+  **Correction to `wasm-cpp-plugin-toolchain.md`:** it claimed `manhawato_cpp`
+  "replaces the Go wasm in `app_data/plugins/manhawato/`". `md5sum` disproves it
+  — the installed file (`556a3890…`, 2 164 283 B) is identical to the Go build,
+  not the C++ one (`aca7086b…`, 306 538 B). No C++ twin has ever been installed,
+  and none has live A/B proof. Swapping one requires the usual port procedure
+  (clear `plugin_cache`, then compare search/detail/chapters/pages).
+  Size picture that decides Odin-vs-C++ for the rest: Odin ~416 KB, C++ ~313 KB,
+  TinyGo ~2.1 MB — so for plugins with **no** twin, Odin stays preferable (no
+  wasi-sdk, one build command, shared `abi/`).
+
 ## 2026-10-19
 
 - **Normalized the duplicated Odin host-helper wrappers into `abi/`** (8 plugins,

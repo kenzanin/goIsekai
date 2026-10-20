@@ -33,6 +33,37 @@ Status: **8 plugin sudah diport ke Odin** dan diverifikasi live. Data dari scan
 | `mangafire` | 428 KB | `crypto.vrf_sign`, `text.url_encode`, `text.unescape`, `text.strip_html`, `text.normalize_status`, `text.date_to_iso`, `http_body` | detail identical, chapters 79/79 set+num identical, search superset |
 | `manga_uno` | 416 KB | `text.url_encode`, `text.normalize_status`, `text.date_to_iso`, `http_body` | A/B identical |
 | `weebcentral` | 417 KB | `html.*`, `regex.find/find_all/replace`, `text.url_encode`, `text.normalize_status`, `text.chapter_num` | search 32/32 + detail all fields + chapters 574/574 identical |
+| `violetmanga` | 301 KB | `html.find_*`, `regex.find/find_all/replace`, `text.url_encode`, `text.normalize_status` | search 2307 B + detail all fields + pages identical; chapters 13/13 id+title identical, `chapter_num` 0→13..1 |
+
+### violetmanga (port 2026-10-20) — bukti A/B
+
+Kandidat terkecil yang tersisa (174 LOC). A/B dengan `plugin_cache` dibersihkan:
+
+| endpoint | hasil |
+| --- | --- |
+| search | **IDENTICAL** (2386 B) |
+| detail | **IDENTICAL** (1077 B) |
+| pages | **IDENTICAL** (1125 B) |
+| chapters | 13/13 id + title + url identical; `chapter_num` 0→13..1 |
+
+`chapter_num` adalah tambahan sengaja (Lua tidak mengisinya sama sekali sehingga
+semua chapter tersortir sebagai 0), pola yang sama dengan port sebelumnya.
+
+**Dua jebakan yang ditemukan saat port ini:**
+
+1. **`author` sempat hilang dan A/B yang menangkapnya.** Komentar Lua bilang situs
+   hanya punya "uploader, bukan mangaka", jadi versi pertama sengaja
+   mengosongkan `author`. A/B menunjukkan Lua mengirim `"author":"Serab"` —
+   selector `.imptdt span.author i` memang menghasilkan nilai. **Jangan percaya
+   komentar sumber; percaya payload A/B.** Sudah diperbaiki dan detail jadi
+   identical.
+2. **Id chapter mengandung `/`, jadi route sandbox `pages/{chapterID}` (satu
+   segmen chi) hanya bisa diuji dengan URL-encode.** `curl .../pages/<id>`
+   mentah membalas `404 page not found` — itu batasan route sandbox, bukan bug
+   plugin. Pakai `python3 -c "urllib.parse.quote(id, safe='')"`. `id` sendiri
+   **harus** tetap relative path (`/slug-chapter-N/`) karena route reader
+   meng-URL-encode-nya; menyimpan URL absolut akan merusaknya.
+
 
 ### weebcentral (port 2026-10-19) — bukti A/B
 
@@ -96,40 +127,104 @@ LOC di bawah adalah **total `*.lua` di folder plugin**, bukan hanya `main.lua` �
 hampir semua plugin punya `util.lua` dan angka `main.lua` saja menyesatkan
 (`mangatown` 108 baris `main.lua` = 406 baris total).
 
-| plugin | LOC total | helpers | catatan |
-| --- | ---: | --- | --- |
-| `mangafreak` | 365 | `text.url_encode`, `http.get_body`, `json.*`, `os.clock`, `+ regex.find` | **kandidat terbaik berikutnya**: paling kecil, `gmatch` 8× perlu rewrite |
-| `kaliscan` | 373 | `+ regex.find` | `gmatch` 4× |
-| `mangahere` | 393 | sama | `gmatch` 5× |
-| `mangatown` | 406 | `text.url_encode`, `http.get_body`, `html.*`, `os.clock` | `gmatch` 7×, plus chapterfun + Dean-Edwards unpacker |
-| `fanfox` | 431 | sama | `gmatch` 6× |
-| ~~`mangafire`~~ | 371 | `crypto.vrf_sign`, `os.clock` | **SELESAI** diport 2026-10-19 — 0 `gmatch`, lihat bukti A/B di atas |
-| ~~`weebcentral`~~ | 390 | host.html.*, `os.clock` | **SELESAI** diport 2026-10-19 |
-| ~~`zeroscann`~~ | 239 | `text.url_encode` + `html.parse` | **DITOLAK** — situs 500 (butuh PHP 8) |
-| ~~`valirscans`~~ | 225 | `regex.find_all/find_index/quote` | **DITOLAK** — sandbox balik `null` |
+Sudah selesai / ditolak (jangan dihitung lagi):
 
-**Faktor penentu sebenarnya: `gmatch`, bukan LOC.** `mangafire` menang sebagai
-port berikutnya karena satu-satunya kandidat dengan **0 `gmatch`** (gap wasm yang
-terdokumentasi di `wasmHelperGaps`), meski bukan yang terkecil. Semua kandidat
-tersisa butuh rewrite `gmatch` → `regex.find_all` (4-8 situs per plugin), jadi
-ukuran file tidak lagi menjadi patokan utama.
+| plugin | LOC total | status |
+| --- | ---: | --- |
+| ~~`mangafire`~~ | 371 | **SELESAI** diport 2026-10-19 — 0 `gmatch`, lihat bukti A/B di atas |
+| ~~`weebcentral`~~ | 390 | **SELESAI** diport 2026-10-19 |
+| ~~`zeroscann`~~ | 239 | **DITOLAK** — situs 500 (butuh PHP 8) |
+| ~~`valirscans`~~ | 225 | **DITOLAK** — sandbox balik `null` |
+| ~~`kaliscan`~~ | 373 | **DITOLAK 2026-10-20** — `kaliscan.me`/`kaliscan.io` balik `000` |
 
-Tersisa yang benar-benar kandidat: `mangafreak`, `kaliscan`, `mangahere`,
-`mangatown`, `fanfox` — semuanya butuh rewrite `gmatch`.
+**Faktor penentu bukan `gmatch`, dan bukan LOC.** Koreksi 2026-10-20: klaim lama
+"semua `gmatch` itu `host.regex.gmatch`" **salah**. Ada 4 situs `gmatch` native
+(`1manga:103`, `mangahub:97`, `violetmanga:164`, `weebcentral:116`) — dan
+`weebcentral` yang **sudah diport** membuktikan itu bukan halangan: Lua-nya
+`body:gmatch('id="tag-([^"]+)"')`, Odin-nya `find_all(body, 'id="tag-([^"]+)"')`,
+satu baris, pola sama. Jadi `gmatch` native = swap loop, bukan blocker.
 
-### Tier B — pakai `browser.*` (baru di-port, perlu verifikasi live)
+Yang benar-benar menentukan **bentuk keluaran `regex.find_all` per jumlah capture**
+(`pluginutil.RegexFindAll` + `wasmRegexRow`): 0 capture → tiap baris array 1 elemen
+(`whole := re.NumSubexp() == 0`), 1 capture → `[]string` datar, N capture →
+`[][]string`. Karena `abi.find_all` (1 capture) dan `abi.find_all_pairs`
+(N capture) sekarang sudah dipusatkan, biaya rewrite itu **nol baris helper** —
+tinggal pilih fungsi yang cocok. `violetmanga:164` polanya 0-capture
+(`"https?:\\?/\\?/[^\"']+"`), jadi ia tetap masuk `find_all`.
 
-`violetmanga` (174), `mangataro` (223), `comix` (291). Semua helper
-`browser.fetch/evaluate/evaluate_with_init` sudah ter-wire di
-`wasm_host_dispatch.go`, tapi belum ada port Odin yang pakai — jadi perlu proof
-di situs sebenarnya.
+**Klaim Tier B juga salah.** `violetmanga` dan `mangataro` **tidak memanggil
+`host.browser.*` sama sekali** — kata `browser` hanya muncul di komentar. Keduanya
+`host.html.*` + `host.http.get_body` + `host.json.*` murni. Karena itu
+`violetmanga` (174 LOC) — **kandidat terkecil yang tersisa** — sebelumnya tidak
+pernah masuk tabel Tier A padahal lebih kecil dari semua isinya.
 
-### Tier C — pakai `regex.gmatch` (perlu rewrite ke `regex.find_all`)
+**Tier A yang sudah dikoreksi (0 atau 2 `gmatch`, semua masih hidup):**
 
-`dynastyscan`, `en-thunderscan`, `harimanga`, `lhtranslation`, `madaradex`,
-`mangaread`, `mangasushi`, `topmanhua`, `anisascans`, `mangabuddy`,
-`mangakatana`, `mangahub` (423), `1manga` (511). `regex.gmatch` adalah Lua
-iterator tanpa setara JSON — gap yang didokumentasikan di `wasmHelperGaps`.
+| plugin | LOC total | gmatch | helper inti | catatan |
+| --- | ---: | ---: | --- | --- |
+| ~~`violetmanga`~~ | 174 | 1 native (0-capture) | `html.find_*`, `regex.find/find_all/replace`, `normalize_status` | **SELESAI 2026-10-20** — lihat bukti A/B di atas |
+| `dynastyscan` | 201 | 2 host | `html.*`, `regex.find`, `text.trim/unescape` | **kandidat terbaik berikutnya**: pola `(?s)<dd>(.*?)</dd>` → `find_all` |
+| `mangataro` | 223 | 0 | `html.*`, `json.*`, `crypto.md5_hex`, jam | Butuh jam dinding; `os.time()` Lua → `time.time_to_unix(time.now())` di Odin (probe wasi: **build OK**). Token `md5(ts .. "mng_ch_" .. jamUTC)`. Timpa `text.date_to_iso` untuk jam UTC |
+| `lhtranslation` | 258 | 2 host | `regex.find/find_index/match`, `text.strip_html` | 22 `regex.find` — paling padat regex |
+| `mangakatana` | 265 | 2 host | `html.*`, `regex.find/match` | |
+| `mangafreak` | 365 | 8 host | `regex.find`, `json.*` | Terbesar di tier ini; 8 rewrite |
+
+Tersisa yang masih kandidat nyata: **`dynastyscan` → `mangataro` →
+`lhtranslation` → `mangakatana`**. `mangahere` (5 `gmatch`) / `mangatown` (6) /
+`fanfox` (6) tetap di belakang: lebih besar dan butuh rewrite lebih banyak.
+
+### Tier B — pakai `browser.*` (masih belum ada port Odin yang membuktikannya)
+
+Setelah koreksi, **tidak ada** kandidat Tier-B murni di daftar ini: `violetmanga`
+dan `mangataro` ternyata bukan pengguna `browser.*`. `comix` (291) satu-satunya
+yang benar-benar memanggil `host.browser.*` (5 situs). Konsekuensinya pembuktian
+jalur `browser.*` di wasm **belum punya bukti live** — kalau `comix` dijadwalkan,
+itu sekaligus test pertama jalur tersebut.
+
+### Tier C — `regex.gmatch` host
+
+`en-thunderscan` (4), `harimanga` (5), `madaradex` (5), `mangaread` (4),
+`mangasushi` (4), `topmanhua` (5), `anisascans` (4), `mangabuddy` (3),
+`mangahub` (3, plus `string.gmatch` native), `1manga` (2, native),
+`mangahere` (5), `mangatown` (6), `fanfox` (6). Semua ini sekarang **bukan**
+blocker: `host.regex.gmatch` dan `string.gmatch` sama-sama menjadi satu loop
+`for row in abi.find_all(...)`.
+
+## Peluang lebih besar daripada port Lua: 7 plugin TinyGo yang kembaran C++-nya sudah ada
+
+Survei 2026-10-20 menemukan yang **tidak** perlu menulis kode baru sama sekali.
+Tujuh plugin wasm masih TinyGo/standard-Go, dan **kembaran C++-nya sudah dibangun
+dan ada di `examples/`**, tetapi yang **terpasang di `app_data/` masih versi Go**:
+
+| plugin | Go terpasang | C++ siap | rasio |
+| --- | ---: | ---: | ---: |
+| `komix_to` | 2 110 343 | 313 116 | 6.7× |
+| `mangak` | 1 899 228 | 312 815 | 6.1× |
+| `ksgroupscans` | 2 186 868 | 325 187 | 6.7× |
+| `kunmanga_online` | 2 122 986 | 320 614 | 6.6× |
+| `mangakakalot` | 2 181 593 | 327 235 | 6.7× |
+| `manhawato` | 2 164 283 | 306 538 | 7.1× |
+| `reimanga_net` | 1 834 751 | 106 986 | 17.2× |
+| **total** | **14 500 052** | **2 012 491** | **7.2×** |
+
+`manhawato` adalah kasus paling tajam: `wasm-cpp-plugin-toolchain.md` menyatakan
+`manhawato_cpp` "replaces the Go wasm in `app_data/plugins/manhawato/`", tetapi
+`md5sum` membuktikan `app_data/plugins/manhawato/main.wasm` **identik dengan versi
+Go**, bukan C++. Klaim dokumen itu salah dan sudah dikoreksi.
+
+Artinya "migrasi" termurah yang tersisa **bukan** port Lua→Odin, melainkan
+memasang kembaran C++ yang sudah lolos build: 7.2× lebih kecil untuk 14.5 MB,
+tanpa satu baris kode baru. Yang belum ada bukti: **A/B live** untuk ketujuh
+kembaran itu — belum pernah dijalankan sebagai plugin terpasang. Sebelum swap,
+jalankan prosedur yang sama dengan port Odin (bersihkan `plugin_cache`, bandingkan
+search/detail/chapters/pages terhadap versi Go).
+
+Untuk sisanya, Odin dan C++ ternyata **setara dari sisi ukuran** (Odin ~416 KB vs
+C++ ~313 KB vs TinyGo ~2.1 MB) — jadi untuk plugin yang **belum** punya kembaran
+C++, port Odin tetap pilihan yang lebih baik (tanpa wasi-sdk, satu perintah build,
+`abi/` bersama). Prioritasnya: **pasang C++ twin dulu** (murah), baru port Odin
+untuk plugin yang memang belum punya twin.
+
 
 ## Catatan host
 
