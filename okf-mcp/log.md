@@ -2,6 +2,38 @@
 
 ## 2026-10-20
 
+- **Weebcentral search covers were on the wrong titles** (reported: "title and
+  cover shifted apart, searching dungeon"). Measured on the live
+  `/search/data` response: every card renders **two** `<img>` (a desktop
+  `article.hidden` and a mobile `article.lg:hidden` variant), but the plugin
+  assumed one cover per card and zipped the cover list with the card list by
+  position — so 31 of 32 covers belonged to the previous card. Fixed in both
+  the Odin port and the Lua reference by matching the cover to its card on the
+  ULID the cover URL carries (`/cover/fallback/<ULID>.jpg`) instead of on
+  position. Live before 1/32, after 32/32; `348/348` cover URLs in the HAR
+  contain a ULID, so the join is total. Detail:
+  `concept/weebcentral-search-card-cover-alignment.md`.
+  - **General rule recorded:** never zip two independently-extracted lists
+    from a web page. Join them on an identifier the page itself provides. A
+    positional zip is only safe when one element per record was measured.
+  - **Same pattern not yet checked:** `mangakatana`, `mangataro`,
+    `violetmanga`, `zeroscann` and `htmlscrape` all pair `titles[i]` with
+    `covers[i]` positionally. Their selectors are narrower, but the count was
+    never measured.
+- **Installing a wasm plugin deadlocked the whole host** (found by the live
+  test for the fix above, which hung for the full 5-minute timeout).
+  `Install` held `m.mu` and `loadWasm` → `ensureWasmRuntime` took `m.mu`
+  again; `sync.RWMutex` is not reentrant, so the second `Lock()` blocked
+  forever and the process was stuck, not just the request. Pre-existing, not
+  introduced by the info-script work: the wasm path was only ever reached
+  through `Discover` → lazy load, which releases the lock before loading. The
+  shared wazero runtime now has its own `runtimeMu`; lock order stays
+  `mu -> runtimeMu`. Regression tests cover both `Install` and `LoadPlugin`.
+  Detail: `concept/wasm-install-deadlock.md`.
+  - **General rule recorded:** a lock taken by a helper must never be one its
+    caller already holds. `m.mu` guards the plugin registry, `runtimeMu` the
+    runtime, `challengeMu` the challenge map, `p.mu` one plugin.
+
 - **Enrichment (info) scripts now run as Odin wasm**, and the plugins page lists
   them. The "info scripts can't be wasm" answer was wrong on three of four
   counts: the helper surface (`json`, `http`, `text`, `log`) was already complete

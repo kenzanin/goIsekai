@@ -33,3 +33,5 @@ Progressive disclosure index for this OKF bundle.
 
 * [Chapter bound with chapter_num 0](concept/chapter-bound-zero-chapter-num.md) - Why bulk "set this and before/after as read" marked the whole manga: chapter_num alone is not a key, (chapter_num, id) lexicographic bound fixes comizy-style all-zero sources
 * [Info scripts as Odin wasm](concept/info-scripts-as-odin-wasm.md) - Enrichment scripts run as wasm: the helper surface was already complete, discovery's hardcoded main.lua was the real blocker, required exports switch on the info: prefix, and a Lua-only title-matching bug the port fixed
+* [Weebcentral search cover alignment](concept/weebcentral-search-card-cover-alignment.md) - Every search card renders TWO img (desktop + mobile variant), so a positional zip put each cover on the previous title; match covers to cards by the ULID the cover URL carries, never by position
+* [Wasm install deadlock](concept/wasm-install-deadlock.md) - Install held the manager lock and loadWasm -> ensureWasmRuntime took it again; sync.RWMutex is not reentrant, so installing a .wasm hung the whole host. Runtime now has its own lock
