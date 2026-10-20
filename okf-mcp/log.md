@@ -2,6 +2,28 @@
 
 ## 2026-10-20
 
+- **Ported `mangakatana` Lua → Odin wasm** (`examples/plugins/wasm/mangakatana_odin/`,
+  **409 315 bytes**). 265 LOC. **Cleanest port of the queue: all four endpoints
+  byte-IDENTICAL to Lua with no deliberate delta** — search (2696 B), detail
+  (749 B), pages (1197 B), chapters (1203 B), `plugin_cache` cleared.
+  The id contract is load-bearing: manga id is `<slug>` (`naruto.1205`) and the
+  chapter id is `<slug>:<cXXX>` (`naruto.1205:c700`), because the host pastes them
+  into URL paths and a path segment cannot hold a slash.
+  **Reader pages ship no usable image URLs**: every `<img>` has `data-src="#"` and
+  JavaScript copies the real ones in; the list lives in a JS array literal
+  (`var thzq=[...]`). The port takes the bracket literal with the most `http` URLs
+  and ignores its name, so an obfuscated-variable rename cannot break it —
+  verified live (37 image URLs lifted, `data-src` appears 38×).
+  Selector gotcha worth remembering: the detail page's author/status cells have
+  **combined** classes — `.value authors` and `.value status completed` — so
+  `grep -c 'class="authors"'` returns 0 and looks like a broken selector.
+  One adjustment: the description is read as the `<p>` in `div.summary` with
+  `<br>` → newline, because `html.xpath_list_text(.../p/text())` used by the Lua is
+  **not exposed to wasm** (no `xpath*` in `abi/`); both agree on the live markup
+  (that paragraph carries zero `<br>`). Page numbering stays 1-based like Lua's
+  `ipairs`. `GetGenres` is the static 27-entry table, verified live via
+  `/view/search` (cache NULL → **987 B**). HAR moved to `tmp/mangakatana.har`.
+
 - **Ported `lhtranslation` Lua → Odin wasm** (`examples/plugins/wasm/lhtranslation_odin/`,
   **415 460 bytes**). 258 LOC, WordPress + Madara theme, every read is a scrape
   (no JSON API). A/B with `plugin_cache` cleared: **search IDENTICAL (521 B),

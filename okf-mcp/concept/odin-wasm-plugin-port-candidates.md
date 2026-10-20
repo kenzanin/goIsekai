@@ -37,6 +37,53 @@ Status: **8 plugin sudah diport ke Odin** dan diverifikasi live. Data dari scan
 | `dynastyscan` | 419 KB | `html.*`, `regex.find/find_all`, `text.unescape/strip_html/normalize_status/date_to_iso/chapter_num`, `http_body` | search 1257 B + detail 656 B + pages 2023 B identical; chapters 32/32; `GetGenres` 120 genre live |
 | `mangataro` | 410 KB | `html.*`, `text.url_encode/normalize_status/date_to_iso/chapter_num/sub`, `crypto.md5_hex`, `http_body` | search 3331 B + detail 415 B + pages 6291 B identical; chapters 88/88 id+order identical, `released_at` 0→nyata; `GetGenres` live |
 | `lhtranslation` | 415 KB | `regex.find/find_all/find_all_pairs/replace`, `text.unescape/strip_html/normalize_status/date_to_iso/chapter_num`, `http.get_body`/`http.post_body` | search 521 B + detail 909 B identical; pages 33/33 url identical; chapters 4/4 id+order identical |
+| `mangakatana` | 409 KB | `html.find_text/find_attr/find_list_text/find_list_attr`, `regex.find/find_all/sub`, `text.url_encode/normalize_status/unescape`, `http.get_body` | **search 2696 B + detail 749 B + pages 1197 B + chapters 1203 B semuanya IDENTICAL** |
+
+### mangakatana (port 2026-10-20) — empat endpoint identik, dan cara membaca `page_urls`
+
+265 LOC. **Hasil terbersih dari seluruh antrean: keempat endpoint byte-IDENTICAL**
+dengan Lua, tanpa satu pun delta yang disengaja. A/B dengan `plugin_cache`
+dibersihkan:
+
+| endpoint | hasil |
+| --- | --- |
+| search | **IDENTICAL** (2696 B) |
+| detail | **IDENTICAL** (749 B) |
+| pages | **IDENTICAL** (1197 B) |
+| chapters | **IDENTICAL** (1203 B) |
+
+**Kontrak id (jangan diubah — host menempelkannya ke path URL):**
+manga id = `<slug>` (`naruto.1205`), chapter id = `<slug>:<cXXX>`
+(`naruto.1205:c700`). Segmen path tidak boleh mengandung slash, itu sebabnya
+chapter id memakai titik dua dan `chapter_url` mengembalikannya jadi
+`/manga/<slug>/<cXXX>`.
+
+**Halaman baca tidak memuat URL gambar yang bisa dipakai.** Setiap `<img>`
+punya `data-src="#"` dan JavaScript menyalin URL asli ke sana; daftar aslinya ada
+di literal array JS (`var thzq=[...]`). Strategi port (sama seperti Lua): ambil
+**array dengan URL `http` terbanyak** di halaman dan **abaikan nama variabelnya**,
+sehingga rename variabel obfuscated tidak memutuskan plugin. Diverifikasi live:
+37 URL gambar terangkat, `data-src` muncul 38×.
+
+**Tiga hal lain yang diverifikasi live, bukan diasumsikan:**
+
+1. Selector detail memang ada, tapi class-nya gabungan: `.value authors` dan
+   `.value status completed` — bukan `class="authors"`. Cek `grep -c
+   'class="authors"'` menghasilkan **0** dan sempat menyesatkan; yang benar
+   `h.count('authors')` di dalam `div class="d-cell-small value authors"`.
+2. Tabel chapter ada di halaman detail itu sendiri (6 baris untuk slug uji),
+   selector `div.chapters table tbody tr td div.chapter a`, sudah newest-first.
+3. `#related` bersarang di dalam `#single_book` dan mengulang bentuk kartu
+   search, jadi semua lookup detail harus di-scope.
+
+**Satu-satunya penyesuaian:** deskripsi dibaca sebagai `<p>` di dalam `div.summary`
+dengan `<br>` → newline, karena `html.xpath_list_text(.../p/text())` yang dipakai
+Lua **tidak diekspos ke wasm** (tidak ada `xpath*` di `abi/`). Kedua bentuk sepakat
+pada markup live — paragraf itu tidak memuat `<br>` sama sekali. Nomor halaman
+tetap 1-based seperti `ipairs` Lua, bukan 0.
+
+`GetGenres` statis 27 entri; diverifikasi live (cache NULL → **987 B**).
+
 
 ### lhtranslation (port 2026-10-20) — Madara, chapter list hanya lewat AJAX POST
 
