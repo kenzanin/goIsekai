@@ -36,6 +36,49 @@ Status: **8 plugin sudah diport ke Odin** dan diverifikasi live. Data dari scan
 | `violetmanga` | 301 KB | `html.find_*`, `regex.find/find_all/replace`, `text.url_encode`, `text.normalize_status` | search 2307 B + detail all fields + pages identical; chapters 13/13 id+title identical, `chapter_num` 0→13..1 |
 | `dynastyscan` | 419 KB | `html.*`, `regex.find/find_all`, `text.unescape/strip_html/normalize_status/date_to_iso/chapter_num`, `http_body` | search 1257 B + detail 656 B + pages 2023 B identical; chapters 32/32; `GetGenres` 120 genre live |
 | `mangataro` | 410 KB | `html.*`, `text.url_encode/normalize_status/date_to_iso/chapter_num/sub`, `crypto.md5_hex`, `http_body` | search 3331 B + detail 415 B + pages 6291 B identical; chapters 88/88 id+order identical, `released_at` 0→nyata; `GetGenres` live |
+| `lhtranslation` | 415 KB | `regex.find/find_all/find_all_pairs/replace`, `text.unescape/strip_html/normalize_status/date_to_iso/chapter_num`, `http.get_body`/`http.post_body` | search 521 B + detail 909 B identical; pages 33/33 url identical; chapters 4/4 id+order identical |
+
+### lhtranslation (port 2026-10-20) — Madara, chapter list hanya lewat AJAX POST
+
+258 LOC. WordPress + tema Madara, **semua baca itu scrape** — tidak ada JSON API.
+A/B dengan `plugin_cache` dibersihkan:
+
+| endpoint | hasil |
+| --- | --- |
+| search | **IDENTICAL** (521 B) |
+| detail | **IDENTICAL** (909 B) |
+| pages | 33/33 url + urutan sama; `index` 0→0..32 |
+| chapters | 4/4 id + urutan sama; `manga_id` + `released_at` |
+
+**Yang wajib diketahui sebelum menyentuh plugin Madara mana pun:**
+
+1. **Halaman detail TIDAK memuat `li.wp-manga-chapter` sama sekali.** Madara
+   memuat daftar chapter lewat AJAX:
+   `POST /manga/<slug>/ajax/chapters/` dengan header `X-Requested-With:
+   xmlhttprequest`. Scrape halaman detail untuk chapter akan **diam-diam
+   menghasilkan nol** — sudah dibuktikan live (count marker = 0), bukan dugaan.
+2. **`img[data-src]` diawali tab dan newline.** URL hanya valid setelah di-trim.
+3. Halaman detail punya dua blok judul mirip-`<h1>` (judul situs + judul manga);
+   yang benar ada di dalam `div.post-title`, jadi blok itu harus di-scope dulu.
+
+**Bug di sumber Lua yang ketahuan:** genre dikirim sebagai nama yang
+di-URL-encode (`Gender Bender` → `/manga-genre/Gender%20Bender/`), dan situs
+menjawab **404** — diverifikasi live, sementara `gender-bender` → 200. Port ini
+menurunkan slug (`lower`, spasi→hyphen) sehingga filter itu berfungsi; 45 genre
+lain tidak berubah (`Action` dan `action` sama-sama 200).
+
+**Delta yang disengaja:** `pages[].index` diisi 0..N-1. Lua tidak mengirim field
+itu sama sekali, dan host mengisinya 0 untuk semua baris (33 halaman → 33 nol).
+
+**Catatan `released_at`:** chapter terbaru memakai tanggal relatif di situs
+("20 hours ago"), jadi `text.date_to_iso` me-resolve-nya terhadap jam sekarang dan
+nilainya bergeser tiap pemanggilan — dua kali berturut-turut memberi
+`15:56:54Z` lalu `15:56:56Z`. Ini sifat situs, bukan regresi: chapter dengan
+tanggal absolut (`chapter 1..3`) cocok persis dengan Lua.
+
+`GetGenres` tetap statis (45 nama) dengan slug yang diturunkan; diverifikasi live
+dengan me-NULL-kan `plugins.genres` → terisi **1672 B**.
+
 
 ### mangataro (port 2026-10-20) — bukti A/B + bug walltime di host
 

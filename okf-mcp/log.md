@@ -2,6 +2,27 @@
 
 ## 2026-10-20
 
+- **Ported `lhtranslation` Lua → Odin wasm** (`examples/plugins/wasm/lhtranslation_odin/`,
+  **415 460 bytes**). 258 LOC, WordPress + Madara theme, every read is a scrape
+  (no JSON API). A/B with `plugin_cache` cleared: **search IDENTICAL (521 B),
+  detail IDENTICAL (909 B)**; pages 33/33 url+order identical with `index`
+  filled 0..32 (Lua omits the field, so the host stamps 0 on all 33); chapters
+  4/4 id+order identical with `manga_id` filled and `released_at` present.
+  **Madara trap, proven live:** the detail page carries **zero**
+  `li.wp-manga-chapter` markup — the list only exists behind
+  `POST /manga/<slug>/ajax/chapters/` with `X-Requested-With: xmlhttprequest`,
+  so scraping the detail page silently yields nothing. Also: `img[data-src]`
+  starts with tabs and newlines, and two title-ish blocks exist (the manga one is
+  scoped by `div.post-title`).
+  **Lua source bug found:** genres were sent as the URL-encoded display name, so
+  `Gender Bender` → `/manga-genre/Gender%20Bender/` returns **404** live, while
+  `gender-bender` returns 200. The port derives the slug (lower, hyphenated); the
+  other 45 genres are unaffected. `GetGenres` verified live (cache NULL → 1672 B).
+  Note on `released_at`: the newest chapter uses a relative site date ("20 hours
+  ago"), so `text.date_to_iso` resolves it against the current clock and drifts
+  between calls (15:56:54Z → 15:56:56Z) — site behaviour, not a regression;
+  absolute-dated chapters match Lua exactly. HAR moved to `tmp/lhtranslation.har`.
+
 - **Ported `mangataro` Lua → Odin wasm** (`examples/plugins/wasm/mangataro_odin/`,
   **410 403 bytes**). 223 LOC. The Lua header claims the chapter and page lists
   need `host.browser.evaluate` (a scroll-poll harvest) but the code never calls
