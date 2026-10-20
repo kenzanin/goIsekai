@@ -25,6 +25,68 @@ func (s *AppService) PluginDir(pluginID string) string {
 	return ""
 }
 
+// InfoPluginDir returns the directory containing an enrichment script, or ""
+// when no script with that id is registered. Needed because info scripts are
+// not manga sources: LoadedPlugins excludes them, so PluginDir cannot see them,
+// and a logo beside main.wasm/main.lua would otherwise be unreachable.
+func (s *AppService) InfoPluginDir(pluginID string) string {
+	for _, p := range s.mgr.InfoPlugins() {
+		if p.ID != pluginID || p.WasmPath == "" {
+			continue
+		}
+		// wasmPath is the entry FILE for wasm scripts and the FOLDER for
+		// lua/js/yaegi, so normalise to a directory either way.
+		if fi, err := os.Stat(p.WasmPath); err == nil && fi.IsDir() {
+			return p.WasmPath
+		}
+		return filepath.Dir(p.WasmPath)
+	}
+	return ""
+}
+
+// InfoPluginLogoURL returns the URL for an enrichment script's logo, or ""
+// when it has none.
+//
+// Info scripts live under info_dir, not the plugin directory, so they need
+// their own static path — and an id can exist as BOTH a scraper and an info
+// script (mangadex is), so the scraper's cached logo must not shadow the
+// script's own file. The declared plugin.json logo wins; otherwise the usual
+// filenames beside the entry are probed.
+func (s *AppService) InfoPluginLogoURL(pluginID string) string {
+	dir := s.InfoPluginDir(pluginID)
+	if dir == "" {
+		return ""
+	}
+
+	name := ""
+	for _, p := range s.mgr.InfoPlugins() {
+		if p.ID != pluginID {
+			continue
+		}
+		src := p.Logo
+		if src != "" && !strings.HasPrefix(src, "http://") &&
+			!strings.HasPrefix(src, "https://") && !strings.HasPrefix(src, "data:") {
+			base := filepath.Base(src)
+			if fi, err := os.Stat(filepath.Join(dir, base)); err == nil && !fi.IsDir() {
+				name = base
+			}
+		}
+		break
+	}
+	if name == "" {
+		for _, cand := range []string{"logo.png", "logo.svg", "logo.jpg", "logo.ico"} {
+			if fi, err := os.Stat(filepath.Join(dir, cand)); err == nil && !fi.IsDir() {
+				name = cand
+				break
+			}
+		}
+	}
+	if name == "" {
+		return ""
+	}
+	return "/info-static/" + pluginID + "/" + name
+}
+
 // SyncPluginMeta persists a loaded plugin's identity metadata (name, logo)
 // to the database so deferred plugins show correct data on the next page view.
 // Every logo shape (file, URL, inline) is first materialised into the

@@ -25,6 +25,20 @@ type PluginView struct {
 	LibraryCount      int      // in-library manga contributed by this plugin
 }
 
+// InfoPluginView is one enrichment script on the plugins page.
+//
+// It is a separate type from PluginView on purpose: an info script is not a
+// manga source, so it has no database row, no toggle, no TLS profile and no
+// library count — only its identity, its runtime and its logo.
+type InfoPluginView struct {
+	ID        string
+	Name      string
+	Kind      string // runtime the script ships in: lua, js, wasm, yaegi
+	SiteURL   string
+	BuiltWith string // toolchain + version that built the artifact, "" = unknown
+	IconURL   string // /info-static/{id}/{file}, "" when the script has no logo
+}
+
 // viewPlugins renders the plugin manager page.
 func (s *Server) viewPlugins(w http.ResponseWriter, r *http.Request) {
 	plugins, err := s.service.ListPlugins()
@@ -70,9 +84,27 @@ func (s *Server) viewPlugins(w http.ResponseWriter, r *http.Request) {
 		v.PinnedProfile, v.AvailableProfiles = s.service.PluginProfile(p.ID)
 		views = append(views, v)
 	}
+	// Enrichment scripts are listed above the manga sources: they are the
+	// metadata providers the user installs deliberately, and they are few.
+	infoViews := make([]InfoPluginView, 0, 4)
+	for _, p := range s.service.InfoPlugins() {
+		iv := InfoPluginView{
+			ID:        p.ID,
+			Name:      p.Name,
+			Kind:      p.Kind,
+			SiteURL:   p.SiteURL,
+			BuiltWith: p.BuiltWith,
+			IconURL:   s.service.InfoPluginLogoURL(p.ID),
+		}
+		if iv.Name == "" {
+			iv.Name = p.ID
+		}
+		infoViews = append(infoViews, iv)
+	}
+
 	s.renderPage(w, r, "views/plugins", "plugins", map[string]any{
 		"Plugins":     views,
-		"InfoPlugins": s.service.InfoPlugins(),
+		"InfoPlugins": infoViews,
 	})
 }
 

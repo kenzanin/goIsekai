@@ -82,6 +82,7 @@ func (m *Manager) InfoPlugins() []LoadedPlugin {
 			ID:        strings.TrimPrefix(p.id, infoPrefix),
 			Kind:      p.kind,
 			Loaded:    p.loaded,
+			WasmPath:  p.wasmPath,
 			Name:      p.meta.Name,
 			SiteURL:   p.meta.SiteURL,
 			BuiltWith: p.meta.BuiltWith,

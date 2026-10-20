@@ -25,7 +25,7 @@ return function(data)
 	local infoPlugins = data.InfoPlugins or {}
 	local infoHTML = ""
 	if #infoPlugins > 0 then
-		infoHTML = '<div class="mt-8" id="info-scripts">'
+		infoHTML = '<div class="mb-8" id="info-scripts">'
 			.. '<h2 class="text-sm font-semibold text-neutral-300 mb-1">Info scripts</h2>'
 			.. '<p class="text-xs text-neutral-500 mb-3">Enrichment providers from <code class="font-mono">info_dir</code>: they supply metadata (titles, summaries, categories, authors, related, covers) and are never used as a manga source.</p>'
 			.. '<div class="space-y-2">'
@@ -37,8 +37,22 @@ return function(data)
 			end
 			local siteURL = p.SiteURL or ""
 			local builtWith = p.BuiltWith or ""
+			local iconURL = p.IconURL or ""
+			-- Logo, falling back to the initials block the plugin cards use, so
+			-- a script without a logo still renders a consistent tile.
+			local iconHTML
+			if iconURL ~= "" then
+				iconHTML = '<img src="'
+					.. h(iconURL)
+					.. '" alt="" class="h-10 w-10 rounded-md object-cover bg-neutral-800 shrink-0">'
+			else
+				iconHTML = '<div class="h-10 w-10 rounded-md bg-amber-500/15 text-amber-400 flex items-center justify-center text-sm font-semibold shrink-0">'
+					.. h(getInitials(name))
+					.. "</div>"
+			end
 			infoHTML = infoHTML
-				.. '<div class="bg-neutral-900 rounded-lg p-3 border border-neutral-800 flex items-center gap-3">'
+				.. '<div class="bg-neutral-900 rounded-lg p-4 border border-neutral-800 flex items-center gap-3">'
+				.. iconHTML
 				.. '<div class="min-w-0 flex-1">'
 				.. '<div class="font-medium text-sm flex items-center gap-2">'
 				.. h(name)
@@ -61,7 +75,11 @@ return function(data)
 		infoHTML = infoHTML .. "</div></div>"
 	end
 
-	return '<div class="flex items-center gap-3 flex-wrap mb-6">'
+	-- The info-scripts section comes FIRST: it is short, and it lists the
+	-- enrichment providers the user installs deliberately, above the long list
+	-- of manga sources.
+	return infoHTML
+		.. '<div class="flex items-center gap-3 flex-wrap mb-6">'
 		.. '<div class="shrink-0"><h1 class="text-xl font-semibold">Plugins</h1>'
 		.. '<div class="text-xs text-neutral-500">'
 		.. h(tostring(#plugins))
@@ -89,7 +107,6 @@ return function(data)
 		.. '<button type="submit" class="border border-solid border-neutral-700 hover:border-red-600 hover:bg-red-600/10 rounded-md px-3 py-2 text-sm text-neutral-400 hover:text-red-300 transition">Purge removed</button>'
 		.. "</form></div>"
 		.. cardsHTML
-		.. infoHTML
 		.. [[<script>
 document.querySelectorAll('input[type=file]').forEach(inp => {
   inp.addEventListener('change', function() {
