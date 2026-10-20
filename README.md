@@ -262,21 +262,21 @@ One folder per site under `app_data/plugins/<id>/`, with `main.lua` as the entry
 
 ```lua
 local PLUGIN = {
-  name = "KaliScan",
+  name = "Example Scans",
   version = "1.0.0",
   thumb_ratio = 0.71,
 }
 
 function search(filter_json)
   local filter = json.decode(filter_json)
-  local res = http_request({ url = "https://kaliscan.io/?s=" .. filter.query })
+  local res = http_request({ url = "https://example.com/?s=" .. filter.query })
   return results
 end
 ```
 
 `main.lua` defines the ABI globals (`search`, `get_manga_detail`, `get_chapter_list`, `get_page_list`) and lives beside a `plugin.json` holding its metadata. Each takes one JSON-string argument and returns a Lua table. Networking goes through `http_request({url=..., method=..., headers=...})`, which rides the same TLS-fingerprinted, cookie-jarred, rate-paced session as all other runtimes. `json.encode`/`json.decode` are provided. Available stdlib: `string`, `table`, `math`, `os.time/date/clock` — no `io`, no `os.execute`. The legacy name `search_manga` still resolves with a deprecation warning.
 
-Reusable modules (`helpers.lua`) can be copied across plugins for shared utilities. See `examples/plugins/lua/mangabuddy/` for a complete example.
+Reusable modules (`helpers.lua`) can be copied across plugins for shared utilities. See any plugin under `examples/plugins/lua/` for a complete example.
 
 ### Info scripts (metadata enrichment)
 
@@ -321,7 +321,7 @@ function search(filterJson) {
 }
 ```
 
-Same ABI as Lua — camelCase globals (`search`, `getMangaDetail`, ...) plus a sibling `plugin.json` for metadata. `http_request` takes a JSON string, returns a JSON string. `json` is native JS. See `examples/plugins/js/mangzio/` for a complete example. The legacy name `searchManga` still resolves with a deprecation warning.
+Same ABI as Lua — camelCase globals (`search`, `getMangaDetail`, ...) plus a sibling `plugin.json` for metadata. `http_request` takes a JSON string, returns a JSON string. `json` is native JS. See `examples/plugins/js/dummy/` for a complete example. The legacy name `searchManga` still resolves with a deprecation warning.
 
 ### Yaegi plugins (interpreted Go)
 
@@ -340,8 +340,7 @@ ABI functions take one string arg and return `(string, error)`. Metadata lives i
 
 One folder per site under `app_data/plugins/<id>/` with `main.wasm` (or a single `<id>.wasm` at the plugins root), plus a `plugin.json` for metadata — every runtime reads metadata from there, so wasm needs no `Init`/`PLUGIN` export. The host runs the module with **wazero**; it must export `contract_version`, `Search`, `GetMangaDetail`, `GetChapterList`, `GetPageList`, and a `malloc`/`free` pair. Networking and the shared helper library go through the single `env.host_call` import (`env.host_http_request` remains for the raw HTTP ABI). See `docs/plugin-wasm-helpers.md` and `examples/plugins/wasm/` for full examples.
 
-The same source plugin (`manga_uno`) is implemented for four backends, so the
-size difference is measured rather than estimated:
+The same source plugin is implemented for four backends, so the size difference is measured rather than estimated:
 
 | backend | size | notes |
 | --- | --- | --- |
@@ -356,14 +355,14 @@ plugins:
 
 | plugin | standard Go | TinyGo | saved |
 | --- | ---: | ---: | ---: |
-| `manga_uno` | 3,709,966 | 1,530,371 | 58% |
-| `reimanga_net` | 4,129,582 | 1,834,751 | 55% |
-| `mangak` | 4,223,419 | 1,899,228 | 55% |
-| `komix_to` | 4,337,955 | 2,110,343 | 51% |
-| `kunmanga_online` | 4,354,477 | 2,122,986 | 51% |
-| `mangakakalot` | 4,407,558 | 2,181,593 | 50% |
-| `manhawato` | 4,385,986 | 2,164,253 | 50% |
-| `ksgroupscans` | 4,427,832 | 2,186,868 | 50% |
+| plugin 1 | 3,709,966 | 1,530,371 | 58% |
+| plugin 2 | 4,129,582 | 1,834,751 | 55% |
+| plugin 3 | 4,223,419 | 1,899,228 | 55% |
+| plugin 4 | 4,337,955 | 2,110,343 | 51% |
+| plugin 5 | 4,354,477 | 2,122,986 | 51% |
+| plugin 6 | 4,407,558 | 2,181,593 | 50% |
+| plugin 7 | 4,385,986 | 2,164,253 | 50% |
+| plugin 8 | 4,427,832 | 2,186,868 | 50% |
 
 If a plugin is ever rewritten from scratch, C++ or Odin win on size by another
 order of magnitude — TinyGo only removes about half of the Go runtime.
@@ -374,7 +373,7 @@ Standard Go (full runtime, `//go:wasmexport`/`//go:wasmimport`):
 GOOS=wasip1 GOARCH=wasm CGO_ENABLED=0 go build -buildmode=c-shared -o main.wasm .
 ```
 
-C++17 (wasi-sdk clang, smallest; see `examples/plugins/wasm/manga_uno_cpp/`):
+C++17 (wasi-sdk clang, smallest; see the `*_cpp` examples under `examples/plugins/wasm/`):
 
 ```sh
 /opt/wasi-sdk/bin/clang++ -std=c++17 -O2 -fno-exceptions -fno-rtti \
@@ -382,8 +381,8 @@ C++17 (wasi-sdk clang, smallest; see `examples/plugins/wasm/manga_uno_cpp/`):
   main.cpp -o main.wasm -Wl,--export=malloc -Wl,--export=free -Wl,-z,stack-size=1048576
 ```
 
-Odin (no wasi-sdk, no RapidJSON, no manual exports; see
-`examples/plugins/wasm/manga_uno_odin/`):
+Odin (no wasi-sdk, no RapidJSON, no manual exports; see the `*_odin` examples under
+`examples/plugins/wasm/`):
 
 ```sh
 odin build . -target:wasi_wasm32 -no-entry-point -out:main.wasm
@@ -421,7 +420,7 @@ GOROOT=$HOME/.govman/versions/go1.26.9 GOTOOLCHAIN=local \
 `wasm_abi.h`), and a plugin is then just its own `main.odin`:
 
 ```
-examples/plugins/wasm/atsumaru_odin/
+examples/plugins/wasm/myplugin_odin/
 ├── abi/wasm_abi.odin   ← copy as-is; provides host_call, malloc/free,
 │                         contract_version, http_body, to_json, host_str
 ├── main.odin           ← exports Search / GetMangaDetail / GetChapterList /
@@ -447,13 +446,13 @@ Five Odin-specific rules, all of which cost a build to learn:
 - `core:runtime` is `base:runtime` now, and two `package` declarations cannot
   share one directory — hence the `abi/` subdirectory.
 
-Working examples: `atsumaru_odin` (JSON API + Typesense search, numeric genre
-ids) and `comicasura_odin` (HTML scraping, composite `slug:chapter` ids), both
-live-verified end to end.
+Working examples: one covering a JSON API + search-backed catalogue with numeric
+genre ids, and one covering HTML scraping with composite `slug:chapter` ids, both
+live-verified end to end. Browse `examples/plugins/wasm/` for the full set.
 
 ### Native plugins (C/C++ `.so`, no cgo)
 
-One folder per site under `app_data/plugins/<id>/` with `main.so`, plus a `plugin.json` for metadata. The host opens it with **purego** (`dlopen`/`dlsym`), so a `.so` plugin works on the default `CGO_ENABLED=0` binary — it is not a Go plugin module and needs no matching toolchain. Export the ABI as `char*`-returning functions (`Search`, `GetMangaDetail`, `GetChapterList`, `GetPageList`, optional `GetGenres`) plus `plugin_free`, which the host calls on the buffer your plugin returns. A plugin may also export `plugin_init(host_call_fn)` to receive the host-helper bridge. See `examples/plugins/native/roliascan/` (libcurl + libxml2 + RapidJSON) and `examples/plugins/native/dummy/` for the ABI fixture.
+One folder per site under `app_data/plugins/<id>/` with `main.so`, plus a `plugin.json` for metadata. The host opens it with **purego** (`dlopen`/`dlsym`), so a `.so` plugin works on the default `CGO_ENABLED=0` binary — it is not a Go plugin module and needs no matching toolchain. Export the ABI as `char*`-returning functions (`Search`, `GetMangaDetail`, `GetChapterList`, `GetPageList`, optional `GetGenres`) plus `plugin_free`, which the host calls on the buffer your plugin returns. A plugin may also export `plugin_init(host_call_fn)` to receive the host-helper bridge. See `examples/plugins/native/dummy/` for the ABI fixture (and any other folder under `examples/plugins/native/` for a libcurl + libxml2 + RapidJSON example).
 
 ```sh
 examples/plugins/native/dummy/build.sh   # g++ -std=c++17 -shared → libdummy.so
@@ -462,7 +461,7 @@ examples/plugins/native/dummy/build.sh   # g++ -std=c++17 -shared → libdummy.s
 ### Bundled examples
 
 ```sh
-just install-lua kaliscan   # copies a Lua plugin → app_data/plugins/
+just install-lua myplugin   # copies a Lua plugin → app_data/plugins/
 ```
 
 ## TLS profile ladder
@@ -501,7 +500,7 @@ just race            # the same, under the race detector
 just lint            # golangci-lint
 just lint-web        # Biome (web sources)
 just check           # fmt + modernize + lint, production Go only
-just install-lua kaliscan   # install a Lua plugin into app_data/plugins/
+just install-lua myplugin   # install a Lua plugin into app_data/plugins/
 just br              # brotli-compress static assets
 just clean           # remove the binary
 just --list          # everything else
