@@ -2,6 +2,42 @@
 
 ## 2026-10-20
 
+- **Chapter lists came out oldest-first** (reported: "plugin weebcentral index
+  manga chapter nya kebalik"). A library manga read 74, 73, 72 … while the
+  same series read 1, 2, 3 … live — the order depended on library status
+  because the cached path sorts `chapter_num DESC` and the live path returned
+  the plugin's raw order. **Root cause: two plugins, not the host.** The repo's
+  ABI is newest-first (the host's `chapterNeighbors`, `computeContinue` and
+  `ListChaptersCached` all assume it; 15 plugins state it), but `weebcentral`
+  and `comizy` reversed the site's newest-first fragment and shipped it
+  ascending, each with a comment claiming the opposite ("the reader wants
+  ascending"). An audit of all 34 installed plugins found only these two; 30
+  return newest-first.
+  - **Fix:** the reversal is gone from all four sources (Lua + Odin for both
+    plugins) — the sites already answer in the ABI order. `chapter_num` was
+    added where it was missing, because the cached path sorts by it and a
+    plugin that ships none leaves the order to the `id` tie-break (reverse
+    insertion order): `weebcentral` sent none, `comizy` sent 0 for every row.
+  - **A false claim corrected:** comizy_odin's header said "reading progress is
+    keyed off chapter_num, so inventing a number here would silently detach
+    the reader". Progress is keyed off the chapter's **source id**
+    (`GetChapterProgressForManga` joins `read_history` on `chapters.id`), so a
+    real number detaches nothing.
+  - **Split chapters:** the site labels a split chapter `Chapter 12-2` and a
+    decimal one `Chapter 12.1`; `text.chapter_num` reads the leading number
+    only, so both halves collapsed onto 12 (6 colliding rows in one manga).
+    `comizy_chapter_num` folds the hyphen into the decimal the dot form uses.
+  - **Trap:** `plugin_cache` is not invalidated by a plugin change — the
+    chapter list lives 168 h, so the stale ascending JSON kept being served
+    until it was purged.
+  - **Verified live:** weebcentral 75 chapters `Chapter 74`→`Chapter 1`,
+    unique 75/75; comizy 14 chapters, unique 14/14; DB after a re-sync holds
+    14.2 / 14.1 / 13.2 / 13.1 / 12.2 / 12.1 / 11.1 / 10.0; both detail pages
+    now render newest-first on the library *and* the live path.
+  - **Test:** `internal/pluginmanager/weebcentral_chapter_order_test.go` — an
+    offline fixture test for the Lua plugin plus live tests for both wasm
+    plugins (descending order, non-zero and non-colliding numbers).
+  - Full write-up: `okf-mcp/concept/chapter-order-newest-first-abi.md`.
 - **Chapter upload dates showed the sync day** (reported: "tanggal upload nya
   chapter manga di website nya"). The chapter list has one date column,
   `fetched_at`, and the code used it for two different things. `UpsertChapter`

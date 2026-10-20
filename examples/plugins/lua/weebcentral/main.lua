@@ -196,7 +196,8 @@ function get_manga_detail(arg)
 end
 
 -- ─── ABI: get_chapter_list ───────────────────────────────────────────────
--- arg: '"<ULID>"'. HTMX fragment, newest-first (ascending = reverse).
+-- arg: '"<ULID>"'. HTMX fragment, newest-first — which is the ABI order, so
+-- the list is delivered as it comes.
 function get_chapter_list(arg)
     local ulid = host.json.decode(arg)
     if not ulid then
@@ -226,17 +227,16 @@ function get_chapter_list(arg)
             out[#out + 1] = {
                 id = chid,
                 title = t ~= "" and t or chid,
+                chapter_num = t ~= "" and host.text.chapter_num(t) or 0,
                 released_at = times[i] or "",
             }
         end
     end
-    -- fragment is newest-first; reader wants ascending
-    local asc = {}
-    for i = #out, 1, -1 do
-        asc[#asc + 1] = out[i]
-    end
-    log.info("weebcentral: found " .. tostring(#asc) .. " chapters")
-    return host.json.encode(asc)
+    -- The fragment is newest-first, which is the ABI order: the host sorts the
+    -- detail list by chapter_num descending and its reader resolves prev/next
+    -- assuming newest-first. Reversing here flipped the list.
+    log.info("weebcentral: found " .. tostring(#out) .. " chapters")
+    return host.json.encode(out)
 end
 
 -- ─── ABI: get_page_list ──────────────────────────────────────────────────

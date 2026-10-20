@@ -24,18 +24,22 @@
 //     the composite "<mangaId>|<slug>", and a chapter's ID is
 //     "<mangaSlug>|<chapterSlug>" for GetPageList.
 //
-//  3. Chapter output deliberately mirrors the Lua source, which sets neither
-//     manga_id nor url and leaves chapter_num at 0. Filling them would look
-//     like an improvement, but reading progress is keyed off chapter_num, so
-//     inventing a number here would silently detach the reader from the
-//     chapters it has already recorded for the library entries of this source.
+//  3. Chapter output mirrors the Lua source, which sets neither manga_id nor
+//     url, but it now also carries chapter_num. The Lua source shipped 0
+//     because the Odin port was written when reading progress was believed to
+//     be keyed off chapter_num; it is not - progress is keyed off the chapter's
+//     source id - and a source with no numbers cannot be ordered at all.
+//
+//  4. The site labels a split chapter "Chapter 12-2" and a decimal one
+//     "Chapter 12.1". text.chapter_num reads the leading number only, so the
+//     hyphen form collapsed to 12 and collided with its sibling. Fold the
+//     hyphen into the decimal the dot form already uses.
 package comizy_odin
 
 import "abi"
 import "base:runtime"
 import "core:encoding/json"
 import "core:fmt"
-import "core:slice"
 import "core:strings"
 
 kAPI :: "https://api.comizy.io"
@@ -235,6 +239,16 @@ build_id :: proc () -> string {
 // released_at rather than emitting an epoch.
 date_to_iso :: proc (s: string) -> string { return abi.date_to_iso(s) }
 
+// comizy_chapter_num is the chapter number of a comizy chapter label. The site
+// labels a split chapter "Chapter 12-2" and a decimal one "Chapter 12.1";
+// text.chapter_num reads the leading number only, so the hyphen form collapsed
+// to 12 and collided with its sibling. Fold the hyphen into the decimal the
+// dot form already uses.
+comizy_chapter_num :: proc (title: string) -> f64 {
+	folded := abi.sub(title, `^(?i)(Chapter\s+\d+)\s*-\s*(\d+)\s*$`, "$1.$2")
+	return abi.chapter_num(folded)
+}
+
 // ─── search ──────────────────────────────────────────────────────────────────
 
 search_impl :: proc (arg: string) -> string {
@@ -425,12 +439,14 @@ chapters_impl :: proc (arg: string) -> string {
 		append(&out, Chapter_Out{
 			ID          = strings.concatenate({slug, "|", c.Slug}),
 			Title       = title,
+			Chapter_Num = comizy_chapter_num(title),
 			Released_At = date_to_iso(c.Updated_At),
 		})
 	}
 
-	// The endpoint answers newest-first; the ABI wants ascending.
-	slice.reverse(out[:])
+	// The endpoint is already newest-first, which is the ABI order: the host
+	// sorts its cached list by chapter_num descending and its reader resolves
+	// prev/next assuming newest-first. Reversing here flipped the list.
 	return abi.to_json(out[:])
 }
 

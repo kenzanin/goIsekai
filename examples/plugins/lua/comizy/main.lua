@@ -54,6 +54,15 @@ local function split_id(id)
     return id:sub(1, sep - 1), id:sub(sep + 1)
 end
 
+-- comizy labels a split chapter "Chapter 12-2" and a decimal one "Chapter
+-- 12.1". text.chapter_num reads the leading number only, so the hyphen form
+-- collapsed to 12 and collided with its sibling. Fold the hyphen into the
+-- decimal the dot form already uses.
+local function comizy_chapter_num(title)
+    local t = (title or ""):gsub("^(%s*[Cc]hapter%s+%d+)%s*%-%s*(%d+)%s*$", "%1.%2")
+    return host.text.chapter_num(t)
+end
+
 -- ─── ABI: search_manga ─────────────────────────────────────────────────
 -- arg: {query=string, page=n, genres?={slug,...}}. id packs "{mangaId}|{slug}"
 -- (chapters need the opaque mangaId, pages need the slug — neither derives
@@ -195,7 +204,7 @@ end
 
 -- ─── ABI: get_chapter_list ─────────────────────────────────────────────
 -- arg: JSON string '"{mangaId}|{slug}"'. Dedicated endpoint (no cv);
--- returns newest-first, reversed to ascending. Chapter id packs
+-- returns newest-first, which is the ABI order. Chapter id packs
 -- "{mangaSlug}|{chapterSlug}" for get_page_list.
 
 function get_chapter_list(arg)
@@ -217,20 +226,20 @@ function get_chapter_list(arg)
     local out = {}
     for _, c in ipairs(chs) do
         if c.slug then
+            local title = c.name or c.slug
             out[#out + 1] = {
                 id = slug .. "|" .. c.slug,
-                title = c.name or c.slug,
+                title = title,
+                chapter_num = comizy_chapter_num(title),
                 released_at = c.updated_at or "",
             }
         end
     end
-    -- endpoint is newest-first; reader wants ascending
-    local asc = {}
-    for i = #out, 1, -1 do
-        asc[#asc + 1] = out[i]
-    end
-    log.info("comizy: found " .. tostring(#asc) .. " chapters")
-    return host.json.encode(asc)
+    -- The endpoint is already newest-first, which is the ABI order: the host
+    -- sorts its cached list by chapter_num descending and its reader resolves
+    -- prev/next assuming newest-first. Reversing here flipped the list.
+    log.info("comizy: found " .. tostring(#out) .. " chapters")
+    return host.json.encode(out)
 end
 
 -- ─── ABI: get_page_list ────────────────────────────────────────────────

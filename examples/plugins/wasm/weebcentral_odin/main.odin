@@ -23,8 +23,8 @@
 //     card's title.
 //  2. The clean title lives in `a.line-clamp-1`; the picture anchor's text is
 //     badge noise ("Official..."). Titles never come from the picture anchor.
-//  3. `/full-chapter-list` is newest-first; the reader wants ascending, so the
-//     list is reversed on the way out.
+//  3. `/full-chapter-list` is newest-first, which is the ABI order, so the
+//     list is delivered as it comes.
 //  4. The reader page is paginated: the chapter doc only carries `max_page`,
 //     and `/images?current_page=N` returns one batch. All batches are walked.
 //
@@ -308,11 +308,9 @@ chapters_impl :: proc (arg: string) -> string {
 		})
 	}
 
-	// The fragment is newest-first; the reader wants ascending.
-	n := len(out)
-	for i in 0 ..< n / 2 {
-		out[i], out[n - 1 - i] = out[n - 1 - i], out[i]
-	}
+	// The fragment is already newest-first, which is the ABI order: the host
+	// sorts its cached list by chapter_num descending and its reader resolves
+	// prev/next assuming newest-first. Reversing here flipped the list.
 	return abi.to_json(out[:])
 }
 
