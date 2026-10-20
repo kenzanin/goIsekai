@@ -275,11 +275,11 @@ func TestNativePluginInstallAndHotLoad(t *testing.T) {
 // cString walks a C string without purego's internal helper, so it gets its own
 // check: a nil pointer and an embedded terminator both have to behave.
 func TestCString(t *testing.T) {
-	if got := cString(0); got != "" {
-		t.Fatalf("cString(0) = %q, want empty", got)
+	if got := cString(nil); got != "" {
+		t.Fatalf("cString(nil) = %q, want empty", got)
 	}
 	buf := []byte("hello\x00world\x00")
-	if got := cString(uintptr(unsafe.Pointer(&buf[0]))); got != "hello" {
+	if got := cString(unsafe.Pointer(&buf[0])); got != "hello" {
 		t.Fatalf("cString = %q, want %q", got, "hello")
 	}
 }

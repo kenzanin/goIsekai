@@ -47,7 +47,7 @@ func TestJobsWSBroadcast(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ws dial: %v", err)
 	}
-	t.Cleanup(func() { conn.Close() })
+	t.Cleanup(func() { _ = conn.Close() })
 
 	// filter then un-filter
 	send := func(id string) {
@@ -114,7 +114,7 @@ func TestJobsWSProgress(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ws dial: %v", err)
 	}
-	t.Cleanup(func() { conn.Close() })
+	t.Cleanup(func() { _ = conn.Close() })
 
 	// Drive the SAME callback production wires (registerWSRoutes sets pool.ProgressChanged).
 	pool.SetProgress("job-77", 42)
@@ -152,7 +152,7 @@ func TestJobsWSUnregister(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ws dial: %v", err)
 	}
-	conn.Close()
+	_ = conn.Close()
 
 	s.broadcastJobStatus("job-999", workers.StatusDone.String(), "")
 	time.Sleep(50 * time.Millisecond)

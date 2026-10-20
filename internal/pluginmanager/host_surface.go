@@ -159,17 +159,6 @@ func hostSurfaceNames() []string {
 	return out
 }
 
-// hostSurfaceByNamespace groups the pure helpers by namespace, so a runtime can
-// build its table without walking the flat list.
-func hostSurfaceByNamespace() map[string][]hostHelper {
-	out := map[string][]hostHelper{}
-	for _, h := range hostSurface {
-		ns, _ := splitHostName(h.name)
-		out[ns] = append(out[ns], h)
-	}
-	return out
-}
-
 // invoke runs one kindPure helper with positional string arguments and returns
 // its value and an error. ok is false for kindRuntime entries, telling the
 // caller to use its own wiring.

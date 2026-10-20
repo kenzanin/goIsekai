@@ -56,9 +56,15 @@ var goFnNames = map[string]string{
 
 // goFn is one resolved entry point plus the free function that releases the
 // buffer it returns. Both come from the same library, so they travel together.
+//
+// The pointers are unsafe.Pointer rather than uintptr: purego maps
+// unsafe.Pointer <-> void* directly, so the C buffer never has to be laundered
+// through an integer type (which is what made go vet flag a "possible misuse of
+// unsafe.Pointer"). A real pointer is also the correct holder for C memory — a
+// uintptr carries no liveness information at all.
 type goFn struct {
-	call func(string) uintptr
-	free func(uintptr)
+	call func(string) unsafe.Pointer
+	free func(unsafe.Pointer)
 }
 
 // hostCallCallback is the bridge that gives a native plugin the helpers wasm
@@ -116,15 +122,15 @@ func writeCString(out *byte, outCap int32, s string) int32 {
 // cString reads a NUL-terminated C string at ptr. purego keeps its own
 // CString/GoString helpers internal, so the host walks the bytes itself; JSON
 // payloads never contain a NUL, which is what makes the terminator safe.
-func cString(ptr uintptr) string {
-	if ptr == 0 {
+//
+// ptr is unsafe.Pointer rather than uintptr because purego hands void* back as
+// a real pointer; keeping it typed is what lets go vet follow the value instead
+// of flagging a "possible misuse of unsafe.Pointer".
+func cString(ptr unsafe.Pointer) string {
+	if ptr == nil {
 		return ""
 	}
-	// The uintptr→unsafe.Pointer conversion cannot be avoided here: dlopen
-	// hands symbols back as uintptr, so vet cannot trace it. It is safe by
-	// contract — the pointer is a live C string owned by the plugin for the
-	// duration of the call.
-	return cStringAt(unsafe.Pointer(ptr)) //nolint:govet // see above: purego returns C pointers as uintptr
+	return cStringAt(ptr)
 }
 
 // cStringFrom is cString for the callback path, where the pointer arrives as a
@@ -171,7 +177,7 @@ func (m *Manager) loadGo(id, path string) (*loadedPlugin, error) {
 
 	// plugin_free is required: without it the host cannot hand a result back,
 	// so a plugin missing it would leak on every call.
-	var free func(uintptr)
+	var free func(unsafe.Pointer)
 	if err := lib.bind("plugin_free", &free); err != nil {
 		_ = lib.close()
 		return nil, fmt.Errorf("go plugin %s: symbol plugin_free missing: %w", id, err)
@@ -179,7 +185,7 @@ func (m *Manager) loadGo(id, path string) (*loadedPlugin, error) {
 
 	fns := map[string]any{}
 	for hostName, symName := range goFnNames {
-		var call func(string) uintptr
+		var call func(string) unsafe.Pointer
 		if err := lib.bind(symName, &call); err != nil {
 			// GetGenres is optional; every other mapped export is required.
 			if hostName == types.GetGenresFunc {
@@ -233,7 +239,7 @@ func callGo(p *loadedPlugin, fnName, inputJSON string) (string, error) {
 	// purego converts the Go string to a NUL-terminated C string for the call
 	// and keeps it alive across it, so the input needs no manual buffer.
 	out := fn.call(inputJSON)
-	if out == 0 {
+	if out == nil {
 		return "", fmt.Errorf("go plugin %s %s: returned a null result", p.id, fnName)
 	}
 	res := cString(out)
