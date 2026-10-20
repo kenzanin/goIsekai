@@ -192,38 +192,49 @@ blocker: `host.regex.gmatch` dan `string.gmatch` sama-sama menjadi satu loop
 
 ## Peluang lebih besar daripada port Lua: 7 plugin TinyGo yang kembaran C++-nya sudah ada
 
-Survei 2026-10-20 menemukan yang **tidak** perlu menulis kode baru sama sekali.
-Tujuh plugin wasm masih TinyGo/standard-Go, dan **kembaran C++-nya sudah dibangun
-dan ada di `examples/`**, tetapi yang **terpasang di `app_data/` masih versi Go**:
+**SELESAI 2026-10-20.** Ketujuh kembaran C++ sekarang **sudah terpasang** di
+`app_data/plugins/` dan lolos A/B live terhadap baseline Go. Bagian ini disimpan
+sebagai catatan keputusan, bukan lagi sebagai pekerjaan tertunda.
 
-| plugin | Go terpasang | C++ siap | rasio |
+Survei 2026-10-20 menemukan pekerjaan yang **tidak** perlu menulis kode baru sama
+sekali. Waktu itu tujuh plugin wasm masih TinyGo/standard-Go dan kembaran C++-nya
+sudah dibangun di `examples/`, tetapi yang terpasang masih versi Go:
+
+| plugin | Go (baseline) | C++ terpasang | rasio |
 | --- | ---: | ---: | ---: |
-| `komix_to` | 2 110 343 | 313 116 | 6.7× |
-| `mangak` | 1 899 228 | 312 815 | 6.1× |
-| `ksgroupscans` | 2 186 868 | 325 187 | 6.7× |
-| `kunmanga_online` | 2 122 986 | 320 614 | 6.6× |
-| `mangakakalot` | 2 181 593 | 327 235 | 6.7× |
-| `manhawato` | 2 164 283 | 306 538 | 7.1× |
-| `reimanga_net` | 1 834 751 | 106 986 | 17.2× |
-| **total** | **14 500 052** | **2 012 491** | **7.2×** |
+| `komix_to` | 2 110 343 | 199 712 | 10.6× |
+| `mangak` | 1 899 228 | 205 446 | 9.2× |
+| `ksgroupscans` | 2 186 868 | 218 509 | 10.0× |
+| `kunmanga_online` | 2 122 986 | 207 102 | 10.3× |
+| `mangakakalot` | 2 181 593 | 213 731 | 10.2× |
+| `manhawato` | 2 164 283 | 199 197 | 10.9× |
+| `reimanga_net` | 1 834 751 | 106 850 | 17.2× |
+| **total** | **14 500 052** | **1 350 547** | **10.7×** |
 
-`manhawato` adalah kasus paling tajam: `wasm-cpp-plugin-toolchain.md` menyatakan
-`manhawato_cpp` "replaces the Go wasm in `app_data/plugins/manhawato/`", tetapi
-`md5sum` membuktikan `app_data/plugins/manhawato/main.wasm` **identik dengan versi
-Go**, bukan C++. Klaim dokumen itu salah dan sudah dikoreksi.
+Angka C++ di tabel ini **lebih kecil** dari survei awal (mis. `komix_to` 313 116 →
+199 712) karena `build.sh` C++ ternyata menyimpan binary basi saat compile gagal
+— lihat "Jebakan utama" di `wasm-cpp-plugin-toolchain.md`. Setelah `rm -f main.wasm`
+ditambahkan ke kedelapan `build.sh`, semua binary dibangun ulang dan mengecil
+dengan flag yang sama.
 
-Artinya "migrasi" termurah yang tersisa **bukan** port Lua→Odin, melainkan
-memasang kembaran C++ yang sudah lolos build: 7.2× lebih kecil untuk 14.5 MB,
-tanpa satu baris kode baru. Yang belum ada bukti: **A/B live** untuk ketujuh
-kembaran itu — belum pernah dijalankan sebagai plugin terpasang. Sebelum swap,
-jalankan prosedur yang sama dengan port Odin (bersihkan `plugin_cache`, bandingkan
-search/detail/chapters/pages terhadap versi Go).
+`manhawato` adalah kasus paling tajam: `wasm-cpp-plugin-toolchain.md` dulu
+menyatakan `manhawato_cpp` "replaces the Go wasm in `app_data/plugins/manhawato/`",
+tetapi `md5sum` membuktikan yang terpasang masih **versi Go**. Klaim itu salah,
+sudah dikoreksi, dan sekarang baru benar-benar terpasang.
 
-Untuk sisanya, Odin dan C++ ternyata **setara dari sisi ukuran** (Odin ~416 KB vs
-C++ ~313 KB vs TinyGo ~2.1 MB) — jadi untuk plugin yang **belum** punya kembaran
-C++, port Odin tetap pilihan yang lebih baik (tanpa wasi-sdk, satu perintah build,
-`abi/` bersama). Prioritasnya: **pasang C++ twin dulu** (murah), baru port Odin
-untuk plugin yang memang belum punya twin.
+Hasil A/B: search/detail/chapters **identik** untuk 6 dari 7 plugin. `pages`
+berubah `null` → `[]` di semua plugin, yang aman karena host men-decode ke
+`[]types.Page` (`internal/pluginmanager/api_detail.go:97`). `reimanga_net` justru
+**lebih baik**: versi Go mengembalikan "plugin unreachable" untuk detail/chapters/
+pages, versi C++ mengembalikan data nyata (126 chapter termasuk desimal `116.5`,
+author, cover, genres, 4 page).
+
+Untuk sisa plugin yang **belum** punya kembaran C++, Odin dan C++ ternyata setara
+dari sisi ukuran (Odin ~416 KB vs C++ ~200–313 KB vs TinyGo ~2.1 MB) — jadi port
+Odin tetap pilihan yang lebih baik untuk plugin baru (tanpa wasi-sdk, satu perintah
+build, `abi/` bersama). Prioritas historisnya: pasang C++ twin dulu (murah), baru
+port Odin untuk plugin yang memang belum punya twin. Itu sudah dijalankan.
+
 
 
 ## Catatan host

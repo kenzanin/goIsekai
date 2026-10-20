@@ -2,5 +2,5 @@
   "name": "KunManga",
   "site_url": "https://www.kunmanga.online",
   "logo": "logo.png",
-  "built_with": "clang 13.0.0"
+  "built_with": "cpp 13.0.0"
 }

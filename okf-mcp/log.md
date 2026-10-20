@@ -2,6 +2,41 @@
 
 ## 2026-10-20
 
+- **Swapped all seven Go/TinyGo wasm plugins for their existing C++ twins** in
+  `app_data/plugins/` (komix_to, mangak, ksgroupscans, kunmanga_online,
+  mangakakalot, manhawato, reimanga_net). **14 500 052 → 1 350 547 bytes, 10.7×**
+  (reimanga_net 17.2×). Same plugin id and `plugin.json` `name` kept, so
+  library/progress survives. `examples/` untouched — the Go sources stay as the
+  permanent archive; only `app_data/` swaps. A/B (Go baseline vs installed C++)
+  with `plugin_cache` cleared: search/detail/chapters **identical** on 6 of 7;
+  `pages` goes `null` → `[]` everywhere, which the host decodes identically
+  (`var result []types.Page`), so it is shape-only. `reimanga_net` is a **big
+  win**: the Go build returned `plugin unreachable` for detail/chapters/pages,
+  C++ returns real data (126 chapters incl. decimal `116.5`, author, cover,
+  genres, 4 pages). `kunmanga_online` fixes a broken cover URL (missing slash →
+  `onlinethumb/`). Full write-up: `concept/wasm-cpp-plugin-toolchain.md`.
+- **Found the reason a C++ twin had gone stale: `build.sh` swallowed compile
+  failures.** `clang++ … 2>&1 | grep -v "no version information available" ||
+  true` makes the pipeline's status `grep`'s, and `|| true` discards it; when the
+  compile fails the OLD `main.wasm` is still on disk, so `test -f main.wasm`
+  passes and the script prints `exports OK (<size of the old binary>)`.
+  `manhawato_cpp`'s `main.cpp` was from 10-19 11:31 while `main.wasm` was from
+  10-17 11:24 — two days stale, reported as OK, and its live A/B then showed a
+  missing `status` field. Fixed by `rm -f main.wasm` **before** the compile line
+  in all eight `*_cpp/build.sh`, so a failed build now fails loudly. Rebuilt
+  binaries are much smaller (komix_to 313 116 → 199 712 B) with unchanged flags
+  and identical behavior — the old sizes were stale artifacts. **Never trust
+  `exports OK` from a script that filters compiler output.**
+- **Fixed a real C++ port bug found by A/B:** `mangakakalot_cpp` had
+  `for (…; count < 48; …)`, a hardcoded cap that dropped the last 2 results (Go
+  returned 50). Cap removed (Go has none; the host paginates) → 50/50 identical.
+- **Operational gotcha:** `komix.to` can take ~16.7 s for one page, past the
+  host's `invokeTimeout` (15 s, `internal/pluginmanager/manager.go:22`). The wasm
+  module is then closed and the **next** call fails with
+  `malloc failed for input` — a misleading message. Restarting the server
+  restores it. On a wasm/C++ plugin, `malloc failed` means "module already
+  closed", not "allocation failed".
+
 - **Ported `violetmanga` Lua → Odin wasm** (`examples/plugins/wasm/violetmanga_odin/`,
   301 KB). Smallest remaining candidate (174 LOC). The Lua header claims the
   reader needs `host.browser.evaluate`, but that plugin **never calls it** — the

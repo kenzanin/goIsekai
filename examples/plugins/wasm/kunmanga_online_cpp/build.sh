@@ -20,6 +20,12 @@ if ldd "$WASI_SDK/bin/wasm-ld" 2>/dev/null | grep -q "libxml2.so.2 => not found"
     export LD_LIBRARY_PATH="$SHIM${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
 fi
 
+# Delete any previous artifact first: the clang++ line below filters a harmless
+# linker warning through grep, so its exit status is grep's. Without this, a
+# failed compile leaves the OLD main.wasm behind and `test -f` passes it off as
+# a fresh build (that is how manhawato ended up 2 days stale).
+rm -f main.wasm
+
 "$WASI_SDK/bin/clang++" \
     -std=c++17 -O2 -fno-exceptions -fno-rtti \
     --target=wasm32-wasi -mexec-model=reactor \

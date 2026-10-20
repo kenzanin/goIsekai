@@ -2,5 +2,5 @@
   "name": "MangaKakalot",
   "site_url": "https://www.mangakakalove.com",
   "logo": "logo.png",
-  "built_with": "clang 13.0.0"
+  "built_with": "cpp 13.0.0"
 }

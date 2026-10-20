@@ -214,8 +214,9 @@ static std::string search_impl(const std::string &arg) {
     auto &alloc = out.GetAllocator();
     std::vector<std::string> seen;
     std::regex cardRe(R"re([\s\S]<h3[^>]*>\s*<a[^>]*href="([^"]+)"[^>]*>([\s\S]*?)</a>)re");
-    int count = 0;
-    for (std::sregex_iterator it(body.begin(), body.end(), cardRe), end; it != end && count < 48; ++it) {
+    // No result cap: the Go twin emits every card on the page, and the host
+    // paginates. A `count < 48` here silently dropped the last two results.
+    for (std::sregex_iterator it(body.begin(), body.end(), cardRe), end; it != end; ++it) {
         std::string slug = slug_of((*it)[1].str());
         if (slug.empty() || std::find(seen.begin(), seen.end(), slug) != seen.end()) continue;
         seen.push_back(slug);
@@ -224,7 +225,6 @@ static std::string search_impl(const std::string &arg) {
         add_string(m, "title", clean((*it)[2].str()), alloc);
         add_string(m, "cover_url", abs_url(cover_near(body, slug)), alloc);
         out.PushBack(m, alloc);
-        count++;
     }
     return to_json(out);
 }

@@ -12,12 +12,15 @@ the system **wasi-sdk** clang, alongside the Go (`//go:wasmexport`) path. Shippe
 `examples/plugins/wasm/komix_to_cpp/` and `examples/plugins/wasm/manhawato_cpp/`.
 Commit `a628bd5`.
 
-**Koreksi 2026-10-20:** dokumen ini dulu menyatakan `manhawato_cpp` "replaces the
-Go wasm in `app_data/plugins/manhawato/`". Itu **tidak benar**. `md5sum` membuktikan
-`app_data/plugins/manhawato/main.wasm` identik dengan versi **Go**
-(`556a3890…` vs C++ `aca7086b…`), dan ukurannya 2 164 283 vs 306 538 bytes. Jadi
-belum ada satu pun C++ twin yang benar-benar dipasang; ketujuhnya masih berupa
-build di `examples/` tanpa bukti A/B live sebagai plugin terpasang.
+**Koreksi 2026-10-20 (pagi):** dokumen ini dulu menyatakan `manhawato_cpp` "replaces
+the Go wasm in `app_data/plugins/manhawato/`". Itu **tidak benar**. `md5sum`
+membuktikan `app_data/plugins/manhawato/main.wasm` identik dengan versi **Go**
+(`556a3890…` vs C++ `aca7086b…`), dan ukurannya 2 164 283 vs 306 538 bytes. Saat
+itu belum ada satu pun C++ twin yang benar-benar dipasang.
+
+**Status 2026-10-20 (sore): ketujuhnya SUDAH terpasang dan terverifikasi A/B.**
+Lihat bagian "Live swap" di bawah — klaim di atas sudah usang, tapi disimpan
+sebagai catatan bahwa "sudah dibuild di `examples/`" ≠ "sudah dipasang".
 
 ## Toolchain
 
@@ -109,6 +112,103 @@ half of standard Go but ~6× C++.
   the earlier fallback to standard-Go.
 - `wasm-opt` (available at `~/.opt/tinygo/bin/wasm-opt`) could shrink either
   backend further; not applied here.
+
+## Live swap 2026-10-20 — ketujuh C++ twin dipasang
+
+Ketujuh C++ twin sekarang benar-benar menggantikan Go/TinyGo di
+`app_data/plugins/`. Aturan yang dipegang: **plugin id dan `name` di `plugin.json`
+tidak berubah**, jadi library/progress user tidak hilang (`Komix`, `MangaK`,
+`KSGroupScans`, `KunManga`, `MangaKakalot`, `Manhwato`, `ReiManga`). Yang berubah
+hanya `main.wasm` + field `built_with`.
+
+| plugin | Go (bytes) | C++ (bytes) | ratio |
+| --- | ---: | ---: | ---: |
+| komix_to | 2 110 343 | 199 712 | 10.6× |
+| mangak | 1 899 228 | 205 446 | 9.2× |
+| ksgroupscans | 2 186 868 | 218 509 | 10.0× |
+| kunmanga_online | 2 122 986 | 207 102 | 10.3× |
+| mangakakalot | 2 181 593 | 213 731 | 10.2× |
+| manhawato | 2 164 283 | 199 197 | 10.9× |
+| reimanga_net | 1 834 751 | 106 850 | 17.2× |
+| **total** | **14 500 052** | **1 350 547** | **10.7×** |
+
+Sumber C++ di `examples/` **tidak dihapus** (arsip permanen); hanya
+`app_data/plugins/` yang di-swap.
+
+### A/B: Go baseline vs C++ terpasang
+
+`plugin_cache` **wajib** dihapus per plugin sebelum capture
+(`DELETE FROM plugin_cache WHERE plugin_id='X'`), kalau tidak payload lama yang
+disajikan dan A/B jadi palsu. Endpoint: `search?q=love`, `detail/{id}`,
+`chapters/{id}`, `pages/{chapterID}` (`{chapterID}` satu segmen → URL-encode).
+
+Hasil akhir: **search/detail/chapters identik** untuk 6 dari 7 plugin;
+`reimanga_net` justru **lebih baik** (lihat bawah). Semua perbedaan yang tersisa
+sudah diverifikasi aman atau diperbaiki.
+
+**Perbedaan yang AMAN (bukan regresi):**
+
+- **`pages`: Go `null` → C++ `[]`** di ketujuh plugin. Host men-decode ke
+  `var result []types.Page` lalu `json.Unmarshal`, jadi `null` dan `[]` sama-sama
+  panjang 0 (`internal/pluginmanager/api_detail.go:97`). C++ kebetulan lebih benar
+  bentuknya (array valid).
+- **`released_at` kehilangan milidetik** (`…23.526Z` → `…23Z`, `komix_to`).
+  Field-nya `time.Time` (`pkg/types/types.go:34`), keduanya RFC3339 valid.
+- **Urutan `search` bisa beda** walau set hasil sama. Diuji: plugin yang sama,
+  dua panggilan berurutan → urutan stabil, jadi ini urutan dari situs, bukan
+  nondeterminisme plugin.
+
+**Perbedaan yang diperbaiki (C++ lebih benar):**
+
+- **`reimanga_net`**: versi Go mengembalikan
+  `{"error":"bridge: plugin reimanga_net is unreachable…"}` untuk detail,
+  chapters **dan** pages — praktis mati. C++ mengembalikan data nyata: 126 chapter
+  (termasuk desimal `116.5`), author `Fargo`, cover, deskripsi, genres, dan 4 page.
+  Ini peningkatan besar, bukan regresi.
+- **`kunmanga_online`**: `cover_url` Go
+  `https://www.kunmanga.onlinethumb/love-4-a-walk.webp` (slash hilang, URL rusak);
+  C++ `https://www.kunmanga.online/thumb/love-4-a-walk.webp`. Sumber C++ sudah
+  mencatat ini sebagai `ponytail:` comment.
+
+**Bug C++ yang ditemukan dan diperbaiki saat swap:**
+
+- **`mangakakalot_cpp`**: `for (…; count < 48; …)` — cap hardcoded yang
+  membuang 2 hasil terakhir (Go mengembalikan 50, C++ 48). Cap dihapus; Go juga
+  tidak punya batas, host yang memaginasi. Setelah perbaikan: 50/50 identik.
+
+### Jebakan utama: `build.sh` C++ menelan kegagalan compile
+
+`manhawato` kehilangan `status` setelah swap. Penyebabnya **bukan** kode, tapi
+**binary basi**: `main.cpp` diubah 10-19 11:31, `main.wasm` masih 10-17 11:24.
+Akarnya ada di `build.sh`:
+
+```sh
+"$WASI_SDK/bin/clang++" … main.cpp -o main.wasm \
+    2>&1 | grep -v "no version information available" || true
+test -f main.wasm
+```
+
+Exit status baris itu adalah milik `grep`, dan `|| true` menelannya habis. Saat
+compile gagal, `main.wasm` **lama** tetap ada, `test -f` lolos, dan skrip
+mencetak `exports OK` beserta ukuran binary lama. Persis ini yang terjadi: satu
+build gagal, dilaporkan sukses, dan binary 2 hari yang lalu ikut ter-commit.
+
+Perbaikan (diterapkan ke **kedelapan** `*_cpp/build.sh`): `rm -f main.wasm`
+sebelum baris compile, sehingga kegagalan membuat `test -f` gagal keras. Setelah
+`rm -f`, semua binary yang dibangun ulang jauh lebih kecil (mis. `komix_to`
+313 116 → 199 712 B); flag compile tidak berubah dan validasi export tetap lolos,
+serta A/B menunjukkan perilaku identik — jadi ukuran lama berasal dari artefak
+build yang lebih tua, bukan dari flag yang hilang. **Pelajaran: jangan pernah
+mempercayai `exports OK` dari skrip yang memfilter output compiler tanpa
+memeriksa status compile.**
+
+### Catatan operasional
+
+- `komix.to` kadang butuh ~16.7 s untuk satu halaman, melebihi `invokeTimeout`
+  host (15 s, `internal/pluginmanager/manager.go:22`). Modul wasm lalu ditutup dan
+  panggilan **berikutnya** gagal dengan `malloc failed for input` — pesan yang
+  menyesatkan. Setelah restart server, plugin normal kembali. Jadi `malloc failed`
+  pada plugin C++/wasm berarti "modul sudah mati", bukan "alokasi gagal".
 
 ## Related
 
