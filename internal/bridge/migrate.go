@@ -105,10 +105,16 @@ func repointMangaTx(tx *sql.Tx, mangaID int64, pluginID, sourceMangaID string, m
 
 func upsertChaptersTx(tx *sql.Tx, mangaID int64, chapters []types.Chapter) error {
 	for _, c := range chapters {
+		// NULL (not "") when the plugin knows no date, so "no date" stays
+		// distinguishable from a real one.
+		var releasedAt any
+		if s := database.ReleasedAtString(c.ReleasedAt); s != "" {
+			releasedAt = s
+		}
 		_, err := tx.Exec(
-			`INSERT INTO chapters (manga_id, source_chapter_id, title, chapter_num, volume_num) VALUES (?, ?, ?, ?, ?)
-			 ON CONFLICT(manga_id, source_chapter_id) DO UPDATE SET title = excluded.title, chapter_num = excluded.chapter_num, volume_num = excluded.volume_num`,
-			mangaID, c.ID, c.Title, c.ChapterNum, c.VolumeNum,
+			`INSERT INTO chapters (manga_id, source_chapter_id, title, chapter_num, volume_num, released_at) VALUES (?, ?, ?, ?, ?, ?)
+			 ON CONFLICT(manga_id, source_chapter_id) DO UPDATE SET title = excluded.title, chapter_num = excluded.chapter_num, volume_num = excluded.volume_num, released_at = excluded.released_at`,
+			mangaID, c.ID, c.Title, c.ChapterNum, c.VolumeNum, releasedAt,
 		)
 		if err != nil {
 			return err

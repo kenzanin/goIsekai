@@ -75,6 +75,15 @@ var ddl = []string{
 );`,
 	`ALTER TABLE plugins ADD COLUMN thumb_ratio REAL DEFAULT 0;`,
 	`ALTER TABLE mangas ADD COLUMN new_since TIMESTAMP;`,
+	`ALTER TABLE plugins ADD COLUMN http_profile TEXT DEFAULT '';`,
+	`ALTER TABLE plugins ADD COLUMN genres TEXT;`,
+	`ALTER TABLE mangas ADD COLUMN author TEXT NOT NULL DEFAULT '';`,
+	`ALTER TABLE mangas ADD COLUMN custom_cover INTEGER NOT NULL DEFAULT 0;`,
+	`ALTER TABLE mangas ADD COLUMN reader_prefs TEXT NOT NULL DEFAULT '';`,
+	// released_at is the site's own upload date for a chapter, as reported by
+	// the plugin. It is NULL when the plugin knows no date — distinct from
+	// fetched_at, which is when WE last synced the row.
+	`ALTER TABLE chapters ADD COLUMN released_at TIMESTAMP;`,
 	// alt_titles column was added then dropped; the replacement table is below.
 	`CREATE TABLE IF NOT EXISTS alt_titles (
 		id INTEGER PRIMARY KEY AUTOINCREMENT,

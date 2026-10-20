@@ -158,7 +158,7 @@ func (s *AppService) persistMangaDetails(pluginID string, m types.Manga, chapter
 			Title:           c.Title,
 			ChapterNum:      c.ChapterNum,
 			VolumeNum:       c.VolumeNum,
-			FetchedAt:       c.ReleasedAt,
+			ReleasedAt:      c.ReleasedAt,
 		}); err != nil {
 			return err
 		}

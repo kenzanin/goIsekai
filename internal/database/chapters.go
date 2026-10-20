@@ -1,14 +1,40 @@
 package database
 
 import (
+	"time"
+
 	. "goisekai/internal/database/.gen/table"
 
 	. "github.com/go-jet/jet/v2/sqlite"
 )
 
+// ReleasedAtString renders a chapter's release date in the storage format of
+// the released_at column. It returns "" for a zero time, which means "the
+// plugin knows no date".
+func ReleasedAtString(t time.Time) string {
+	if t.IsZero() {
+		return ""
+	}
+	return t.UTC().Format("2006-01-02 15:04:05")
+}
+
+// chapterReleasedAt is the SQL expression for a chapter's release date: the
+// site's own upload date as reported by the plugin, or NULL when the plugin
+// knows none. NULL keeps "no date known" distinguishable from a real date.
+func chapterReleasedAt(t time.Time) TimestampExpression {
+	s := ReleasedAtString(t)
+	if s == "" {
+		return TimestampExp(NULL)
+	}
+	return TimestampExp(String(s))
+}
+
 // UpsertChapter inserts a chapter or, on a duplicate (manga_id, source_chapter_id),
 // refreshes the identifying/metadata columns while preserving is_read, last_page_read
 // and download_status. Returns the integer chapter ID.
+//
+// fetched_at is stamped with the sync time (CURRENT_TIMESTAMP); the site's own
+// upload date goes to released_at, which is a different thing entirely.
 func (d *DB) UpsertChapter(c Chapter) (int64, error) {
 	// If ID is zero, let SQLite auto-generate it by inserting NULL.
 	idVal := c.ID
@@ -28,6 +54,7 @@ func (d *DB) UpsertChapter(c Chapter) (int64, error) {
 		Chapters.LastPageRead,
 		Chapters.DownloadStatus,
 		Chapters.FetchedAt,
+		Chapters.ReleasedAt,
 	).VALUES(
 		c.MangaID,
 		c.SourceChapterID,
@@ -38,12 +65,14 @@ func (d *DB) UpsertChapter(c Chapter) (int64, error) {
 		c.LastPageRead,
 		c.DownloadStatus,
 		RawTimestamp("CURRENT_TIMESTAMP"),
+		chapterReleasedAt(c.ReleasedAt),
 	).ON_CONFLICT(Chapters.MangaID, Chapters.SourceChapterID).DO_UPDATE(
 		SET(
 			Chapters.Title.SET(Chapters.EXCLUDED.Title),
 			Chapters.ChapterNum.SET(Chapters.EXCLUDED.ChapterNum),
 			Chapters.VolumeNum.SET(Chapters.EXCLUDED.VolumeNum),
 			Chapters.FetchedAt.SET(RawTimestamp("CURRENT_TIMESTAMP")),
+			Chapters.ReleasedAt.SET(chapterReleasedAt(c.ReleasedAt)),
 		),
 	)
 
@@ -60,6 +89,7 @@ func (d *DB) UpsertChapter(c Chapter) (int64, error) {
 			Chapters.LastPageRead,
 			Chapters.DownloadStatus,
 			Chapters.FetchedAt,
+			Chapters.ReleasedAt,
 		).VALUES(
 			idVal,
 			c.MangaID,
@@ -71,12 +101,14 @@ func (d *DB) UpsertChapter(c Chapter) (int64, error) {
 			c.LastPageRead,
 			c.DownloadStatus,
 			RawTimestamp("CURRENT_TIMESTAMP"),
+			chapterReleasedAt(c.ReleasedAt),
 		).ON_CONFLICT(Chapters.MangaID, Chapters.SourceChapterID).DO_UPDATE(
 			SET(
 				Chapters.Title.SET(Chapters.EXCLUDED.Title),
 				Chapters.ChapterNum.SET(Chapters.EXCLUDED.ChapterNum),
 				Chapters.VolumeNum.SET(Chapters.EXCLUDED.VolumeNum),
 				Chapters.FetchedAt.SET(RawTimestamp("CURRENT_TIMESTAMP")),
+				Chapters.ReleasedAt.SET(chapterReleasedAt(c.ReleasedAt)),
 			),
 		)
 	}

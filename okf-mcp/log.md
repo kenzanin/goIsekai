@@ -2,6 +2,51 @@
 
 ## 2026-10-20
 
+- **Chapter upload dates showed the sync day** (reported: "tanggal upload nya
+  chapter manga di website nya"). The chapter list has one date column,
+  `fetched_at`, and the code used it for two different things. `UpsertChapter`
+  wrote `CURRENT_TIMESTAMP` into it — in both INSERT branches and both
+  `DO UPDATE` clauses — and never read the `c.FetchedAt` it had been handed,
+  while the three read paths (`bridge/service.go:164`,
+  `bridge/library_fallback.go:26` and `:99`) mapped that same column back out
+  as `ReleasedAt`. The plugin's date was carried to the database and dropped on
+  the way in. DB proof: `SELECT date(fetched_at), COUNT(*)` returned only sync
+  days (2026-10-20: 11138, 10-19: 8702, 10-18: 2365, 10-17: 7889, …) — **zero**
+  real upload dates were stored anywhere.
+  - **Fix:** a dedicated `chapters.released_at` column (migration 30, NULL
+    when the plugin knows no date), written from the plugin's date in both
+    INSERT branches and both `DO UPDATE` clauses; `fetched_at` keeps meaning
+    "when we synced". A reused column was rejected: 17 of the Lua plugins send
+    no `released_at` at all, and a single column cannot express "no date
+    known" next to a real one.
+  - **The write path was probed, not assumed**: `TimestampExp(String(...))`
+    and `TimestampExp(NULL)` were run against a real migrated DB first and
+    round-trip exactly (text → `2024-09-07T17:04:15Z`, NULL → NULL).
+  - **The jetgen trap, hit twice.** `cmd/jetgen`'s DDL list had fallen 7
+    ALTERs behind `schema.go`'s migrations slice, so regenerating `.gen`
+    produced a diff that *dropped* `CustomCover` from the mangas table (2
+    insertions / 5 deletions) — a regression, not a fix. The missing ALTERs
+    were added to the generator first; the regeneration then repaired the
+    stale codegen as a side effect (`plugins.http_profile`, `plugins.genres`,
+    `mangas.author`, `mangas.reader_prefs` came back). **Rule: before
+    regenerating `.gen`, diff the generator's DDL against the migrations
+    slice** — a generator that has fallen behind produces a diff that removes
+    real columns.
+  - Five regression tests across two levels (3 in `internal/database`, 2 in
+    `internal/bridge`): the date survives the upsert round trip, a plugin with
+    no date leaves the column NULL, a re-sync refreshes `fetched_at` without
+    discarding `released_at`, and both read sites serve the site's own date.
+  - **Live, on weebcentral after `POST /action/sync-manga`:** 75 chapters, 75
+    with a date; histogram `2024-09-07 → 66`, `2024-11-11 → 9`; the detail
+    page now reads "Sep 8, 2024" ×41 and "Nov 11, 2024" ×9, where it read
+    "20 Oct 2026" on every row before. Timezone checked against the site's
+    own dayjs formatter — both render in the visitor's local zone, so no
+    day-shift is introduced. Detail:
+    `concept/chapter-release-date-column.md`.
+  - **Follow-up:** existing rows stay NULL until their manga is re-synced —
+    there is no periodic library sync, only `POST /action/sync` and
+    `/action/sync-manga/{pluginID}/{mangaID}`.
+
 - **Weebcentral search covers were on the wrong titles** (reported: "title and
   cover shifted apart, searching dungeon"). Measured on the live
   `/search/data` response: every card renders **two** `<img>` (a desktop

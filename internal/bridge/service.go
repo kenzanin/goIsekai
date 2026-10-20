@@ -161,7 +161,7 @@ func (s *AppService) GetChapterList(pluginID, mangaID string) ([]types.Chapter, 
 					Title:      c.Title,
 					ChapterNum: c.ChapterNum,
 					VolumeNum:  c.VolumeNum,
-					ReleasedAt: c.FetchedAt,
+					ReleasedAt: c.ReleasedAt,
 				}
 			}
 			return out, nil

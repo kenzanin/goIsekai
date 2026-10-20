@@ -8,11 +8,13 @@
 package model
 
 type Plugins struct {
-	ID         *string `sql:"primary_key"`
-	Name       string
-	Version    string
-	WasmPath   string
-	IsActive   *int64
-	IconURL    *string
-	ThumbRatio *float64
+	ID          *string `sql:"primary_key"`
+	Name        string
+	Version     string
+	WasmPath    string
+	IsActive    *int64
+	IconURL     *string
+	ThumbRatio  *float64
+	HTTPProfile *string
+	Genres      *string
 }

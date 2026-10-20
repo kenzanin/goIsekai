@@ -29,6 +29,7 @@ type chaptersTable struct {
 	DownloadStatus  sqlite.ColumnString
 	FetchedAt       sqlite.ColumnTimestamp
 	TotalPages      sqlite.ColumnInteger
+	ReleasedAt      sqlite.ColumnTimestamp
 
 	AllColumns     sqlite.ColumnList
 	MutableColumns sqlite.ColumnList
@@ -82,8 +83,9 @@ func newChaptersTableImpl(schemaName, tableName, alias string) chaptersTable {
 		DownloadStatusColumn  = sqlite.StringColumn("download_status")
 		FetchedAtColumn       = sqlite.TimestampColumn("fetched_at")
 		TotalPagesColumn      = sqlite.IntegerColumn("total_pages")
-		allColumns            = sqlite.ColumnList{IDColumn, MangaIDColumn, SourceChapterIDColumn, TitleColumn, ChapterNumColumn, VolumeNumColumn, IsReadColumn, IsSkippedColumn, LastPageReadColumn, DownloadStatusColumn, FetchedAtColumn, TotalPagesColumn}
-		mutableColumns        = sqlite.ColumnList{MangaIDColumn, SourceChapterIDColumn, TitleColumn, ChapterNumColumn, VolumeNumColumn, IsReadColumn, IsSkippedColumn, LastPageReadColumn, DownloadStatusColumn, FetchedAtColumn, TotalPagesColumn}
+		ReleasedAtColumn      = sqlite.TimestampColumn("released_at")
+		allColumns            = sqlite.ColumnList{IDColumn, MangaIDColumn, SourceChapterIDColumn, TitleColumn, ChapterNumColumn, VolumeNumColumn, IsReadColumn, IsSkippedColumn, LastPageReadColumn, DownloadStatusColumn, FetchedAtColumn, TotalPagesColumn, ReleasedAtColumn}
+		mutableColumns        = sqlite.ColumnList{MangaIDColumn, SourceChapterIDColumn, TitleColumn, ChapterNumColumn, VolumeNumColumn, IsReadColumn, IsSkippedColumn, LastPageReadColumn, DownloadStatusColumn, FetchedAtColumn, TotalPagesColumn, ReleasedAtColumn}
 		defaultColumns        = sqlite.ColumnList{IsReadColumn, IsSkippedColumn, LastPageReadColumn, DownloadStatusColumn, FetchedAtColumn, TotalPagesColumn}
 	)
 
@@ -103,6 +105,7 @@ func newChaptersTableImpl(schemaName, tableName, alias string) chaptersTable {
 		DownloadStatus:  DownloadStatusColumn,
 		FetchedAt:       FetchedAtColumn,
 		TotalPages:      TotalPagesColumn,
+		ReleasedAt:      ReleasedAtColumn,
 
 		AllColumns:     allColumns,
 		MutableColumns: mutableColumns,

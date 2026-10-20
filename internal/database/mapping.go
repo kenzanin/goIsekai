@@ -82,6 +82,7 @@ func chapterFromModel(m model.Chapters) Chapter {
 		TotalPages:      int(derefInt64(m.TotalPages)),
 		DownloadStatus:  derefStr(m.DownloadStatus),
 		FetchedAt:       derefTime(m.FetchedAt),
+		ReleasedAt:      derefTime(m.ReleasedAt),
 	}
 }
 

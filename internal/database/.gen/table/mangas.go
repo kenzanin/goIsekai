@@ -28,8 +28,10 @@ type mangasTable struct {
 	CreatedAt         sqlite.ColumnTimestamp
 	UpdatedAt         sqlite.ColumnTimestamp
 	NewSince          sqlite.ColumnTimestamp
-	CustomTitle       sqlite.ColumnInteger
+	Author            sqlite.ColumnString
 	CustomCover       sqlite.ColumnInteger
+	ReaderPrefs       sqlite.ColumnString
+	CustomTitle       sqlite.ColumnInteger
 	CustomDescription sqlite.ColumnInteger
 	Genres            sqlite.ColumnString
 	CoverDim          sqlite.ColumnInteger
@@ -85,14 +87,16 @@ func newMangasTableImpl(schemaName, tableName, alias string) mangasTable {
 		CreatedAtColumn         = sqlite.TimestampColumn("created_at")
 		UpdatedAtColumn         = sqlite.TimestampColumn("updated_at")
 		NewSinceColumn          = sqlite.TimestampColumn("new_since")
-		CustomTitleColumn       = sqlite.IntegerColumn("custom_title")
+		AuthorColumn            = sqlite.StringColumn("author")
 		CustomCoverColumn       = sqlite.IntegerColumn("custom_cover")
+		ReaderPrefsColumn       = sqlite.StringColumn("reader_prefs")
+		CustomTitleColumn       = sqlite.IntegerColumn("custom_title")
 		CustomDescriptionColumn = sqlite.IntegerColumn("custom_description")
 		GenresColumn            = sqlite.StringColumn("genres")
 		CoverDimColumn          = sqlite.IntegerColumn("cover_dim")
-		allColumns              = sqlite.ColumnList{IDColumn, PluginIDColumn, SourceMangaIDColumn, TitleColumn, CoverURLColumn, DescriptionColumn, StatusColumn, InLibraryColumn, CreatedAtColumn, UpdatedAtColumn, NewSinceColumn, CustomTitleColumn, CustomCoverColumn, CustomDescriptionColumn, GenresColumn, CoverDimColumn}
-		mutableColumns          = sqlite.ColumnList{PluginIDColumn, SourceMangaIDColumn, TitleColumn, CoverURLColumn, DescriptionColumn, StatusColumn, InLibraryColumn, CreatedAtColumn, UpdatedAtColumn, NewSinceColumn, CustomTitleColumn, CustomCoverColumn, CustomDescriptionColumn, GenresColumn, CoverDimColumn}
-		defaultColumns          = sqlite.ColumnList{InLibraryColumn, CreatedAtColumn, UpdatedAtColumn, CustomTitleColumn, CustomDescriptionColumn, CoverDimColumn}
+		allColumns              = sqlite.ColumnList{IDColumn, PluginIDColumn, SourceMangaIDColumn, TitleColumn, CoverURLColumn, DescriptionColumn, StatusColumn, InLibraryColumn, CreatedAtColumn, UpdatedAtColumn, NewSinceColumn, AuthorColumn, CustomCoverColumn, ReaderPrefsColumn, CustomTitleColumn, CustomDescriptionColumn, GenresColumn, CoverDimColumn}
+		mutableColumns          = sqlite.ColumnList{PluginIDColumn, SourceMangaIDColumn, TitleColumn, CoverURLColumn, DescriptionColumn, StatusColumn, InLibraryColumn, CreatedAtColumn, UpdatedAtColumn, NewSinceColumn, AuthorColumn, CustomCoverColumn, ReaderPrefsColumn, CustomTitleColumn, CustomDescriptionColumn, GenresColumn, CoverDimColumn}
+		defaultColumns          = sqlite.ColumnList{InLibraryColumn, CreatedAtColumn, UpdatedAtColumn, AuthorColumn, CustomCoverColumn, ReaderPrefsColumn, CustomTitleColumn, CustomDescriptionColumn, CoverDimColumn}
 	)
 
 	return mangasTable{
@@ -110,8 +114,10 @@ func newMangasTableImpl(schemaName, tableName, alias string) mangasTable {
 		CreatedAt:         CreatedAtColumn,
 		UpdatedAt:         UpdatedAtColumn,
 		NewSince:          NewSinceColumn,
-		CustomTitle:       CustomTitleColumn,
+		Author:            AuthorColumn,
 		CustomCover:       CustomCoverColumn,
+		ReaderPrefs:       ReaderPrefsColumn,
+		CustomTitle:       CustomTitleColumn,
 		CustomDescription: CustomDescriptionColumn,
 		Genres:            GenresColumn,
 		CoverDim:          CoverDimColumn,

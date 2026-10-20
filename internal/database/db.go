@@ -34,6 +34,10 @@ type Chapter struct {
 	TotalPages      int
 	DownloadStatus  string
 	FetchedAt       time.Time
+	// ReleasedAt is the site's own upload date for the chapter, as reported
+	// by the plugin. Zero means the plugin knows no date. FetchedAt is when
+	// we last synced the row — a different thing entirely.
+	ReleasedAt time.Time
 }
 
 // ChapterProgress is the per-chapter read progress surfaced to the UI.

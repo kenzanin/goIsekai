@@ -17,13 +17,15 @@ type pluginsTable struct {
 	sqlite.Table
 
 	// Columns
-	ID         sqlite.ColumnString
-	Name       sqlite.ColumnString
-	Version    sqlite.ColumnString
-	WasmPath   sqlite.ColumnString
-	IsActive   sqlite.ColumnInteger
-	IconURL    sqlite.ColumnString
-	ThumbRatio sqlite.ColumnFloat
+	ID          sqlite.ColumnString
+	Name        sqlite.ColumnString
+	Version     sqlite.ColumnString
+	WasmPath    sqlite.ColumnString
+	IsActive    sqlite.ColumnInteger
+	IconURL     sqlite.ColumnString
+	ThumbRatio  sqlite.ColumnFloat
+	HTTPProfile sqlite.ColumnString
+	Genres      sqlite.ColumnString
 
 	AllColumns     sqlite.ColumnList
 	MutableColumns sqlite.ColumnList
@@ -65,29 +67,33 @@ func newPluginsTable(schemaName, tableName, alias string) *PluginsTable {
 
 func newPluginsTableImpl(schemaName, tableName, alias string) pluginsTable {
 	var (
-		IDColumn         = sqlite.StringColumn("id")
-		NameColumn       = sqlite.StringColumn("name")
-		VersionColumn    = sqlite.StringColumn("version")
-		WasmPathColumn   = sqlite.StringColumn("wasm_path")
-		IsActiveColumn   = sqlite.IntegerColumn("is_active")
-		IconURLColumn    = sqlite.StringColumn("icon_url")
-		ThumbRatioColumn = sqlite.FloatColumn("thumb_ratio")
-		allColumns       = sqlite.ColumnList{IDColumn, NameColumn, VersionColumn, WasmPathColumn, IsActiveColumn, IconURLColumn, ThumbRatioColumn}
-		mutableColumns   = sqlite.ColumnList{NameColumn, VersionColumn, WasmPathColumn, IsActiveColumn, IconURLColumn, ThumbRatioColumn}
-		defaultColumns   = sqlite.ColumnList{IsActiveColumn, ThumbRatioColumn}
+		IDColumn          = sqlite.StringColumn("id")
+		NameColumn        = sqlite.StringColumn("name")
+		VersionColumn     = sqlite.StringColumn("version")
+		WasmPathColumn    = sqlite.StringColumn("wasm_path")
+		IsActiveColumn    = sqlite.IntegerColumn("is_active")
+		IconURLColumn     = sqlite.StringColumn("icon_url")
+		ThumbRatioColumn  = sqlite.FloatColumn("thumb_ratio")
+		HTTPProfileColumn = sqlite.StringColumn("http_profile")
+		GenresColumn      = sqlite.StringColumn("genres")
+		allColumns        = sqlite.ColumnList{IDColumn, NameColumn, VersionColumn, WasmPathColumn, IsActiveColumn, IconURLColumn, ThumbRatioColumn, HTTPProfileColumn, GenresColumn}
+		mutableColumns    = sqlite.ColumnList{NameColumn, VersionColumn, WasmPathColumn, IsActiveColumn, IconURLColumn, ThumbRatioColumn, HTTPProfileColumn, GenresColumn}
+		defaultColumns    = sqlite.ColumnList{IsActiveColumn, ThumbRatioColumn, HTTPProfileColumn}
 	)
 
 	return pluginsTable{
 		Table: sqlite.NewTable(schemaName, tableName, alias, allColumns...),
 
 		//Columns
-		ID:         IDColumn,
-		Name:       NameColumn,
-		Version:    VersionColumn,
-		WasmPath:   WasmPathColumn,
-		IsActive:   IsActiveColumn,
-		IconURL:    IconURLColumn,
-		ThumbRatio: ThumbRatioColumn,
+		ID:          IDColumn,
+		Name:        NameColumn,
+		Version:     VersionColumn,
+		WasmPath:    WasmPathColumn,
+		IsActive:    IsActiveColumn,
+		IconURL:     IconURLColumn,
+		ThumbRatio:  ThumbRatioColumn,
+		HTTPProfile: HTTPProfileColumn,
+		Genres:      GenresColumn,
 
 		AllColumns:     allColumns,
 		MutableColumns: mutableColumns,

@@ -119,7 +119,7 @@ func (d *DB) runMigrations() error {
 			}
 			continue
 		}
-		if i == skipColumnMigration || i == authorMigration || i == genresColumnMigration || i == customCoverMigration || i == readerPrefsMigration {
+		if i == skipColumnMigration || i == authorMigration || i == genresColumnMigration || i == customCoverMigration || i == readerPrefsMigration || i == releasedAtMigration {
 			// Idempotent: test DBs and databases rebuilt by the storage
 			// migration may already carry these columns; synthetic fixtures
 			// may lack the plugins table entirely.

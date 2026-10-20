@@ -39,6 +39,10 @@ const customCoverMigration = 28
 // (per-manga reader prefs JSON). Idempotent for the same reason.
 const readerPrefsMigration = 29
 
+// releasedAtMigration is the index for the chapters.released_at ALTER TABLE
+// (the site's own upload date for a chapter). Idempotent for the same reason.
+const releasedAtMigration = 30
+
 // migrations is an ordered list of DDL statements applied in sequence.
 // Version is tracked via PRAGMA user_version; migrations[i] is applied when
 // user_version < len(migrations) so partial upgrades resume correctly.
@@ -195,4 +199,8 @@ var migrations = []string{
 	// Index 29: per-manga reader prefs (JSON object: viewMode, direction,
 	// zoom per fit-mode, strip). Empty string means "use global defaults".
 	`ALTER TABLE mangas ADD COLUMN reader_prefs TEXT NOT NULL DEFAULT '';`,
+	// Index 30: the site's own upload date for a chapter, as reported by the
+	// plugin. NULL means the plugin knows no date — distinct from fetched_at,
+	// which records when WE last synced the row.
+	`ALTER TABLE chapters ADD COLUMN released_at TIMESTAMP;`,
 }

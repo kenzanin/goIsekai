@@ -23,6 +23,9 @@ type Mangas struct {
 	CreatedAt         *time.Time
 	UpdatedAt         *time.Time
 	NewSince          *time.Time
+	Author            string
+	CustomCover       int64
+	ReaderPrefs       string
 	CustomTitle       int64
 	CustomDescription int64
 	Genres            *string
