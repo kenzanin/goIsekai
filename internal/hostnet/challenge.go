@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"time"
 
 	http "github.com/bogdanfinn/fhttp"
 
@@ -44,6 +45,18 @@ func (p *Proxy) solveAndSeed(ctx context.Context, pluginID, targetURL string) er
 		return errors.New("hostnet: no challenge solver installed")
 	}
 	cfg := p.CDPConfig()
+	// Clamp the solve budget to what the caller can actually wait for. The
+	// configured cdp_solve_timeout (often 120s) routinely exceeds the plugin
+	// invoke budget (15-30s), so a solve would burn its full engine timeout on
+	// every attempt and still be abandoned — and with a 2-attempt engine
+	// budget that is 4 minutes of work for a caller that left after 15
+	// seconds. Bounding each attempt by the remaining ctx keeps the attempt
+	// inside the caller's budget instead of past it.
+	if dl, ok := ctx.Deadline(); ok {
+		if remaining := time.Until(dl); remaining > 0 && (cfg.Timeout <= 0 || remaining < cfg.Timeout) {
+			cfg.Timeout = remaining
+		}
+	}
 	type solveResult struct {
 		cookies []*http.Cookie
 		ua      string

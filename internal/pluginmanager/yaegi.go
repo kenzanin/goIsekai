@@ -80,7 +80,7 @@ func (m *Manager) loadYaegi(id, dir string) (*loadedPlugin, error) {
 	// and a plugin's only permitted non-stdlib import is `hostnet`. The helper
 	// list lives in yaegi_surface.go, which takes each function from
 	// hostSurface so the two surfaces cannot drift.
-	hp := yaegiHostPkg{proxy: m.proxy, id: id}
+	hp := yaegiHostPkg{proxy: m.proxy, id: id, mgr: m}
 	exports := yaegiExports()
 	exports["Get"] = reflect.ValueOf(hp.Get)
 	exports["Post"] = reflect.ValueOf(hp.Post)

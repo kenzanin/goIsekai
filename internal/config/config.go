@@ -83,6 +83,11 @@ type Config struct {
 	CDPPath string
 	// CDPSolveTimeout bounds a single challenge solve in seconds.
 	CDPSolveTimeout int
+	// CDPObscuraPath / CDPLightpandaPath are the ws:// CDP endpoints of the
+	// fallback daemons. They are separate from CDPPath because that one holds
+	// the chrome binary; a daemon handed a binary path can only fail.
+	CDPObscuraPath    string
+	CDPLightpandaPath string
 	// [maintenance] — plugin caching and preconnect.
 	// CacheTTLHours is the TTL for plugin response cache in hours.
 	CacheTTLHours int

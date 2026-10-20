@@ -1,6 +1,8 @@
 package pluginmanager
 
 import (
+	"context"
+
 	"goisekai/internal/hostnet"
 	"goisekai/internal/htmldoc"
 	"goisekai/pkg/types"
@@ -12,11 +14,22 @@ import (
 type yaegiHostPkg struct {
 	proxy *hostnet.Proxy
 	id    string
+	mgr   *Manager // for the in-flight invoke ctx; nil falls back to background
+}
+
+// ctx is the in-flight invoke context, so a host call made by interpreted code
+// (an HTTP fetch, a CDP solve) is torn down at the invoke deadline instead of
+// outliving it on context.Background(). Mirrors the JS and Go runtimes.
+func (y yaegiHostPkg) ctx() context.Context {
+	if y.mgr == nil {
+		return context.Background()
+	}
+	return y.mgr.invokeCtx(y.id)
 }
 
 // Get is available as hostnet.Get in interpreted plugins.
 func (y yaegiHostPkg) Get(url string) (string, error) {
-	resp, err := y.proxy.Request(y.id, types.HTTPRequest{
+	resp, err := y.proxy.RequestContext(y.ctx(), y.id, types.HTTPRequest{
 		Method: "GET",
 		URL:    url,
 	})
@@ -28,7 +41,7 @@ func (y yaegiHostPkg) Get(url string) (string, error) {
 
 // Post is available as hostnet.Post in interpreted plugins.
 func (y yaegiHostPkg) Post(url, body string) (string, error) {
-	resp, err := y.proxy.Request(y.id, types.HTTPRequest{
+	resp, err := y.proxy.RequestContext(y.ctx(), y.id, types.HTTPRequest{
 		Method: "POST",
 		URL:    url,
 		Body:   body,

@@ -22,17 +22,18 @@ func engineTripped(engine string) bool {
 	return ok && time.Since(t) < engineCoolDown
 }
 
-// cdpFallbackChain returns the ordered engine names to attempt for a solve:
-// the configured engine first, then the "obscura" and "lightpanda" daemon
-// engines as fallbacks. Duplicates are removed (the configured engine is not
-// repeated when it is already one of the fallbacks) and disabled engines
-// ("", "off") are dropped.
-func cdpFallbackChain(configured string) []string {
-	candidates := []string{configured, "obscura", "lightpanda"}
+// fallbackChain returns the ordered engine names to attempt for a solve: the
+// configured engine first, then the "obscura" and "lightpanda" daemons. An
+// engine is only included when it has an endpoint of the right shape — a
+// daemon without a ws:// URL could only fail, and including it would consume
+// an attempt that a working engine needs. Duplicates are removed and disabled
+// engines ("", "off") are dropped.
+func (c CDPConfig) fallbackChain() []string {
+	candidates := []string{c.Engine, "obscura", "lightpanda"}
 	chain := make([]string, 0, len(candidates))
 	seen := make(map[string]bool, len(candidates))
 	for _, e := range candidates {
-		if e == "" || e == "off" || seen[e] {
+		if e == "" || e == "off" || seen[e] || !c.usable(e) {
 			continue
 		}
 		seen[e] = true

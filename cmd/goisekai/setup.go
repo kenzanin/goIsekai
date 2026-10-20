@@ -66,6 +66,12 @@ func setupProxy(cfg *config.Config, db *database.DB) *hostnet.Proxy {
 		Engine:  cfg.CDPEngine,
 		Path:    cfg.CDPPath,
 		Timeout: time.Duration(cfg.CDPSolveTimeout) * time.Second,
+		// Fallback daemons need their own ws:// endpoint; without this a
+		// fallback engine inherits the chrome binary path and cannot connect.
+		Paths: map[string]string{
+			"obscura":    cfg.CDPObscuraPath,
+			"lightpanda": cfg.CDPLightpandaPath,
+		},
 	})
 
 	// Restore persisted TLS-profile pins and wire persistence so a plugin's

@@ -48,6 +48,8 @@ func (c *Config) Save(path string) error {
 		"sec_ch_ua", c.SecCHUA,
 		"cdp_engine", c.CDPEngine,
 		"cdp_path", c.CDPPath,
+		"cdp_obscura_path", c.CDPObscuraPath,
+		"cdp_lightpanda_path", c.CDPLightpandaPath,
 		"cdp_solve_timeout", strconv.Itoa(c.CDPSolveTimeout),
 		"cache_ttl_hours", strconv.Itoa(c.CacheTTLHours),
 		"chapter_cache_ttl_hours", strconv.Itoa(c.ChapterCacheTTLHours),

@@ -116,6 +116,10 @@ func (c *Config) set(section, key, val string) {
 			}
 		case "cdp_path":
 			c.CDPPath = val
+		case "cdp_obscura_path":
+			c.CDPObscuraPath = val
+		case "cdp_lightpanda_path":
+			c.CDPLightpandaPath = val
 		case "cdp_solve_timeout":
 			if n, err := strconv.Atoi(val); err == nil && n > 0 {
 				c.CDPSolveTimeout = n

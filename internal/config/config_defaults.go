@@ -18,7 +18,11 @@ func Default() *Config {
 		CDPEngine:       "off",
 		CDPPath:         "",
 		CDPSolveTimeout: 30,
-		APIKey:          "",
+		// Daemon endpoints are opt-in: empty means "not installed", so the
+		// fallback chain skips that engine instead of failing on it.
+		CDPObscuraPath:    "",
+		CDPLightpandaPath: "",
+		APIKey:            "",
 
 		BackupIntervalHours:  24,
 		BackupKeep:           5,

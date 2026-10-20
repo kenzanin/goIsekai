@@ -34,20 +34,22 @@ var engineHealth = struct {
 // the browser's User-Agent. It is the concrete solver installed by default;
 // tests swap it out via Proxy.solveChallenge.
 //
-// The engine and binary/endpoint come from cfg:
-//   - "chrome"     → cfg.Path is the chrome binary path, launched as a subprocess.
-//   - "lightpanda" → cfg.Path is a CDP websocket URL (ws://host:port).
-//   - "obscura"    → cfg.Path is a CDP websocket URL (ws://host:port).
+// The engine and its endpoint come from cfg:
+//   - "chrome"     → a binary path, launched as a subprocess.
+//   - "lightpanda" → a CDP websocket URL (ws://host:port).
+//   - "obscura"    → a CDP websocket URL (ws://host:port).
 //
-// Engines are attempted in fallback-chain order (see cdpFallbackChain): the
-// configured engine first, then the "obscura" and "lightpanda" alternatives.
-// At most one fallback engine is tried after the primary fails, and engines
-// that failed within engineCoolDown are skipped (circuit breaker). A fallback
-// attempt is logged at WARN.
+// Engines are attempted in cfg.fallbackChain() order: the configured engine
+// first, then whichever daemons have an endpoint configured. Engines with no
+// usable endpoint never enter the chain, so a chrome-only setup does not lose
+// an attempt to a daemon that could only fail. At most one fallback engine is
+// tried after the primary fails, and engines that failed within
+// engineCoolDown are skipped (circuit breaker). A fallback attempt is logged
+// at WARN.
 func solveChallenge(cfg CDPConfig, url string) ([]*http.Cookie, string, error) {
 	var lastErr error
 	tried := 0
-	for _, engine := range cdpFallbackChain(cfg.Engine) {
+	for _, engine := range cfg.fallbackChain() {
 		if tried >= 2 {
 			break // primary + max 1 retry
 		}
@@ -58,6 +60,7 @@ func solveChallenge(cfg CDPConfig, url string) ([]*http.Cookie, string, error) {
 		tried++
 		attempt := cfg
 		attempt.Engine = engine
+		attempt.Path = cfg.pathFor(engine)
 		cookies, ua, err := solveWithEngine(attempt, url)
 		if err == nil {
 			engineSucceeded(engine)
