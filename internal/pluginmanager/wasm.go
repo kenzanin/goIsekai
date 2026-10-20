@@ -79,7 +79,16 @@ func (m *Manager) loadWasm(id, path string) (*loadedPlugin, error) {
 	}
 	// WithStartFunctions() clears the default _start so a reactor module is not
 	// run to completion at instantiation; _initialize is called explicitly below.
-	mod, err := rt.InstantiateModule(m.ctx, compiled, wazero.NewModuleConfig().WithName(id).WithStartFunctions())
+	//
+	// WithSysWalltime is NOT cosmetic: wazero defaults WASI's realtime clock to
+	// platform.NewFakeWalltime(), which starts at 2022-01-01 and advances 1ms per
+	// read. A plugin that reads the clock (mangataro signs its chapter request
+	// with a timestamp) therefore produced a token the site had long expired, and
+	// the host saw a bare 403 with no hint that the clock was the problem.
+	mod, err := rt.InstantiateModule(m.ctx, compiled, wazero.NewModuleConfig().
+		WithName(id).
+		WithStartFunctions().
+		WithSysWalltime())
 	if err != nil {
 		return nil, fmt.Errorf("wasm plugin %s: instantiate: %w", id, err)
 	}

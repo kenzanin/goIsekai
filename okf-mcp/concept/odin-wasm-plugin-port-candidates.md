@@ -34,6 +34,77 @@ Status: **8 plugin sudah diport ke Odin** dan diverifikasi live. Data dari scan
 | `manga_uno` | 416 KB | `text.url_encode`, `text.normalize_status`, `text.date_to_iso`, `http_body` | A/B identical |
 | `weebcentral` | 417 KB | `html.*`, `regex.find/find_all/replace`, `text.url_encode`, `text.normalize_status`, `text.chapter_num` | search 32/32 + detail all fields + chapters 574/574 identical |
 | `violetmanga` | 301 KB | `html.find_*`, `regex.find/find_all/replace`, `text.url_encode`, `text.normalize_status` | search 2307 B + detail all fields + pages identical; chapters 13/13 id+title identical, `chapter_num` 0→13..1 |
+| `dynastyscan` | 419 KB | `html.*`, `regex.find/find_all`, `text.unescape/strip_html/normalize_status/date_to_iso/chapter_num`, `http_body` | search 1257 B + detail 656 B + pages 2023 B identical; chapters 32/32; `GetGenres` 120 genre live |
+| `mangataro` | 410 KB | `html.*`, `text.url_encode/normalize_status/date_to_iso/chapter_num/sub`, `crypto.md5_hex`, `http_body` | search 3331 B + detail 415 B + pages 6291 B identical; chapters 88/88 id+order identical, `released_at` 0→nyata; `GetGenres` live |
+
+### mangataro (port 2026-10-20) — bukti A/B + bug walltime di host
+
+223 LOC. Header Lua bilang chapter list dan page list butuh
+`host.browser.evaluate` (scroll-poll harvest), **tapi kodenya tidak pernah
+memanggilnya**: chapter lewat AJAX bertoken, page lewat endpoint konten. Port ini
+murni HTTP.
+
+A/B dengan `plugin_cache` dibersihkan:
+
+| endpoint | hasil |
+| --- | --- |
+| search | **IDENTICAL** (3331 B) |
+| detail | **IDENTICAL** (415 B) |
+| pages | **IDENTICAL** (6291 B) |
+| chapters | 88/88 id + urutan sama; satu delta disengaja (`released_at`) |
+
+Delta `chapters`: **`released_at` diisi** (`0001-01-01T00:00:00Z` →
+`2026-10-13T02:43:38Z`). Sumbernya field `date` dari API yang berupa frasa relatif
+("2 years ago"); `text.date_to_iso` me-resolve-nya jadi tanggal nyata. Lua
+membuangnya.
+
+**Token chapter.** Endpoint `GET /auth/manga-chapters?manga_id=<id>&_t=<token>&_ts=<unix>`
+memakai token client-side: `md5(unix_ts .. "mng_ch_" .. YYYYMMDDHH)[:16]`, dengan
+`YYYYMMDDHH` = jam UTC. Jam UTC diturunkan dari `text.date_to_iso` (yang
+memformat UTC), bukan dari date lokal — sama seperti Lua. Formula ini diverifikasi
+manual lewat shell dulu (`http=200`, 47 739 B) sebelum ditulis ke Odin.
+
+#### Bug host: jam WASI beku di 2022-01-01
+
+Percobaan pertama menghasilkan `chapters = []` dan log host:
+
+```
+url=.../auth/manga-chapters?manga_id=341206&_t=9d1040ef12ace9f8&_ts=1640995200 status=403
+```
+
+`1640995200` = **2022-01-01**. Penyebabnya bukan plugin: **wazero memberi jam
+palsu kalau walltime tidak dikonfigurasi.** `internal/sys/sys.go:164` memakai
+`platform.NewFakeWalltime()` bila `walltime == nil`, dan
+`internal/platform/time.go:12` menetapkan `FakeEpochNanos = 1640995200000*ms`
+alias 2022-01-01, naik 1 ms tiap pembacaan. Host tidak pernah memanggil
+`WithSysWalltime()`, jadi **setiap** plugin wasm yang membaca jam dinding menerima
+waktu beku.
+
+Perbaikan di `internal/pluginmanager/wasm.go` — satu method di module config:
+
+```go
+mod, err := rt.InstantiateModule(m.ctx, compiled, wazero.NewModuleConfig().
+    WithName(id).
+    WithStartFunctions().
+    WithSysWalltime())
+```
+
+Setelah itu chapters langsung `16175 B`, identik dengan baseline Lua (sebelumnya
+`3 B`). **Pelajaran:** probe "build OK" untuk `time.now()` hanya membuktikan
+kompilasi, **bukan** runtime — jam baru terbukti benar saat token diterima server.
+Gejalanya menyesatkan: `403` polos tanpa petunjuk apa pun soal jam.
+
+#### Statis vs scrape untuk genres
+
+`GetGenres` tetap **statis** (15 tag) seperti Lua, bukan scrape `/tag/`. Alasannya
+sama dengan sumbernya: halaman tag memuat kategori dan pengelompokan situs yang
+tidak semuanya diterima URL archive. Diverifikasi live: cache `plugins.genres`
+terisi **603 B** setelah di-NULL-kan.
+
+**Catatan:** pengingat yang sama seperti `dynastyscan` — `plugins.genres = "[]"`
+berarti "tidak ada export genre, jangan panggil lagi", jadi kolomnya harus
+di-NULL-kan agar `GetGenres` yang baru dipanggil.
+
 
 ### violetmanga (port 2026-10-20) — bukti A/B
 

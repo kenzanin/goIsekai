@@ -2,6 +2,37 @@
 
 ## 2026-10-20
 
+- **Ported `mangataro` Lua → Odin wasm** (`examples/plugins/wasm/mangataro_odin/`,
+  **410 403 bytes**). 223 LOC. The Lua header claims the chapter and page lists
+  need `host.browser.evaluate` (a scroll-poll harvest) but the code never calls
+  it — chapters come from a tokenised AJAX endpoint and pages from a plain
+  content endpoint, so the port is pure HTTP.
+  A/B with `plugin_cache` cleared: **search IDENTICAL (3331 B), detail IDENTICAL
+  (415 B), pages IDENTICAL (6291 B)**; chapters **88/88** with identical id and
+  order, and one deliberate delta: `released_at` is filled
+  (`0001-01-01T00:00:00Z` → a real date) from the API's relative `date` field
+  ("2 years ago") via `text.date_to_iso`, where Lua discards it.
+  Chapter id is the bare numeric string (`"704814"`), which is exactly the
+  `chapter_id` the page endpoint wants; reader URLs are reduced to trailing
+  digits. The chapter request is signed client-side:
+  `md5(unix_ts .. "mng_ch_" .. YYYYMMDDHH)[:16]`, UTC hour taken from
+  `text.date_to_iso` (which formats UTC) rather than a local date call.
+  `GetGenres` stays a **static 15-tag table** like the Lua (verified live: cache
+  column NULL → **603 bytes**).
+
+- **Host bug found and fixed: the WASI wall clock was frozen at 2022-01-01.**
+  The first `mangataro` run returned `chapters = []` and the host logged a bare
+  `403` with `_ts=1640995200` (= 2022-01-01). Root cause was **not** the plugin:
+  wazero substitutes a fake clock when walltime is unconfigured
+  (`internal/sys/sys.go:164` → `platform.NewFakeWalltime()`, whose
+  `FakeEpochNanos` is `1640995200000*ms`, +1 ms per read). The host never called
+  `WithSysWalltime()`, so **any** wasm plugin reading the clock got 2022.
+  Fixed in `internal/pluginmanager/wasm.go` by adding `.WithSysWalltime()` to the
+  module config; chapters went `3 B` → `16175 B`, identical to the Lua baseline.
+  **Trap worth remembering:** a "build OK" probe for `time.now()` proves
+  compilation only, never the runtime — the clock is only proven correct once a
+  server accepts the signed request, and the symptom is a context-free `403`.
+
 - **Ported `dynastyscan` Lua → Odin wasm** (`examples/plugins/wasm/dynastyscan_odin/`,
   **419 059 bytes**). 201 LOC but mostly JSON: `/series/<slug>.json`
   carries both the detail fields and the chapter list (`taggings`), and

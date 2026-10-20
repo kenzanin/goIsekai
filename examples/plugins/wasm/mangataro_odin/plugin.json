@@ -1,0 +1,9 @@
+{
+  "verify_url": "https://mangataro.org",
+  "thumb_ratio": 0.667,
+  "name": "Mangataro",
+  "site_url": "https://mangataro.org",
+  "logo": "logo.png",
+  "contract_version": 1,
+  "built_with": "odin dev-2026-10:84bc3fc21"
+}
