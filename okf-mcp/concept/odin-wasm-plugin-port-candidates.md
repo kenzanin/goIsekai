@@ -38,6 +38,43 @@ Status: **8 plugin sudah diport ke Odin** dan diverifikasi live. Data dari scan
 | `mangataro` | 410 KB | `html.*`, `text.url_encode/normalize_status/date_to_iso/chapter_num/sub`, `crypto.md5_hex`, `http_body` | search 3331 B + detail 415 B + pages 6291 B identical; chapters 88/88 id+order identical, `released_at` 0→nyata; `GetGenres` live |
 | `lhtranslation` | 415 KB | `regex.find/find_all/find_all_pairs/replace`, `text.unescape/strip_html/normalize_status/date_to_iso/chapter_num`, `http.get_body`/`http.post_body` | search 521 B + detail 909 B identical; pages 33/33 url identical; chapters 4/4 id+order identical |
 | `mangakatana` | 409 KB | `html.find_text/find_attr/find_list_text/find_list_attr`, `regex.find/find_all/sub`, `text.url_encode/normalize_status/unescape`, `http.get_body` | **search 2696 B + detail 749 B + pages 1197 B + chapters 1203 B semuanya IDENTICAL** |
+| `mangaread` | 413 KB | `regex.find/find_all/find_all_pairs/sub`, `text.unescape/strip_html/normalize_status/date_to_iso/chapter_num/url_encode`, `http.get_body`/`http.post_body` | **search 2483 B + detail 767 B + pages 3868 B IDENTICAL**; chapters 22/22 id+order, `manga_id` `""`→slug |
+
+### mangaread (port 2026-10-20) — Madara kedua, kartu search per-blok
+
+264 LOC. Madara kedua setelah `lhtranslation`, jadi jebakannya sudah diketahui dan
+diperlakukan sama: **chapter list hanya ada di balik
+`POST /manga/<slug>/ajax/chapters/`** (diverifikasi live: 22 `wp-manga-chapter`
+di respons AJAX, sedangkan halaman detail tidak memuatnya).
+
+A/B dengan `plugin_cache` dibersihkan:
+
+| endpoint | hasil |
+| --- | --- |
+| search | **IDENTICAL** (2483 B) |
+| detail | **IDENTICAL** (767 B) |
+| pages | **IDENTICAL** (3868 B) |
+| chapters | 22/22 id + urutan sama; `manga_id` `""` → slug |
+
+**Perbedaan penting dari `lhtranslation`: kartu search harus diparse per-blok.**
+Markup-nya satu kartu per `div.row.c-tabs-item__content` (18 blok untuk query
+uji), bukan `<a title=...>` seperti di lhtranslation. Dua kegagalan nyata kalau
+tidak begitu:
+
+1. Kemunculan **pertama** sebuah slug di halaman adalah `og:url` di `<head>`, jadi
+   scan jendela ±3000 karakter di sekitar slug **melewatkan kartu** dan hasil
+   pertama kehilangan cover-nya.
+2. Jendela yang terlalu lebar membuat regex fallback **mencuri cover kartu
+   tetangga**.
+
+Jadi blok diambil sampai penutup `post-title`, dan cover selalu berada sebelum
+judul di dalam blok yang sama.
+
+Path genre juga beda: lhtranslation `/manga-genre/<slug>/`, mangaread
+`/genres/<slug>/`, dan halaman ke-N adalah `/genres/<slug>/page/N/` (bukan
+`?page=N`). `GetGenres` statis 37 entri; diverifikasi live (cache NULL →
+**1369 B**).
+
 
 ### mangakatana (port 2026-10-20) — empat endpoint identik, dan cara membaca `page_urls`
 

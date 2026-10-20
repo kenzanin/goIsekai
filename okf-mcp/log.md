@@ -2,6 +2,24 @@
 
 ## 2026-10-20
 
+- **Ported `mangaread` Lua → Odin wasm** (`examples/plugins/wasm/mangaread_odin/`,
+  **413 244 bytes**). 264 LOC, the second Madara site after lhtranslation, so the
+  known trap was re-verified rather than assumed: the chapter list only exists
+  behind `POST /manga/<slug>/ajax/chapters/` (22 `wp-manga-chapter` in the AJAX
+  response, none on the detail page).
+  A/B with `plugin_cache` cleared: **search IDENTICAL (2483 B), detail IDENTICAL
+  (767 B), pages IDENTICAL (3868 B)**; chapters 22/22 identical id+order with the
+  one deliberate delta `manga_id` `""` → slug.
+  **Search must be parsed per card block**, one per
+  `div.row.c-tabs-item__content`, unlike lhtranslation's `<a title=...>` cards.
+  Two real failures otherwise: the *first* occurrence of a slug on the page is the
+  `<head>` `og:url`, so a ±3000-char window around the slug misses the card and
+  the first result loses its cover; and an over-wide window lets the fallback
+  regex steal a neighbouring card's cover. Genre paths also differ from
+  lhtranslation — `/genres/<slug>/` with `/page/N/` paging, not
+  `/manga-genre/<slug>/` with `?page=N`. `GetGenres` is the static 37-entry table,
+  verified live via `/view/search` (cache NULL → **1369 B**).
+
 - **Ported `mangakatana` Lua → Odin wasm** (`examples/plugins/wasm/mangakatana_odin/`,
   **409 315 bytes**). 265 LOC. **Cleanest port of the queue: all four endpoints
   byte-IDENTICAL to Lua with no deliberate delta** — search (2696 B), detail
