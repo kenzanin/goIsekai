@@ -16,6 +16,12 @@ import (
 // the declared enrichment provider id stays the bare folder name.
 const infoPrefix = "info:"
 
+// fileExists reports whether path names an existing regular file.
+func fileExists(path string) bool {
+	fi, err := os.Stat(path)
+	return err == nil && !fi.IsDir()
+}
+
 // readPluginJSONMeta reads <dir>/plugin.json into plugin metadata. This is the
 // single source of a plugin's metadata for every runtime: the host reads it at
 // discovery, before instantiating anything, so the plugin list can show a
@@ -93,15 +99,27 @@ func (m *Manager) Discover() error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
-	// Enrichment scripts: one folder per source, main.lua entry, folder name is
-	// both the declared provider id and the enrich source id used by the UI.
+	// Enrichment scripts: one folder per source, folder name is both the
+	// declared provider id and the enrich source id used by the UI. A folder
+	// may ship either main.lua or main.wasm; wasm wins when both are present,
+	// matching plugin discovery (a built wasm folder also carries its source).
 	if m.infoDir != "" {
-		infoMatches, err := filepath.Glob(filepath.Join(m.infoDir, "*", "main.lua"))
+		dirs, err := filepath.Glob(filepath.Join(m.infoDir, "*"))
 		if err != nil {
 			return err
 		}
-		for _, path := range infoMatches {
-			id := filepath.Base(filepath.Dir(path))
+		for _, dir := range dirs {
+			// wasmPath means different things per runtime: loadLua/loadJS/loadYaegi
+			// want the FOLDER (they append the entry filename themselves), while
+			// loadWasm wants the .wasm FILE. Getting this wrong yields
+			// "main.lua/main.lua".
+			entry, kind, wasmPath := filepath.Join(dir, "main.lua"), "lua", dir
+			if file := filepath.Join(dir, "main.wasm"); fileExists(file) {
+				entry, kind, wasmPath = file, "wasm", file
+			} else if !fileExists(entry) {
+				continue // neither entry point
+			}
+			id := filepath.Base(dir)
 			key := infoPrefix + id
 			if _, dup := m.plugins[key]; dup {
 				logger.Error("info script id collision, skipping", "id", id)
@@ -109,11 +127,14 @@ func (m *Manager) Discover() error {
 			}
 			m.plugins[key] = &loadedPlugin{
 				id:       key,
-				wasmPath: filepath.Dir(path),
-				kind:     "lua",
+				wasmPath: wasmPath,
+				kind:     kind,
 				infoOnly: true,
+				// Seed metadata so the declared providers are visible without
+				// instantiating the runtime (enrichment scripts stay lazy).
+				meta: readPluginJSONMeta(dir),
 			}
-			logger.Debug("info script registered", "id", id, "path", path)
+			logger.Debug("info script registered", "id", id, "kind", kind, "path", entry)
 		}
 	}
 

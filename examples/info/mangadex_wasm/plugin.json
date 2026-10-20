@@ -1,0 +1,20 @@
+{
+  "enrichment_providers": [
+    {
+      "id": "mangadex",
+      "name": "MangaDex",
+      "kinds": [
+        "titles",
+        "summaries",
+        "categories",
+        "authors",
+        "related",
+        "covers"
+      ]
+    }
+  ],
+  "name": "MangaDex Info",
+  "site_url": "https://mangadex.org",
+  "contract_version": 1,
+  "built_with": "odin dev-2026-10:84bc3fc21"
+}

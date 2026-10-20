@@ -20,6 +20,47 @@ return function(data)
 		end
 	end
 
+	-- Enrichment scripts live under info_dir and are not manga sources, so they
+	-- get their own section instead of being mixed into the cards above.
+	local infoPlugins = data.InfoPlugins or {}
+	local infoHTML = ""
+	if #infoPlugins > 0 then
+		infoHTML = '<div class="mt-8" id="info-scripts">'
+			.. '<h2 class="text-sm font-semibold text-neutral-300 mb-1">Info scripts</h2>'
+			.. '<p class="text-xs text-neutral-500 mb-3">Enrichment providers from <code class="font-mono">info_dir</code>: they supply metadata (titles, summaries, categories, authors, related, covers) and are never used as a manga source.</p>'
+			.. '<div class="space-y-2">'
+		for _, p in ipairs(infoPlugins) do
+			local id = p.ID or ""
+			local name = p.Name or ""
+			if name == "" then
+				name = id
+			end
+			local siteURL = p.SiteURL or ""
+			local builtWith = p.BuiltWith or ""
+			infoHTML = infoHTML
+				.. '<div class="bg-neutral-900 rounded-lg p-3 border border-neutral-800 flex items-center gap-3">'
+				.. '<div class="min-w-0 flex-1">'
+				.. '<div class="font-medium text-sm flex items-center gap-2">'
+				.. h(name)
+				.. '<span class="text-xs px-1.5 py-0.5 rounded-full bg-neutral-700/50 text-neutral-300">'
+				.. h(p.Kind or "")
+				.. "</span>"
+				.. '<span class="text-xs px-1.5 py-0.5 rounded-full bg-amber-500/15 text-amber-400">Info</span>'
+				.. "</div>"
+				.. '<div class="text-xs text-neutral-500">'
+				.. h(id)
+				.. (siteURL ~= ""
+						and (' · <a href="' .. h(siteURL) .. '" target="_blank" rel="noopener" class="hover:underline">' .. h(siteURL) .. "</a>")
+					or "")
+				.. "</div></div>"
+				.. (builtWith ~= ""
+						and ('<span class="text-xs px-2 py-0.5 rounded-full bg-neutral-800 text-neutral-300 font-mono">' .. h(builtWith) .. "</span>")
+					or "")
+				.. "</div>"
+		end
+		infoHTML = infoHTML .. "</div></div>"
+	end
+
 	return '<div class="flex items-center gap-3 flex-wrap mb-6">'
 		.. '<div class="shrink-0"><h1 class="text-xl font-semibold">Plugins</h1>'
 		.. '<div class="text-xs text-neutral-500">'
@@ -48,6 +89,7 @@ return function(data)
 		.. '<button type="submit" class="border border-solid border-neutral-700 hover:border-red-600 hover:bg-red-600/10 rounded-md px-3 py-2 text-sm text-neutral-400 hover:text-red-300 transition">Purge removed</button>'
 		.. "</form></div>"
 		.. cardsHTML
+		.. infoHTML
 		.. [[<script>
 document.querySelectorAll('input[type=file]').forEach(inp => {
   inp.addEventListener('change', function() {

@@ -70,7 +70,10 @@ func (s *Server) viewPlugins(w http.ResponseWriter, r *http.Request) {
 		v.PinnedProfile, v.AvailableProfiles = s.service.PluginProfile(p.ID)
 		views = append(views, v)
 	}
-	s.renderPage(w, r, "views/plugins", "plugins", map[string]any{"Plugins": views})
+	s.renderPage(w, r, "views/plugins", "plugins", map[string]any{
+		"Plugins":     views,
+		"InfoPlugins": s.service.InfoPlugins(),
+	})
 }
 
 // viewSettings renders the current goisekai.ini values.

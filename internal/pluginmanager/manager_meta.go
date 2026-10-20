@@ -3,6 +3,7 @@ package pluginmanager
 import (
 	"sort"
 	"strconv"
+	"strings"
 
 	"goisekai/internal/hostnet"
 	"goisekai/pkg/types"
@@ -58,6 +59,33 @@ func (m *Manager) LoadedPlugins() []LoadedPlugin {
 			SiteURL:          p.meta.SiteURL,
 			BuiltWith:        p.meta.BuiltWith,
 			Logo:             p.meta.Logo,
+		})
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i].ID < out[j].ID })
+	return out
+}
+
+// InfoPlugins returns metadata for the enrichment scripts discovered under
+// infoDir, sorted by id. They stay out of LoadedPlugins (they are not manga
+// sources, so search and verify must not see them), but the plugins page lists
+// them separately so a user can tell which enrichment sources are installed and
+// which runtime runs each one. The id is returned without the info: namespace.
+func (m *Manager) InfoPlugins() []LoadedPlugin {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	out := make([]LoadedPlugin, 0, 4)
+	for _, p := range m.plugins {
+		if !p.infoOnly {
+			continue
+		}
+		out = append(out, LoadedPlugin{
+			ID:        strings.TrimPrefix(p.id, infoPrefix),
+			Kind:      p.kind,
+			Loaded:    p.loaded,
+			Name:      p.meta.Name,
+			SiteURL:   p.meta.SiteURL,
+			BuiltWith: p.meta.BuiltWith,
+			Logo:      p.meta.Logo,
 		})
 	}
 	sort.Slice(out, func(i, j int) bool { return out[i].ID < out[j].ID })

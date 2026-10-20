@@ -21,13 +21,18 @@ const (
 	hostModuleName = "env"
 )
 
-// wasmRequiredFns are the ABI entry points every wasm plugin must export.
+// wasmRequiredFns are the ABI entry points a wasm SOURCE plugin must export.
+// An enrichment script (infoOnly) exports GetEnrichment instead — requiring
+// the scraper ABI from it would reject every info script.
 var wasmRequiredFns = []string{
 	types.SearchFunc,
 	types.GetMangaDetailFunc,
 	types.GetChapterListFunc,
 	types.GetPageListFunc,
 }
+
+// wasmInfoRequiredFns are the entry points a wasm enrichment script must export.
+var wasmInfoRequiredFns = []string{types.GetEnrichmentFunc}
 
 // ensureWasmRuntime lazily creates the shared wazero runtime once,
 // instantiating WASI and the host module ("env" exporting host_http_request and
@@ -116,17 +121,27 @@ func (m *Manager) loadWasm(id, path string) (*loadedPlugin, error) {
 		return nil, fmt.Errorf("wasm plugin %s: %w", id, err)
 	}
 
-	fns := make(map[string]api.Function, len(wasmRequiredFns)+1)
-	for _, name := range wasmRequiredFns {
+	// An enrichment script exports the metadata ABI, not the scraper ABI; the
+	// id prefix is what distinguishes it (infoPrefix), so no extra plumbing
+	// has to cross the three load call sites.
+	requiredFns := wasmRequiredFns
+	if isInfoPlugin(id) {
+		requiredFns = wasmInfoRequiredFns
+	}
+	fns := make(map[string]api.Function, len(requiredFns)+2)
+	for _, name := range requiredFns {
 		fn := mod.ExportedFunction(name)
 		if fn == nil {
 			return nil, fmt.Errorf("wasm plugin %s: does not export %s", id, name)
 		}
 		fns[name] = fn
 	}
-	// GetGenres is optional.
-	if fn := mod.ExportedFunction(types.GetGenresFunc); fn != nil {
-		fns[types.GetGenresFunc] = fn
+	// GetGenres and GetEnrichment are optional: a source plugin may omit the
+	// former, and an info script is only ever asked for the latter.
+	for _, name := range []string{types.GetGenresFunc, types.GetEnrichmentFunc} {
+		if fn := mod.ExportedFunction(name); fn != nil {
+			fns[name] = fn
+		}
 	}
 
 	logger.Debug("wasm plugin loaded", "id", id, "path", path)

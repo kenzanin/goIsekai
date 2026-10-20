@@ -98,6 +98,12 @@ func (s *AppService) PluginMetas() map[string]pluginmanager.LoadedPlugin {
 	return out
 }
 
+// InfoPlugins returns the enrichment scripts installed under info_dir, for the
+// plugins page's separate "Info scripts" section.
+func (s *AppService) InfoPlugins() []pluginmanager.LoadedPlugin {
+	return s.mgr.InfoPlugins()
+}
+
 // PluginProfile returns the plugin's pinned TLS profile ("" when unpinned) and
 // the selectable profile names, for the plugins-page profile UI.
 func (s *AppService) PluginProfile(pluginID string) (pin string, available []string) {
