@@ -1,0 +1,9 @@
+{
+  "verify_url": "https://dynasty-scans.com",
+  "thumb_ratio": 0.703,
+  "name": "DynastyScan",
+  "site_url": "https://dynasty-scans.com",
+  "logo": "logo.png",
+  "contract_version": 1,
+  "built_with": "odin dev-2026-10:84bc3fc21"
+}

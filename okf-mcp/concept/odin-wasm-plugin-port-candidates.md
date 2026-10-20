@@ -65,6 +65,70 @@ semua chapter tersortir sebagai 0), pola yang sama dengan port sebelumnya.
    meng-URL-encode-nya; menyimpan URL absolut akan merusaknya.
 
 
+### dynastyscan (port 2026-10-20) — bukti A/B
+
+201 LOC, tapi hampir semuanya JSON — sumber Lua sudah memanfaatkannya:
+`/series/<slug>.json` membawa detail **dan** chapter list (`taggings`), dan
+`/chapters/<permalink>.json` membawa page list. Hanya search dan index genre yang
+HTML. A/B dengan `plugin_cache` dibersihkan:
+
+| endpoint | hasil |
+| --- | --- |
+| search | **IDENTICAL** (1257 B) |
+| detail | **IDENTICAL** (656 B) |
+| pages | **IDENTICAL** (2023 B) |
+| chapters | 32/32 id + title + url sama; 3 delta disengaja (di bawah) |
+
+Delta `chapters` yang disengaja:
+
+1. **`manga_id` diisi** (`""` → `if_you_could_see_love`). Lua mengosongkannya.
+2. **`released_at` diisi** dari `taggings[].released_on` (`0001-01-01T00:00:00Z`
+   → tanggal nyata). Lua membuang field ini, jadi host menerima zero time.
+3. **Urutan dua chapter `chapter_num == 0`** (`volume_1_extras` vs
+   `volume_2_extras`) tertukar. Ini **bukan** regresi: keduanya bernilai 0, dan
+   `table.sort` Lua tidak stabil sehingga urutannya arbitrer. Port memakai
+   `slice.stable_sort_by` → urutan feed situs dipertahankan (`volume_1`
+   released 2021-03-11 sebelum `volume_2` 2021-06-28). Konvensi yang sama dipakai
+   port Odin sebelumnya (`stable_sort_by` untuk tie).
+
+**Jebakan utama — `find_all_pairs` vs `find_all` (baru, penting):**
+
+`abi.find_all_pairs` men-decode `[][]string`, tetapi host merender baris dengan
+**satu** capture group sebagai **string telanjang**, bukan array
+(`wasmRegexRow` di `internal/pluginmanager/wasm_host_dispatch.go:144`). Pola
+`(?s)<dd>(.*?)</dd>` punya satu grup, jadi decode `[][]string` gagal **tanpa
+error** dan search mengembalikan `[]` kosong. Perbaikannya satu kata:
+`abi.find_all` (decode `[]string`). Aturan praktisnya:
+
+| jumlah capture group | helper |
+| --- | --- |
+| 1 | `abi.find_all` → `[]string` |
+| 2+ | `abi.find_all_pairs` → `[][]string` |
+| 0 | `abi.find_all` (host mengembalikan whole match) |
+
+**`GetGenres` (opsional) juga diporting** dan terverifikasi live: `/tags` HTML
+menghasilkan **120 genre unik** (JSON `/tags.json` juga ada, tapi payload-nya
+dikelompokkan per huruf `{"A":[...]}` dan iterasi map tidak berurutan, jadi HTML
+yang sudah alfabetis lebih baik). Bukti: cache `plugins.genres` terisi ulang
+**5009 byte** setelah di-NULL-kan, dan `/view/search?pluginID=dynastyscan`
+merender **162 `<option>`** (120 genre + header/lainnya).
+
+**Catatan cache genre:** kolom `plugins.genres` menyimpan `"[]"` sebagai
+"plugin ini tidak punya export genre — jangan pernah dipanggil lagi". Nilai itu
+**bertahan** dari sebelum port, jadi `GetGenres` yang baru tidak akan pernah
+dipanggil sampai kolomnya di-NULL-kan:
+`UPDATE plugins SET genres=NULL WHERE id='dynastyscan';` Ini sama kelasnya dengan
+`plugin_cache` dan mudah tertukar dengan "plugin tidak punya genre".
+
+**HAR mengonfirmasi asumsi port.** `dynasty-scans.har` (16.9 MB, 143 entry)
+berisi **0 request XHR/fetch**, dan `/search?q=isekai` mengembalikan dokumen
+penuh — jadi search memang server-rendered, bukan JS. HAR juga menunjukkan
+`/tags/isekai` dan `/tags/isekai?view=groupings` dihit browser, cocok dengan
+jalur archive yang dipakai port saat filter genre aktif.
+
+`CGO_ENABLED=0 go test ./internal/pluginmanager` hijau (23.1 s).
+
+
 ### weebcentral (port 2026-10-19) — bukti A/B
 
 Measured, cache cleared first:
@@ -163,8 +227,8 @@ pernah masuk tabel Tier A padahal lebih kecil dari semua isinya.
 | plugin | LOC total | gmatch | helper inti | catatan |
 | --- | ---: | ---: | --- | --- |
 | ~~`violetmanga`~~ | 174 | 1 native (0-capture) | `html.find_*`, `regex.find/find_all/replace`, `normalize_status` | **SELESAI 2026-10-20** — lihat bukti A/B di atas |
-| `dynastyscan` | 201 | 2 host | `html.*`, `regex.find`, `text.trim/unescape` | **kandidat terbaik berikutnya**: pola `(?s)<dd>(.*?)</dd>` → `find_all` |
-| `mangataro` | 223 | 0 | `html.*`, `json.*`, `crypto.md5_hex`, jam | Butuh jam dinding; `os.time()` Lua → `time.time_to_unix(time.now())` di Odin (probe wasi: **build OK**). Token `md5(ts .. "mng_ch_" .. jamUTC)`. Timpa `text.date_to_iso` untuk jam UTC |
+| ~~`dynastyscan`~~ | 201 | 2 host | `html.*`, `regex.find`, `text.trim/unescape` | **SELESAI 2026-10-20** — lihat bukti A/B di bawah |
+| `mangataro` | 223 | 0 | `html.*`, `json.*`, `crypto.md5_hex`, jam | **kandidat terbaik berikutnya**. Butuh jam dinding; `os.time()` Lua → `time.time_to_unix(time.now())` di Odin (probe wasi: **build OK**). Token `md5(ts .. "mng_ch_" .. jamUTC)`. Timpa `text.date_to_iso` untuk jam UTC |
 | `lhtranslation` | 258 | 2 host | `regex.find/find_index/match`, `text.strip_html` | 22 `regex.find` — paling padat regex |
 | `mangakatana` | 265 | 2 host | `html.*`, `regex.find/match` | |
 | `mangafreak` | 365 | 8 host | `regex.find`, `json.*` | Terbesar di tier ini; 8 rewrite |

@@ -2,6 +2,34 @@
 
 ## 2026-10-20
 
+- **Ported `dynastyscan` Lua → Odin wasm** (`examples/plugins/wasm/dynastyscan_odin/`,
+  **419 059 bytes**). 201 LOC but mostly JSON: `/series/<slug>.json`
+  carries both the detail fields and the chapter list (`taggings`), and
+  `/chapters/<permalink>.json` carries the pages, so only search and the genre
+  index are HTML. A/B with `plugin_cache` cleared: **search IDENTICAL (1257 B),
+  detail IDENTICAL (656 B), pages IDENTICAL (2023 B)**; chapters 32/32 with
+  identical id+title+url and three deliberate deltas — `manga_id` filled (`""` →
+  the slug), `released_at` filled from `taggings[].released_on` (Lua emits the
+  zero time), and the two `chapter_num == 0` extras in feed order instead of
+  Lua's arbitrary unstable-`table.sort` order (`stable_sort_by`).
+  `GetGenres` was ported too and verified live: `/tags` yields **120 unique
+  genres**, the cache column refilled from NULL to **5009 bytes**, and
+  `/view/search?pluginID=dynastyscan` renders **162 `<option>`s**.
+  **New trap, worth remembering:** `abi.find_all_pairs` decodes `[][]string`, but
+  the host renders a **single**-capture row as a bare string (`wasmRegexRow` in
+  `wasm_host_dispatch.go:144`), so a one-group pattern like `(?s)<dd>(.*?)</dd>`
+  decoded to nothing **without an error** and search returned `[]`. Use
+  `abi.find_all` for 1 capture group, `find_all_pairs` for 2+. **Second trap:**
+  `plugins.genres = "[]"` means "no genre export, never call again", so a plugin
+  that gains `GetGenres` stays dark until
+  `UPDATE plugins SET genres=NULL WHERE id='…';`. `dynasty-scans.har` (143
+  entries) confirmed the port's assumption: **0 XHR/fetch**, `/search?q=isekai`
+  is a full server-rendered document, and `/tags/isekai` is hit — matching the
+  archive path the port uses for genre-filtered searches. Lua original stays in
+  `examples/plugins/lua/dynastyscan/`; only `app_data/plugins/dynastyscan/` was
+  swapped (its `main.lua` moved aside, because the lua glob in `discovery.go`
+  runs **before** `discoverWasm` and would otherwise win the id).
+
 - **Swapped all seven Go/TinyGo wasm plugins for their existing C++ twins** in
   `app_data/plugins/` (komix_to, mangak, ksgroupscans, kunmanga_online,
   mangakakalot, manhawato, reimanga_net). **14 500 052 → 1 350 547 bytes, 10.7×**
