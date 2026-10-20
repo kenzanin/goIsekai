@@ -549,6 +549,68 @@ func TestSetChaptersBulkRead(t *testing.T) {
 	}
 }
 
+// TestSetChaptersBoundWithZeroChapterNums is the regression for the bulk
+// "set this and before/after as read" actions marking the WHOLE manga.
+//
+// comizy (and any source that ships no chapter numbers) writes chapter_num = 0
+// for every row. The bound was chapter_num alone, so "up to chapter 5" became
+// `chapter_num <= 0` — which matches every chapter, not just the first five.
+// The order has to be the pair (chapter_num, id) with id as the tie-break.
+func TestSetChaptersBoundWithZeroChapterNums(t *testing.T) {
+	db := openTestDB(t)
+
+	m := Manga{PluginID: "p1", SourceMangaID: "zero", Title: "Z"}
+	mangaID, err := db.UpsertManga(m)
+	if err != nil {
+		t.Fatalf("upsert manga: %v", err)
+	}
+
+	// Seven chapters, all chapter_num 0, inserted in reading order (id order).
+	srcs := []string{"c1", "c2", "c3", "c4", "c5", "c6", "c7"}
+	for _, src := range srcs {
+		if _, err := db.UpsertChapter(Chapter{
+			MangaID: mangaID, SourceChapterID: src, Title: src, ChapterNum: 0,
+		}); err != nil {
+			t.Fatalf("upsert chapter %s: %v", src, err)
+		}
+	}
+
+	// "Ticked chapter and everything before it", ticked c5: c1..c5 read, c6-c7 not.
+	if err := db.SetChaptersUpTo(mangaID, []string{"c5"}, true); err != nil {
+		t.Fatalf("SetChaptersUpTo: %v", err)
+	}
+	p := chapterProgressBySource(t, db, mangaID)
+	for _, src := range []string{"c1", "c2", "c3", "c4", "c5"} {
+		if !p[src].IsRead {
+			t.Fatalf("%s is at or before the ticked c5 and should be read: %+v", src, p)
+		}
+	}
+	for _, src := range []string{"c6", "c7"} {
+		if p[src].IsRead {
+			t.Fatalf("%s is after the ticked c5 and must stay unread: %+v", src, p)
+		}
+	}
+
+	// "Ticked chapter and everything after it", ticked c5: c5..c7 read, c1-c4 not.
+	if err := db.SetMangaChaptersRead(mangaID, false); err != nil {
+		t.Fatalf("reset: %v", err)
+	}
+	if err := db.SetChaptersDownTo(mangaID, []string{"c5"}, true); err != nil {
+		t.Fatalf("SetChaptersDownTo: %v", err)
+	}
+	p = chapterProgressBySource(t, db, mangaID)
+	for _, src := range []string{"c5", "c6", "c7"} {
+		if !p[src].IsRead {
+			t.Fatalf("%s is at or after the ticked c5 and should be read: %+v", src, p)
+		}
+	}
+	for _, src := range []string{"c1", "c2", "c3", "c4"} {
+		if p[src].IsRead {
+			t.Fatalf("%s is before the ticked c5 and must stay unread: %+v", src, p)
+		}
+	}
+}
+
 // TestChapterProgressForManga covers total-pages persistence and the
 // per-manga progress read used by the detail-page badges and Continue button.
 func TestChapterProgressForManga(t *testing.T) {

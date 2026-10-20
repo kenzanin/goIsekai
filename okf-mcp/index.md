@@ -31,3 +31,4 @@ Progressive disclosure index for this OKF bundle.
 * [Native .so plugin ABI (purego loader)](concept/native-so-plugin-abi.md) - Loading C/C++ `.so` plugins without cgo: `char*(const char*)` JSON ABI, plugin-owns-the-buffer + required `plugin_free`, the `{"error"}` envelope, and why stdlib `plugin` could never work in a `CGO_ENABLED=0` build
 * [Home reload NS_BINDING_ABORTED (saved-filter redirect)](concept/home-reload-ns-binding-aborted.md) - Why Firefox cancels plugin logo/favicon requests on a library reload (the client-side `location.replace()` that restores the saved filter), why a manual request still returns 200, and the unfixed fix options
 
+* [Chapter bound with chapter_num 0](concept/chapter-bound-zero-chapter-num.md) - Why bulk "set this and before/after as read" marked the whole manga: chapter_num alone is not a key, (chapter_num, id) lexicographic bound fixes comizy-style all-zero sources

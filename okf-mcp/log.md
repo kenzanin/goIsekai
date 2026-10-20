@@ -2,6 +2,19 @@
 
 ## 2026-10-20
 
+- **Fixed bulk "set this and before/after as read" marking the whole manga**
+  (`internal/database/chapters_read.go`). `setChaptersToBound` filtered on
+  `chapter_num` alone, but `comizy` ships **no chapter numbers**, so all 7 rows
+  of that manga had `chapter_num = 0.0` and `chapter_num <= 0` (and `>= 0`)
+  matched every row. The bound is now the pair `(chapter_num, id)` compared
+  lexicographically, `id` being insertion order = source chapter order.
+  Verified live on the exact manga from `manga_detail_action.har`: tick ch5 +
+  "up to as read" → ch1–5 read / ch6–7 unread; tick ch5 + "down to as unread"
+  → ch1–4 read / ch5–7 unread. 12 mangas in the reference DB have the all-zero
+  shape. Regression: `TestSetChaptersBoundWithZeroChapterNums` (the old
+  `TestSetChaptersBulkRead` used chapter_num 1..4, so it never caught this).
+  Detail: `concept/chapter-bound-zero-chapter-num.md`.
+
 - **Ported `mangaread` Lua → Odin wasm** (`examples/plugins/wasm/mangaread_odin/`,
   **413 244 bytes**). 264 LOC, the second Madara site after lhtranslation, so the
   known trap was re-verified rather than assumed: the chapter list only exists
