@@ -45,7 +45,7 @@ func (s *AppService) GetPageList(pluginID, chapterID string) ([]types.Page, erro
 	if err != nil {
 		return nil, fmt.Errorf("bridge: get page list: %w", err)
 	}
-	if raw, merr := json.Marshal(result); merr == nil {
+	if raw, merr := json.Marshal(result); merr == nil && len(result) > 0 {
 		chapterIntID, _ := s.resolveChapterIntID(pluginID, "", chapterID)
 		if chapterIntID != 0 {
 			if perr := s.db.SaveChapterPages(chapterIntID, raw); perr != nil {
@@ -59,6 +59,10 @@ func (s *AppService) GetPageList(pluginID, chapterID string) ([]types.Page, erro
 // GetPageListCached returns the cached page list from the database immediately
 // without blocking on the interactive lane. Returns nil pages for empty result
 // (plugin returned no pages) so caller can handle gracefully.
+//
+// A cached EMPTY list counts as a miss, not as an answer: a plugin that failed
+// to list its pages once would otherwise pin the chapter to "no pages" for
+// good, because the reader only falls back to a live fetch on a nil result.
 func (s *AppService) GetPageListCached(pluginID, chapterID string) ([]types.Page, error) {
 	chapterIntID, _ := s.resolveChapterIntID(pluginID, "", chapterID)
 	if chapterIntID == 0 {
@@ -74,6 +78,9 @@ func (s *AppService) GetPageListCached(pluginID, chapterID string) ([]types.Page
 	var pages []types.Page
 	if uerr := json.Unmarshal(cached, &pages); uerr != nil {
 		return nil, fmt.Errorf("bridge: unmarshal cached pages: %w", uerr)
+	}
+	if len(pages) == 0 {
+		return nil, nil // empty cache - treat as a miss so the caller refetches
 	}
 	return pages, nil
 }

@@ -16,7 +16,7 @@
 --
 -- Layout (split to make copying to a new plugin trivial):
 --   helpers.lua  generic helpers  (normalizeStatus, http_get) — copy unchanged
---   main.lua     THIS file — the only one you edit: PLUGIN table + BASE/CDN/UA
+--   main.lua     THIS file — the only one you edit: PLUGIN table + BASE/UA
 --                + site-specific parsers + the four core ABI functions.
 -- Every sibling pre-executes before main.lua, so their globals are ready.
 
@@ -31,7 +31,6 @@ PLUGIN = {
 }
 
 BASE = "https://mangabuddy1.co.uk"
-CDN = "https://cdn1.love4awalk.xyz"
 UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 Safari/537.36"
 
 -- ─── helpers ────────────────────────────────────────────────────────────────
@@ -226,14 +225,18 @@ function get_page_list(arg)
         return host.json.encode({})
     end
 
-    -- Page images: data-src="https://cdn1.love4awalk.xyz/{slug}/{ch}/{i}.webp"
-    -- (chapter cover /thumb/ images and the discord gif don't match this shape).
+    -- Page images: data-src="https://{cdn}/{slug}/{ch}/{i}.webp"
+    -- The host is matched loosely on purpose: the site moved its CDN from
+    -- cdn1.love4awalk.xyz to cdn4.sags2mobile.com, and pinning the host here
+    -- made every chapter come back with zero pages. The page shape (slug /
+    -- chapter number / page index) is what identifies a page image - the cover
+    -- (/thumb/...) and the ad script URLs do not have that shape.
     local pages = {}
     local seen = {}
-    for u in host.regex.gmatch(html, [[data-src="(https://cdn1\.love4awalk\.xyz/[^"]*?/[\d.]+/\d+\.webp)"]]) do
+    for u in host.regex.gmatch(html, [[data-src="(https://[^"/]+/[^"]*?/[\d.]+/\d+\.webp)"]]) do
         if not seen[u] then
             seen[u] = true
-            pages[#pages + 1] = {url = u}
+            pages[#pages + 1] = {index = #pages, url = u}
         end
     end
     log.debug("pages: " .. #pages .. " for chapter " .. manga_id .. ":" .. chslug)
