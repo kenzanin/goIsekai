@@ -21,8 +21,8 @@ PLUGIN = {
     thumb_ratio = 0.703,
 }
 
-BASE = "https://valirscans.org"
-MEDIA = "https://media.valirscans.org"
+BASE = host.plugin.param("site_url")
+MEDIA = host.plugin.param("media")
 
 -- normalizeStatus maps a raw status string to a canonical host value.
 -- Canonical set: Ongoing, Completed, Hiatus, Dropped, Upcoming.

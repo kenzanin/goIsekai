@@ -4,5 +4,8 @@
   "name": "Comizy",
   "site_url": "https://comizy.io",
   "logo": "logo.png",
-  "contract_version": 1
+  "contract_version": 1,
+  "params": {
+    "api": "https://api.comizy.io"
+  }
 }

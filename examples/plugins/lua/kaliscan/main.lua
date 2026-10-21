@@ -12,7 +12,7 @@ PLUGIN = {
 	thumb_ratio = 0.703,
 }
 
-BASE = "https://kaliscan.me"
+BASE = host.plugin.param("site_url")
 
 local util = require("util")
 

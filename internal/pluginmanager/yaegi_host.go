@@ -96,3 +96,16 @@ func (y yaegiHostPkg) XPathListText(doc *htmldoc.Document, expr string) ([]strin
 func (y yaegiHostPkg) XPathListAttr(doc *htmldoc.Document, expr, attr string) ([]string, error) {
 	return doc.XPathListAttr(expr, attr)
 }
+
+// Param returns the value the plugin declared under name in the "params"
+// object of its own plugin.json, or "" when it declared none.
+//
+// It lives on the bridge rather than in the static yaegi surface because the
+// value belongs to ONE plugin: the same helper name must answer differently
+// for two plugins, so the function needs the manager and the plugin id.
+func (y yaegiHostPkg) Param(name string) string {
+	if y.mgr == nil {
+		return ""
+	}
+	return y.mgr.pluginParam(y.id, name)
+}

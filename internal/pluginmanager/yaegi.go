@@ -49,6 +49,10 @@ func (m *Manager) loadYaegi(id, dir string) (*loadedPlugin, error) {
 		}
 	}
 
+	// The plugin's own params must be readable BEFORE its code runs: a plugin
+	// that builds a URL at load time reads them at the top level.
+	m.loadParams(id, dir)
+
 	// Verify: reject third-party imports.
 	fset := token.NewFileSet()
 	f, err := parser.ParseFile(fset, "main.go", src, parser.ImportsOnly)
@@ -93,6 +97,7 @@ func (m *Manager) loadYaegi(id, dir string) (*loadedPlugin, error) {
 	exports["XPathAttr"] = reflect.ValueOf(hp.XPathAttr)
 	exports["XPathListText"] = reflect.ValueOf(hp.XPathListText)
 	exports["XPathListAttr"] = reflect.ValueOf(hp.XPathListAttr)
+	exports["Param"] = reflect.ValueOf(hp.Param)
 	if err := i.Use(interp.Exports{"hostnet/hostnet": exports}); err != nil {
 		return nil, fmt.Errorf("yaegi plugin %s: host exports: %w", id, err)
 	}

@@ -31,13 +31,13 @@ PLUGIN = {
 	thumb_ratio = 0.694, -- covers render at 193x278
 }
 
-BASE = "https://www.topmanhua.fan"
+BASE = host.plugin.param("base")
 
 -- Covers: the search JSON carries only a relative path (thumb/<slug>.webp) plus
 -- a base_cdn number (4->img-r1, 6->img-r2), but img-r1 served every tested
 -- thumb across both base_cdn values while img-r2 503'd the base_cdn=4 ones —
 -- so one cover host for all.
-CDN_COVER = "https://img-r1.2xstorage.com/"
+CDN_COVER = host.plugin.param("cdn")
 
 local trim = host.text.trim
 local unescape = host.text.unescape

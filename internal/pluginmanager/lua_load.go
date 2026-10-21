@@ -17,12 +17,19 @@ func (m *Manager) loadLua(id, dir string) (*loadedPlugin, error) {
 		return nil, err
 	}
 
-	if err := setupRequire(state, id, dir); err != nil {
+	// The plugin's own params must be readable BEFORE its code runs: a plugin
+	// that builds a URL at load time reads them at the top level.
+	m.loadParams(id, dir)
+
+	// The host globals come before the modules: setupRequire pre-executes
+	// every sibling .lua, and a sibling may read a param at the top level
+	// too (a shared util.lua holding the API URL, say).
+	if err := m.setupGlobals(state, id); err != nil {
+		_ = state.Close()
 		return nil, err
 	}
 
-	if err := m.setupGlobals(state, id); err != nil {
-		_ = state.Close()
+	if err := setupRequire(state, id, dir); err != nil {
 		return nil, err
 	}
 

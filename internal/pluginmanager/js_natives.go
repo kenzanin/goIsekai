@@ -50,6 +50,9 @@ func registerJSHostNatives(vm *goja.Runtime, m *Manager, id string) error {
 	if err := groupOf("json").Set("encode", jsJSONEncode(vm)); err != nil {
 		return err
 	}
+	if err := groupOf("plugin").Set("param", jsPluginParam(vm, m, id)); err != nil {
+		return err
+	}
 
 	// host.html — HTML parsing helpers with an opaque handle.
 	htmlObj, err := htmlGroupJS(vm)

@@ -4,5 +4,9 @@
   "name": "ValirScans",
   "site_url": "https://valirscans.org",
   "logo": "logo.png",
-  "contract_version": 1
+  "contract_version": 1,
+  "params": {
+    "media": "https://media.valirscans.org",
+    "site_url": "https://valirscans.org"
+  }
 }

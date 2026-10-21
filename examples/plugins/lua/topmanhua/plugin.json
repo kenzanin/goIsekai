@@ -4,5 +4,9 @@
   "name": "TopManhua",
   "site_url": "https://www.topmanhua.fan/",
   "logo": "logo.png",
-  "contract_version": 1
+  "contract_version": 1,
+  "params": {
+    "base": "https://www.topmanhua.fan",
+    "cdn": "https://img-r1.2xstorage.com/"
+  }
 }

@@ -16,8 +16,8 @@ PLUGIN = {
     thumb_ratio = 0.677,
 }
 
-API_URL = "https://mangafire.to/api"
-REFERER = "https://mangafire.to/"
+API_URL = host.plugin.param("api")
+REFERER = host.plugin.param("referer")
 
 -- VRF signing tables — same as the JS plugin.
 -- host.crypto.vrf_sign(api_path, params, stages) handles the transform.

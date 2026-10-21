@@ -4,5 +4,8 @@
   "name": "Mangataro",
   "site_url": "https://mangataro.org",
   "logo": "logo.png",
-  "contract_version": 1
+  "contract_version": 1,
+  "params": {
+    "site_url": "https://mangataro.org"
+  }
 }

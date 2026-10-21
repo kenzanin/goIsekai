@@ -12,7 +12,7 @@ PLUGIN = {
     thumb_ratio = 0.703,
 }
 
-local BASE = "https://www.mangafreak.me"
+local BASE = host.plugin.param("site_url")
 local util = require("util")
 
 -- ─── ABI: search_manga ─────────────────────────────────────────────────────

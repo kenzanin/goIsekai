@@ -16,7 +16,7 @@ PLUGIN = {
     logo = "logo.png",
 }
 
-BASE = "https://zeroscann.com"
+BASE = host.plugin.param("site_url")
 
 local function fetch(url)
     local body = host.http.get_body(url, {

@@ -21,7 +21,7 @@ PLUGIN = {
     thumb_ratio = 0.703,
 }
 
-BASE = "https://madaradex.org"
+BASE = host.plugin.param("site_url")
 AJAX = BASE .. "/wp-admin/admin-ajax.php"
 MANGA_PATH = "/title/"
 

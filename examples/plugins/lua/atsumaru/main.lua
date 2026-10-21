@@ -12,11 +12,11 @@ PLUGIN = {
     thumb_ratio = 0.703,
 }
 
-BASE = "https://atsu.moe"
+BASE = host.plugin.param("site_url")
 -- Images are not served from the site itself: atsu.moe/static/... is 410 Gone and
 -- cdn.atsu.moe serves the same path, so every relative image path is resolved
 -- against the CDN rather than the origin.
-CDN = "https://cdn.atsu.moe"
+CDN = host.plugin.param("cdn")
 
 local HEADERS = {
     ["accept"] = "application/json",

@@ -107,6 +107,12 @@ type Manager struct {
 	// when a reload races an invoke that hits a challenge.
 	challengeMu sync.Mutex
 	challenges  map[string]error
+	// paramsMu guards params, the per-plugin values read from the plugin's
+	// own plugin.json. It is a LEAF lock, for the same reason challengeMu is:
+	// a plugin's code runs while mu is held, so a lookup that took mu here
+	// would self-deadlock the host.
+	paramsMu sync.Mutex
+	params   map[string]types.PluginParams
 	// cacheTTL is the TTL for cached plugin responses.
 	// chapterCacheTTL is the TTL for cached chapter lists.
 	chapterCacheTTL time.Duration

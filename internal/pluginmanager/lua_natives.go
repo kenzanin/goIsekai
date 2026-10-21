@@ -24,6 +24,7 @@ func registerHostNatives(state *lua.State, m *Manager, id string) {
 		"regex":   regexGroup(state),
 		"http":    luaNewTable(state),
 		"browser": luaNewTable(state),
+		"plugin":  luaNewTable(state),
 	}
 
 	// Pure helpers: same Go function as the wasm dispatcher and the JS object.
@@ -44,6 +45,7 @@ func registerHostNatives(state *lua.State, m *Manager, id string) {
 	_ = tables["crypto"].RawSetString("vrf_sign", luaVrfSign(state))
 	_ = tables["json"].RawSetString("decode", luaJSONDecode(state))
 	_ = tables["json"].RawSetString("encode", luaJSONEncode(state))
+	_ = tables["plugin"].RawSetString("param", luaPluginParam(state, m, id))
 	_ = tables["http"].RawSetString("get", luaHttpGet(state, m, id))
 	_ = tables["http"].RawSetString("post", luaHttpPost(state, m, id))
 	_ = tables["http"].RawSetString("get_body", luaHTTPGetBody(state, m, id))

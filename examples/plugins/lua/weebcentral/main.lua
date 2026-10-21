@@ -25,7 +25,7 @@ PLUGIN = {
     logo = "logo.png",
 }
 
-BASE = "https://weebcentral.com"
+BASE = host.plugin.param("site_url")
 UA = "Mozilla/5.0 (compatible; goIsekai-plugin/1.0)"
 
 local function fetch(url)

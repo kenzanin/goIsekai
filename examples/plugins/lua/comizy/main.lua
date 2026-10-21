@@ -28,8 +28,8 @@ PLUGIN = {
     thumb_ratio = 0.703,
 }
 
-local API = "https://api.comizy.io"
-local WEB = "https://comizy.io"
+local API = host.plugin.param("api")
+local WEB = host.plugin.param("site_url")
 
 local function get_json(url)
     local body = host.http.get_body(url, { ["accept"] = "application/json" })

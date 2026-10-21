@@ -14,11 +14,11 @@ PLUGIN = {
     thumb_ratio = 0.703,
 }
 
-local GRAPHQL_URL = "https://api.mghcdn.com/graphql"
-local SITE_URL = "https://mangahub.io"
+local GRAPHQL_URL = host.plugin.param("api")
+local SITE_URL = host.plugin.param("site_url")
 local SOURCE_ID = "m01"
-local IMG_CDN = "https://imgx.mghcdn.com/"
-local THUMB_CDN = "https://thumb.mghcdn.com/"
+local IMG_CDN = host.plugin.param("img_cdn")
+local THUMB_CDN = host.plugin.param("thumb_cdn")
 
 -- Cached access key, dropped whenever the API refuses.
 local cachedKey = nil

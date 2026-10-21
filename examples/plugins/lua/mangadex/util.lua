@@ -4,8 +4,8 @@
 
 local util = {}
 
-util.API_URL = "https://api.mangadex.org"
-util.CDN_URL = "https://uploads.mangadex.org"
+util.API_URL = host.plugin.param("api")
+util.CDN_URL = host.plugin.param("cdn")
 util.LANG = "en"
 
 -- MangaDex image endpoints reject requests without a Referer.

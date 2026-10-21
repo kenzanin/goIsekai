@@ -21,7 +21,7 @@ PLUGIN = {
     logo = "logo.png",
 }
 
-BASE = "https://violetmanga.com"
+BASE = host.plugin.param("site_url")
 
 -- For static pages (search, detail, chapters) we can use plain HTTP.
 -- Only the reader needs the browser because ts_reader() is JS-rendered.

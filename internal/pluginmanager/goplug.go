@@ -113,6 +113,11 @@ func (m *Manager) loadGo(id, path string) (*loadedPlugin, error) {
 		return nil, fmt.Errorf("go plugin %s: open %s: %w", id, path, err)
 	}
 
+	// The plugin's own params must be readable BEFORE its code runs: a native
+	// plugin calls host_call from plugin_init, and the host answers with the
+	// params its own plugin.json declared.
+	m.loadParams(id, filepath.Dir(path))
+
 	// Metadata lives in plugin.json beside the plugin, never in the .so: the
 	// host already read it at discovery, so a plugin never has to be opened
 	// just to be listed with its name and logo.

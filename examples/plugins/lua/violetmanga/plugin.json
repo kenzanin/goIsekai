@@ -4,5 +4,8 @@
   "name": "VioletManga",
   "site_url": "https://violetmanga.com",
   "logo": "logo.png",
-  "contract_version": 1
+  "contract_version": 1,
+  "params": {
+    "site_url": "https://violetmanga.com"
+  }
 }

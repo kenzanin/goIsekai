@@ -30,7 +30,7 @@ PLUGIN = {
     thumb_ratio = 0.667,
 }
 
-BASE = "https://mangabuddy1.co.uk"
+BASE = host.plugin.param("site_url")
 UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 Safari/537.36"
 
 -- ─── helpers ────────────────────────────────────────────────────────────────

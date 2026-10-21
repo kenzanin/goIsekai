@@ -12,7 +12,7 @@ PLUGIN = {
     thumb_ratio = 0.703,
 }
 
-BASE = "https://lhtranslation.net"
+BASE = host.plugin.param("site_url")
 
 -- ─── helpers ────────────────────────────────────────────────────────────────
 

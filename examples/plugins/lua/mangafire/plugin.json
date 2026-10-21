@@ -3,5 +3,9 @@
   "name": "MangaFire",
   "site_url": "https://mangafire.to",
   "logo": "logo.png",
-  "contract_version": 1
+  "contract_version": 1,
+  "params": {
+    "api": "https://mangafire.to/api",
+    "referer": "https://mangafire.to/"
+  }
 }

@@ -11,7 +11,7 @@
 --   chapters: /title/<slug> renders a.mchap-row__primary links
 --   pages:   chapter page renders images (extract via evaluate)
 
-local BASE = "https://comix.to"
+local BASE = host.plugin.param("site_url")
 
 PLUGIN = {
     id = "comix",

@@ -310,6 +310,7 @@ var yaegiNotApplicable = map[string]string{
 	"json.decode":  "an interpreted Go plugin calls stdlib encoding/json directly",
 	"json.encode":  "an interpreted Go plugin calls stdlib encoding/json directly",
 	"regex.gmatch": "Lua iterator protocol; Go ranges over RegexFindAll's slice",
+	"plugin.param": "a yaegi plugin reads its params through hostnet.Param, a per-plugin bridge function like Get and Post",
 }
 
 // TestYaegiSurfaceCoversTheScriptAliases is the coverage direction: every

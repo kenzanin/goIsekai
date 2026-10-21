@@ -123,6 +123,9 @@ var hostSurface = []hostHelper{
 	{"browser.evaluate", kindRuntime, nil, "needs manager + plugin id"},
 	{"browser.evaluate_with_init", kindRuntime, nil, "needs manager + plugin id"},
 
+	// ── host.plugin (the values the plugin declared in its own plugin.json) ──
+	{"plugin.param", kindRuntime, nil, "reads one value from the plugin's own plugin.json params"},
+
 	// ── log (globals in Lua/JS, a host_call key in wasm) ──
 	{"log.debug", kindRuntime, nil, "global in Lua/JS, host_call key in wasm"},
 	{"log.info", kindRuntime, nil, "global in Lua/JS, host_call key in wasm"},

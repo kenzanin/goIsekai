@@ -4,5 +4,9 @@
   "name": "MangaDex",
   "site_url": "https://mangadex.org",
   "logo": "logo.png",
-  "contract_version": 1
+  "contract_version": 1,
+  "params": {
+    "api": "https://api.mangadex.org",
+    "cdn": "https://uploads.mangadex.org"
+  }
 }

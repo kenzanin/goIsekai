@@ -4,5 +4,8 @@
   "name": "MangaKatana",
   "site_url": "https://mangakatana.com",
   "logo": "logo.png",
-  "contract_version": 1
+  "contract_version": 1,
+  "params": {
+    "site_url": "https://mangakatana.com"
+  }
 }

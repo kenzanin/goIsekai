@@ -61,6 +61,10 @@ func resolveJSFn(id string, vm *goja.Runtime, fnName string) (string, bool) {
 func (m *Manager) loadJS(id, dir string) (*loadedPlugin, error) {
 	vm := goja.New()
 
+	// The plugin's own params must be readable BEFORE its code runs: a plugin
+	// that builds a URL at load time reads them at the top level.
+	m.loadParams(id, dir)
+
 	// Sandboxing: no fs, os, net, http, process, require, setTimeout globals.
 	// Only expose: console (debug/info/warn/error), JSON, and the log table.
 	_ = vm.Set("console", newJSConsole(id))

@@ -118,6 +118,12 @@ type PluginMeta struct {
 	// plugins page can show how a plugin was built. Free-form; empty means
 	// unknown (a plugin copied in without a build).
 	BuiltWith string `json:"built_with,omitempty"`
+	// Params holds the values a plugin declared in the "params" object of its
+	// plugin.json, keyed by name. The host hands them back through
+	// host.plugin.param(name), so the facts that change (the site URL, a CDN
+	// host, a user agent) live in data the user can edit without touching the
+	// plugin's code.
+	Params PluginParams `json:"params,omitempty"`
 	// ContractVersion is the ABI version this plugin was written against.
 	// Checked at discovery, so a plugin built for another ABI is rejected
 	// without instantiating a runtime. Absent means ContractVersion (current).

@@ -35,7 +35,7 @@ PLUGIN = {
     thumb_ratio = 0.667,
 }
 
-BASE = "https://example.invalid"
+BASE = host.plugin.param("site_url")
 
 -- Ids may be full URLs, so this example can be pointed at any host (the test
 -- serves a stub on 127.0.0.1) without editing the file.

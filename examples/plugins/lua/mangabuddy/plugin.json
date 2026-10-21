@@ -4,5 +4,8 @@
   "name": "MangaBuddy",
   "site_url": "https://mangabuddy1.co.uk",
   "logo": "logo.png",
-  "contract_version": 1
+  "contract_version": 1,
+  "params": {
+    "site_url": "https://mangabuddy1.co.uk"
+  }
 }

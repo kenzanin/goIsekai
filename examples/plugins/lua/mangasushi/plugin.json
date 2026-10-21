@@ -4,5 +4,8 @@
   "name": "Mangasushi",
   "site_url": "https://mangasushi.org",
   "logo": "logo.png",
-  "contract_version": 1
+  "contract_version": 1,
+  "params": {
+    "site_url": "https://mangasushi.org"
+  }
 }

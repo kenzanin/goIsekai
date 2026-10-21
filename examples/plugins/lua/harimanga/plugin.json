@@ -4,5 +4,8 @@
   "name": "HariManga",
   "site_url": "https://www.harimanga.cc",
   "logo": "logo.png",
-  "contract_version": 1
+  "contract_version": 1,
+  "params": {
+    "site_url": "https://www.harimanga.cc"
+  }
 }

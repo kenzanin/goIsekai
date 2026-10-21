@@ -12,7 +12,7 @@ PLUGIN = {
     thumb_ratio = 0.703,
 }
 
-BASE = "https://en-thunderscans.com"
+BASE = host.plugin.param("site_url")
 
 local trim = host.text.trim
 local unescape = host.text.unescape

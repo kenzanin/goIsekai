@@ -38,6 +38,10 @@ func (m *Manager) loadWasm(id, path string) (*loadedPlugin, error) {
 	if err != nil {
 		return nil, fmt.Errorf("wasm plugin %s: %w", id, err)
 	}
+	// The plugin's own params must be readable BEFORE its code runs: a wasm
+	// plugin calls host_call from _initialize, and the host answers with the
+	// params its own plugin.json declared.
+	m.loadParams(id, filepath.Dir(path))
 	code, err := os.ReadFile(path)
 	if err != nil {
 		return nil, fmt.Errorf("wasm plugin %s: %w", id, err)

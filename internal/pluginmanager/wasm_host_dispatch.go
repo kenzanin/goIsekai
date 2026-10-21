@@ -26,6 +26,8 @@ func (m *Manager) dispatchHostCall(ctx context.Context, id, fn string, args []st
 	switch fn {
 	case "text.normalize_status":
 		return wasmNormalizeStatus(args)
+	case "plugin.param":
+		return m.pluginParam(id, wasmArg(args, 0)), nil
 	case "json.decode":
 		var v any
 		if err := json.Unmarshal([]byte(wasmArg(args, 0)), &v); err != nil {

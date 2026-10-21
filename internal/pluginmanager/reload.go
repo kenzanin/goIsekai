@@ -46,6 +46,11 @@ func (m *Manager) UnloadPlugin(id string) error {
 	p.contractVersion = 0
 	p.meta = types.PluginMeta{}
 	p.loaded = false
+	// Drop the params too: they came from the plugin's own plugin.json, and a
+	// plugin that is about to be reloaded may have a different file on disk.
+	m.paramsMu.Lock()
+	delete(m.params, id)
+	m.paramsMu.Unlock()
 	logger.Debug("plugin unloaded", "id", id)
 	return nil
 }

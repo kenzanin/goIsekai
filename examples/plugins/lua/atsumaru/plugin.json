@@ -4,5 +4,9 @@
   "name": "Atsumaru",
   "site_url": "https://atsu.moe",
   "logo": "logo.png",
-  "contract_version": 1
+  "contract_version": 1,
+  "params": {
+    "cdn": "https://cdn.atsu.moe",
+    "site_url": "https://atsu.moe"
+  }
 }

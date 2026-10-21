@@ -23,7 +23,7 @@ PLUGIN = {
   logo = "logo.png",
 }
 
-BASE = "https://mangataro.org"
+BASE = host.plugin.param("site_url")
 UA = "Mozilla/5.0 (compatible; goIsekai-plugin/1.0)"
 
 local function abs(url)

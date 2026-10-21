@@ -12,7 +12,7 @@ PLUGIN = {
     thumb_ratio = 0.703,
 }
 
-BASE = "https://www.harimanga.cc"
+BASE = host.plugin.param("site_url")
 
 -- ─── helpers ────────────────────────────────────────────────────────────────
 
