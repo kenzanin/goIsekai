@@ -163,6 +163,23 @@ func (s *AppService) persistMangaDetails(pluginID string, m types.Manga, chapter
 			return err
 		}
 	}
+
+	// Drop rows the plugin re-issued under a new id (it now answers
+	// "slug:chapter-42" where the row still holds "chapter-42"). The prune only
+	// removes a row whose replacement was in this very answer; an empty answer
+	// proves nothing and removes nothing.
+	returned := make([]database.Chapter, 0, len(chapters))
+	for _, c := range chapters {
+		returned = append(returned, database.Chapter{
+			SourceChapterID: c.ID,
+			ChapterNum:      c.ChapterNum,
+		})
+	}
+	if n, err := s.db.PruneSupersededChapters(mangaIntID, returned); err != nil {
+		logger.Warn("prune superseded chapters", "manga", mangaIntID, "error", err)
+	} else if n > 0 {
+		logger.Debug("pruned superseded chapters", "manga", mangaIntID, "removed", n)
+	}
 	return nil
 }
 
