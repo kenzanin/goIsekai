@@ -3,87 +3,12 @@ package bridge
 import (
 	"context"
 	"fmt"
-	"maps"
-	neturl "net/url"
-	"os"
-	"strings"
 	"time"
 
 	"goisekai/internal/logger"
 	"goisekai/internal/workers"
 	"goisekai/pkg/types"
 )
-
-// hasHeader reports whether headers already carry the named key (case-insensitive).
-func hasHeader(headers map[string]string, name string) bool {
-	for k := range headers {
-		if strings.EqualFold(k, name) {
-			return true
-		}
-	}
-	return false
-}
-
-// withReferer returns a copy of headers carrying the given Referer (input never
-// mutated). An empty ref leaves headers untouched.
-func withReferer(headers map[string]string, ref string) map[string]string {
-	if ref == "" {
-		return headers
-	}
-	out := make(map[string]string, len(headers)+1)
-	maps.Copy(out, headers)
-	out["Referer"] = ref
-	return out
-}
-
-// memorizedReferer returns the Referer that previously succeeded for this
-// image host, so gated CDNs (rx.resmk.org) pay the extra 403 round-trip only
-// once per host instead of once per image.
-func (s *AppService) memorizedReferer(host string) (string, bool) {
-	s.imgRefMu.Lock()
-	defer s.imgRefMu.Unlock()
-	if s.imgRef == nil {
-		s.imgRef = make(map[string]string)
-	}
-	ref, ok := s.imgRef[host]
-	return ref, ok
-}
-
-// memorizeReferer records the Referer that succeeded for an image host.
-func (s *AppService) memorizeReferer(host, ref string) {
-	s.imgRefMu.Lock()
-	defer s.imgRefMu.Unlock()
-	if s.imgRef == nil {
-		s.imgRef = make(map[string]string)
-	}
-	s.imgRef[host] = ref
-}
-
-// refererCandidates are the Referer values to try for one image fetch, in
-// order, when the caller set none (explicit Referer always wins, untouched).
-// The image's own origin leads: a CDN that serves its own origin (uploads.
-// mangadex.org) returns the real image there, while a foreign Referer (e.g.
-// the plugin's site) silently serves a placeholder — a 200 with wrong bytes,
-// undetectable by status. The plugin's siteURL follows as fallback because
-// gated CDNs (rx.resmk.org) reject the origin and accept only the plugin
-// site. A failure of the first candidate costs one extra request, only for
-// CDNs that gate on the plugin site.
-func refererCandidates(imageURL, siteURL string) []string {
-	var out []string
-	if u, err := neturl.Parse(imageURL); err == nil && u.Scheme != "" && u.Host != "" {
-		out = append(out, u.Scheme+"://"+u.Host+"/")
-	}
-	if siteURL != "" && (len(out) == 0 || out[0] != siteURL) {
-		out = append(out, siteURL)
-	}
-	// Last-resort: some CDNs (comix.to's lov.*.site) reject ANY Referer and
-	// serve only with none. Working plugins memoize at an earlier candidate and
-	// never reach this one, so appending it is a no-op for them. Without it, a
-	// host that 403s on both image-origin and plugin-site Referers has no
-	// no-Referer attempt and every image fails.
-	out = append(out, "")
-	return out
-}
 
 // GetImage fetches image bytes for pluginID from url (with optional per-request
 // headers) through the hostnet proxy. Results are cached in memory (L1) and on
@@ -101,53 +26,6 @@ type imageCall struct {
 	done chan struct{}
 	data []byte
 	err  error
-}
-
-// cachedImage returns the bytes for url from the in-memory or disk cache.
-//
-// It is a function rather than inline code because GetImage has to run it twice:
-// once before joining the singleflight, and once after winning it. The second
-// probe closes a window that is otherwise a duplicate upstream fetch - see the
-// comment at that call site.
-func (s *AppService) cachedImage(pluginID, mangaID, chapterID, url string) ([]byte, bool) {
-	// L1: in-memory cache.
-	s.imageMu.RLock()
-	cached, ok := s.imageCache[url]
-	s.imageMu.RUnlock()
-	if ok {
-		logger.Debug("image cache: L1 hit", "url", url)
-		return cached, true
-	}
-
-	// L2: disk cache. Converted images are stored as <key>.<format>, anything
-	// that kept its original bytes (gif passthrough, undecodable, "original"
-	// mode) as <key>.img. Older builds used ".webp"/".img" only, so every
-	// format we can write is tried before declaring a miss. JXL comes last:
-	// when a format switch left several copies behind, the renderable one wins.
-	base := s.diskCachePath(pluginID, mangaID, chapterID, url)
-	if base == "" {
-		return nil, false
-	}
-	for _, ext := range []string{
-		"." + string(FormatAVIF), "." + string(FormatWebP), ".img",
-		"." + string(FormatJXL),
-	} {
-		data, err := os.ReadFile(base + ext)
-		if err != nil {
-			continue
-		}
-		if !validateImageFast(data) {
-			// Invalid cached image: delete stale file and treat as miss.
-			_ = os.Remove(base + ext)
-			continue
-		}
-		s.imageMu.Lock()
-		s.imageCache[url] = data
-		s.imageMu.Unlock()
-		logger.Debug("image cache: L2 hit", "url", url, "ext", ext)
-		return data, true
-	}
-	return nil, false
 }
 
 // GetImage returns the bytes for one image URL, from cache when possible and

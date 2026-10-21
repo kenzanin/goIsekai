@@ -9,21 +9,9 @@ package workers
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"sync"
 	"sync/atomic"
-)
-
-// Lane identifies which pool a job runs on.
-type Lane int
-
-const (
-	LaneInteractive Lane = iota
-	LaneFetch
-	LaneImage
-	LaneMaintenance
-	LaneCDP // anti-bot challenge solving (Phase 4)
 )
 
 func (l Lane) String() string {
@@ -42,25 +30,6 @@ func (l Lane) String() string {
 	return fmt.Sprintf("lane(%d)", int(l))
 }
 
-// Priority orders the two image sub-queues (high drained before low).
-type Priority int
-
-const (
-	PriorityLow Priority = iota
-	PriorityHigh
-)
-
-// JobStatus is the observable lifecycle state (design D6).
-type JobStatus int
-
-const (
-	StatusQueued JobStatus = iota
-	StatusRunning
-	StatusDone
-	StatusFailed
-	StatusDead
-)
-
 func (s JobStatus) String() string {
 	switch s {
 	case StatusQueued:
@@ -75,32 +44,6 @@ func (s JobStatus) String() string {
 		return "dead"
 	}
 	return fmt.Sprintf("status(%d)", int(s))
-}
-
-var (
-	// ErrBusy is returned when a background lane rejects a job within its
-	// short enqueue timeout (callers map it to 503).
-	ErrBusy = errors.New("workers: queue full")
-	// ErrClosed is returned after Shutdown.
-	ErrClosed = errors.New("workers: pool closed")
-	// ErrEnqueueTimeout is returned by the interactive lane when its ctx
-	// deadline hits before the queue frees up (callers map it to 503).
-	ErrEnqueueTimeout = errors.New("workers: enqueue timed out")
-)
-
-// ErrPermanent marks errors that must not be retried (rate limit exhausted,
-// permanent upstream 404...). Wrap with Permanent().
-type ErrPermanent struct{ Err error }
-
-func (e *ErrPermanent) Error() string { return e.Err.Error() }
-func (e *ErrPermanent) Unwrap() error { return e.Err }
-
-// Permanent wraps err so the retry logic stops retrying it.
-func Permanent(err error) error {
-	if err == nil {
-		return nil
-	}
-	return &ErrPermanent{Err: err}
 }
 
 // Job is one unit of work on a lane. Run may be retried on transient errors

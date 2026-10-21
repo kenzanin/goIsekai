@@ -11,19 +11,16 @@
 package main
 
 import (
-	"net"
 	"os"
 	"os/exec"
 	"os/signal"
 	"path/filepath"
-	"runtime"
-	"strconv"
 	"syscall"
-	"time"
 
-	"fyne.io/systray"
 	"goisekai/internal/config"
 	"goisekai/internal/logger"
+
+	"fyne.io/systray"
 )
 
 type app struct {
@@ -92,121 +89,4 @@ func main() {
 		systray.Quit()
 	}()
 	systray.Run(a.onReady, a.onExit)
-}
-
-// resolveURL builds the browser target from the server's bind address. A
-// bind-all address cannot be opened as-is, so it loops back to 127.0.0.1.
-func resolveURL(host string, port int) string {
-	if port <= 0 {
-		port = 8080
-	}
-	switch host {
-	case "", "0.0.0.0", "::", "[::]":
-		host = "127.0.0.1"
-	}
-	return "http://" + net.JoinHostPort(host, strconv.Itoa(port)) + "/"
-}
-
-// resolveDir makes a possibly relative config path absolute against base (the
-// child's working directory), the same way the server resolves it.
-func resolveDir(path, base string) string {
-	if filepath.IsAbs(path) {
-		return path
-	}
-	return filepath.Join(base, path)
-}
-
-func (a *app) onReady() {
-	systray.SetIcon(a.iconB)
-	systray.SetTitle("goIsekai")
-	systray.SetTooltip("goIsekai — manga server")
-
-	mOpen := systray.AddMenuItem("Open Browser", "Open the reader UI")
-	mRestart := systray.AddMenuItem("Restart Server", "Stop and start the server")
-	mQuit := systray.AddMenuItem("Quit", "Stop server and exit tray")
-
-	if err := a.start(); err != nil {
-		systray.SetTooltip("goIsekai — FAILED to start: " + err.Error())
-	}
-
-	for {
-		select {
-		case <-mOpen.ClickedCh:
-			openBrowser(a.url)
-		case <-mRestart.ClickedCh:
-			a.stop()
-			time.Sleep(500 * time.Millisecond)
-			if err := a.start(); err != nil {
-				systray.SetTooltip("goIsekai — FAILED: " + err.Error())
-			}
-		case err, ok := <-a.exited:
-			if ok && err != nil && !a.dead {
-				systray.SetTooltip("goIsekai — server exited: " + err.Error())
-			}
-		case <-mQuit.ClickedCh:
-			a.dead = true
-			a.stop()
-			systray.Quit()
-			return
-		}
-	}
-}
-
-func (a *app) start() error {
-	if err := os.MkdirAll(filepath.Dir(a.logPath), 0o755); err != nil {
-		return err
-	}
-	logF, err := os.OpenFile(a.logPath, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o644)
-	if err != nil {
-		return err
-	}
-	// No -logLevel flag: the server reads log_level from goisekai.ini itself
-	// (flag > file > default). Everything config-worthy lives in the ini.
-	cmd := exec.Command(a.serverBin)
-	cmd.Dir = a.workDir
-	cmd.Stdout = logF
-	cmd.Stderr = logF
-	if err := cmd.Start(); err != nil {
-		_ = logF.Close() // error path: the Start error is what matters
-		return err
-	}
-	a.cmd, a.logF = cmd, logF
-	a.exited = make(chan error, 1)
-	go func() { a.exited <- cmd.Wait() }()
-	systray.SetTooltip("goIsekai — running at " + a.url)
-	return nil
-}
-
-func (a *app) stop() {
-	if a.cmd == nil || a.cmd.Process == nil {
-		return
-	}
-	_ = a.cmd.Process.Signal(syscall.SIGTERM)
-	done := make(chan struct{})
-	go func() { _, _ = a.cmd.Process.Wait(); close(done) }()
-	select {
-	case <-done:
-	case <-time.After(10 * time.Second):
-		_ = a.cmd.Process.Kill()
-		<-done
-	}
-	select {
-	case <-a.exited:
-	default:
-	}
-	_ = a.logF.Close()
-	a.cmd, a.logF = nil, nil
-}
-
-func (a *app) onExit() { a.stop() }
-
-func openBrowser(u string) {
-	var cmd *exec.Cmd
-	switch runtime.GOOS {
-	case "linux":
-		cmd = exec.Command("xdg-open", u)
-	default:
-		return
-	}
-	_ = cmd.Start()
 }

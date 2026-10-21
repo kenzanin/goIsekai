@@ -2,7 +2,6 @@ package pluginmanager
 
 import (
 	"context"
-	"errors"
 	"sync"
 	"time"
 
@@ -114,48 +113,6 @@ type Manager struct {
 	cacheTTL        time.Duration
 }
 
-// parkChallenge records an anti-bot challenge for pluginID until the running
-// invoke finishes. Non-challenge errors are ignored: those already reach the
-// guest through the helper's own return value, and only a challenge needs the
-// verify wizard.
-func (m *Manager) parkChallenge(id string, err error) {
-	var ce *hostnet.ChallengeError
-	if !errors.As(err, &ce) {
-		return
-	}
-	m.challengeMu.Lock()
-	defer m.challengeMu.Unlock()
-	if m.challenges == nil {
-		m.challenges = make(map[string]error)
-	}
-	m.challenges[id] = ce
-}
-
-// clearChallenge drops any challenge left over from an earlier invoke, so a
-// transient block cannot fail a later, unrelated call.
-func (m *Manager) clearChallenge(id string) {
-	m.challengeMu.Lock()
-	defer m.challengeMu.Unlock()
-	delete(m.challenges, id)
-}
-
-// takeChallenge returns and clears the challenge parked for pluginID, or nil.
-func (m *Manager) takeChallenge(id string) error {
-	m.challengeMu.Lock()
-	defer m.challengeMu.Unlock()
-	err := m.challenges[id]
-	delete(m.challenges, id)
-	return err
-}
-
-// SetOnLoad registers a callback that fires once per plugin after its first
-// successful lazy-load. The callback receives the plugin id.
-func (m *Manager) SetOnLoad(fn func(id string)) {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	m.onLoad = fn
-}
-
 // invokeCtx returns the context of the in-flight invocation for plugin id, or
 // context.Background() when none is running. JS natives run inside the goja VM
 // and receive no ctx from the runtime, so they read the ctx published by
@@ -169,48 +126,4 @@ func (m *Manager) invokeCtx(id string) context.Context {
 		return context.Background()
 	}
 	return p.curCtx
-}
-
-// SetEnrichRegistry wires an enrichment registry so that plugin-declared
-// enrichment providers are registered with the registry when the plugin loads.
-// If no enrichment registry is provided, this is a no-op.
-func (m *Manager) SetEnrichRegistry(reg *enrich.Registry) {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	m.enrich = reg
-}
-
-// NewManager returns a Manager that will load plugins from pluginsDir and route
-// their network access through proxy. SetDB must be called before use for caching.
-func NewManager(proxy *hostnet.Proxy, pluginsDir string) *Manager {
-	return &Manager{
-		proxy:           proxy,
-		pluginsDir:      pluginsDir,
-		ctx:             context.Background(),
-		plugins:         make(map[string]*loadedPlugin),
-		chapterCacheTTL: 168 * time.Hour, // default TTL for chapter lists
-		cacheTTL:        24 * time.Hour,  // default TTL for detail
-	}
-}
-
-// SetInfoDir points the manager at the enrichment script directory. Discovery
-// of that directory is part of Discover, so call this before it.
-func (m *Manager) SetInfoDir(dir string) {
-	m.infoDir = dir
-}
-
-// SetDB wires the database handle and cache TTL for response caching.
-func (m *Manager) SetDB(db *database.DB, cacheTTL time.Duration) {
-	m.db = db
-	m.cacheTTL = cacheTTL
-}
-
-// SetCacheTTL updates the cache TTL (e.g. from config reload).
-func (m *Manager) SetCacheTTL(ttl time.Duration) {
-	m.cacheTTL = ttl
-}
-
-// SetChapterCacheTTL updates the chapter list cache TTL.
-func (m *Manager) SetChapterCacheTTL(ttl time.Duration) {
-	m.chapterCacheTTL = ttl
 }
