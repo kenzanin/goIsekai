@@ -1,0 +1,10 @@
+{
+  "name": "1Manga",
+  "description": "Manga catalogue from 1manga.co",
+  "site_url": "https://1manga.co",
+  "logo": "logo.png",
+  "contract_version": 1,
+  "verify_url": "https://1manga.co",
+  "thumb_ratio": 0.703,
+  "built_with": "zig c++ musl 1.2.6"
+}
