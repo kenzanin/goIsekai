@@ -69,26 +69,42 @@ e.g. `released_at 2022-04-24 21:56:04` against `fetched_at 2026-10-21
 ## Not only 1manga
 
 Every plugin with chapters synced before the 20 Oct migration has the same
-gap. The ones whose build **does** emit `released_at` are backfillable the
-same way (verified with `strings` on the installed binary):
+gap. The whole library was then re-synced through the button that already
+exists in the UI - `POST /action/sync` (the **Update** button on the library
+page) - which is `SyncLibrary()` -> `syncMangas()`, 519 manga in one
+sequential pass on the fetch lane, **355 seconds**, 453 of 519 manga
+re-synced (the other 66 failed on an anti-bot challenge, which is unrelated to
+the date).
 
-| plugin | NULL rows | sends released_at |
+```
+released_at NULL:  26,145  ->  7,913
+```
+
+The remaining NULLs are **not** a backfill gap any more - they are rows the
+source genuinely has no date for:
+
+| kind | rows | why |
 |---|---|---|
-| mangafire | 5,376 | yes |
-| atsumaru | 5,703 | yes |
-| mangak | 1,984 | yes |
-| mangadex | 1,342 | yes |
-| mangaread | 1,442 | yes |
-| mangahub | 1,099 | yes |
-| mangabuddy | 1,088 | yes |
-| lhtranslation | 715 | yes |
-| mangakatana | 886 | no |
-| ksgroupscans | 305 | **no** - the source has no date |
+| old rows, plugin id format changed | 1,570 | the plugin no longer emits that id at all (e.g. lhtranslation switched from bare `chapter-53` to `<slug>:chapter-53`), so a re-sync creates the new row and leaves the old one orphaned |
+| plugin never sends the field | 4,503 | bato1 2,341, mangakatana 886, mangafreak 816, ksgroupscans 305, topmanhua 110, comix 40, onisaga 5 |
+| plugin sends a **zero time** | 1,837 | mangaread, mangzio, anisascans answer `"released_at": "0001-01-01T00:00:00Z"` - the site has no date, and the host stores that as NULL on purpose |
+| misc | 3 | mangahub |
 
-**Rule:** an empty `released_at` means "this row was synced before the
-column existed", not "the plugin does not know the date". Only the plugins
-that genuinely never send the field (ksgroupscans and friends) keep NULL for
-new rows too.
+`manga_uno` is the same zero-time case (all 74 rows come back as
+`0001-01-01T00:00:00Z`).
+
+**Rule:** an empty `released_at` means "this row has no date the site is
+willing to give", not "the plugin is broken". The backfill gap was real for
+the rows that predate the 20 Oct migration and is now closed.
+
+## The scheduler will not do this on its own
+
+`POST /action/sync` (the Update button) syncs **every** manga in the
+library, while the hourly scheduler (`StartLibraryScheduler` ->
+`SyncStaleLibrary`) only refreshes manga whose `updated_at` is older than
+`update_stale_days` (3 by default). After the migration only 12 of 519
+library manga were stale, and 507 were fresh - so the scheduler would have
+left almost all of the gap untouched. The button is the tool for this.
 
 ## Note on the UI
 
