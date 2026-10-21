@@ -1,8 +1,8 @@
 ---
 id: native-zig-build
-title: Native .so plugins now build with zig c++ - static libc++, one dependency, at the cost of size
+title: Native .so plugins build with zig c++ against static musl - a self-contained .so with zero DT_NEEDED entries
 type: finding
-tags: [goisekai, plugins, native, zig, c++, build, toolchain, static-link]
+tags: [goisekai, plugins, native, zig, c++, build, toolchain, static-link, musl]
 ---
 
 # Native .so plugins now build with zig c++
@@ -38,13 +38,17 @@ Build time, same source, same machine:
 | g++ | 5.9 s | 5.9 s |
 | zig | 38 s | **74-87 ms** (its cache) |
 
-## Full static is not reachable for a .so
+## Full static .so: not reachable, but "no shared dependency" IS
 
 `zig c++ -static -shared` does not produce a shared object - it emits an **ar
 archive** (`file` says "current ar archive"), which `dlopen` cannot load. A
-`.so` needs PIC relocations in the first place, so a fully static one is
-contradictory. Static **libc++** is the closest target that works, and that is
-what zig gives by default.
+`.so` needs PIC relocations in the first place, so a fully static *executable*
+is contradictory.
+
+**Correction (later session):** a fully static *executable* is out of reach, but
+a **self-contained shared object** - a `.so` with **zero `DT_NEEDED` entries** -
+is not, and is what the project now builds. See
+[static-musl-so.md](static-musl-so.md) for the musl recipe and its traps.
 
 For comparison, `g++ -static-libstdc++ -static-libgcc` also reaches
 `libc.so.6` only, at 490,304 B for roliascan - so g++ can do the same job, it

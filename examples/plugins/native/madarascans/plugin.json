@@ -4,5 +4,5 @@
   "site_url": "https://madarascans.net",
   "logo": "logo.png",
   "contract_version": 1,
-  "built_with": "zig 0.18.0-dev.253+16d31ceed"
+  "built_with": "zig c++ musl 1.2.6"
 }

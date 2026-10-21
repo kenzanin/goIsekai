@@ -5,11 +5,11 @@
 # JSON-LD block all go through the host bridge (native_abi.h), so there is no
 # libcurl/libxml2/OpenSSL link here.
 #
-# Toolchain: zig c++ is preferred, g++ is the fallback (see
-# tools/build-native.sh). zig links its own libc++ and libgcc statically, so
-# the result depends on libc.so.6 only - no libstdc++.so.6 / libgcc_s.so.1
-# needed on the host. It costs size (roughly twice the g++ build) and a cold
-# build of ~38 s; warm builds are <100 ms via zig's cache.
+# Toolchain: tools/build-native.sh picks the best available tier -
+# zig c++ against static musl (a .so with NO shared dependency at all),
+# else zig c++ (glibc, needs libc.so.6 only), else g++ (needs
+# libstdc++.so.6 + libgcc_s.so.1). A cold musl build is ~5 s; warm ones
+# are <100 ms via zig's cache.
 set -euo pipefail
 cd "$(dirname "$0")"
 
