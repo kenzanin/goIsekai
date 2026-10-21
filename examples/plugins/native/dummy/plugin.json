@@ -3,5 +3,5 @@
   "description": "Fixture plugin for the native .so ABI",
   "site_url": "https://example.invalid",
   "contract_version": 1,
-  "built_with": "g++ 16.2.1"
+  "built_with": "zig 0.18.0-dev.253+16d31ceed"
 }
