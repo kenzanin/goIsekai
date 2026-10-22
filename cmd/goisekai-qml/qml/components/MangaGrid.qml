@@ -9,13 +9,15 @@ GridView {
 
     property var rows: []
     property int page: 1
-    property int pageSize: 24
+    property int pageSize: 25
     property int totalRows: 0
     property string queryText: ""
-    // Covers are asked for at cell resolution, so no 720px original is decoded
-    // for a 168px card.
-    readonly property int cellW: 168
-    readonly property int cellH: 300
+    // Width-driven, not a fixed cell size: a fixed 168px cell fits six columns
+    // at one window width and four at another, so "5 per row" only holds if the
+    // cell is derived from the viewport.
+    readonly property int columns: 5
+    readonly property int cellW: Math.max(120, Math.floor(width / columns))
+    readonly property int cellH: Math.round(cellW / Theme.defaultRatio) + 80
 
     signal activated(var item)
 

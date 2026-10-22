@@ -20,13 +20,34 @@ ApplicationWindow {
     property string tagFilter: ""
     property bool onlyDuplicates: false
     property int page: 1
-    readonly property int pageSize: 24
+    readonly property int pageSize: 25
     // Visible rows for the current filter set, rebuilt by rebuild().
     property var rows: []
     // Set by refresh(); onLastRefreshChanged swaps the data in. A plain
     // property var cannot be reassigned from Go, so the round trip goes
     // through QML's own XMLHttpRequest.
     property var lastRefresh: null
+
+    // Maps GET /api/library rows to the shape the cards read. This mirrors
+    // client.FetchLibrary, which builds the initial payload in Go; refresh goes
+    // straight to the API from here, so the two must agree on every key.
+    function fromAPI(rows) {
+        return rows.map((r) => {
+            return ({
+                "title": r.title,
+                "cover": r.cover_url ? serverBase + "/image?pluginID=" + encodeURIComponent(r.plugin_id) + "&url=" + encodeURIComponent(r.cover_url) : "",
+                "read": r.read_chapters,
+                "total": r.total_chapters,
+                "hasNew": r.has_new,
+                "updatedAt": r.updated_at,
+                "lastReadAt": r.last_read_at,
+                "dupGroup": r.dup_group,
+                "href": serverBase + "/view/manga/" + encodeURIComponent(r.plugin_id) + "/" + encodeURIComponent(r.source_manga_id),
+                "key": r.plugin_id + ":" + r.source_manga_id,
+                "pluginId": r.plugin_id
+            });
+        });
+    }
 
     function byTitle(a, b) {
         return a.title.localeCompare(b.title);
@@ -164,7 +185,7 @@ ApplicationWindow {
     color: Theme.bg
     onLastRefreshChanged: {
         if (lastRefresh && lastRefresh.length !== undefined) {
-            allItems = lastRefresh;
+            allItems = root.fromAPI(lastRefresh);
             statusText = allItems.length + " manga";
             rebuild();
         }

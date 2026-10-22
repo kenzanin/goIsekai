@@ -177,7 +177,7 @@ Rectangle {
                             spacing: 6
 
                             Image {
-                                source: modelData.icon ? serverBase + modelData.icon : ""
+                                source: modelData.icon ? (modelData.icon.indexOf("data:") === 0 ? modelData.icon : serverBase + modelData.icon) : ""
                                 sourceSize.width: 14
                                 sourceSize.height: 14
                                 asynchronous: true

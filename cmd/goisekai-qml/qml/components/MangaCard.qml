@@ -50,7 +50,7 @@ Rectangle {
                 visible: cover.status === Image.Error || (card.item && card.item.cover === "")
                 text: cover.status === Image.Error ? "cannot decode" : "no cover"
                 color: Theme.textFaint
-                font.pixelSize: 10
+                font.pixelSize: 12
             }
 
             // New-chapter badge, from the API's has_new.
@@ -73,7 +73,8 @@ Rectangle {
             Layout.fillWidth: true
             text: card.item ? card.item.title : ""
             color: Theme.text
-            font.pixelSize: 12
+            font.pixelSize: 14
+            font.bold: true
             wrapMode: Text.WordWrap
             maximumLineCount: 2
             elide: Text.ElideRight
@@ -101,7 +102,7 @@ Rectangle {
         Label {
             text: card.item ? (card.item.total > 0 ? card.item.read + " / " + card.item.total : "unread") : ""
             color: Theme.textFaint
-            font.pixelSize: 10
+            font.pixelSize: 12
         }
 
     }
