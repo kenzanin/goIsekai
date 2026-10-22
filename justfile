@@ -13,6 +13,9 @@ pkgs := "./internal/... ./pkg/... ./cmd/..."
 # the linter; the Lua and web assets have their own recipes.
 prod := "./internal/... ./pkg/... ./cmd/..."
 
+# QML sources of the desktop client (Qt Quick).
+qml_dir := "cmd/goisekai-qml/qml"
+
 # Where `install-lua`, `install-js` and `install-info` copy into. Override per run:
 #   just plugins_dir=/tmp/plugins install-lua kaliscan
 plugins_dir := "app_data/plugins"
@@ -25,6 +28,12 @@ lib_dir := "cmd/goisekai/frontend/lib"
 # compile the server binary (pure Go, CGO-free, cross-compilable)
 build: css br
     CGO_ENABLED=0 go build -o {{binary}} ./cmd/goisekai
+
+# compile the Qt Quick desktop client (cgo + Qt 6, separate from the CGO-free server).
+# -s -w drops the DWARF debug info: 112MB -> 33MB. Qt itself is linked
+# dynamically (libQt6*.so.6), so none of it is inside this binary.
+build-qml:
+    CGO_ENABLED=1 go build -ldflags="-s -w" -o goisekai-qml ./cmd/goisekai-qml
 
 # compile the embedded stylesheet from the templates, if npx is available
 css:
@@ -53,7 +62,7 @@ br:
     done
 
 # quality gate over production Go code only (tests: `just test`, web: `just lint-web`)
-check: fmt-prod modernize lint-prod
+check: fmt-prod modernize lint-prod lint-qml
 
 # build, then serve at debug log level; `just run -port 9099` passes args to the server
 run *args: build
@@ -105,6 +114,26 @@ fmt-web:
 # lint and format-check the frontend (Biome), read-only
 lint-web:
     biome check {{frontend_dir}}
+
+# format the QML sources of the desktop client in place
+fmt-qml:
+    qmlformat -i $(find {{qml_dir}} -name '*.qml')
+
+# lint and format-check the QML sources, read-only.
+# qmllint on Qt 6.12 reports SYNTAX errors only - a misspelt property such as
+# `widht: 10` passes, so a green run here is not proof the UI renders. The
+# format check is a diff against stdout because qmlformat has no --check flag.
+lint-qml:
+    #!/usr/bin/env sh
+    set -eu
+    files=$(find {{qml_dir}} -name '*.qml')
+    qmllint $files
+    for f in $files; do
+        qmlformat "$f" | diff -u "$f" - > /dev/null || {
+            echo "not formatted: $f (run: just fmt-qml)"
+            exit 1
+        }
+    done
 
 # format the Lua templates with Stylua
 fmt-lua:

@@ -21,6 +21,7 @@ require (
 	github.com/go-rod/rod v0.116.2
 	github.com/goccy/go-json v0.10.6
 	github.com/gomarkdown/markdown v0.0.0-20260917010721-cc30ffac3c05
+	github.com/mappu/miqt v0.15.0
 	github.com/mmcdole/lunar v0.1.1
 	github.com/tetratelabs/wazero v1.12.0
 	github.com/traefik/yaegi v0.16.1
