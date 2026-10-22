@@ -12,6 +12,9 @@ GridView {
     property int pageSize: 25
     property int totalRows: 0
     property string queryText: ""
+    // plugin_id -> display name, owned by Main.qml so the grid stays stateless.
+    property var pluginNames: ({
+    })
     // Width-driven, not a fixed cell size: a fixed 168px cell fits six columns
     // at one window width and four at another, so "5 per row" only holds if the
     // cell is derived from the viewport.
@@ -64,6 +67,7 @@ GridView {
         width: view.cellW
         height: view.cellH
         item: modelData
+        pluginName: modelData && modelData.pluginId ? (view.pluginNames[modelData.pluginId] || modelData.pluginId) : ""
         onActivated: (it) => {
             view.currentIndex = index;
             view.forceActiveFocus();

@@ -21,6 +21,12 @@ ApplicationWindow {
     property bool onlyDuplicates: false
     property int page: 1
     readonly property int pageSize: 25
+    // Active top-level tab. Only "library" has content; the rest render a
+    // placeholder page so the nav is real without pretending the pages exist.
+    property string currentTab: "library"
+    // plugin_id -> display name, so cards can label their source.
+    property var pluginNames: ({
+    })
     // Visible rows for the current filter set, rebuilt by rebuild().
     property var rows: []
     // Set by refresh(); onLastRefreshChanged swaps the data in. A plain
@@ -195,6 +201,11 @@ ApplicationWindow {
         facets = JSON.parse(facetsJson);
         tags = facets.tags || ({
         });
+        const names = ({
+        });
+        const list = facets.plugins || [];
+        for (let i = 0; i < list.length; ++i) names[list[i].plugin_id] = list[i].name
+        pluginNames = names;
         rebuild();
     }
 
@@ -208,9 +219,20 @@ ApplicationWindow {
         onActivated: toolbar.focusSearch()
     }
 
+    // Placeholder for every tab except the library. One instance, retitled on
+    // switch, rather than seven copies of the same page.
+    EmptyPage {
+        anchors.fill: parent
+        visible: root.currentTab !== "library"
+        sectionTitle: root.currentTab.charAt(0).toUpperCase() + root.currentTab.slice(1)
+    }
+
     RowLayout {
         anchors.fill: parent
         spacing: 0
+        // The library page is the only one with content; every other tab swaps
+        // the whole browsing surface for a placeholder.
+        visible: root.currentTab === "library"
 
         LibrarySidebar {
             Layout.fillHeight: true
@@ -265,6 +287,7 @@ ApplicationWindow {
                 pageSize: root.pageSize
                 totalRows: root.allItems.length
                 queryText: root.query
+                pluginNames: root.pluginNames
                 onActivated: (it) => {
                     return root.openItem(it);
                 }
@@ -285,30 +308,49 @@ ApplicationWindow {
 
     }
 
-    header: LibraryToolbar {
-        id: toolbar
+    header: ColumnLayout {
+        Layout.fillWidth: true
+        spacing: 0
 
-        query: root.query
-        sortKey: root.sortKey
-        statusFilter: root.statusFilter
-        statusText: root.statusText
-        resultCount: root.rows.length
-        totalCount: root.allItems.length
-        onQueryEdited: (v) => {
-            root.query = v;
-            root.rebuild();
+        NavBar {
+            Layout.fillWidth: true
+            currentTab: root.currentTab
+            onTabSelected: (t) => {
+                root.currentTab = t;
+                if (t === "library")
+                    grid.forceActiveFocus();
+
+            }
         }
-        onSortEdited: (v) => {
-            root.sortKey = v;
-            root.rebuild();
+
+        LibraryToolbar {
+            id: toolbar
+
+            Layout.fillWidth: true
+            visible: root.currentTab === "library"
+            query: root.query
+            sortKey: root.sortKey
+            statusFilter: root.statusFilter
+            statusText: root.statusText
+            resultCount: root.rows.length
+            totalCount: root.allItems.length
+            onQueryEdited: (v) => {
+                root.query = v;
+                root.rebuild();
+            }
+            onSortEdited: (v) => {
+                root.sortKey = v;
+                root.rebuild();
+            }
+            onStatusEdited: (v) => {
+                root.statusFilter = v;
+                root.rebuild();
+            }
+            onRefreshRequested: root.refresh()
+            onSearchFocusReturned: grid.forceActiveFocus()
+            onOpenRequested: root.openItem(root.rows[grid.currentIndex])
         }
-        onStatusEdited: (v) => {
-            root.statusFilter = v;
-            root.rebuild();
-        }
-        onRefreshRequested: root.refresh()
-        onSearchFocusReturned: grid.forceActiveFocus()
-        onOpenRequested: root.openItem(root.rows[grid.currentIndex])
+
     }
 
 }

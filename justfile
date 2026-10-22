@@ -135,6 +135,19 @@ lint-qml:
         }
     done
 
+# run the QML unit tests (qmltestrunner). Not part of `check`: on some Qt 6.12
+# hosts the runner exits 1 with no output even for a trivial TestCase, so it is
+# run explicitly where it works.
+test-qml:
+    #!/usr/bin/env sh
+    set -eu
+    cd {{qml_dir}}/..
+    if ! command -v qmltestrunner >/dev/null 2>&1; then
+        echo "qmltestrunner not found — skipping QML tests"
+        exit 0
+    fi
+    qmltestrunner -input qmltest
+
 # format the Lua templates with Stylua
 fmt-lua:
     stylua internal/templates/

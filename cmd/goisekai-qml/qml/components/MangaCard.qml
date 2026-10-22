@@ -10,6 +10,47 @@ Rectangle {
 
     property var item: null
     property real thumbRatio: Theme.defaultRatio
+    // Display name of the source plugin; the card cannot look it up itself.
+    property string pluginName: ""
+    // Same predicates as Main.qml's status filter, so the badge and the filter
+    // cannot disagree about what "done" means.
+    readonly property string statusKey: {
+        if (!item)
+            return "";
+
+        if (item.total > 0 && item.read >= item.total)
+            return "done";
+
+        if (item.hasNew)
+            return "new";
+
+        if (item.read > 0 && item.total > 0)
+            return "reading";
+
+        return "unread";
+    }
+    readonly property var statusStyle: ({
+        "done": {
+            "label": "DONE",
+            "fg": "#0b2e1a",
+            "bg": "#22c55e"
+        },
+        "new": {
+            "label": "NEW",
+            "fg": "#2a1a05",
+            "bg": "#ffa332"
+        },
+        "reading": {
+            "label": "READING",
+            "fg": "#0b1f2e",
+            "bg": "#60a5fa"
+        },
+        "unread": {
+            "label": "UNREAD",
+            "fg": "#e5e5e5",
+            "bg": "#1f1f1f"
+        }
+    })
 
     signal activated(var item)
 
@@ -65,6 +106,84 @@ Rectangle {
                 color: Theme.accent
                 border.width: 2
                 border.color: Theme.card
+            }
+
+            // Overlays sit on the cover rather than under it: the text below is
+            // the title, and adding two more lines there shrinks every cover.
+            // A scrim keeps them readable over light artwork.
+            Rectangle {
+                anchors.bottom: parent.bottom
+                anchors.left: parent.left
+                anchors.right: parent.right
+                height: 56
+
+                gradient: Gradient {
+                    GradientStop {
+                        position: 0
+                        color: "transparent"
+                    }
+
+                    GradientStop {
+                        position: 1
+                        color: "#cc000000"
+                    }
+
+                }
+
+            }
+
+            Row {
+                anchors.bottom: parent.bottom
+                anchors.left: parent.left
+                anchors.margins: 6
+                spacing: 6
+
+                // Status overlay.
+                Rectangle {
+                    visible: card.statusKey !== ""
+                    width: statusLabel.implicitWidth + 10
+                    height: statusLabel.implicitHeight + 4
+                    radius: 3
+                    color: card.statusStyle[card.statusKey].bg
+                    border.width: card.statusKey === "unread" ? 1 : 0
+                    border.color: "#3a3a3a"
+
+                    Label {
+                        id: statusLabel
+
+                        anchors.centerIn: parent
+                        text: card.statusKey === "" ? "" : card.statusStyle[card.statusKey].label
+                        color: card.statusKey === "" ? Theme.text : card.statusStyle[card.statusKey].fg
+                        font.pixelSize: 11
+                        font.bold: true
+                    }
+
+                }
+
+                // Source-plugin overlay, so a duplicate from another source is
+                // visible without opening the manga.
+                Rectangle {
+                    visible: card.pluginName !== ""
+                    width: srcLabel.implicitWidth + 10
+                    height: srcLabel.implicitHeight + 4
+                    radius: 3
+                    color: "#cc000000"
+                    border.width: 1
+                    border.color: "#55ffffff"
+
+                    Label {
+                        id: srcLabel
+
+                        anchors.centerIn: parent
+                        text: card.pluginName
+                        color: "#e5e5e5"
+                        font.pixelSize: 11
+                        elide: Text.ElideRight
+                        width: Math.min(implicitWidth, 110)
+                    }
+
+                }
+
             }
 
         }
