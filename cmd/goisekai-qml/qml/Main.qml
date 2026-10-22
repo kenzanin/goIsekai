@@ -214,7 +214,7 @@ ApplicationWindow {
 
         LibrarySidebar {
             Layout.fillHeight: true
-            Layout.preferredWidth: 240
+            Layout.preferredWidth: 264
             facets: root.facets
             pluginFilter: root.pluginFilter
             tagFilter: root.tagFilter

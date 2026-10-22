@@ -17,7 +17,7 @@ GridView {
     // cell is derived from the viewport.
     readonly property int columns: 5
     readonly property int cellW: Math.max(120, Math.floor(width / columns))
-    readonly property int cellH: Math.round(cellW / Theme.defaultRatio) + 80
+    readonly property int cellH: Math.round(cellW / Theme.defaultRatio) + 96
 
     signal activated(var item)
 
@@ -52,7 +52,7 @@ GridView {
         wrapMode: Text.WordWrap
         visible: view.count === 0
         color: Theme.textDim
-        font.pixelSize: 14
+        font.pixelSize: 17
         text: view.totalRows === 0 ? statusText : "No manga matches “" + view.queryText.trim() + "” with these filters"
     }
 

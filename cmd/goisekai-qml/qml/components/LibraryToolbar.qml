@@ -134,7 +134,7 @@ ToolBar {
 
                     text: modelData.label
                     padding: 8
-                    font.pixelSize: 14
+                    font.pixelSize: 17
                     onClicked: bar.statusEdited(modelData.key)
 
                     background: Rectangle {
@@ -147,7 +147,7 @@ ToolBar {
                     contentItem: Label {
                         text: parent.text
                         color: parent.on ? Theme.accent : Theme.textDim
-                        font.pixelSize: 14
+                        font.pixelSize: 17
                         horizontalAlignment: Text.AlignHCenter
                         verticalAlignment: Text.AlignVCenter
                     }
@@ -166,12 +166,12 @@ ToolBar {
             // Show the filtered count only when a filter narrowed the list.
             text: resultCount === totalCount ? totalCount + " manga" : resultCount + " of " + totalCount + " manga"
             color: Theme.textDim
-            font.pixelSize: 15
+            font.pixelSize: 17
         }
 
         Button {
             text: "Refresh (F5)"
-            font.pixelSize: 14
+            font.pixelSize: 17
             onClicked: bar.refreshRequested()
         }
 

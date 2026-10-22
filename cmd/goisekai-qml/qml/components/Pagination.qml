@@ -74,7 +74,7 @@ Row {
 
         enabled: !isEllipsis
         implicitWidth: isEllipsis ? 24 : Math.max(32, label.length * 9 + 16)
-        implicitHeight: 32
+        implicitHeight: 40
         padding: 0
 
         background: Rectangle {
@@ -88,7 +88,7 @@ Row {
         contentItem: Label {
             text: navButton.label
             color: navButton.active ? Theme.accent : (navButton.enabled ? Theme.textDim : Theme.textFaint)
-            font.pixelSize: 13
+            font.pixelSize: 17
             horizontalAlignment: Text.AlignHCenter
             verticalAlignment: Text.AlignVCenter
         }
