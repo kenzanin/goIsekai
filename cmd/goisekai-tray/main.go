@@ -31,6 +31,7 @@ type app struct {
 	dead   bool
 
 	serverBin string // server binary to spawn ([tray] server_bin)
+	qmlBin    string // desktop client; derived from serverBin's directory
 	workDir   string // child cwd; the server resolves goisekai.ini relative to it
 	url       string // Open Browser target ([tray] url)
 	logPath   string // child stdout/stderr ([tray] log_file)
@@ -61,6 +62,9 @@ func main() {
 		a.serverBin = filepath.Join(exeDir, "goisekai")
 	}
 	a.workDir = filepath.Dir(a.serverBin)
+	// No separate config key: the desktop client ships next to the server
+	// binary, so moving server_bin moves this too.
+	a.qmlBin = filepath.Join(a.workDir, "goisekai-qml")
 	a.url = cfg.TrayURL
 	if a.url == "" {
 		a.url = resolveURL(cfg.Host, cfg.Port)

@@ -25,16 +25,48 @@ func (a *app) onReady() {
 	systray.SetTitle("goIsekai")
 	systray.SetTooltip("goIsekai — manga server")
 
+	mQML := systray.AddMenuItem("Open Desktop Client", "Launch the Qt Quick desktop UI")
 	mOpen := systray.AddMenuItem("Open Browser", "Open the reader UI")
 	mRestart := systray.AddMenuItem("Restart Server", "Stop and start the server")
 	mQuit := systray.AddMenuItem("Quit", "Stop server and exit tray")
+
+	// The client is built by `just build-qml`, so it may legitimately be
+	// absent on a server-only deployment. Disable the entry rather than
+	// offering a menu item that can only fail.
+	if _, err := os.Stat(a.qmlBin); err != nil {
+		mQML.Disable()
+		mQML.SetTitle("Open Desktop Client (not built)")
+	}
 
 	if err := a.start(); err != nil {
 		systray.SetTooltip("goIsekai — FAILED to start: " + err.Error())
 	}
 
+	// Poll the server so the dot reflects reality instead of the fact that we
+	// once spawned a process. A crashed child is not always visible through
+	// the exited channel (a reused PID, or a stop we did not initiate).
+	green, red := statusIcon(true), statusIcon(false)
+	up := healthy(a.url)
+	a.setStatus(up, green, red)
+	tick := time.NewTicker(5 * time.Second)
+	defer tick.Stop()
+
 	for {
 		select {
+		case <-tick.C:
+			if now := healthy(a.url); now != up {
+				up = now
+				a.setStatus(up, green, red)
+			}
+		case <-mQML.ClickedCh:
+			// Fire and forget: the client is long-lived and independently
+			// owned once started. Its output is discarded rather than piped,
+			// since nothing here reads it.
+			cmd := exec.Command(a.qmlBin)
+			cmd.Dir = a.workDir
+			if err := cmd.Start(); err != nil {
+				systray.SetTooltip("goIsekai — cannot launch the desktop client: " + err.Error())
+			}
 		case <-mOpen.ClickedCh:
 			openBrowser(a.url)
 		case <-mRestart.ClickedCh:
@@ -43,10 +75,14 @@ func (a *app) onReady() {
 			if err := a.start(); err != nil {
 				systray.SetTooltip("goIsekai — FAILED: " + err.Error())
 			}
+			up = healthy(a.url)
+			a.setStatus(up, green, red)
 		case err, ok := <-a.exited:
 			if ok && err != nil && !a.dead {
 				systray.SetTooltip("goIsekai — server exited: " + err.Error())
 			}
+			up = false
+			a.setStatus(up, green, red)
 		case <-mQuit.ClickedCh:
 			a.dead = true
 			a.stop()
@@ -54,6 +90,18 @@ func (a *app) onReady() {
 			return
 		}
 	}
+}
+
+// setStatus swaps the dot and keeps the tooltip in step, so a hover tells the
+// same story as the colour.
+func (a *app) setStatus(up bool, green, red []byte) {
+	if up {
+		systray.SetIcon(green)
+		systray.SetTooltip("goIsekai — running at " + a.url)
+		return
+	}
+	systray.SetIcon(red)
+	systray.SetTooltip("goIsekai — server not reachable at " + a.url)
 }
 
 func (a *app) start() error {
