@@ -2,17 +2,19 @@
 -- Site: https://en-thunderscans.com (WordPress mangareader theme, bsx cards)
 -- ABI contract version: 1
 
+-- The origin lives in plugin.json only; PLUGIN and BASE both read it, so a
+-- site move is one edit there instead of three strings kept in sync by hand.
+BASE = host.plugin.param("site_url")
+
 PLUGIN = {
     contract_version = 1,
     name = "En-Thunderscans",
-    site_url = "https://en-thunderscans.com",
+    site_url = BASE,
     logo = "logo.png",
-    verify_url = "https://en-thunderscans.com",
+    verify_url = BASE,
     needs_human_verify = false,
     thumb_ratio = 0.703,
 }
-
-BASE = host.plugin.param("site_url")
 
 local trim = host.text.trim
 local unescape = host.text.unescape

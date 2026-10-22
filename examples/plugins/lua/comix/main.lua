@@ -264,13 +264,16 @@ function get_genres(_)
     if not data then
         return host.json.encode({})
     end
-    -- Genres live under list.options.genres in the browse payload.
+    -- Genres live under list.options.genres in the browse payload, each entry
+    -- shaped {id, label, slug}. Reading `name` here matched nothing and shipped
+    -- an empty list, which the host cached as "[]" — an empty selector with no
+    -- error to show for it.
     local out = {}
     local function walk(v)
         if type(v) ~= "table" then return end
-        if v.name and v.slug and #v.name < 40 then
-            -- Heuristic: genre entries have short name+slug pairs.
-            out[#out + 1] = { name = v.name, slug = v.slug }
+        local label = v.label or v.name
+        if type(label) == "string" and type(v.slug) == "string" and #label < 40 then
+            out[#out + 1] = { name = label, slug = v.slug }
             return
         end
         for _, child in pairs(v) do

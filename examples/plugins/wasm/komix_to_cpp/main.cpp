@@ -22,8 +22,22 @@
 
 #include "html_util.h"
 
-static const char *kSite = "https://komix.to";
-static const char *kJSONHeaders = "{\"Accept\":\"application/json\",\"Referer\":\"https://komix.to/\"}";
+// site() is the plugin's own origin from plugin.json. Lazy (not a global
+// initializer): the host dispatcher is only ready after _initialize, so a
+// static-init host_call would run too early. Cached after the first request.
+static const std::string &site() {
+    static const std::string v = [] {
+        std::string s = host_str("plugin.param", "site_url");
+        return s.empty() ? std::string("https://komix.to") : s;
+    }();
+    return v;
+}
+
+// jsonHeaders() derives the Referer from the same origin, so a site move is
+// one edit in plugin.json rather than two strings kept in sync by hand.
+static std::string jsonHeaders() {
+    return "{\"Accept\":\"application/json\",\"Referer\":\"" + site() + "/\"}";
+}
 
 // ─── search ─────────────────────────────────────────────────────────────────
 
@@ -43,7 +57,7 @@ static std::string search_impl(const std::string &arg) {
     if (trim(query).empty()) return genre_listing(genres[0]);
 
     std::string body;
-    if (!http_body(std::string(kSite) + "/api/search?q=" + url_encode(query), kJSONHeaders, body)) return "[]";
+    if (!http_body(site() + "/api/search?q=" + url_encode(query), jsonHeaders(), body)) return "[]";
 
     rapidjson::Document resp;
     resp.Parse(body.c_str());
@@ -58,7 +72,7 @@ static std::string search_impl(const std::string &arg) {
         rapidjson::Value m(rapidjson::kObjectType);
         add_string(m, "id", it.HasMember("slug") && it["slug"].IsString() ? trim(it["slug"].GetString()) : "", alloc);
         add_string(m, "title", it.HasMember("title") && it["title"].IsString() ? trim(it["title"].GetString()) : "", alloc);
-        add_string(m, "cover_url", make_abs(kSite, cover), alloc);
+        add_string(m, "cover_url", make_abs(site(), cover), alloc);
         add_string(m, "status", it.HasMember("status") && it["status"].IsString() ? normalize_status(it["status"].GetString()) : "", alloc);
         out.PushBack(m, alloc);
     }
@@ -68,7 +82,7 @@ static std::string search_impl(const std::string &arg) {
 static std::string genre_listing(const std::string &genre) {
     std::string slug = genre_slug(genre);
     std::string body;
-    if (!get_body(std::string(kSite) + "/genres/" + url_encode(slug), body)) return "[]";
+    if (!get_body(site() + "/genres/" + url_encode(slug), body)) return "[]";
 
     std::vector<std::string> seen;
     rapidjson::Document out;
@@ -97,7 +111,7 @@ static std::string detail_impl(const std::string &arg) {
     std::string slug = trim(decode_string(arg));
     if (slug.empty()) return "{}";
     std::string body;
-    if (!get_body(std::string(kSite) + "/title/" + url_encode(slug), body)) return "{}";
+    if (!get_body(site() + "/title/" + url_encode(slug), body)) return "{}";
 
     rapidjson::Document m;
     m.SetObject();
@@ -133,7 +147,7 @@ static std::string chapters_impl(const std::string &arg) {
     std::string slug = trim(decode_string(arg));
     if (slug.empty()) return "[]";
     std::string body;
-    if (!get_body(std::string(kSite) + "/title/" + url_encode(slug), body)) return "[]";
+    if (!get_body(site() + "/title/" + url_encode(slug), body)) return "[]";
 
     // Embedded JSON is escaped: \"chapters\":[{\"id\":...}]
     std::smatch m;
@@ -160,7 +174,7 @@ static std::string chapters_impl(const std::string &arg) {
         add_string(ch, "title", c.HasMember("title") && c["title"].IsString() ? trim(c["title"].GetString()) : "", alloc);
         ch.AddMember("chapter_num", num, alloc);
         add_string(ch, "released_at", c.HasMember("created_at") && c["created_at"].IsString() ? parse_time(c["created_at"].GetString()) : "", alloc);
-        add_string(ch, "url", std::string(kSite) + "/title/" + slug + "/chapter/" + numstr, alloc);
+        add_string(ch, "url", site() + "/title/" + slug + "/chapter/" + numstr, alloc);
         out.PushBack(ch, alloc);
     }
     return to_json(out);
@@ -175,7 +189,7 @@ static std::string pages_impl(const std::string &arg) {
     std::string page_url;
     size_t colon = chID.find(':');
     if (colon != std::string::npos) {
-        page_url = std::string(kSite) + "/title/" + url_encode(chID.substr(0, colon)) + "/chapter/" + url_encode(chID.substr(colon + 1));
+        page_url = site() + "/title/" + url_encode(chID.substr(0, colon)) + "/chapter/" + url_encode(chID.substr(colon + 1));
     } else {
         page_url = chID;
     }
@@ -199,7 +213,7 @@ static std::string pages_impl(const std::string &arg) {
         if (!p.IsObject()) continue;
         std::string u = p.HasMember("image_url") && p["image_url"].IsString() ? trim(p["image_url"].GetString()) : "";
         std::string enc = p.HasMember("enc") && p["enc"].IsString() ? trim(p["enc"].GetString()) : "";
-        if (u.empty() && !enc.empty()) u = std::string(kSite) + "/api/images?t=" + enc;
+        if (u.empty() && !enc.empty()) u = site() + "/api/images?t=" + enc;
         if (u.empty()) continue;
         rapidjson::Value pg(rapidjson::kObjectType);
         pg.AddMember("index", idx++, alloc);
@@ -214,7 +228,7 @@ static std::string pages_impl(const std::string &arg) {
 static std::string genres_impl() {
     std::vector<std::string> names = {"Action", "Adventure", "Comedy", "Drama", "Fantasy", "Isekai", "Romance"};
     std::string body;
-    if (get_body(std::string(kSite) + "/genres", body)) {
+    if (get_body(site() + "/genres", body)) {
         std::vector<std::string> seen;
         names.clear();
         for (auto &g : all_subs(std::regex("/genres/([a-z0-9-]+)"), body, 80)) {

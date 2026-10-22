@@ -40,8 +40,22 @@ import "core:fmt"
 import "core:slice"
 import "core:strings"
 
-kSite :: "https://comicasura.net"
-kHeaders :: `{"Accept":"text/html,application/xhtml+xml","Referer":"https://comicasura.net/"}`
+// The site origin, and the Referer derived from it, come from plugin.json so a
+// site move is one edit there rather than three strings kept in sync by hand.
+// Procs rather than package constants: the host dispatcher only answers after
+// _initialize has run, so a host_call in a global initializer would be too early.
+site :: proc () -> string {
+	s := abi.host_str("plugin.param", "site_url")
+	if s == "" {
+		return "https://comicasura.net"
+	}
+	return s
+}
+
+// headers derives the Referer from the same origin.
+headers :: proc () -> string {
+	return strings.concatenate({`{"Accept":"text/html,application/xhtml+xml","Referer":"`, site(), `/"}`})
+}
 
 url_encode :: proc (s: string) -> string { return abi.url_encode(s) }
 
@@ -131,10 +145,10 @@ search_impl :: proc (arg: string) -> string {
 	}
 
 	url := strings.concatenate({
-		kSite, "/advanced-search?name=", url_encode(strings.trim_space(f.Query)),
+		site(), "/advanced-search?name=", url_encode(strings.trim_space(f.Query)),
 		"&page=", fmt.aprintf("%d", page),
 	})
-	body, ok := abi.http_body(url, kHeaders)
+	body, ok := abi.http_body(url, headers())
 	if !ok {
 		return "[]"
 	}
@@ -201,8 +215,8 @@ detail_impl :: proc (arg: string) -> string {
 	}
 
 	body, ok := abi.http_body(
-		strings.concatenate({kSite, "/manga/", slug}),
-		kHeaders,
+		strings.concatenate({site(), "/manga/", slug}),
+		headers(),
 	)
 	if !ok {
 		return abi.to_json(Manga_Out{ID = slug})
@@ -255,8 +269,8 @@ chapters_impl :: proc (arg: string) -> string {
 	}
 
 	body, ok := abi.http_body(
-		strings.concatenate({kSite, "/manga/", slug}),
-		kHeaders,
+		strings.concatenate({site(), "/manga/", slug}),
+		headers(),
 	)
 	if !ok {
 		return "[]"
@@ -280,7 +294,7 @@ chapters_impl :: proc (arg: string) -> string {
 			Manga_ID    = slug,
 			Title       = label,
 			Chapter_Num = host_num("text.chapter_num", label),
-			URL         = strings.concatenate({kSite, "/manga/", slug, "/", cid}),
+			URL         = strings.concatenate({site(), "/manga/", slug, "/", cid}),
 		})
 	}
 
@@ -307,8 +321,8 @@ pages_impl :: proc (arg: string) -> string {
 	chapter := raw[i + 1:]
 
 	body, ok := abi.http_body(
-		strings.concatenate({kSite, "/manga/", slug, "/", chapter}),
-		kHeaders,
+		strings.concatenate({site(), "/manga/", slug, "/", chapter}),
+		headers(),
 	)
 	if !ok {
 		return "[]"
@@ -336,8 +350,8 @@ pages_impl :: proc (arg: string) -> string {
 
 genres_impl :: proc () -> string {
 	body, ok := abi.http_body(
-		strings.concatenate({kSite, "/genres"}),
-		kHeaders,
+		strings.concatenate({site(), "/genres"}),
+		headers(),
 	)
 	if !ok {
 		return "[]"

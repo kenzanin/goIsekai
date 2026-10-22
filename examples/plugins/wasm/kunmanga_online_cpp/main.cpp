@@ -22,9 +22,39 @@
 
 #include "html_util.h"
 
-static const char *kSite = "https://www.kunmanga.online";
-static const char *kJSONHeaders =
-    "{\"Accept\":\"application/json\",\"Referer\":\"https://www.kunmanga.online/\"}";
+// The site origin comes from plugin.json so a site move is one edit there.
+// Lazy, not a global initializer: host_call only answers after _initialize.
+static const std::string &site() {
+    static const std::string v = [] {
+        std::string s = host_str("plugin.param", "site_url");
+        return s.empty() ? std::string("https://www.kunmanga.online") : s;
+    }();
+    return v;
+}
+
+// jsonHeaders() derives the Referer from the same origin.
+static std::string jsonHeaders() {
+    return "{\"Accept\":\"application/json\",\"Referer\":\"" + site() + "/\"}";
+}
+
+// Covers live on a CDN, not on the site. The API's image_original comes in
+// three shapes — "//thumb/x.webp", "/thumb/x.webp", "thumb/x.webp" — and the
+// site origin serves none of them (404); cdn.zinmanga1.com serves all three.
+// "//thumb/x.webp" is the nasty one: it looks protocol-relative, so a plain
+// make_abs() yields "https://thumb/x.webp" — a URL whose host is the literal
+// directory name. Retarget every /thumb/ path at the CDN.
+static std::string cover_url(const std::string &raw) {
+    std::string u = trim(raw);
+    if (u.empty()) return "";
+    std::string cdn = host_str("plugin.param", "cdn");
+    if (cdn.empty()) cdn = "https://cdn.zinmanga1.com";
+    // Match "thumb/" without the leading slash: the API emits all three of
+    // "//thumb/x", "/thumb/x" and bare "thumb/x", and only the first two have a
+    // slash to anchor on. Everything from "thumb/" on is the CDN path.
+    size_t at = u.find("thumb/");
+    if (at != std::string::npos) return cdn + "/" + u.substr(at);
+    return make_abs(site(), u);
+}
 
 // "a-b-c" → "a b c" (the Go plugin's ReplaceAll(slug, "-", " ") fallback).
 static std::string dashes_to_spaces(const std::string &s) {
@@ -77,7 +107,7 @@ static std::string search_impl(const std::string &arg) {
     if (query.empty()) return genre_listing(genres[0], page);
 
     std::string body;
-    if (!http_body(std::string(kSite) + "/manga/searching?title=" + url_encode(query), kJSONHeaders, body)) return "[]";
+    if (!http_body(site() + "/manga/searching?title=" + url_encode(query), jsonHeaders(), body)) return "[]";
 
     rapidjson::Document resp;
     resp.Parse(body.c_str());
@@ -93,10 +123,8 @@ static std::string search_impl(const std::string &arg) {
         std::string cover = it.HasMember("image_original") && it["image_original"].IsString()
                                 ? trim(it["image_original"].GetString())
                                 : "";
-        // ponytail: Go plugin did a bare siteURL+cover concat, which drops the
-        // slash when the API returns "thumb/x.webp" (broken cover_url). make_abs
-        // inserts it and passes absolute http(s) URLs through untouched.
-        cover = make_abs(kSite, cover);
+        // Covers resolve on the CDN, not the site origin — see cover_url().
+        cover = cover_url(cover);
 
         rapidjson::Value m(rapidjson::kObjectType);
         add_string(m, "id", it.HasMember("slug") && it["slug"].IsString() ? trim(it["slug"].GetString()) : "", alloc);
@@ -121,7 +149,7 @@ static std::string search_impl(const std::string &arg) {
 // Scrapes /manga-genre/<slug> cards (.page-item-detail).
 static std::string genre_listing(const std::string &genre, int page) {
     std::string slug = genre_slug(genre);
-    std::string u = std::string(kSite) + "/manga-genre/" + url_encode(slug);
+    std::string u = site() + "/manga-genre/" + url_encode(slug);
     if (page > 1) u += "/page/" + std::to_string(page);
     std::string body;
     if (!get_body(u, body)) return "[]";
@@ -170,7 +198,7 @@ static std::string detail_impl(const std::string &arg) {
     std::string slug = trim(decode_string(arg));
     if (slug.empty()) return "{}";
     std::string body;
-    if (!get_body(std::string(kSite) + "/manga/" + url_encode(slug), body)) return "{}";
+    if (!get_body(site() + "/manga/" + url_encode(slug), body)) return "{}";
 
     rapidjson::Document m;
     m.SetObject();
@@ -216,10 +244,10 @@ static std::string chapters_impl(const std::string &arg) {
     auto &alloc = out.GetAllocator();
 
     for (int page = 1;; page++) {
-        std::string u = std::string(kSite) + "/api/comics/" + url_encode(slug) + "/chapters?page=" +
+        std::string u = site() + "/api/comics/" + url_encode(slug) + "/chapters?page=" +
                         std::to_string(page) + "&per_page=50&order=desc";
         std::string body;
-        if (!http_body(u, kJSONHeaders, body)) break;
+        if (!http_body(u, jsonHeaders(), body)) break;
 
         rapidjson::Document resp;
         resp.Parse(body.c_str());
@@ -246,7 +274,7 @@ static std::string chapters_impl(const std::string &arg) {
                            c.HasMember("updated_at") && c["updated_at"].IsString()
                                ? parse_time(c["updated_at"].GetString())
                                : "", alloc);
-                add_string(ch, "url", std::string(kSite) + "/manga/" + slug + "/" + cslug, alloc);
+                add_string(ch, "url", site() + "/manga/" + slug + "/" + cslug, alloc);
                 out.PushBack(ch, alloc);
             }
         }
@@ -267,7 +295,7 @@ static std::string pages_impl(const std::string &arg) {
     std::string page_url;
     size_t colon = chID.find(':');
     if (colon != std::string::npos) {
-        page_url = std::string(kSite) + "/manga/" + url_encode(chID.substr(0, colon)) + "/" +
+        page_url = site() + "/manga/" + url_encode(chID.substr(0, colon)) + "/" +
                    url_encode(chID.substr(colon + 1));
     } else {
         page_url = chID;
@@ -297,7 +325,7 @@ static std::string pages_impl(const std::string &arg) {
 static std::string genres_impl() {
     std::vector<std::string> names = {"Action", "Adventure", "Comedy", "Drama", "Fantasy", "Isekai", "Romance"};
     std::string body;
-    if (get_body(std::string(kSite) + "/manga-genre/action", body)) {
+    if (get_body(site() + "/manga-genre/action", body)) {
         std::vector<std::string> seen;
         names.clear();
         for (auto &g : all_subs2(std::regex(R"re(manga-genre/([a-z0-9-]+)">([^<]+))re"), body, 100)) {

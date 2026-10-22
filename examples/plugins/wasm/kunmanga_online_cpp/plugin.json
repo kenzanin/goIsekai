@@ -2,5 +2,8 @@
   "name": "KunManga",
   "site_url": "https://www.kunmanga.online",
   "logo": "logo.png",
+  "params": {
+    "cdn": "https://cdn.zinmanga1.com"
+  },
   "built_with": "cpp 13.0.0"
 }
