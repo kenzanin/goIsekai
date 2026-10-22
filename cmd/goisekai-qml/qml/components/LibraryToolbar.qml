@@ -70,13 +70,6 @@ ToolBar {
         anchors.rightMargin: Theme.gap
         spacing: 12
 
-        Label {
-            text: "goIsekai"
-            color: Theme.text
-            font.pixelSize: 20
-            font.bold: true
-        }
-
         TextField {
             id: search
 
