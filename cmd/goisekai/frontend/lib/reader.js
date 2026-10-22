@@ -662,7 +662,14 @@
   // list is fetched and its pages appended to the same column with a thin
   // divider, so split-up releases read continuously.
   var stripImgs = []; // pages currently in the column
+  // Per-page chapter bookkeeping, parallel to stripImgs. The column spans every
+  // chapter appended at the seam, so a page's position in stripImgs says nothing
+  // about its page number within its own chapter — and `pages` only ever holds
+  // one chapter's list.
+  var stripMeta = []; // {chID, idx, pages, nextID, prevID, num, title}
   var stripChapters = []; // chapter ids already appended
+  var curNum = 0, // loaded chapter's number/title, so a seam crossing can sync
+    curTitle = ''; // the top bar back to the chapter it scrolled into
 
   // Read mode is one cycle button — the current mode is always a single letter
   // on screen:
@@ -727,6 +734,15 @@
     stripChapters = [cid];
     pages.forEach((p, i) => {
       stripImgs.push(appendStripPage(p, i, cid));
+      stripMeta.push({
+        chID: cid,
+        idx: i,
+        pages: pages,
+        nextID: nextChID,
+        prevID: prevChID,
+        num: curNum,
+        title: curTitle,
+      });
     });
     applyStripSizing();
   }
@@ -738,6 +754,7 @@
     stripView.classList.add('hidden');
     stripView.innerHTML = '';
     stripImgs = [];
+    stripMeta = [];
     stripChapters = [];
     canvas.style.display = '';
     syncReadModeBtn();
@@ -785,52 +802,84 @@
         stripChapters.push(nextChID);
         appendStripDivider(d.chapterNum || '');
         // Rebase p{k}/n{k} image keys are per-chapter; column images carry
-        // their own chapter id via imageUrl, so plain appends are safe.
-        d.pages.forEach((p) => {
-          stripImgs.push(appendStripPage(p, stripImgs.length, nextChID));
+        // their own chapter id via imageUrl, so plain appends are safe. The
+        // appended pages are numbered within THEIR chapter, not the column, so
+        // each carries its own idx and page list.
+        var chID = nextChID;
+        d.pages.forEach((p, i) => {
+          stripImgs.push(appendStripPage(p, i, chID));
+          stripMeta.push({
+            chID: chID,
+            idx: i,
+            pages: d.pages,
+            nextID: d.nextChapterID || '',
+            prevID: d.prevChapterID || '',
+            num: d.chapterNum || 0,
+            title: d.chapterTitle || '',
+          });
         });
         applyStripSizing();
-        // Seam keeps flowing: adopt the appended chapter as current so
-        // progress tracking and the next append chain onward.
-        adoptNeighbor(nextChID, d);
+        // No adoption here: appended pages are below the viewport, so the reader
+        // is still on the previous chapter's last page. trackStripProgress()
+        // adopts each chapter when it actually scrolls into view, which is what
+        // makes the counter and the title follow the page on screen.
       })
       .catch(() => {
         stripLoading = false;
       });
   }
 
-  // Point the reader's state at the chapter whose pages were appended, without
-  // touching the visible column — scroll continues across the seam.
-  function adoptNeighbor(chID, data) {
-    cid = chID;
-    nextChID = data.nextChapterID || '';
-    prevChID = data.prevChapterID || '';
+  // Adopt a chapter the column scrolled into. The pages are already in the
+  // column, so this only re-points the identity the rest of the reader reads
+  // from — the counter's total, prev/next, the title and the progress write.
+  function adoptSeam(meta) {
+    cid = meta.chID;
+    // Follow the chapter on screen: `pages` is what the counter, the jumper and
+    // the progress write all read their total from, and the column holds several
+    // chapters' lists at once.
+    pages = meta.pages;
+    curNum = meta.num;
+    curTitle = meta.title;
+    nextChID = meta.nextID;
+    prevChID = meta.prevID;
+    // The warm caches described the chapter just left, so drop them or the next
+    // seam append would reuse those pages while labelling them as the new next.
     nextData = null;
     nextPages = null;
     prevData = null;
     prevPages = null;
     prevWarmTried = false;
-    syncChapterNav(data);
+    syncChapterNav({ chapterNum: meta.num, chapterTitle: meta.title });
     history.replaceState(
       {},
       '',
-      `/view/read/${[pid, mid, chID].map(encodeURIComponent).join('/')}`,
+      `/view/read/${[pid, mid, cid].map(encodeURIComponent).join('/')}`,
     );
   }
 
-  stripView.addEventListener('scroll', () => {
-    maybeExtendStrip();
-    trackStripProgress();
-  });
-
   // Progress = the image crossing the viewport's vertical midpoint.
+  //
+  // The counter tracks the page number WITHIN the page's own chapter: `k` is a
+  // position in the column, which keeps climbing across a seam, so the old
+  // `k % pages.length` reported the previous chapter's last page for every page
+  // of the next one (10, then 10 again, instead of resetting to 1).
   function trackStripProgress() {
     var acc = 0;
     for (let k = 0; k < stripImgs.length; k++) {
       acc += stripImgs[k].clientHeight + 8;
       if (acc >= stripView.scrollTop + stripView.clientHeight / 2) {
-        if (current !== k && k < pages.length) {
-          current = k % Math.max(pages.length, 1);
+        var meta = stripMeta[k];
+        if (!meta) break;
+        // Swallow the seam: scrolled into a chapter that is not the one the rest
+        // of the reader state points at. Adopt it so prev/next, the title and
+        // the progress write all refer to the chapter actually on screen.
+        var adopted = meta.chID !== cid;
+        if (adopted) adoptSeam(meta);
+        // Report on a chapter change even when the page number is unchanged: a
+        // fast scroll can land on page 3 of the next chapter while `current` is
+        // still 3 from the previous one, and that page must still be recorded.
+        if (adopted || current !== meta.idx) {
+          current = meta.idx;
           updateCounter();
           reportProgress();
         }
@@ -838,6 +887,10 @@
       }
     }
   }
+  stripView.addEventListener('scroll', () => {
+    maybeExtendStrip();
+    trackStripProgress();
+  });
   stripView.addEventListener('click', () => setBarsVisible(!barsVisible));
 
   // Load pages[idx] into one slot of the view. Reuses the preloaded Image when
@@ -1107,6 +1160,8 @@
     abortAllWarm();
     cid = targetCID;
     pages = data.pages;
+    curNum = data.chapterNum || 0;
+    curTitle = data.chapterTitle || '';
     nextChID = data.nextChapterID || '';
     prevChID = data.prevChapterID || '';
     preloaded = {};
@@ -1130,6 +1185,7 @@
     if (stripMode) {
       for (const im of stripImgs) im.remove();
       stripImgs = [];
+      stripMeta = [];
       stripChapters = [];
       populateStrip();
       stripView.scrollTop = targetPage === 'last' ? stripView.scrollHeight : 0;
@@ -1437,6 +1493,10 @@
           showReaderError('Empty chapter (plugin failed to fetch pages) — try Retry');
           return;
         }
+        // Seed the chapter identity the seam bookkeeping restores when the
+        // column scrolls back up into this chapter.
+        curNum = data.chapterNum || 0;
+        curTitle = data.chapterTitle || '';
         debugLog('[reader] Pages loaded:', pages.length);
         _lastFailedRetry = null;
         nextFrame(() => {
