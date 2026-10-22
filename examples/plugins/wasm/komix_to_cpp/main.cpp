@@ -1,8 +1,9 @@
 // Komix.to (komix.to) source plugin for goIsekai — C++17 WASM reactor.
 //
 // Komix.to is Next.js + JSON API:
-//   search: GET /api/search?q=<query>
-//           → {"results":[{"id,title,slug,cover_image,status,type,...}]}
+//   search: GET /api/page-data/browse?q=<query>&page=<n>
+//           → {"results":[{"id,title,slug,cover_image,status,type,...}],"totalCount":N}
+//           60 rows per page; /api/search is only the 6-row typeahead.
 //           cover_image like "/api/images?path=<slug>%2Fcover.jpg"
 //   detail: scrape /title/<slug> (og:image, og:description, /genres/* links)
 //   pages:  scrape /title/<slug>/chapter/<n> — embedded "pages":[{image_url,enc}]
@@ -56,25 +57,52 @@ static std::string search_impl(const std::string &arg) {
     if (trim(query).empty() && genres.empty()) return "[]";
     if (trim(query).empty()) return genre_listing(genres[0]);
 
-    std::string body;
-    if (!http_body(site() + "/api/search?q=" + url_encode(query), jsonHeaders(), body)) return "[]";
-
-    rapidjson::Document resp;
-    resp.Parse(body.c_str());
-    if (!resp.IsObject() || !resp.HasMember("results") || !resp["results"].IsArray()) return "[]";
+    // /api/search is the typeahead endpoint: it answers 6-20 rows and ignores
+    // every paging parameter. The browse page's own data source is
+    // /api/page-data/browse, which returns 60 rows per page and reports
+    // totalCount ("isekai" → 1506). The host slices the returned array itself
+    // (plugins are expected to send every match), so one call has to walk the
+    // pages. 5 pages ≈ 300 titles, which fills 10 host pages at 30 per view.
+    // It is deliberately not 10: each page is a serial remote fetch, and the
+    // warm cost is ~0.6s/page, so 10 pages left no headroom and a slow page
+    // pushed the whole call past the host's 15s invoke deadline.
+    // ponytail: fixed page cap; raise kMaxSearchPages when a query needs to
+    // browse past 300, or return early once totalCount is reachable in time.
+    const int kMaxSearchPages = 5;
 
     rapidjson::Document out;
     out.SetArray();
     auto &alloc = out.GetAllocator();
-    for (auto &it : resp["results"].GetArray()) {
-        if (!it.IsObject()) continue;
-        std::string cover = it.HasMember("cover_image") && it["cover_image"].IsString() ? trim(it["cover_image"].GetString()) : "";
-        rapidjson::Value m(rapidjson::kObjectType);
-        add_string(m, "id", it.HasMember("slug") && it["slug"].IsString() ? trim(it["slug"].GetString()) : "", alloc);
-        add_string(m, "title", it.HasMember("title") && it["title"].IsString() ? trim(it["title"].GetString()) : "", alloc);
-        add_string(m, "cover_url", make_abs(site(), cover), alloc);
-        add_string(m, "status", it.HasMember("status") && it["status"].IsString() ? normalize_status(it["status"].GetString()) : "", alloc);
-        out.PushBack(m, alloc);
+    std::vector<std::string> seen;
+    long total = -1;
+    for (int page = 1; page <= kMaxSearchPages; page++) {
+        std::string body;
+        std::string url = site() + "/api/page-data/browse?q=" + url_encode(query) + "&page=" + std::to_string(page);
+        if (!http_body(url, jsonHeaders(), body)) break;
+
+        rapidjson::Document resp;
+        resp.Parse(body.c_str());
+        if (!resp.IsObject() || !resp.HasMember("results") || !resp["results"].IsArray()) break;
+        if (total < 0 && resp.HasMember("totalCount") && resp["totalCount"].IsInt64())
+            total = resp["totalCount"].GetInt64();
+
+        int added = 0;
+        for (auto &it : resp["results"].GetArray()) {
+            if (!it.IsObject()) continue;
+            std::string slug = it.HasMember("slug") && it["slug"].IsString() ? trim(it["slug"].GetString()) : "";
+            if (slug.empty() || std::find(seen.begin(), seen.end(), slug) != seen.end()) continue;
+            seen.push_back(slug);
+            std::string cover = it.HasMember("cover_image") && it["cover_image"].IsString() ? trim(it["cover_image"].GetString()) : "";
+            rapidjson::Value m(rapidjson::kObjectType);
+            add_string(m, "id", slug, alloc);
+            add_string(m, "title", it.HasMember("title") && it["title"].IsString() ? trim(it["title"].GetString()) : "", alloc);
+            add_string(m, "cover_url", make_abs(site(), cover), alloc);
+            add_string(m, "status", it.HasMember("status") && it["status"].IsString() ? normalize_status(it["status"].GetString()) : "", alloc);
+            out.PushBack(m, alloc);
+            added++;
+        }
+        if (added == 0) break;                                  // past the last page
+        if (total > 0 && (long)out.Size() >= total) break;      // everything collected
     }
     return to_json(out);
 }
