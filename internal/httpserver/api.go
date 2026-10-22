@@ -18,6 +18,7 @@ func (s *Server) registerAPIRoutes(r chi.Router) {
 		_ = jsonMarshalLogs(w, lines)
 	})
 	r.Get("/library", s.apiLibrary)
+	r.Get("/library/facets", s.apiLibraryFacets)
 	r.Get("/library/search", s.apiLibrarySearch)
 	r.Get("/search", s.apiSearch)
 	r.Delete("/manga/{pluginID}/{mangaID}/alt-titles", s.apiRemoveAltTitle)
@@ -53,4 +54,10 @@ type apiLibraryItem struct {
 	ReadChapters  int     `json:"read_chapters"`
 	HasNew        bool    `json:"has_new"`
 	NewSince      *string `json:"new_since"`
+	// Sort keys the desktop client needs; the web handler computes these
+	// server-side instead of shipping them.
+	UpdatedAt  string `json:"updated_at"`
+	LastReadAt string `json:"last_read_at"`
+	// DupGroup is the index of the duplicate group this manga belongs to, or -1.
+	DupGroup int `json:"dup_group"`
 }

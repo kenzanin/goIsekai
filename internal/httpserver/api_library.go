@@ -3,6 +3,7 @@ package httpserver
 import (
 	"net/http"
 	"strconv"
+	"time"
 
 	"goisekai/internal/database"
 	"goisekai/internal/logger"
@@ -24,6 +25,19 @@ func (s *Server) apiLibrary(w http.ResponseWriter, r *http.Request) {
 	for _, st := range libStats {
 		statsMap[st.MangaID] = st
 	}
+	// Row ID -> duplicate group index, so the client can offer the same
+	// "duplicates" sort and filter the web sidebar has. A failed query leaves
+	// the map empty, which just means no manga is flagged.
+	dupGroups, dupErr := s.service.FindPotentialDuplicates()
+	if dupErr != nil {
+		s.logger.Warn("api library duplicates", "error", dupErr)
+	}
+	dupRank := make(map[int64]int, len(dupGroups)*2)
+	for gi, g := range dupGroups {
+		for _, m := range g.Members {
+			dupRank[m.ID] = gi
+		}
+	}
 	items := make([]apiLibraryItem, 0, len(mangas))
 	for _, m := range mangas {
 		item := apiLibraryItem{
@@ -31,6 +45,13 @@ func (s *Server) apiLibrary(w http.ResponseWriter, r *http.Request) {
 			PluginID:      m.PluginID,
 			SourceMangaID: m.SourceMangaID,
 			CoverURL:      m.CoverURL,
+			DupGroup:      -1,
+		}
+		if g, ok := dupRank[m.ID]; ok {
+			item.DupGroup = g
+		}
+		if !m.UpdatedAt.IsZero() {
+			item.UpdatedAt = m.UpdatedAt.Format(time.RFC3339)
 		}
 		if st, ok := statsMap[strconv.FormatInt(m.ID, 10)]; ok {
 			item.TotalChapters = st.TotalChapters
@@ -39,6 +60,9 @@ func (s *Server) apiLibrary(w http.ResponseWriter, r *http.Request) {
 			if st.NewSince != nil {
 				ts := st.NewSince.Format("2006-01-02T15:04:05Z")
 				item.NewSince = &ts
+			}
+			if st.LastReadAt != nil {
+				item.LastReadAt = st.LastReadAt.Format(time.RFC3339)
 			}
 		}
 		items = append(items, item)
