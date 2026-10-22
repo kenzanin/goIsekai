@@ -33,7 +33,21 @@ func TestRefererCandidates(t *testing.T) {
 	t.Parallel()
 	t.Run("origin first site fallback", func(t *testing.T) {
 		got := refererCandidates("https://uploads.mangadex.org/covers/x.jpg", "https://mangadex.org")
-		if len(got) != 3 || got[0] != "https://uploads.mangadex.org/" || got[1] != "https://mangadex.org" || got[2] != "" {
+		want := []string{"https://uploads.mangadex.org/", "https://mangadex.org/", "https://mangadex.org", ""}
+		if len(got) != len(want) {
+			t.Fatalf("candidates = %v", got)
+		}
+		for i := range want {
+			if got[i] != want[i] {
+				t.Fatalf("candidate %d = %q, want %q (all: %v)", i, got[i], want[i], got)
+			}
+		}
+	})
+	t.Run("site offered with and without trailing slash", func(t *testing.T) {
+		// 2xstorage.com / zinmanga1.com gate on the slash form; the bare origin
+		// stays as a fallback for hosts that gate the other way.
+		got := refererCandidates("https://cdn.zinmanga1.com//zin/a/1.png", "https://www.kunmanga.online")
+		if len(got) < 2 || got[1] != "https://www.kunmanga.online/" || got[2] != "https://www.kunmanga.online" {
 			t.Fatalf("candidates = %v", got)
 		}
 	})
@@ -45,7 +59,7 @@ func TestRefererCandidates(t *testing.T) {
 	})
 	t.Run("unparseable url falls back to site", func(t *testing.T) {
 		got := refererCandidates("::bad", "https://site.io")
-		if len(got) != 2 || got[0] != "https://site.io" || got[1] != "" {
+		if len(got) != 3 || got[0] != "https://site.io/" || got[1] != "https://site.io" || got[2] != "" {
 			t.Fatalf("candidates = %v", got)
 		}
 	})

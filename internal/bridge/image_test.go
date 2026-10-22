@@ -141,16 +141,28 @@ func TestImageCacheInvalidBytesRejected(t *testing.T) {
 	}
 }
 
-func TestImageCacheStableKeyAcrossQuery(t *testing.T) {
+// The cache key hashes the query as well as the path. A path-only key collapses
+// every cover a plugin serves through one endpoint (komix.to/api/images?path=
+// <slug>/cover.jpg) onto a single file, so all covers rendered identically.
+// Re-signed URLs therefore re-download; that costs bytes, not correctness.
+func TestImageCacheKeyDistinguishesQuery(t *testing.T) {
 	s := newTestServiceWithCache(t)
 	base := s.diskCachePath("plugin-x", "m1", "c1", "http://cdn.example.com/img/1.png")
-	for _, signed := range []string{
-		"http://cdn.example.com/img/1.png?acc=abc&expires=1",
-		"http://cdn.example.com/img/1.png?acc=xyz&expires=2",
+	seen := map[string]string{base: "no query"}
+	for _, distinct := range []string{
+		"http://cdn.example.com/api/images?path=a/cover.jpg",
+		"http://cdn.example.com/api/images?path=b/cover.jpg",
 	} {
-		if got := s.diskCachePath("plugin-x", "m1", "c1", signed); got != base {
-			t.Errorf("diskCachePath(%s) = %s, want stable %s", signed, got, base)
+		got := s.diskCachePath("plugin-x", "m1", "c1", distinct)
+		if prev, dup := seen[got]; dup {
+			t.Errorf("%s collides with %s (both hash to %s)", distinct, prev, got)
 		}
+		seen[got] = distinct
+	}
+	// The same URL must still be a stable hit across calls.
+	url := "http://cdn.example.com/api/images?path=a/cover.jpg"
+	if s.diskCachePath("plugin-x", "m1", "c1", url) != s.diskCachePath("plugin-x", "m1", "c1", url) {
+		t.Error("the same URL must hash identically on every call")
 	}
 }
 

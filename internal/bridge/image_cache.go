@@ -19,11 +19,19 @@ func (s *AppService) diskCachePath(pluginID, mangaID, chapterID, url string) str
 	if s.cacheDir == "" {
 		return ""
 	}
-	// Strip query parameters to get a stable cache key across signed URLs.
+	// Hash the path *and* query. The path alone is not unique: a plugin that
+	// serves covers through one endpoint (`komix.to/api/images?path=<slug>/
+	// cover.jpg`) maps every title to the same path, so a path-only key served
+	// the first cover for all of them. A re-signed URL therefore re-downloads
+	// once per signature, which costs bytes; serving the wrong image costs
+	// correctness, so bytes lose.
 	key := url
 	if u, err := neturl.Parse(url); err == nil {
-		// Use only the path component for hashing; scheme/host are already scoped.
+		// scheme/host are already scoped by pluginID and sub.
 		key = u.Path
+		if u.RawQuery != "" {
+			key += "?" + u.RawQuery
+		}
 	}
 	h := sha256.Sum256([]byte(key))
 	sub := "library"

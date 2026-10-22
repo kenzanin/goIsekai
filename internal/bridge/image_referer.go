@@ -51,6 +51,17 @@ func (s *AppService) memorizeReferer(host, ref string) {
 	s.imgRef[host] = ref
 }
 
+// appendUnique appends v unless out already holds it, so a site whose origin
+// equals a candidate above contributes nothing twice.
+func appendUnique(out []string, v string) []string {
+	for _, have := range out {
+		if have == v {
+			return out
+		}
+	}
+	return append(out, v)
+}
+
 // refererCandidates are the Referer values to try for one image fetch, in
 // order, when the caller set none (explicit Referer always wins, untouched).
 // The image's own origin leads: a CDN that serves its own origin (uploads.
@@ -65,8 +76,15 @@ func refererCandidates(imageURL, siteURL string) []string {
 	if u, err := neturl.Parse(imageURL); err == nil && u.Scheme != "" && u.Host != "" {
 		out = append(out, u.Scheme+"://"+u.Host+"/")
 	}
-	if siteURL != "" && (len(out) == 0 || out[0] != siteURL) {
-		out = append(out, siteURL)
+	// The site origin *with* its trailing slash leads, because the host
+	// fallback below passes site_url verbatim: CDNs behind 2xstorage.com and
+	// zinmanga1.com answer 403 for "https://site.tld" and 200 only for
+	// "https://site.tld/". Bare siteURL stays as a fallback for hosts that
+	// gate on the exact origin instead.
+	if siteURL != "" {
+		withSlash := strings.TrimSuffix(siteURL, "/") + "/"
+		out = appendUnique(out, withSlash)
+		out = appendUnique(out, siteURL)
 	}
 	// Last-resort: some CDNs (comix.to's lov.*.site) reject ANY Referer and
 	// serve only with none. Working plugins memoize at an earlier candidate and
