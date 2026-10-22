@@ -5,6 +5,7 @@
   "site_url": "https://1manga.co",
   "logo": "logo.png",
   "contract_version": 1,
+  "paginates": true,
   "params": {
     "api": "https://api.mghcdn.com/graphql",
     "img_cdn": "https://imgx.mghcdn.com/",

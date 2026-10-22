@@ -4,6 +4,7 @@
   "logo": "logo.png",
   "thumb_ratio": 0.75,
   "contract_version": 1,
+  "paginates": true,
   "params": {
     "site_url": "https://batcave.biz",
     "rtip": "1.2.3.4"

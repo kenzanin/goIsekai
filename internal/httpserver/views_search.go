@@ -3,6 +3,7 @@ package httpserver
 import (
 	"errors"
 	"net/http"
+	"slices"
 	"strconv"
 
 	"goisekai/internal/bridge"
@@ -34,11 +35,25 @@ func (s *Server) viewSearch(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 	}
-	genre := r.URL.Query().Get("genre")
+	// genre is repeatable: ?genre=a&genre=b. The first value drives the
+	// single-select UI; every value goes to the plugin, whose SearchFilter
+	// already accepts a list.
+	genreValues := r.URL.Query()["genre"]
+	genre := ""
+	if len(genreValues) > 0 {
+		genre = genreValues[0]
+	}
+	filterGenres := slices.DeleteFunc(genreValues, func(g string) bool { return g == "" })
 	page, _ := strconv.Atoi(r.URL.Query().Get("page"))
 	if page < 1 {
 		page = 1
 	}
+	// The plugin's metadata decides who paginates, so read it before searching.
+	var pluginMeta pluginmanager.LoadedPlugin
+	if pluginID != "" {
+		pluginMeta = s.service.PluginMeta(pluginID)
+	}
+	filter := types.SearchFilter{Query: q, Page: page, Genres: filterGenres}
 	var genres []bridge.Genre
 	if pluginID != "" {
 		genres, _ = s.service.ListGenres(pluginID)
@@ -52,13 +67,13 @@ func (s *Server) viewSearch(w http.ResponseWriter, r *http.Request) {
 			// immediately without calling the plugin (avoids CDP timeout).
 			// Once cookies exist, fall through to the normal search path below so
 			// the saved cookies are used by the proxy.
-			if pluginMeta := s.service.PluginMeta(pluginID); pluginMeta.NeedsHumanVerify {
+			if pluginMeta.NeedsHumanVerify {
 				verifyState, hasVerify, verifyErr := s.service.GetPluginVerifyState(pluginID)
 				if verifyErr == nil && (!hasVerify || verifyState.Cookies == "") {
 					challenge = true
 					results = nil
 				} else {
-					results, err = s.service.SearchManga(pluginID, types.SearchFilter{Query: q, Page: page, Genres: []string{genre}})
+					results, err = s.service.SearchManga(pluginID, filter)
 					if err != nil {
 						if _, ok := errors.AsType[*hostnet.ChallengeError](err); ok {
 							challenge = true
@@ -70,7 +85,7 @@ func (s *Server) viewSearch(w http.ResponseWriter, r *http.Request) {
 					}
 				}
 			} else {
-				results, err = s.service.SearchManga(pluginID, types.SearchFilter{Query: q, Page: page, Genres: []string{genre}})
+				results, err = s.service.SearchManga(pluginID, filter)
 				if err != nil {
 					if _, ok := errors.AsType[*hostnet.ChallengeError](err); ok {
 						challenge = true
@@ -82,7 +97,7 @@ func (s *Server) viewSearch(w http.ResponseWriter, r *http.Request) {
 				}
 			}
 		} else {
-			results, err = s.service.SearchManga(pluginID, types.SearchFilter{Query: q, Page: page, Genres: []string{genre}})
+			results, err = s.service.SearchManga(pluginID, filter)
 			if err != nil {
 				if _, ok := errors.AsType[*hostnet.ChallengeError](err); ok {
 					challenge = true
@@ -95,14 +110,44 @@ func (s *Server) viewSearch(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	pageSize := searchPageSize
-	// Host-side pagination: plugins return ALL matching results; slice out the
-	// requested page here so the template never renders more than one page.
+	// Who paginates depends on the plugin. The default contract is that a
+	// plugin returns every match and the host slices out one page. A plugin
+	// that declares paginates:true has already asked the remote source for just
+	// this page, so slicing again would skip rows that were never returned:
+	// page 2 of a 12-result search came back empty because the host dropped the
+	// first 30 rows of an already-paged 12-row answer.
 	total := len(results)
-	start := min((page-1)*pageSize, total)
-	end := min(start+pageSize, total)
+	start, end := 0, total
+	hasNext := false
+	if pluginMeta.Paginates {
+		// The plugin pages upstream and does not report a total, so any results
+		// mean there may be a next page. That can offer one empty page past the
+		// end; hiding Next instead would make paging unusable on sources that
+		// return fewer rows per page than searchPageSize.
+		// ponytail: add a has_next field to the plugin ABI when an extra click
+		// starts mattering.
+		hasNext = total > 0
+	} else {
+		start = min((page-1)*pageSize, total)
+		end = min(start+pageSize, total)
+		hasNext = end < total
+	}
+	// Version the cover URLs so a browser cache entry keyed on the bare /image
+	// URL cannot keep serving a stale image. /image answers with a week-long
+	// max-age and its URL carries no version, so a cover cached under the wrong
+	// bytes for that URL survives a fix until the entry expires. The detail page
+	// already appends cb; the results grid did not.
+	coverVersions := make(map[string]string, end-start)
+	for _, r := range results[start:end] {
+		if r.CoverURL == "" {
+			continue
+		}
+		if v := s.service.CoverCacheVersion(pluginID, r.CoverURL); v != "" {
+			coverVersions[r.CoverURL] = v
+		}
+	}
 	pluginName := pluginID
 	pluginIcon := ""
-	var pluginMeta pluginmanager.LoadedPlugin
 	var verifyRow database.PluginVerifyRow
 	if pluginID != "" {
 		names, icons := s.pluginDisplayMaps()
@@ -110,10 +155,17 @@ func (s *Server) viewSearch(w http.ResponseWriter, r *http.Request) {
 			pluginName = name
 		}
 		pluginIcon = icons[pluginID]
-		// Human verification wizard data: PluginMeta self-loads the plugin so
-		// the NeedsHumanVerify flag is visible before any search runs.
-		pluginMeta = s.service.PluginMeta(pluginID)
 		verifyRow, _, _ = s.service.GetPluginVerifyState(pluginID)
+	}
+	// TotalPages drives the numbered pager. A host-paged search knows its total;
+	// a self-paging plugin does not report one, so offer just the next page when
+	// there is one rather than inventing a count.
+	totalPages := max((total+pageSize-1)/pageSize, 1)
+	if pluginMeta.Paginates {
+		totalPages = page
+		if hasNext {
+			totalPages = page + 1
+		}
 	}
 	s.renderPage(w, r, "views/search", "search", map[string]any{
 		"Plugins":          plugins,
@@ -121,12 +173,14 @@ func (s *Server) viewSearch(w http.ResponseWriter, r *http.Request) {
 		"PluginID":         pluginID,
 		"Genres":           genres,
 		"Genre":            genre,
+		"GenresSelected":   filterGenres,
 		"PluginName":       pluginName,
 		"PluginIcon":       pluginIcon,
 		"Results":          results[start:end],
+		"CoverVersions":    coverVersions,
 		"Page":             page,
-		"TotalPages":       max((total+pageSize-1)/pageSize, 1),
-		"HasNext":          end < total,
+		"TotalPages":       totalPages,
+		"HasNext":          hasNext,
 		"ThumbRatio":       pluginMeta.ThumbRatio,
 		"Challenge":        challenge,
 		"NeedsHumanVerify": pluginMeta.NeedsHumanVerify,

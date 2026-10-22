@@ -5,6 +5,7 @@
   "site_url": "https://zeroscann.com",
   "logo": "logo.png",
   "contract_version": 1,
+  "paginates": true,
   "params": {
     "site_url": "https://zeroscann.com"
   }

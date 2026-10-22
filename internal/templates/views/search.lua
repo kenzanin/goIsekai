@@ -19,6 +19,12 @@ return function(data)
 	local challenge = data.Challenge or false
 	local genres = data.Genres or {}
 	local genre = data.Genre or ""
+	-- GenresSelected is every genre the request asked for (genre is repeatable:
+	-- ?genre=a&genre=b). `genre` is just the first one, kept for display.
+	local genresSelected = data.GenresSelected or {}
+	-- Cache-buster per cover URL, same contract the detail page uses: /image is
+	-- cached for a week under an unversioned URL, so the grid must vary it.
+	local coverVersions = data.CoverVersions or {}
 
 	-- Build plugin options
 	local pluginOpts = ""
@@ -57,12 +63,18 @@ return function(data)
 	if pluginID ~= "" and #genres > 0 then
 		genreOpts = ' <option value="">All genres</option>\n'
 		for _, g in ipairs(genres) do
-			local selected = (genre == g.Slug) and " selected" or ""
+			local isSel = false
+			for _, sel in ipairs(genresSelected) do
+				if sel == g.Slug then
+					isSel = true
+					break
+				end
+			end
 			genreOpts = genreOpts
 				.. ' <option value="'
 				.. h(g.Slug)
 				.. '"'
-				.. selected
+				.. (isSel and " selected" or "")
 				.. ">"
 				.. h(g.Name)
 				.. "</option>\n"
@@ -82,6 +94,7 @@ return function(data)
 				.. h(pluginID)
 				.. "&amp;url="
 				.. h(coverURL)
+				.. (coverVersions[coverURL] and coverVersions[coverURL] ~= "" and ("&amp;cb=" .. h(coverVersions[coverURL])) or "")
 				.. '" alt="'
 				.. h(title)
 				.. '" class="w-full aspect-[2/3] object-cover" loading="lazy">'
@@ -161,7 +174,7 @@ return function(data)
 				Param = "page",
 				Current = page,
 				Total = totalPages,
-				Extra = { "q", q, "pluginID", pluginID, "genre", genre },
+				Extra = { "q", q, "pluginID", pluginID, "genre", genresSelected },
 				Compact = true,
 			},
 		})
@@ -176,7 +189,7 @@ return function(data)
 				Param = "page",
 				Current = page,
 				Total = totalPages,
-				Extra = { "q", q, "pluginID", pluginID, "genre", genre },
+				Extra = { "q", q, "pluginID", pluginID, "genre", genresSelected },
 				Compact = false,
 			},
 		})
@@ -228,7 +241,7 @@ return function(data)
 		.. '"><select id="pluginIDNative" class="hidden">'
 		.. pluginOpts
 		.. "</select></div>"
-		.. (genreOpts ~= "" and ('<div><label for="genre" class="block text-xs text-neutral-400 mb-1">Category</label><select id="genre" name="genre" class="bg-neutral-900 border border-neutral-700 rounded-md px-3 py-2 text-sm">' .. genreOpts .. "</select></div>") or "")
+		.. (genreOpts ~= "" and ('<div><label for="genre" class="block text-xs text-neutral-400 mb-1">Category</label><select id="genre" name="genre" multiple size="4" class="bg-neutral-900 border border-neutral-700 rounded-md px-3 py-2 text-sm">' .. genreOpts .. "</select></div>") or "")
 		.. '<div class="flex-1"><label for="q" class="block text-xs text-neutral-400 mb-1">&nbsp;</label><input id="q" name="q" type="text" value="'
 		.. h(q)
 		.. '" placeholder="Manga title..." class="w-full bg-neutral-900 border border-neutral-700 rounded-md px-3 py-2 text-sm"></div>'
@@ -271,7 +284,14 @@ return function(data)
   }
   function save(h) { try { localStorage.setItem(KEY, JSON.stringify(h.slice(0, MAX))); } catch (e) {} }
   var qEl = document.getElementById("q"), pEl = document.getElementById("pluginID"), gEl = document.getElementById("genre");
-  var q = qEl ? qEl.value : "", pid = pEl ? pEl.value : "", genre = gEl ? gEl.value : "";
+  var genres = [];
+  if (gEl) {
+    for (var i = 0; i < gEl.options.length; i++) {
+      if (gEl.options[i].selected && gEl.options[i].value) genres.push(gEl.options[i].value);
+    }
+  }
+  // Joined so old single-value history entries keep working unchanged.
+  var q = qEl ? qEl.value : "", pid = pEl ? pEl.value : "", genre = genres.join(",");
   var pname = (pEl && pEl.dataset && pEl.dataset.pname) ? pEl.dataset.pname : pid;
   var h = load();
   if (q || genre) {
@@ -292,7 +312,8 @@ return function(data)
   h.slice(0, MAX_SHOW).forEach(function (e) {
     var a = document.createElement("a");
     var url = "/view/search?pluginID=" + encodeURIComponent(e.pid || "") + "&q=" + encodeURIComponent(e.q || "");
-    if (e.g) url += "&genre=" + encodeURIComponent(e.g);
+    // e.g holds the genres joined by "," (one entry per selected genre).
+    if (e.g) url += e.g.split(",").filter(Boolean).map(function (g) { return "&genre=" + encodeURIComponent(g); }).join("");
     a.href = url;
     a.className = "block truncate text-xs px-3 py-1.5 rounded-md bg-neutral-800 border border-neutral-700 text-neutral-300 hover:bg-neutral-700";
     a.title = (e.q || e.g) + (e.pname || e.pid ? " via " + (e.pname || e.pid) : "");

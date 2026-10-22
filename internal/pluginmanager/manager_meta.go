@@ -24,6 +24,9 @@ type LoadedPlugin struct {
 	SiteURL          string
 	BuiltWith        string // toolchain + version stamped at build time, "" = unknown
 	Logo             string
+	// Paginates reports that the plugin pages the remote source itself and
+	// returns just the requested page, so the host must not slice again.
+	Paginates bool
 }
 
 // LoadedPlugins returns metadata for every plugin currently registered,
@@ -59,6 +62,7 @@ func (m *Manager) LoadedPlugins() []LoadedPlugin {
 			SiteURL:          p.meta.SiteURL,
 			BuiltWith:        p.meta.BuiltWith,
 			Logo:             p.meta.Logo,
+			Paginates:        p.meta.Paginates,
 		})
 	}
 	sort.Slice(out, func(i, j int) bool { return out[i].ID < out[j].ID })

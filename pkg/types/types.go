@@ -79,6 +79,13 @@ type PluginMeta struct {
 	// ThumbRatio is the cover width/height ratio (e.g. 0.703) used by the UI
 	// to reserve cover space before images load. 0 means use the 2:3 default.
 	ThumbRatio float64 `json:"thumb_ratio,omitempty"`
+	// Paginates reports that the plugin pages the remote source itself: it
+	// reads SearchFilter.Page and returns just that page. The host must then
+	// stop slicing results itself, or the two schemes cancel out — page 2 of a
+	// 12-result search came back empty because the host skipped 30 rows of an
+	// already-paged 12-row answer. Absent/false keeps the default contract:
+	// the plugin returns every match and the host slices out one page.
+	Paginates bool `json:"paginates,omitempty"`
 	// NeedsJS reports that this source's site renders client-side and should be
 	// routed through the browser engine (when configured) instead of the fast
 	// path. Analogous to NeedsHumanVerify but for JS-capable engines.

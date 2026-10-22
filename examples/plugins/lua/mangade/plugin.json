@@ -3,5 +3,6 @@
   "name": "MangaDE",
   "site_url": "https://mangade.io",
   "logo": "logo.png",
-  "contract_version": 1
+  "contract_version": 1,
+  "paginates": true
 }

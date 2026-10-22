@@ -4,5 +4,6 @@
   "timeout": 60,
   "site_url": "https://m.fanfox.net",
   "logo": "logo.png",
-  "contract_version": 1
+  "contract_version": 1,
+  "paginates": true
 }

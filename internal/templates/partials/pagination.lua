@@ -36,7 +36,16 @@ local function pageURL(p, n)
 	if p.Extra and #p.Extra > 0 then
 		for i = 1, #p.Extra, 2 do
 			local k, v = p.Extra[i], p.Extra[i + 1]
-			if v ~= "" then
+			-- A table value means a repeated parameter (multi-select filters,
+			-- e.g. genre=a&genre=b). Blank entries are skipped so an unset
+			-- filter never becomes an empty parameter.
+			if type(v) == "table" then
+				for _, item in ipairs(v) do
+					if item ~= "" then
+						url = url .. "&" .. k .. "=" .. tostring(item)
+					end
+				end
+			elseif v ~= "" then
 				url = url .. "&" .. k .. "=" .. tostring(v)
 			end
 		end
