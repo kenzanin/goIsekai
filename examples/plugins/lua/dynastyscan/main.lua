@@ -40,11 +40,15 @@ function search_manga(arg)
     local page = args.page or 1
     local genres = args.genres or {}
 
+    -- A tag archive defaults to view=chapters, whose <dd> entries link to
+    -- /chapters/... - the series grid only appears under view=groupings. Without
+    -- it the /series/ regex below matched nothing and a genre search returned an
+    -- empty list even though the tag page has results.
+    local tagURL = #genres > 0
     local url
-    if #genres > 0 then
-        -- Tag archives: /tags/<slug>/, with ?page=N rather than a path segment.
-        url = BASE .. "/tags/" .. host.text.url_encode(genres[1]) .. "/"
-        if page > 1 then url = url .. "?page=" .. tostring(page) end
+    if tagURL then
+        url = BASE .. "/tags/" .. host.text.url_encode(genres[1]) .. "?view=groupings"
+        if page > 1 then url = url .. "&page=" .. tostring(page) end
     else
         url = BASE .. "/search?q=" .. host.text.url_encode(query)
         if page > 1 then url = url .. "&page=" .. tostring(page) end
@@ -57,26 +61,49 @@ function search_manga(arg)
         return host.json.encode(results)
     end
 
-    -- Results are definition lists: <dd>...<a href="/series/slug" class="name">TITLE</a>
-    -- by <a href="/authors/x">AUTHOR</a>...</dd>. Matching the whole entry keeps
-    -- the title paired with the right slug when titles repeat across the page.
     local seen = {}
-    for block in host.regex.gmatch(body, [[(?s)<dd>(.*?)</dd>]]) do
-        local slug = host.regex.find(block, [[href="/series/([a-z0-9_]+)"]])
-        local title = host.regex.find(block, [[class="name"[^>]*>([^<]+)</a>]])
-        if slug and title and not seen[slug] then
-            seen[slug] = true
-            -- The result card carries no cover image at all - the only <img> on
-            -- the search page is the site logo - so the cover comes from the
-            -- series JSON, the same response the detail call reads.
-            local cover = ""
-            local series = get_json(BASE .. "/series/" .. host.text.url_encode(slug) .. ".json")
-            if series and series.cover then cover = absolute(series.cover) end
-            results[#results + 1] = {
-                id = slug,
-                title = host.text.unescape(trim(title)),
-                cover_url = cover,
-            }
+    if tagURL then
+        -- Groupings are cover cards, and their attributes use single quotes:
+        -- <li class='span2'><a class='thumbnail' href='/series/slug'>
+        --   <img src="/system/tag_contents_covers/...">
+        --   <div class='caption'><b>TITLE</b></div></a></li>
+        -- The card already carries the cover, so unlike /search this needs no
+        -- per-series JSON fetch - 25 cards stay 1 request instead of 26.
+        for block in host.regex.gmatch(body, [[(?s)<li class='span2'>(.*?)</li>]]) do
+            local slug = host.regex.find(block, [[href='/series/([^']+)]])
+            local cover = host.regex.find(block, [[src="([^"]+)"]] )
+            local title = host.regex.find(block, [[class='caption'><b>([^<]+)</b>]])
+            if slug and title and not seen[slug] then
+                seen[slug] = true
+                results[#results + 1] = {
+                    id = slug,
+                    title = host.text.unescape(trim(title)),
+                    cover_url = absolute(host.text.unescape(cover or "")),
+                }
+            end
+        end
+    else
+        -- Search results are definition lists: <dd>...<a href="/series/slug"
+        -- class="name">TITLE</a> by <a href="/authors/x">AUTHOR</a>...</dd>.
+        -- Matching the whole entry keeps the title paired with the right slug
+        -- when titles repeat across the page.
+        for block in host.regex.gmatch(body, [[(?s)<dd>(.*?)</dd>]]) do
+            local slug = host.regex.find(block, [[href="/series/([a-z0-9_]+)"]])
+            local title = host.regex.find(block, [[class="name"[^>]*>([^<]+)</a>]])
+            if slug and title and not seen[slug] then
+                seen[slug] = true
+                -- A search card carries no cover image at all - the only <img> on
+                -- the search page is the site logo - so the cover comes from the
+                -- series JSON, the same response the detail call reads.
+                local cover = ""
+                local series = get_json(BASE .. "/series/" .. host.text.url_encode(slug) .. ".json")
+                if series and series.cover then cover = absolute(series.cover) end
+                results[#results + 1] = {
+                    id = slug,
+                    title = host.text.unescape(trim(title)),
+                    cover_url = cover,
+                }
+            end
         end
     end
 
