@@ -211,10 +211,14 @@ search_impl :: proc (arg: string) -> string {
 			continue
 		}
 		seen[slug] = true
-		// Result cards carry no cover image on this site (the only <img> on the
-		// page is the site logo), so this stays empty; the detail call fills it.
-		cover := abi.find_one(block, `<img[^>]*src="([^"]+)"`)
-		append(&out, Manga_Out{ID = slug, Title = title, Cover_URL = absolute(cover)})
+		// The result card carries no cover image at all — the only <img> on the
+		// search page is the site logo — so the cover has to come from the
+		// series JSON, the same response the detail call reads.
+		cover := ""
+		if s, ok := fetch_series(slug); ok {
+			cover = absolute(s.Cover)
+		}
+		append(&out, Manga_Out{ID = slug, Title = title, Cover_URL = cover})
 	}
 	return abi.to_json(out[:])
 }

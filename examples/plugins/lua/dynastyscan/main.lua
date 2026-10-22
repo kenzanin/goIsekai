@@ -66,11 +66,16 @@ function search_manga(arg)
         local title = host.regex.find(block, [[class="name"[^>]*>([^<]+)</a>]])
         if slug and title and not seen[slug] then
             seen[slug] = true
-            local cover = host.regex.find(block, [[<img[^>]*src="([^"]+)"]])
+            -- The result card carries no cover image at all - the only <img> on
+            -- the search page is the site logo - so the cover comes from the
+            -- series JSON, the same response the detail call reads.
+            local cover = ""
+            local series = get_json(BASE .. "/series/" .. host.text.url_encode(slug) .. ".json")
+            if series and series.cover then cover = absolute(series.cover) end
             results[#results + 1] = {
                 id = slug,
                 title = host.text.unescape(trim(title)),
-                cover_url = cover and absolute(cover) or "",
+                cover_url = cover,
             }
         end
     end
