@@ -1,0 +1,12 @@
+{
+  "name": "BatCave",
+  "site_url": "https://batcave.biz",
+  "logo": "logo.png",
+  "thumb_ratio": 0.75,
+  "contract_version": 1,
+  "params": {
+    "site_url": "https://batcave.biz",
+    "rtip": "1.2.3.4"
+  },
+  "timeout": 45
+}
