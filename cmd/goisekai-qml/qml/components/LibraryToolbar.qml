@@ -73,7 +73,7 @@ ToolBar {
         Label {
             text: "goIsekai"
             color: Theme.text
-            font.pixelSize: 18
+            font.pixelSize: 20
             font.bold: true
         }
 
@@ -134,7 +134,7 @@ ToolBar {
 
                     text: modelData.label
                     padding: 8
-                    font.pixelSize: 12
+                    font.pixelSize: 14
                     onClicked: bar.statusEdited(modelData.key)
 
                     background: Rectangle {
@@ -147,7 +147,7 @@ ToolBar {
                     contentItem: Label {
                         text: parent.text
                         color: parent.on ? Theme.accent : Theme.textDim
-                        font.pixelSize: 12
+                        font.pixelSize: 14
                         horizontalAlignment: Text.AlignHCenter
                         verticalAlignment: Text.AlignVCenter
                     }
@@ -166,12 +166,12 @@ ToolBar {
             // Show the filtered count only when a filter narrowed the list.
             text: resultCount === totalCount ? totalCount + " manga" : resultCount + " of " + totalCount + " manga"
             color: Theme.textDim
-            font.pixelSize: 13
+            font.pixelSize: 15
         }
 
         Button {
             text: "Refresh (F5)"
-            font.pixelSize: 12
+            font.pixelSize: 14
             onClicked: bar.refreshRequested()
         }
 

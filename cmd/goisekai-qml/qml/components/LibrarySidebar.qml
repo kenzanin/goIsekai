@@ -40,7 +40,7 @@ Rectangle {
             Label {
                 text: "LIBRARY"
                 color: Theme.textFaint
-                font.pixelSize: 10
+                font.pixelSize: 12
                 font.bold: true
             }
 
@@ -69,7 +69,7 @@ Rectangle {
                         required property var modelData
 
                         Layout.fillWidth: true
-                        implicitHeight: 46
+                        implicitHeight: 56
                         radius: 6
                         color: Theme.card
 
@@ -79,7 +79,7 @@ Rectangle {
                             Label {
                                 text: modelData.v
                                 color: Theme.accent
-                                font.pixelSize: 16
+                                font.pixelSize: 18
                                 font.bold: true
                                 anchors.horizontalCenter: parent.horizontalCenter
                             }
@@ -87,7 +87,7 @@ Rectangle {
                             Label {
                                 text: modelData.l
                                 color: Theme.textFaint
-                                font.pixelSize: 10
+                                font.pixelSize: 12
                                 anchors.horizontalCenter: parent.horizontalCenter
                             }
 
@@ -102,7 +102,7 @@ Rectangle {
             Rectangle {
                 visible: side.duplicateCount > 0
                 Layout.fillWidth: true
-                implicitHeight: 32
+                implicitHeight: 38
                 radius: 6
                 color: side.onlyDuplicates ? "#3a2a10" : Theme.card
                 border.width: 1
@@ -112,7 +112,7 @@ Rectangle {
                     anchors.centerIn: parent
                     text: side.duplicateCount + " in duplicate groups"
                     color: side.onlyDuplicates ? Theme.accent : Theme.textDim
-                    font.pixelSize: 11
+                    font.pixelSize: 13
                 }
 
                 MouseArea {
@@ -130,7 +130,7 @@ Rectangle {
                 Label {
                     text: "SOURCES"
                     color: Theme.textFaint
-                    font.pixelSize: 10
+                    font.pixelSize: 12
                     font.bold: true
                 }
 
@@ -142,7 +142,7 @@ Rectangle {
                     visible: side.pluginFilter !== ""
                     text: "clear"
                     color: Theme.accent
-                    font.pixelSize: 10
+                    font.pixelSize: 12
 
                     MouseArea {
                         anchors.fill: parent
@@ -166,7 +166,7 @@ Rectangle {
                         readonly property bool on: modelData.plugin_id === side.pluginFilter
 
                         Layout.fillWidth: true
-                        implicitHeight: 26
+                        implicitHeight: 30
                         radius: 4
                         color: on ? "#3a2a10" : "transparent"
 
@@ -178,8 +178,8 @@ Rectangle {
 
                             Image {
                                 source: modelData.icon ? (modelData.icon.indexOf("data:") === 0 ? modelData.icon : serverBase + modelData.icon) : ""
-                                sourceSize.width: 14
-                                sourceSize.height: 14
+                                sourceSize.width: 16
+                                sourceSize.height: 16
                                 asynchronous: true
                                 visible: modelData.icon !== ""
                             }
@@ -189,13 +189,13 @@ Rectangle {
                                 text: modelData.name
                                 elide: Text.ElideRight
                                 color: on ? Theme.accent : Theme.textDim
-                                font.pixelSize: 11
+                                font.pixelSize: 13
                             }
 
                             Label {
                                 text: modelData.count
                                 color: Theme.textFaint
-                                font.pixelSize: 10
+                                font.pixelSize: 12
                             }
 
                         }
@@ -219,7 +219,7 @@ Rectangle {
                 Label {
                     text: "TAGS"
                     color: Theme.textFaint
-                    font.pixelSize: 10
+                    font.pixelSize: 12
                     font.bold: true
                 }
 
@@ -231,7 +231,7 @@ Rectangle {
                     visible: side.tagFilter !== ""
                     text: side.tagFilter
                     color: Theme.accent
-                    font.pixelSize: 10
+                    font.pixelSize: 12
 
                     MouseArea {
                         anchors.fill: parent
@@ -255,7 +255,7 @@ Rectangle {
                         readonly property bool on: modelData.name === side.tagFilter
 
                         width: chip.implicitWidth + 14
-                        height: 22
+                        height: 26
                         radius: 4
                         color: on ? "#3a2a10" : Theme.card
                         border.width: 1
@@ -267,7 +267,7 @@ Rectangle {
                             anchors.centerIn: parent
                             text: modelData.name + "  " + modelData.count
                             color: on ? Theme.accent : Theme.textDim
-                            font.pixelSize: 10
+                            font.pixelSize: 12
                         }
 
                         MouseArea {
