@@ -25,6 +25,8 @@ func (a *app) onReady() {
 	systray.SetTitle("goIsekai")
 	systray.SetTooltip("goIsekai — manga server")
 
+	mStatus := systray.AddMenuItem("Status: unknown", "Server health, checked every 5 seconds")
+	mStatus.Disable()
 	mQML := systray.AddMenuItem("Open Desktop Client", "Launch the Qt Quick desktop UI")
 	mOpen := systray.AddMenuItem("Open Browser", "Open the reader UI")
 	mRestart := systray.AddMenuItem("Restart Server", "Stop and start the server")
@@ -42,12 +44,11 @@ func (a *app) onReady() {
 		systray.SetTooltip("goIsekai — FAILED to start: " + err.Error())
 	}
 
-	// Poll the server so the dot reflects reality instead of the fact that we
-	// once spawned a process. A crashed child is not always visible through
-	// the exited channel (a reused PID, or a stop we did not initiate).
-	green, red := statusIcon(true), statusIcon(false)
+	// Poll the server instead of trusting the child process: a server started
+	// outside the tray looks identical to one we spawned, and a crashed child
+	// is not always visible through the exited channel.
 	up := healthy(a.url)
-	a.setStatus(up, green, red)
+	setStatus(mStatus, up, a.url)
 	tick := time.NewTicker(5 * time.Second)
 	defer tick.Stop()
 
@@ -56,7 +57,7 @@ func (a *app) onReady() {
 		case <-tick.C:
 			if now := healthy(a.url); now != up {
 				up = now
-				a.setStatus(up, green, red)
+				setStatus(mStatus, up, a.url)
 			}
 		case <-mQML.ClickedCh:
 			// Fire and forget: the client is long-lived and independently
@@ -76,13 +77,13 @@ func (a *app) onReady() {
 				systray.SetTooltip("goIsekai — FAILED: " + err.Error())
 			}
 			up = healthy(a.url)
-			a.setStatus(up, green, red)
+			setStatus(mStatus, up, a.url)
 		case err, ok := <-a.exited:
 			if ok && err != nil && !a.dead {
 				systray.SetTooltip("goIsekai — server exited: " + err.Error())
 			}
 			up = false
-			a.setStatus(up, green, red)
+			setStatus(mStatus, up, a.url)
 		case <-mQuit.ClickedCh:
 			a.dead = true
 			a.stop()
@@ -92,16 +93,17 @@ func (a *app) onReady() {
 	}
 }
 
-// setStatus swaps the dot and keeps the tooltip in step, so a hover tells the
-// same story as the colour.
-func (a *app) setStatus(up bool, green, red []byte) {
+// setStatus renders the health line. The icon stays the app logo: a coloured
+// dot competing with the logo made the tray entry hard to recognise, and the
+// menu already has room for words.
+func setStatus(m *systray.MenuItem, up bool, url string) {
 	if up {
-		systray.SetIcon(green)
-		systray.SetTooltip("goIsekai — running at " + a.url)
+		m.SetTitle("Status: ● running")
+		m.SetTooltip("goIsekai is reachable at " + url)
 		return
 	}
-	systray.SetIcon(red)
-	systray.SetTooltip("goIsekai — server not reachable at " + a.url)
+	m.SetTitle("Status: ● not reachable")
+	m.SetTooltip("Nothing is answering at " + url)
 }
 
 func (a *app) start() error {
