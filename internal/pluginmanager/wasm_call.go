@@ -48,6 +48,15 @@ func (m *Manager) callWasm(p *loadedPlugin, fnName, inputJSON string) (string, e
 
 	results, err := fn.Call(ctx, uint64(inPtr), uint64(len(input)))
 	if err != nil {
+		// The runtime is built WithCloseOnContextDone, so a call that trips the
+		// invoke deadline leaves the module CLOSED while p.loaded still says
+		// otherwise. Without this reset every later call reached
+		// wasmAlloc on a dead module and failed with "malloc failed for input"
+		// forever — one slow response permanently bricked the plugin until a
+		// restart. Dropping the handle makes the next call reload it.
+		p.wasmMod = nil
+		p.wasmFns = nil
+		p.loaded = false
 		return "", fmt.Errorf("wasm plugin %s %s: %w", p.id, fnName, err)
 	}
 	if len(results) == 0 {
