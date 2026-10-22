@@ -2,7 +2,6 @@ package client
 
 import (
 	"net/url"
-	"strconv"
 )
 
 // Item is one library row as the QML views consume it. Field names become
@@ -54,54 +53,4 @@ func coverProxyURL(base, pluginID, coverURL string) string {
 func mangaHref(base, pluginID, sourceMangaID string) string {
 	return base + "/view/manga/" + url.PathEscape(pluginID) +
 		"/" + url.PathEscape(sourceMangaID)
-}
-
-// StatusFilter values, matching the server's libraryStatuses vocabulary in
-// internal/httpserver/library_sort.go. Client-side filtering must use the same
-// predicates or the two front ends disagree on the counts.
-const (
-	StatusAll     = "all"
-	StatusReading = "reading"
-	StatusUnread  = "unread"
-	StatusDone    = "done"
-	StatusNew     = "new"
-)
-
-// MatchesStatus reports whether item belongs to the given status filter.
-func MatchesStatus(i Item, status string) bool {
-	switch status {
-	case StatusReading:
-		return i.Read > 0 && i.Total > 0 && i.Read < i.Total
-	case StatusUnread:
-		return i.Read == 0
-	case StatusDone:
-		return i.Total > 0 && i.Read >= i.Total
-	case StatusNew:
-		return i.HasNew
-	default:
-		return true
-	}
-}
-
-// Sort keys, matching the server's librarySorts.
-const (
-	SortUpdated    = "updated"
-	SortTitle      = "title"
-	SortRead       = "read"
-	SortProgress   = "progress"
-	SortRecentRead = "recent_read"
-	SortDuplicates = "duplicates"
-)
-
-// SortOrders lists the sort keys in the order the toolbar shows them.
-var SortOrders = []string{SortUpdated, SortTitle, SortRead, SortProgress, SortRecentRead, SortDuplicates}
-
-// DupGroupKey turns a dup group index into a string, or "" when the item is not
-// a duplicate. QML compares strings more predictably than -1 sentinels across
-// the model boundary.
-func DupGroupKey(i Item) string {
-	if i.DupGroup < 0 {
-		return ""
-	}
-	return strconv.Itoa(i.DupGroup)
 }
