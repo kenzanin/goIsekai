@@ -166,6 +166,20 @@ func TestImageCacheKeyDistinguishesQuery(t *testing.T) {
 	}
 }
 
+// One URL arrives in two encodings: the plugin hands over the raw string
+// ("path=a%2Fb.jpg"), while /image's query decoder has already turned "%2F"
+// into "/". Hashing them apart gave the same image two cache entries, and
+// CoverCacheVersion then looked in the wrong one, so the search grid silently
+// dropped its cb= cache-buster and a stale cover stuck for a week.
+func TestImageCacheKeyIgnoresQueryEncoding(t *testing.T) {
+	s := newTestServiceWithCache(t)
+	raw := s.diskCachePath("plugin-x", "", "", "http://cdn.example.com/api/images?path=a%2Fcover.jpg")
+	decoded := s.diskCachePath("plugin-x", "", "", "http://cdn.example.com/api/images?path=a/cover.jpg")
+	if raw != decoded {
+		t.Errorf("the same query in two encodings must share one key: raw=%s decoded=%s", raw, decoded)
+	}
+}
+
 func TestImageCacheHealsCorruptEntry(t *testing.T) {
 	// Pre-seed L2 with corrupt bytes (legacy fail-open entry).
 	s := newTestServiceWithCache(t)

@@ -25,12 +25,25 @@ func (s *AppService) diskCachePath(pluginID, mangaID, chapterID, url string) str
 	// the first cover for all of them. A re-signed URL therefore re-downloads
 	// once per signature, which costs bytes; serving the wrong image costs
 	// correctness, so bytes lose.
+	//
+	// The query is canonicalised because the same URL reaches this function in
+	// two encodings: the plugin hands over the raw string (`path=a%2Fb.jpg`),
+	// while /image's own query decoder has already turned "%2F" back into "/".
+	// Hashing the encodings apart made them two different cache entries, so
+	// CoverCacheVersion never found the file the proxy wrote and the
+	// cache-buster silently went missing.
 	key := url
 	if u, err := neturl.Parse(url); err == nil {
 		// scheme/host are already scoped by pluginID and sub.
 		key = u.Path
 		if u.RawQuery != "" {
-			key += "?" + u.RawQuery
+			// Fall back to the raw query when it does not parse, so an
+			// unparseable pair cannot collapse distinct URLs onto one key.
+			if q := u.Query().Encode(); q != "" {
+				key += "?" + q
+			} else {
+				key += "?" + u.RawQuery
+			}
 		}
 	}
 	h := sha256.Sum256([]byte(key))
