@@ -666,13 +666,15 @@ ApplicationWindow {
                 Layout.rightMargin: Theme.gap
                 wrap: true
                 spacing: 6
-                model: root.rows.slice((root.page - 1) * root.pageSize,
-                                       root.page * root.pageSize)
 
-                delegate: MangaCard {
-                    item: modelData
-                    pluginName: root.pluginNames[modelData.pluginId] || ""
-                    onActivated: (it) => root.openItem(it)
+                Repeater {
+                    model: root.rows.slice((root.page - 1) * root.pageSize,
+                                           root.page * root.pageSize)
+                    delegate: MangaCard {
+                        item: modelData
+                        pluginName: root.pluginNames[modelData.pluginId] || ""
+                        onActivated: (it) => root.openItem(it)
+                    }
                 }
 
                 Label {
