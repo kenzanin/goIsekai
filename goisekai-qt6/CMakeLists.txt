@@ -25,5 +25,7 @@ qt_add_qml_module(goisekai-qt6
     QML_FILES
         qml/Theme.qml
         qml/MangaCard.qml
+        qml/FilterChip.qml
+        qml/LibraryPage.qml
         qml/Main.qml
 )

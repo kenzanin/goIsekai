@@ -27,7 +27,7 @@ Rectangle {
         // Cover.
         Rectangle {
             Layout.fillWidth: true
-            Layout.preferredHeight: width / Theme.defaultRatio
+            Layout.preferredHeight: width * 1.426  // seragamkan semua cover: 2/3 aspect ratio
             radius: Theme.radius
             clip: true
             color: Theme.field
