@@ -163,8 +163,8 @@ return function(data)
 		addStatLink(duplicateCount, "duplicates", "text-indigo-400", dupHref, activeDup, activeDup)
 	end
 
-	sidebarHTML = [[<div class="flex flex-col lg:flex-row gap-4 items-start">
-<aside class="lg:w-56 shrink-0 flex flex-col gap-3">
+	sidebarHTML = [[<div class="flex flex-row gap-4 items-start">
+<aside class="w-56 shrink-0 flex flex-col gap-3">
     <div class="bg-neutral-900 border border-neutral-800 rounded-lg px-4 py-3">
         <div class="flex flex-col gap-3">]] .. statCards .. [[</div>
     </div>

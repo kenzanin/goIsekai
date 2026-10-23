@@ -10,7 +10,12 @@ ApplicationWindow {
     id: root
 
     property string currentTab: "library"
-
+    // pluginId:sourceMangaId of the manga shown on the detail page, set by
+    // LibraryPage's detailRequested signal and passed to MangaDetailPage.qml
+    // which fetches it itself.
+    property string detailKey: ""
+    // Forwarded from LibraryPage so MangaDetailPage can resolve plugin labels.
+    property var _libPluginNames: ({})
     readonly property var navTabs: [
         { "key": "library", "label": "goIsekai" },
         { "key": "search", "label": "Search" },
@@ -103,11 +108,28 @@ ApplicationWindow {
     LibraryPage {
         anchors.fill: parent
         visible: root.currentTab === "library"
+        // Library -> detail page navigation (in-process).
+        onDetailRequested: {
+            root.detailKey = key;
+            root.currentTab = "detail";
+        }
+    }
+
+    // Manga detail page. Renders on top of the layout when currentTab is
+    // "detail", driven by detailKey (pluginId:sourceMangaId).
+    MangaDetailPage {
+        anchors.fill: parent
+        visible: root.currentTab === "detail"
+        detailKey: root.detailKey
+        onBackRequested: {
+            root.detailKey = "";
+            root.currentTab = "library";
+        }
     }
 
     Rectangle {
         anchors.fill: parent
-        visible: root.currentTab !== "library"
+        visible: root.currentTab !== "library" && root.currentTab !== "detail"
         color: Theme.bg
 
         ColumnLayout {

@@ -61,7 +61,7 @@ func (s *Server) viewLibrary(w http.ResponseWriter, r *http.Request) {
 		mangas = kept
 	}
 	// Sorting and the status/tag filters run over the whole library before it is
-	// sliced, otherwise they would only describe the 24 cards on this page.
+	// sliced, otherwise they would only describe the 25 cards on this page.
 	// Progress stats and categories therefore have to be loaded here rather than
 	// next to the grid rendering.
 	libStats, err := s.service.ListLibraryWithProgress()
@@ -143,7 +143,7 @@ func (s *Server) viewLibrary(w http.ResponseWriter, r *http.Request) {
 
 	// Host-side pagination: slice the sorted/filtered library so the grid
 	// renders one page at a time.
-	const pageSize = 24
+	const pageSize = 25
 	page, _ := strconv.Atoi(r.URL.Query().Get("page"))
 	if page < 1 {
 		page = 1

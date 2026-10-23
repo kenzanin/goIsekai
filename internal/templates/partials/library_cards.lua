@@ -20,7 +20,7 @@ return function(data)
     <a href="/view/search" class="inline-block bg-indigo-600 hover:bg-indigo-500 text-white rounded-md px-4 py-2 text-sm font-medium">Search manga</a>
 </div>]]
 	else
-		mangaCards = '<div class="view-container grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">'
+		mangaCards = '<div class="view-container grid grid-cols-5 gap-4">'
 		for _, m in ipairs(mangas) do
 			local mid = tostring(m.ID or "")
 			local pluginID = m.PluginID or ""
