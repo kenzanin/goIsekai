@@ -715,6 +715,19 @@
     drawPage(current);
   }
 
+  // Click zones only make sense in paged (canvas) mode: in strip mode the
+  // pages are a continuous column you scroll, so left/right do nothing and the
+  // bars toggle already comes from stripView's own click handler. Turning their
+  // pointer events off in strip mode lets the mouse wheel reach the strip so
+  // the browser scrolls it natively (see the wheel handler below).
+  var clickZoneIDs = ['zone-top', 'zone-bottom', 'zone-left', 'zone-right', 'zone-center'];
+  function setZonesEnabled(on) {
+    for (var i = 0; i < clickZoneIDs.length; i++) {
+      var el = document.getElementById(clickZoneIDs[i]);
+      if (el) el.style.pointerEvents = on ? '' : 'none';
+    }
+  }
+
   function enterStrip() {
     stripMode = true;
     localStorage.setItem(stripKey, '1');
@@ -722,6 +735,7 @@
     syncReadModeBtn();
     canvas.style.display = 'none';
     stripView.classList.remove('hidden');
+    setZonesEnabled(false);
     populateStrip();
     applyStripSizing();
     stripView.scrollTop = (current / Math.max(pages.length, 1)) * stripView.scrollHeight;
@@ -757,6 +771,7 @@
     stripMeta = [];
     stripChapters = [];
     canvas.style.display = '';
+    setZonesEnabled(true);
     syncReadModeBtn();
     drawPage(current);
   }
@@ -1254,11 +1269,15 @@
   document.addEventListener(
     'wheel',
     (e) => {
+      // Strip (continuous) mode: let the browser scroll the strip natively on
+      // its compositor thread. The old code did e.preventDefault() + a manual
+      // `stripView.scrollTop += e.deltaY` here, which forced a synchronous
+      // main-thread layout+scroll on every wheel tick — smooth in
+      // Firefox/Chrome (compositor scrolling) but stuttery in WebKitGTK. The
+      // click zones are pointer-events:none in strip mode, so the wheel reaches
+      // strip-view directly and needs no JS at all.
+      if (stripMode) return;
       e.preventDefault();
-      if (stripMode) {
-        stripView.scrollTop += e.deltaY;
-        return;
-      }
       if (e.ctrlKey) {
         zoomBy(e.deltaY > 0 ? 0.9 : 1.1, e.clientX, e.clientY);
         return;
