@@ -658,30 +658,21 @@ ApplicationWindow {
             }
 
             // Grid.
-            GridView {
+            Flow {
                 id: grid
                 Layout.fillWidth: true
                 Layout.fillHeight: true
                 Layout.leftMargin: Theme.gap
                 Layout.rightMargin: Theme.gap
-                clip: true
-                cellWidth: 180
-                cellHeight: 300
+                wrap: true
+                spacing: 6
                 model: root.rows.slice((root.page - 1) * root.pageSize,
                                        root.page * root.pageSize)
 
-                delegate: Item {
-                    required property var modelData
-                    width: grid.cellWidth
-                    height: grid.cellHeight
-
-                    MangaCard {
-                        anchors.fill: parent
-                        anchors.margins: 6
-                        item: modelData
-                        pluginName: root.pluginNames[modelData.pluginId] || ""
-                        onActivated: (it) => root.openItem(it)
-                    }
+                delegate: MangaCard {
+                    item: modelData
+                    pluginName: root.pluginNames[modelData.pluginId] || ""
+                    onActivated: (it) => root.openItem(it)
                 }
 
                 Label {

@@ -64,6 +64,27 @@ Rectangle {
                 }
             }
 
+            // Status overlay (status: ongoing/done) di cover — status manga dari plugin.
+            Rectangle {
+                visible: card.item && card.item.total > 0
+                anchors.top: parent.top
+                anchors.left: parent.left
+                anchors.margins: 4
+                width: statusLabel.implicitWidth + 8
+                height: statusLabel.implicitHeight + 4
+                radius: height / 2
+                color: card.done ? "#2234c759" : "#226366f1"
+
+                Label {
+                    id: statusLabel
+                    anchors.centerIn: parent
+                    text: card.done ? "Done" : "Ongoing"
+                    color: card.done ? "#34c759" : "#6366f1"
+                    font.pixelSize: 12
+                    font.bold: true
+                }
+            }
+
             // Plugin badge, bottom-left, like the web card's pluginBadge.
             Rectangle {
                 visible: card.pluginName !== ""
@@ -133,8 +154,8 @@ Rectangle {
                 // needs the reader's attention, same as the web card.
                 Rectangle {
                     visible: card.item ? card.item.hasNew : false
-                    width: newLabel.implicitWidth + 12
-                    height: newLabel.implicitHeight + 4
+                    width: newLabel.implicitWidth + 8
+                    height: newLabel.implicitHeight + 3
                     radius: height / 2
                     color: Theme.newBadge
 
@@ -143,15 +164,15 @@ Rectangle {
                         anchors.centerIn: parent
                         text: "New"
                         color: "white"
-                        font.pixelSize: Theme.fsSmall
+                        font.pixelSize: 12
                         font.bold: true
                     }
                 }
 
                 Rectangle {
                     visible: card.done && !(card.item ? card.item.hasNew : false)
-                    width: doneLabel.implicitWidth + 12
-                    height: doneLabel.implicitHeight + 4
+                    width: doneLabel.implicitWidth + 8
+                    height: doneLabel.implicitHeight + 3
                     radius: height / 2
                     color: Theme.doneBadge
 
@@ -160,7 +181,7 @@ Rectangle {
                         anchors.centerIn: parent
                         text: "Done"
                         color: "white"
-                        font.pixelSize: Theme.fsSmall
+                        font.pixelSize: 12
                         font.bold: true
                     }
                 }
