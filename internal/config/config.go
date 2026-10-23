@@ -144,13 +144,14 @@ type Config struct {
 	WorkersBackgroundEnqueueTimeout int
 
 	// [tray] — goisekai-tray wrapper settings. All optional: an empty value
-	// derives the default at startup (server binary next to the tray, URL
-	// from Host/Port, log under DataDir, repo-relative icon), so a plain
-	// deployment needs no [tray] section at all.
-	TrayServerBin string
-	TrayURL       string
-	TrayLogFile   string
-	TrayIcon      string
+	// derives the default at startup (server binary next to the tray, client
+	// next to the server binary, URL from Host/Port, log under DataDir,
+	// repo-relative icon), so a plain deployment needs no [tray] section.
+	TrayServerBin  string
+	TrayClientQT6  string
+	TrayURL        string
+	TrayLogFile    string
+	TrayIcon       string
 
 	// aliasTouched records the names a config file line already supplied, so
 	// the first line for a name replaces the built-in variants instead of

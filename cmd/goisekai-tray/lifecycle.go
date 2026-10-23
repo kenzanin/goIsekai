@@ -35,7 +35,7 @@ func (a *app) onReady() {
 	// The client is built by `just build-qml`, so it may legitimately be
 	// absent on a server-only deployment. Disable the entry rather than
 	// offering a menu item that can only fail.
-	if _, err := os.Stat(a.qmlBin); err != nil {
+	if _, err := os.Stat(a.clientBin); err != nil {
 		mQML.Disable()
 		mQML.SetTitle("Open Desktop Client (not built)")
 	}
@@ -63,7 +63,7 @@ func (a *app) onReady() {
 			// Fire and forget: the client is long-lived and independently
 			// owned once started. Its output is discarded rather than piped,
 			// since nothing here reads it.
-			cmd := exec.Command(a.qmlBin)
+			cmd := exec.Command(a.clientBin)
 			cmd.Dir = a.workDir
 			if err := cmd.Start(); err != nil {
 				systray.SetTooltip("goIsekai — cannot launch the desktop client: " + err.Error())

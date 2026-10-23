@@ -258,3 +258,26 @@ func TestHotReloadOnlyTruthyValuesEnable(t *testing.T) {
 		}
 	}
 }
+
+func TestTraySectionRoundTrips(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "tray.ini")
+	c := Default()
+	c.TrayServerBin = "/opt/goisekai/goisekai"
+	c.TrayClientQT6 = "/opt/goisekai/goisekai-qt6"
+	c.TrayURL = "http://127.0.0.1:9099/"
+	c.TrayLogFile = "/var/log/goisekai.log"
+	c.TrayIcon = "/opt/goisekai/icon.png"
+
+	if err := c.Save(path); err != nil {
+		t.Fatalf("Save: %v", err)
+	}
+	got, err := Load(path)
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	if got.TrayServerBin != c.TrayServerBin || got.TrayClientQT6 != c.TrayClientQT6 ||
+		got.TrayURL != c.TrayURL || got.TrayLogFile != c.TrayLogFile ||
+		got.TrayIcon != c.TrayIcon {
+		t.Fatalf("tray round-trip mismatch:\n got %+v\nwant %+v", got, c)
+	}
+}
