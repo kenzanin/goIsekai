@@ -70,3 +70,6 @@ ai.sh
 .envrc
 .rtk/
 CLAUDE.md
+
+# C++ Qt Quick client build tree
+/goisekai-qt6/build/
