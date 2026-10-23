@@ -24,10 +24,11 @@ Rectangle {
         anchors.fill: parent
         spacing: 0
 
-        // Cover.
+        // Cover. Fills whatever height the cell leaves after the title block, so
+        // every card is identical and the whole thing scales with the window.
         Rectangle {
             Layout.fillWidth: true
-            Layout.preferredHeight: width * 1.426  // seragamkan semua cover: 2/3 aspect ratio
+            Layout.fillHeight: true
             radius: Theme.radius
             clip: true
             color: Theme.field
