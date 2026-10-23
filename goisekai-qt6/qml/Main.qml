@@ -667,15 +667,12 @@ ApplicationWindow {
                 clip: true
                 cellWidth: 180
                 cellHeight: 300
-
-                Repeater {
-                    model: root.rows.slice((root.page - 1) * root.pageSize,
-                                           root.page * root.pageSize)
-                    delegate: MangaCard {
-                        item: modelData
-                        pluginName: root.pluginNames[modelData.pluginId] || ""
-                        onActivated: (it) => root.openItem(it)
-                    }
+                model: root.rows.slice((root.page - 1) * root.pageSize,
+                                       root.page * root.pageSize)
+                delegate: MangaCard {
+                    item: modelData
+                    pluginName: root.pluginNames[modelData.pluginId] || ""
+                    onActivated: (it) => root.openItem(it)
                 }
 
                 Label {
