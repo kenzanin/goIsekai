@@ -27,9 +27,23 @@ library grid) without any client change.
 
 ```sh
 just build-wails        # -> bin/goisekai-wails
-# or manually:
-cd cmd/goisekai-wails && go build -o ../../bin/goisekai-wails .
+# or manually (the tags matter — see below):
+cd cmd/goisekai-wails && CGO_ENABLED=1 \
+  go build -tags "desktop production webkit2_41" -o ../../bin/goisekai-wails .
 ```
+
+**Build tags are required.** Plain `go build` compiles Wails' stub backend, and
+the binary refuses to start with *"Wails applications will not build without the
+correct build tags."* The real build needs:
+
+- `desktop production` — selects the real app backend instead of stubs.
+- `webkit2_41` — picks the `webkit2gtk-4.1` pkg-config target. Omit it and
+  Wails defaults to `webkit2gtk-4.0`, which modern distros no longer ship.
+- `CGO_ENABLED=1` — the webview binding is cgo.
+
+Note Wails v2 targets the **GTK3** WebKit (`webkit2gtk-4.x`). The newer
+`webkitgtk-6.0` (GTK4 engine) is not supported by Wails v2 — only `4.0`/`4.1`
+matter. Check what you have with `pkg-config --exists webkit2gtk-4.1`.
 
 ## Run
 

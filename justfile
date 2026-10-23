@@ -37,8 +37,11 @@ build-qml:
 
 # compile the Wails webview wrapper (own module under cmd/goisekai-wails, so the
 # heavy Wails deps stay out of the server's go.mod). Output lands in bin/.
+# Needs the Wails build tags: `desktop production` for a real app (plain
+# `go build` compiles stubs that refuse to run), and `webkit2_41` on distros
+# that ship webkit2gtk-4.1 instead of 4.0. CGO on for the same reason.
 build-wails:
-    cd cmd/goisekai-wails && go build -o ../../bin/goisekai-wails .
+    cd cmd/goisekai-wails && CGO_ENABLED=1 go build -tags "desktop production webkit2_41" -o ../../bin/goisekai-wails .
 
 # compile the embedded stylesheet from the templates, if npx is available
 css:
