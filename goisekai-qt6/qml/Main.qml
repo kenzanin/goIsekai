@@ -658,14 +658,15 @@ ApplicationWindow {
             }
 
             // Grid.
-            Flow {
+            GridView {
                 id: grid
                 Layout.fillWidth: true
                 Layout.fillHeight: true
                 Layout.leftMargin: Theme.gap
                 Layout.rightMargin: Theme.gap
-                wrap: true
-                spacing: 6
+                clip: true
+                cellWidth: 180
+                cellHeight: 300
 
                 Repeater {
                     model: root.rows.slice((root.page - 1) * root.pageSize,
