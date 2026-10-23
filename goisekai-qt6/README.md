@@ -30,8 +30,8 @@ Needs Qt 6.5+ (`qt6-quick`), cmake, ninja, g++.
 ./build/goisekai-qt6 --server http://127.0.0.1:8080
 ```
 
-The server must be running; the client is a thin HTTP reader over `/api/library`
-and `/api/library/facets`.
+The server must be running; the client is a thin HTTP reader over
+`/api/library`, `/api/library/facets`, and `/api/library/detail/<pluginID>/<mangaID>`.
 
 ## Scope
 
@@ -39,7 +39,11 @@ and `/api/library/facets`.
   grid, pagination. Owns all filter state.
 - `qml/MangaCard.qml` — one library card with status badge, source overlay and
   progress bar.
+- `qml/MangaDetailPage.qml` — self-contained manga detail page (cover, info,
+  description, status, genres, chapter list with read/unread indicators).
+  Clicking a library card opens this page in-process; no browser needed.
 - `qml/Theme.qml` — palette singleton, matches the web UI.
 
-Only the library page has content. Every other tab renders a placeholder; the
-reader and manga detail still open in the web UI via `Qt.openUrlExternally`.
+The library page has full content; the detail page is in-process (no external
+browser). Every other tab (search, updates, history, plugins, settings, logs,
+about) renders a placeholder.

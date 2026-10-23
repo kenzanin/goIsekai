@@ -35,6 +35,11 @@ build-qml:
     cmake -S goisekai-qt6 -B goisekai-qt6/build -G Ninja -DCMAKE_BUILD_TYPE=Release
     ninja -C goisekai-qt6/build
 
+# compile the Wails webview wrapper (own module under cmd/goisekai-wails, so the
+# heavy Wails deps stay out of the server's go.mod). Output lands in bin/.
+build-wails:
+    cd cmd/goisekai-wails && go build -o ../../bin/goisekai-wails .
+
 # compile the embedded stylesheet from the templates, if npx is available
 css:
     #!/usr/bin/env sh

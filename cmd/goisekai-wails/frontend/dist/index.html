@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>goIsekai</title>
+<style>
+  html, body { height: 100%; margin: 0; background: #0a0a0a; color: #a3a3a3;
+    font-family: system-ui, sans-serif; display: flex; align-items: center;
+    justify-content: center; }
+  #msg { font-size: 14px; }
+</style>
+</head>
+<body>
+<div id="msg">Connecting to goIsekai…</div>
+<script>
+  // window.go.main.App.GetServerURL is the bound Go method (main.go). It
+  // returns the base URL passed via -server. We redirect the webview there
+  // so the actual web UI is served by the goIsekai server itself.
+  (function () {
+    function redirect(url) {
+      window.location.href = url;
+    }
+    function fallback() {
+      // Wails runtime not ready — try again shortly, else use default.
+      setTimeout(function () {
+        if (window.go && window.go.main && window.go.main.App) {
+          window.go.main.App.GetServerURL().then(redirect).catch(fallback);
+        } else {
+          redirect("http://127.0.0.1:8080");
+        }
+      }, 100);
+    }
+    fallback();
+  })();
+</script>
+</body>
+</html>

@@ -182,8 +182,8 @@ func (c *Config) set(section, key, val string) {
 		switch key {
 		case "server_bin":
 			c.TrayServerBin = val
-		case "client_qt6":
-			c.TrayClientQT6 = val
+		case "client_wails", "client_qt6":
+			c.TrayClientWails = val
 		case "url":
 			c.TrayURL = val
 		case "log_file":

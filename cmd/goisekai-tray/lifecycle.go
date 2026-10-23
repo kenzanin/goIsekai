@@ -29,17 +29,17 @@ func (a *app) onReady() {
 
 	mStatus := systray.AddMenuItem("Status: unknown", "Server health, checked every 5 seconds")
 	mStatus.Disable()
-	mQML := systray.AddMenuItem("Open Desktop Client", "Launch the Qt Quick desktop UI")
+	mClient := systray.AddMenuItem("Open Desktop Client", "Launch the Wails desktop UI")
 	mOpen := systray.AddMenuItem("Open Browser", "Open the reader UI")
 	mRestart := systray.AddMenuItem("Restart Server", "Stop and start the server")
 	mQuit := systray.AddMenuItem("Quit", "Stop server and exit tray")
 
-	// The client is built by `just build-qml`, so it may legitimately be
+	// The client is built by `just build-wails`, so it may legitimately be
 	// absent on a server-only deployment. Disable the entry rather than
 	// offering a menu item that can only fail.
 	if _, err := os.Stat(a.clientBin); err != nil {
-		mQML.Disable()
-		mQML.SetTitle("Open Desktop Client (not built)")
+		mClient.Disable()
+		mClient.SetTitle("Open Desktop Client (not built)")
 		logger.Warn("Open Desktop Client disabled", "path", a.clientBin, "error", err)
 	}
 
@@ -62,12 +62,13 @@ func (a *app) onReady() {
 				up = now
 				setStatus(mStatus, up, a.url)
 			}
-		case <-mQML.ClickedCh:
+		case <-mClient.ClickedCh:
 			// Fire and forget: the client is long-lived and independently
 			// owned once started. Its output is discarded rather than piped,
-			// since nothing here reads it.
+			// since nothing here reads it. -server points the webview wrapper
+			// at this server so the tray URL and the client agree.
 			logger.Info("launching desktop client", "path", a.clientBin, "dir", a.workDir)
-			cmd := exec.Command(a.clientBin)
+			cmd := exec.Command(a.clientBin, "-server", a.url)
 			cmd.Dir = a.workDir
 			if err := cmd.Start(); err != nil {
 				logger.Error("cannot launch desktop client", "path", a.clientBin, "error", err)
@@ -100,16 +101,17 @@ func (a *app) onReady() {
 	}
 }
 
-// setStatus renders the health line. The icon stays the app logo: a coloured
-// dot competing with the logo made the tray entry hard to recognise, and the
-// menu already has room for words.
+// setStatus renders the health line. The colour lives in a coloured circle
+// emoji in the menu text itself: fyne.io/systray exposes no per-item icon, and
+// SetIcon would recolour the tray logo — which must stay the plain app icon.
+// Green circle = running, red circle = stopped/error.
 func setStatus(m *systray.MenuItem, up bool, url string) {
 	if up {
-		m.SetTitle("Status: ● running")
+		m.SetTitle("Status: 🟢 running")
 		m.SetTooltip("goIsekai is reachable at " + url)
 		return
 	}
-	m.SetTitle("Status: ● not reachable")
+	m.SetTitle("Status: 🔴 stopped / error")
 	m.SetTooltip("Nothing is answering at " + url)
 }
 

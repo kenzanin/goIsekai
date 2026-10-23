@@ -79,7 +79,7 @@ func (c *Config) Save(path string) error {
 	// in a generated file; empty values mean "derive the default".
 	put(f, "tray",
 		"server_bin", c.TrayServerBin,
-		"client_qt6", c.TrayClientQT6,
+		"client_wails", c.TrayClientWails,
 		"url", c.TrayURL,
 		"log_file", c.TrayLogFile,
 		"icon", c.TrayIcon)

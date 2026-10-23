@@ -31,7 +31,7 @@ type app struct {
 	dead   bool
 
 	serverBin string // server binary to spawn ([tray] server_bin)
-	clientBin string // desktop client to launch ([tray] client_qt6)
+	clientBin string // desktop client to launch ([tray] client_wails — the Wails webview wrapper)
 	workDir   string // child cwd; the server resolves goisekai.ini relative to it
 	url       string // Open Browser target ([tray] url)
 	logPath   string // child stdout/stderr ([tray] log_file)
@@ -62,22 +62,30 @@ func main() {
 		a.serverBin = filepath.Join(exeDir, "goisekai")
 	}
 	a.workDir = filepath.Dir(a.serverBin)
-	// [tray] client_qt6: explicit path to the desktop client. Empty derives it
-	// next to the server binary, so moving server_bin moves this too.
-	a.clientBin = cfg.TrayClientQT6
+	// [tray] client_wails: explicit path to the Wails webview wrapper. Empty
+	// derives bin/goisekai-wails next to the server binary (where
+	// `just build-wails` puts it), falling back to a bare goisekai-wails beside
+	// the server for deployments that flatten the layout.
+	a.clientBin = cfg.TrayClientWails
 	if a.clientBin == "" {
-		a.clientBin = filepath.Join(a.workDir, "goisekai-qt6")
-		logger.Info("client_qt6 not set, deriving", "path", a.clientBin)
+		underBin := filepath.Join(a.workDir, "bin", "goisekai-wails")
+		beside := filepath.Join(a.workDir, "goisekai-wails")
+		if _, err := os.Stat(underBin); err == nil {
+			a.clientBin = underBin
+		} else {
+			a.clientBin = beside
+		}
+		logger.Info("client_wails not set, deriving", "path", a.clientBin)
 	} else {
 		a.clientBin = resolveDir(a.clientBin, a.workDir)
-		logger.Info("client_qt6 from config", "raw", cfg.TrayClientQT6, "path", a.clientBin)
+		logger.Info("client_wails from config", "raw", cfg.TrayClientWails, "path", a.clientBin)
 	}
 	// Resolve once here so the menu item's state and the launch agree: a path
 	// that exists only after a later rebuild would otherwise leave the entry
 	// disabled for the rest of the session.
 	if fi, err := os.Stat(a.clientBin); err != nil {
 		logger.Warn("desktop client missing, tray entry disabled",
-			"path", a.clientBin, "error", err, "hint", "run `just build-qml`")
+			"path", a.clientBin, "error", err, "hint", "run `just build-wails`")
 	} else if fi.Mode()&0o111 == 0 {
 		logger.Warn("desktop client is not executable",
 			"path", a.clientBin, "mode", fi.Mode().String())

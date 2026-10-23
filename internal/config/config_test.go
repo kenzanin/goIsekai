@@ -263,7 +263,7 @@ func TestTraySectionRoundTrips(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "tray.ini")
 	c := Default()
 	c.TrayServerBin = "/opt/goisekai/goisekai"
-	c.TrayClientQT6 = "/opt/goisekai/goisekai-qt6"
+	c.TrayClientWails = "/opt/goisekai/bin/goisekai-wails"
 	c.TrayURL = "http://127.0.0.1:9099/"
 	c.TrayLogFile = "/var/log/goisekai.log"
 	c.TrayIcon = "/opt/goisekai/icon.png"
@@ -275,7 +275,7 @@ func TestTraySectionRoundTrips(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Load: %v", err)
 	}
-	if got.TrayServerBin != c.TrayServerBin || got.TrayClientQT6 != c.TrayClientQT6 ||
+	if got.TrayServerBin != c.TrayServerBin || got.TrayClientWails != c.TrayClientWails ||
 		got.TrayURL != c.TrayURL || got.TrayLogFile != c.TrayLogFile ||
 		got.TrayIcon != c.TrayIcon {
 		t.Fatalf("tray round-trip mismatch:\n got %+v\nwant %+v", got, c)
