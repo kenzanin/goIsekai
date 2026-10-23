@@ -17,6 +17,8 @@ import (
 	"syscall"
 	"time"
 
+	"goisekai/internal/logger"
+
 	"fyne.io/systray"
 )
 
@@ -38,6 +40,7 @@ func (a *app) onReady() {
 	if _, err := os.Stat(a.clientBin); err != nil {
 		mQML.Disable()
 		mQML.SetTitle("Open Desktop Client (not built)")
+		logger.Warn("Open Desktop Client disabled", "path", a.clientBin, "error", err)
 	}
 
 	if err := a.start(); err != nil {
@@ -63,10 +66,14 @@ func (a *app) onReady() {
 			// Fire and forget: the client is long-lived and independently
 			// owned once started. Its output is discarded rather than piped,
 			// since nothing here reads it.
+			logger.Info("launching desktop client", "path", a.clientBin, "dir", a.workDir)
 			cmd := exec.Command(a.clientBin)
 			cmd.Dir = a.workDir
 			if err := cmd.Start(); err != nil {
+				logger.Error("cannot launch desktop client", "path", a.clientBin, "error", err)
 				systray.SetTooltip("goIsekai — cannot launch the desktop client: " + err.Error())
+			} else {
+				logger.Info("desktop client started", "pid", cmd.Process.Pid)
 			}
 		case <-mOpen.ClickedCh:
 			openBrowser(a.url)

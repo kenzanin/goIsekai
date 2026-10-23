@@ -67,8 +67,22 @@ func main() {
 	a.clientBin = cfg.TrayClientQT6
 	if a.clientBin == "" {
 		a.clientBin = filepath.Join(a.workDir, "goisekai-qt6")
+		logger.Info("client_qt6 not set, deriving", "path", a.clientBin)
 	} else {
 		a.clientBin = resolveDir(a.clientBin, a.workDir)
+		logger.Info("client_qt6 from config", "raw", cfg.TrayClientQT6, "path", a.clientBin)
+	}
+	// Resolve once here so the menu item's state and the launch agree: a path
+	// that exists only after a later rebuild would otherwise leave the entry
+	// disabled for the rest of the session.
+	if fi, err := os.Stat(a.clientBin); err != nil {
+		logger.Warn("desktop client missing, tray entry disabled",
+			"path", a.clientBin, "error", err, "hint", "run `just build-qml`")
+	} else if fi.Mode()&0o111 == 0 {
+		logger.Warn("desktop client is not executable",
+			"path", a.clientBin, "mode", fi.Mode().String())
+	} else {
+		logger.Info("desktop client ready", "path", a.clientBin, "size", fi.Size())
 	}
 	a.url = cfg.TrayURL
 	if a.url == "" {
@@ -77,6 +91,21 @@ func main() {
 	a.logPath = cfg.TrayLogFile
 	if a.logPath == "" {
 		a.logPath = filepath.Join(resolveDir(cfg.DataDir, a.workDir), "tray-server.log")
+	}
+	// Route this process's own logs into the same file the server child writes
+	// to. A tray started by a desktop launcher has no terminal, so stderr would
+	// be lost and a failed client launch would leave no trace. os.Stderr is the
+	// stream logger.Init captures, so reassigning it is enough.
+	if err := os.MkdirAll(filepath.Dir(a.logPath), 0o755); err == nil {
+		if f, err := os.OpenFile(a.logPath, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o644); err == nil {
+			os.Stderr = f
+			_ = f.Close()
+			os.Stderr = os.NewFile(2, "/dev/stderr") // restore stderr
+		}
+	}
+	if err := logger.Init(cfg.LogLevel); err != nil {
+		logger.Warn("invalid log_level, falling back to info", "value", cfg.LogLevel, "error", err)
+		_ = logger.Init("info")
 	}
 	iconPath := cfg.TrayIcon
 	if iconPath == "" {

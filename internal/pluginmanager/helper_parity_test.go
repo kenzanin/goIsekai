@@ -3,6 +3,7 @@ package pluginmanager
 import (
 	"context"
 	"reflect"
+	"slices"
 	"sort"
 	"strings"
 	"testing"
@@ -439,13 +440,7 @@ func TestJSHostHelperParity(t *testing.T) {
 func TestLuaHostHelperWalkIsNonTrivial(t *testing.T) {
 	names := luaHostHelpers(t)
 	for _, want := range []string{"text.url_encode", "html.find_text", "regex.find", "http.get"} {
-		found := false
-		for _, n := range names {
-			if n == want {
-				found = true
-				break
-			}
-		}
+		found := slices.Contains(names, want)
 		if !found {
 			t.Errorf("host table walk missed %s; got %v", want, names)
 		}

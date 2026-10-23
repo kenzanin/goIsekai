@@ -62,13 +62,11 @@ func TestCoverCDNFetchesAreNotPaced(t *testing.T) {
 
 	var wg sync.WaitGroup
 	for i := range n {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+		wg.Go(func() {
 			// Distinct paths so each is a cache miss on a distinct URL.
 			_, _ = s.GetImage(context.Background(), "plugin-x",
 				srv.URL+"/cover/"+strconv.Itoa(i)+".png", nil, "", "", PrioHigh)
-		}()
+		})
 	}
 	wg.Wait()
 	close(arrivals)

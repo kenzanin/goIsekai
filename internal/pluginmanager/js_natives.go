@@ -1,6 +1,8 @@
 package pluginmanager
 
 import (
+	"maps"
+
 	"github.com/dop251/goja"
 )
 
@@ -66,9 +68,7 @@ func registerJSHostNatives(vm *goja.Runtime, m *Manager, id string) error {
 		return err
 	}
 	options := map[string]goja.Value{"html": htmlObj, "regex": regexObj}
-	for ns, obj := range options {
-		groups[ns] = obj
-	}
+	maps.Copy(groups, options)
 
 	// host.http — thin wrappers over the http_request proxy.
 	httpObj := groupOf("http")

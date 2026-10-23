@@ -1,5 +1,7 @@
 package pluginmanager
 
+import "maps"
+
 import "goisekai/pkg/types"
 
 // params.go holds the values a plugin declared in the "params" object of its
@@ -18,9 +20,7 @@ import "goisekai/pkg/types"
 // keep in sync, which is how a plugin ends up pointing at the wrong host).
 func (m *Manager) setParams(id string, meta types.PluginMeta) {
 	params := make(types.PluginParams, len(meta.Params)+1)
-	for k, v := range meta.Params {
-		params[k] = v
-	}
+	maps.Copy(params, meta.Params)
 	if meta.SiteURL != "" {
 		if _, ok := params["site_url"]; !ok {
 			params["site_url"] = meta.SiteURL

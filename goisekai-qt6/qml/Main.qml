@@ -2,6 +2,7 @@ import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
 import Goisekai
+import ".."
 
 // Window shell. Owns all filter state so the toolbar, sidebar and grid stay
 // stateless and cannot reset each other. The nav bar lives in `header`, so it
@@ -146,6 +147,7 @@ ApplicationWindow {
         // resetting per keystroke would fight the user.
         if ((page - 1) * pageSize >= rows.length && page > 1)
             page = 1;
+        statusText = rows.length + " manga";
     }
 
     function openItem(it) {
@@ -477,13 +479,29 @@ ApplicationWindow {
                                     Layout.fillWidth: true
                                     text: modelData.name || modelData.plugin_id
                                     color: parent.parent.on ? Theme.accentText : Theme.textDim
-                                    font.pixelSize: Theme.fsSmall
+                                    font.pixelSize: Theme.fsSmall + 3
                                     elide: Text.ElideRight
+                                }
+                                // Plugin logo (icon field from facets.plugins)
+                                Rectangle {
+                                    visible: modelData.icon !== ""
+                                    width: 24
+                                    height: 24
+                                    radius: 4
+                                    color: Theme.field
+                                    Image {
+                                        anchors.centerIn: parent
+                                        source: serverBase + modelData.icon
+                                        sourceSize.width: 16
+                                        sourceSize.height: 16
+                                        asynchronous: true
+                                        cache: true
+                                    }
                                 }
                                 Label {
                                     text: String(modelData.count)
                                     color: Theme.textFaint
-                                    font.pixelSize: Theme.fsSmall
+                                    font.pixelSize: Theme.fsSmall + 3
                                 }
                             }
 
@@ -535,13 +553,13 @@ ApplicationWindow {
                                     Layout.fillWidth: true
                                     text: modelData.name
                                     color: parent.parent.on ? Theme.accentText : Theme.textDim
-                                    font.pixelSize: Theme.fsSmall
+                                    font.pixelSize: Theme.fsSmall + 3
                                     elide: Text.ElideRight
                                 }
                                 Label {
                                     text: String(modelData.count)
                                     color: Theme.textFaint
-                                    font.pixelSize: Theme.fsSmall
+                                    font.pixelSize: Theme.fsSmall + 3
                                 }
                             }
 
@@ -647,8 +665,8 @@ ApplicationWindow {
                 Layout.leftMargin: Theme.gap
                 Layout.rightMargin: Theme.gap
                 clip: true
-                cellWidth: 200
-                cellHeight: 350
+                cellWidth: 180
+                cellHeight: 300
                 model: root.rows.slice((root.page - 1) * root.pageSize,
                                        root.page * root.pageSize)
 

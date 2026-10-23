@@ -3,6 +3,7 @@ package bridge
 import (
 	"maps"
 	neturl "net/url"
+	"slices"
 	"strings"
 )
 
@@ -54,10 +55,8 @@ func (s *AppService) memorizeReferer(host, ref string) {
 // appendUnique appends v unless out already holds it, so a site whose origin
 // equals a candidate above contributes nothing twice.
 func appendUnique(out []string, v string) []string {
-	for _, have := range out {
-		if have == v {
-			return out
-		}
+	if slices.Contains(out, v) {
+		return out
 	}
 	return append(out, v)
 }
