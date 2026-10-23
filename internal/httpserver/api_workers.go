@@ -18,9 +18,10 @@ type apiWorkerLane struct {
 	HasDurations bool  `json:"has_durations"`
 }
 
-// apiWorkers reports worker-lane state for GET /api/workers. Read-only and
-// in-process: no external collector, per the worker-observability spec.
-func (s *Server) apiWorkers(w http.ResponseWriter, r *http.Request) {
+// workerLaneStates converts the pool's lane states into the JSON/HTML shape
+// both GET /api/workers and the server-rendered Logs page use, so the API and
+// the initial page render cannot drift apart.
+func workerLaneStates(s *Server) []apiWorkerLane {
 	states := s.service.GetPool().LaneStates()
 	out := make([]apiWorkerLane, 0, len(states))
 	for _, st := range states {
@@ -38,5 +39,11 @@ func (s *Server) apiWorkers(w http.ResponseWriter, r *http.Request) {
 			HasDurations: st.Durations.HasData,
 		})
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"lanes": out})
+	return out
+}
+
+// apiWorkers reports worker-lane state for GET /api/workers. Read-only and
+// in-process: no external collector, per the worker-observability spec.
+func (s *Server) apiWorkers(w http.ResponseWriter, r *http.Request) {
+	writeJSON(w, http.StatusOK, map[string]any{"lanes": workerLaneStates(s)})
 }

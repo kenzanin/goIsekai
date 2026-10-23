@@ -109,7 +109,7 @@ func (s *Server) viewLogs(w http.ResponseWriter, r *http.Request) {
 	for i, j := 0, len(logs)-1; i < j; i, j = i+1, j-1 {
 		logs[i], logs[j] = logs[j], logs[i]
 	}
-	s.renderPage(w, r, "views/logs", "logs", map[string]any{"Logs": logs, "Limit": limit, "Limits": []int{100, 250, 500, 1000, 2000}, "Filter": filter})
+	s.renderPage(w, r, "views/logs", "logs", map[string]any{"Logs": logs, "Limit": limit, "Limits": []int{100, 250, 500, 1000, 2000}, "Filter": filter, "WorkerLanes": workerLaneStates(s)})
 }
 
 // jsonMarshalLogs writes lines as a JSON array.
