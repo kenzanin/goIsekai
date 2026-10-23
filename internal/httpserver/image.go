@@ -59,6 +59,12 @@ func (s *Server) handleImage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// WebKitGTK decodes AVIF/JXL on the main thread, and the strip stacks every
+	// page as a lazy <img> — one slow decode per page entering the viewport is
+	// what stuttered the scroll in the Wails webview. JPEG decodes cheaply
+	// everywhere, so the reader gets JPEG while the disk cache keeps AVIF.
+	data = bridge.ClientDisplayFormat(data)
+
 	// Sniff the MIME type: bridge.ImageContentType covers JXL and AVIF, which
 	// http.DetectContentType alone reports as application/octet-stream.
 	w.Header().Set("Content-Type", bridge.ImageContentType(data))
