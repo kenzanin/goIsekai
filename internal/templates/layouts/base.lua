@@ -21,6 +21,16 @@ return function(data, content)
 		'    <link rel="stylesheet" href="/static/lib/tailwind.css">',
 		"    <style>",
 		"        html { font-size: 17.5px; }",
+		-- Native form controls (select dropdowns, scrollbars, form fields) do
+		-- not inherit the page's dark theme in WebKit/GTK: the option popup
+		-- came out white-on-white. `color-scheme: dark` makes the browser
+		-- render them dark, and the option rule pins the colours explicitly
+		-- for engines that still use the OS palette.
+		"        :root { color-scheme: dark; }",
+		"        select option, select optgroup {",
+		"            background-color: #171717;",
+		"            color: #e5e5e5;",
+		"        }",
 		"        :where(a, button, input, select, textarea, summary):focus-visible {",
 		"            outline: 2px solid #6366f1;",
 		"            outline-offset: 2px;",

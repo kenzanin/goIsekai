@@ -887,9 +887,20 @@
       }
     }
   }
+  // The scroll handler must not run per scroll event: WebKit fires several per
+  // frame, and trackStripProgress() walks every loaded image reading
+  // .clientHeight (a forced layout) — doing that unthrottled, on a column that
+  // keeps growing across chapter seams, is what made the strip scroll stutter.
+  // Collapse the burst into one pass per animation frame instead.
+  var stripScrollPending = false;
   stripView.addEventListener('scroll', () => {
-    maybeExtendStrip();
-    trackStripProgress();
+    if (stripScrollPending) return;
+    stripScrollPending = true;
+    requestAnimationFrame(() => {
+      stripScrollPending = false;
+      maybeExtendStrip();
+      trackStripProgress();
+    });
   });
   stripView.addEventListener('click', () => setBarsVisible(!barsVisible));
 
