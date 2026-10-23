@@ -13,8 +13,8 @@ pkgs := "./internal/... ./pkg/... ./cmd/..."
 # the linter; the Lua and web assets have their own recipes.
 prod := "./internal/... ./pkg/... ./cmd/..."
 
-# QML sources of the desktop client (Qt Quick).
-qml_dir := "cmd/goisekai-qml/qml"
+# QML sources of the desktop client (C++ Qt Quick, see goisekai-qt6/).
+qml_dir := "goisekai-qt6/qml"
 
 # Where `install-lua`, `install-js` and `install-info` copy into. Override per run:
 #   just plugins_dir=/tmp/plugins install-lua kaliscan
@@ -29,11 +29,11 @@ lib_dir := "cmd/goisekai/frontend/lib"
 build: css br
     CGO_ENABLED=0 go build -o {{binary}} ./cmd/goisekai
 
-# compile the Qt Quick desktop client (cgo + Qt 6, separate from the CGO-free server).
-# -s -w drops the DWARF debug info: 112MB -> 33MB. Qt itself is linked
-# dynamically (libQt6*.so.6), so none of it is inside this binary.
+# compile the Qt Quick desktop client (C++ + Qt 6, separate from the CGO-free
+# server). The binary lands in goisekai-qt6/build/goisekai-qt6.
 build-qml:
-    CGO_ENABLED=1 go build -ldflags="-s -w" -o goisekai-qml ./cmd/goisekai-qml
+    cmake -S goisekai-qt6 -B goisekai-qt6/build -G Ninja -DCMAKE_BUILD_TYPE=Release
+    ninja -C goisekai-qt6/build
 
 # compile the embedded stylesheet from the templates, if npx is available
 css:
@@ -134,19 +134,6 @@ lint-qml:
             exit 1
         }
     done
-
-# run the QML unit tests (qmltestrunner). Not part of `check`: on some Qt 6.12
-# hosts the runner exits 1 with no output even for a trivial TestCase, so it is
-# run explicitly where it works.
-test-qml:
-    #!/usr/bin/env sh
-    set -eu
-    cd {{qml_dir}}/..
-    if ! command -v qmltestrunner >/dev/null 2>&1; then
-        echo "qmltestrunner not found — skipping QML tests"
-        exit 0
-    fi
-    qmltestrunner -input qmltest
 
 # format the Lua templates with Stylua
 fmt-lua:

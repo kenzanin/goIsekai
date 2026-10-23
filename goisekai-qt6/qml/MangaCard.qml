@@ -2,30 +2,16 @@ import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
 
-// One library card. Emits the item; Main.qml decides what a click does.
+// One library card, matching partials/library_cards.lua: cover with the plugin
+// badge bottom-left, two-line title, then "read / total" with a New or Done
+// pill. Emits the item; Main.qml decides what a click does.
 Rectangle {
     id: card
 
     property var item: null
     property string pluginName: ""
 
-    readonly property string statusKey: {
-        if (!item)
-            return "";
-        if (item.total > 0 && item.read >= item.total)
-            return "done";
-        if (item.hasNew)
-            return "new";
-        if (item.read > 0 && item.total > 0)
-            return "reading";
-        return "unread";
-    }
-    readonly property var statusStyle: ({
-        "done": { "label": "DONE", "fg": "#0b2e1a", "bg": "#22c55e" },
-        "new": { "label": "NEW", "fg": "#2a1a05", "bg": "#ffa332" },
-        "reading": { "label": "READING", "fg": "#0b1f2e", "bg": "#60a5fa" },
-        "unread": { "label": "UNREAD", "fg": "#e5e5e5", "bg": "#1f1f1f" }
-    })
+    readonly property bool done: item ? (item.total > 0 && item.read >= item.total) : false
 
     signal activated(var item)
 
@@ -36,13 +22,13 @@ Rectangle {
 
     ColumnLayout {
         anchors.fill: parent
-        anchors.margins: 8
-        spacing: 6
+        spacing: 0
 
+        // Cover.
         Rectangle {
             Layout.fillWidth: true
             Layout.preferredHeight: width / Theme.defaultRatio
-            radius: 5
+            radius: Theme.radius
             clip: true
             color: Theme.field
 
@@ -59,116 +45,126 @@ Rectangle {
 
             Label {
                 anchors.centerIn: parent
-                visible: cover.status === Image.Error || (card.item && card.item.cover === "")
+                visible: cover.status === Image.Error
+                         || (card.item && card.item.cover === "")
                 text: cover.status === Image.Error ? "cannot decode" : "no cover"
                 color: Theme.textFaint
-                font.pixelSize: 14
+                font.pixelSize: Theme.fsSmall
             }
 
-            Rectangle {
-                visible: card.item ? card.item.hasNew : false
-                anchors.top: parent.top
-                anchors.right: parent.right
-                anchors.margins: 6
-                width: 10
-                height: 10
-                radius: 5
-                color: Theme.accent
-                border.width: 2
-                border.color: Theme.card
-            }
-
+            // Scrim so the plugin pill stays readable over light artwork.
             Rectangle {
                 anchors.bottom: parent.bottom
                 anchors.left: parent.left
                 anchors.right: parent.right
-                height: 44
+                height: 40
                 gradient: Gradient {
                     GradientStop { position: 0; color: "transparent" }
                     GradientStop { position: 1; color: "#cc000000" }
                 }
             }
 
-            Row {
+            // Plugin badge, bottom-left, like the web card's pluginBadge.
+            Rectangle {
+                visible: card.pluginName !== ""
                 anchors.bottom: parent.bottom
                 anchors.left: parent.left
-                anchors.margins: 6
+                anchors.margins: 8
+                width: Math.min(pluginLabel.implicitWidth + 16, parent.width - 16)
+                height: pluginLabel.implicitHeight + 6
+                radius: height / 2
+                color: "#99000000"
+
+                Label {
+                    id: pluginLabel
+                    anchors.centerIn: parent
+                    text: card.pluginName
+                    color: "#f5f5f5"
+                    font.pixelSize: Theme.fsSmall
+                    elide: Text.ElideRight
+                    width: Math.min(implicitWidth, card.width - 40)
+                }
+            }
+        }
+
+        // Title + progress.
+        ColumnLayout {
+            Layout.fillWidth: true
+            Layout.margins: 10
+            spacing: 4
+
+            Label {
+                Layout.fillWidth: true
+                text: card.item ? card.item.title : ""
+                color: Theme.text
+                font.pixelSize: Theme.fsBody
+                font.bold: true
+                wrapMode: Text.WordWrap
+                maximumLineCount: 2
+                elide: Text.ElideRight
+            }
+
+            RowLayout {
+                Layout.fillWidth: true
                 spacing: 6
 
+                Label {
+                    text: card.item ? String(card.item.read) : "0"
+                    color: Theme.accentSoft
+                    font.pixelSize: Theme.fsSmall
+                    font.bold: true
+                }
+
+                Label {
+                    text: "/"
+                    color: Theme.textFaint
+                    font.pixelSize: Theme.fsSmall
+                }
+
+                Label {
+                    text: card.item ? String(card.item.total) : "0"
+                    color: Theme.text
+                    font.pixelSize: Theme.fsSmall
+                }
+
+                Item { Layout.fillWidth: true }
+
+                // New wins over Done: a finished manga with a new chapter still
+                // needs the reader's attention, same as the web card.
                 Rectangle {
-                    visible: card.statusKey !== ""
-                    width: statusLabel.implicitWidth + 10
-                    height: statusLabel.implicitHeight + 4
-                    radius: 3
-                    color: card.statusStyle[card.statusKey].bg
-                    border.width: card.statusKey === "unread" ? 1 : 0
-                    border.color: "#3a3a3a"
+                    visible: card.item ? card.item.hasNew : false
+                    width: newLabel.implicitWidth + 12
+                    height: newLabel.implicitHeight + 4
+                    radius: height / 2
+                    color: Theme.newBadge
 
                     Label {
-                        id: statusLabel
+                        id: newLabel
                         anchors.centerIn: parent
-                        text: card.statusKey === "" ? "" : card.statusStyle[card.statusKey].label
-                        color: card.statusKey === "" ? Theme.text : card.statusStyle[card.statusKey].fg
-                        font.pixelSize: 10
+                        text: "New"
+                        color: "white"
+                        font.pixelSize: Theme.fsSmall
                         font.bold: true
                     }
                 }
 
                 Rectangle {
-                    visible: card.pluginName !== ""
-                    width: srcLabel.implicitWidth + 10
-                    height: srcLabel.implicitHeight + 4
-                    radius: 3
-                    color: "#cc000000"
-                    border.width: 1
-                    border.color: "#55ffffff"
+                    visible: card.done && !(card.item ? card.item.hasNew : false)
+                    width: doneLabel.implicitWidth + 12
+                    height: doneLabel.implicitHeight + 4
+                    radius: height / 2
+                    color: Theme.doneBadge
 
                     Label {
-                        id: srcLabel
+                        id: doneLabel
                         anchors.centerIn: parent
-                        text: card.pluginName
-                        color: "#e5e5e5"
-                        font.pixelSize: 10
-                        elide: Text.ElideRight
-                        width: Math.min(implicitWidth, 110)
+                        text: "Done"
+                        color: "white"
+                        font.pixelSize: Theme.fsSmall
+                        font.bold: true
                     }
                 }
             }
-        }
-
-        Label {
-            Layout.fillWidth: true
-            text: card.item ? card.item.title : ""
-            color: Theme.text
-            font.pixelSize: 13
-            font.bold: true
-            wrapMode: Text.WordWrap
-            maximumLineCount: 2
-            elide: Text.ElideRight
-        }
-
-        Item { Layout.fillHeight: true }
-
-        Rectangle {
-            Layout.fillWidth: true
-            height: 3
-            radius: 1.5
-            color: Theme.line
-
-            Rectangle {
-                width: card.item && card.item.total > 0
-                       ? parent.width * Math.min(card.item.read / card.item.total, 1)
-                       : 0
-                height: parent.height
-                radius: parent.radius
-                color: Theme.accent
-            }
-        }
-
-        Label {
-            text: card.item ? (card.item.total > 0 ? card.item.read + " / " + card.item.total : "unread") : ""
-            color: Theme.textFaint
-            font.pixelSize: 11
         }
     }
 

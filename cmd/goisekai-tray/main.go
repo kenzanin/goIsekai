@@ -64,7 +64,7 @@ func main() {
 	a.workDir = filepath.Dir(a.serverBin)
 	// No separate config key: the desktop client ships next to the server
 	// binary, so moving server_bin moves this too.
-	a.qmlBin = filepath.Join(a.workDir, "goisekai-qml")
+	a.qmlBin = filepath.Join(a.workDir, "goisekai-qt6")
 	a.url = cfg.TrayURL
 	if a.url == "" {
 		a.url = resolveURL(cfg.Host, cfg.Port)

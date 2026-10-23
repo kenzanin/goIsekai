@@ -56,7 +56,7 @@ cmd/goisekai/goisekai
 ai.sh
 # Tray wrapper binary
 /goisekai-tray
-/goisekai-qml
+/goisekai-qt6
 
 # Browser HAR captures: local reference material, carry session cookies
 *.har
