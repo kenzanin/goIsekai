@@ -1,0 +1,32 @@
+# Build 1manga wasm plugin for goIsekai
+# TinyGo-only build, no dependency on tools/build-wasm.sh
+
+TINYGO ?= $(HOME)/opt/tinygo/bin/tinygo
+WASMOPT ?= $(HOME)/opt/tinygo/bin/wasm-opt
+GO126 ?= $(HOME)/.govman/versions/go1.26.9
+
+export GO126
+export GOROOT := $(GO126)
+export GOTOOLCHAIN = local
+export CGO_ENABLED = 0
+
+ROOT := $(shell cd $(CURDIR) && pwd | sed 's|/examples/plugins/wasm/1manga||')
+
+.PHONY: all build clean
+
+all: build
+
+build: main.wasm
+
+main.wasm: *.go
+	# Temporarily rewrite go.mod go 1.27 -> go 1.26 for TinyGo
+	sed -i 's/go 1.27.1/go 1.26/' go.mod
+	sed -i 's/go 1.27.1/go 1.26/' $(ROOT)/go.mod
+	$(TINYGO) build -target wasi -buildmode=c-shared -o main.wasm .
+	sed -i 's/go 1.26/go 1.27.1/' go.mod
+	sed -i 's/go 1.26/go 1.27.1/' $(ROOT)/go.mod
+	$(WASMOPT) -O4 main.wasm -o main.wasm
+	@echo "Built main.wasm: $$($(TINYGO) version | awk '{print $$3}')"
+
+clean:
+	rm -f main.wasm
