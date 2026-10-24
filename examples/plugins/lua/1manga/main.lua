@@ -402,34 +402,54 @@ if not chapter then
     		return host.json.encode({})
     	end
 
-	-- Authoritative path: the encrypted page list the API hands back. It names
-	-- every file exactly, which the CDN pattern below cannot do - chapter 59 of
-	-- this manga is "1a.jpg 2a.jpg 3a.jpg 4.jpg ... 9a.jpg ...", so both the
-	-- extension probe and the binary search both fail on it.
-	if type(chapter.pages) == "string" and string.sub(chapter.pages, 1, 7) == "enc:v1:" then
-		local pages, why = encrypted_page_list(chapter.pages, slug, number)
+	-- Authoritative page list: the API hands back the exact file names, which
+	-- the CDN probe below cannot do - this manga's chapters name their pages
+	-- "1a.jpg 2b.jpg 3b.jpg ..." (chapter 59 is the same), so both the
+	-- extension probe and the binary search fail on them. The payload arrives
+	-- in two shapes:
+	--   "enc:v1:<keyId>:<iv>:<tag>:<ciphertext>"  -> AES-256-GCM, key from
+	--   GET /api/chapter-crypto (host.crypto.aes_gcm_decrypt), or
+	--   {"p":"<prefix>/","i":["1a.jpg",...]}      -> plaintext JSON (what the
+	--   API answers today for letter-suffixed pages; the browser's own request
+	--   returns this shape, verified in 1manga.har).
+	-- Both name every file exactly; neither falls through to the probe.
+	local pages_field = chapter.pages
+	if type(pages_field) == "string" and string.sub(pages_field, 1, 7) == "enc:v1:" then
+		local pages, why = encrypted_page_list(pages_field, slug, number)
 		if pages then
 			log.info("1manga pages: found " .. tostring(#pages) .. " pages for " .. chapterID .. " (decrypted)")
 			return host.json.encode(pages)
 		end
--- Fail loudly instead of probing. An encrypted pages field means this
-    		-- chapter is served from the authoritative list, so the CDN pattern is
-    		-- already known to be wrong for it: probing then produced a list that
-    		-- looked plausible and silently dropped pages (observed on chapter 58,
-    		-- which reported 18 pages it had only guessed at). An empty chapter with
-    		-- a stated cause beats a wrong chapter that reads as complete.
-    		-- why is already a code from encrypted_page_list; the details it logged
-    		-- stay in the log rather than travelling to the reader.
-    		return nil, why or "decrypt_failed"
+		-- Fail loudly instead of probing. An encrypted pages field means this
+		-- chapter is served from the authoritative list, so the CDN pattern is
+		-- already known to be wrong for it: probing then produced a list that
+		-- looked plausible and silently dropped pages (observed on chapter 58,
+		-- which reported 18 pages it had only guessed at). An empty chapter with
+		-- a stated cause beats a wrong chapter that reads as complete.
+		-- why is already a code from encrypted_page_list; the details it logged
+		-- stay in the log rather than travelling to the reader.
+		return nil, why or "decrypt_failed"
+	end
+	if type(pages_field) == "string" and pages_field ~= "" then
+		local decoded = host.json.decode(pages_field)
+		if decoded and type(decoded.p) == "string" and type(decoded.i) == "table" then
+			local pages = {}
+			for idx, name in ipairs(decoded.i) do
+				pages[idx] = { index = idx - 1, url = IMG_CDN .. decoded.p .. name }
+			end
+			log.info("1manga pages: found " .. tostring(#pages) .. " pages for " .. chapterID .. " (plaintext)")
+			return host.json.encode(pages)
+		end
+		log.warn("1manga: unrecognised pages payload, falling back to probe: " .. string.sub(pages_field, 1, 60))
 	end
 
-	-- Fallback for a plaintext or unreadable pages field: find the page count
-	-- by probing (page N exists with 200, N+1 404s). Binary search keeps it to
-	-- ~9 cheap requests; the list lands in chapters_pages cache afterward, so the
-	-- cost is paid once per chapter. This assumes contiguous page numbers, which
-	-- is exactly what the encrypted path above exists to avoid.
-	-- The extension varies per chapter (older chapters are .jpg, newer ones
-	-- .jpeg), so probe candidates once on page 1 instead of hardcoding one.
+	-- Fallback for a missing or unparseable pages field: find the page count by
+	-- probing (page N exists with 200, N+1 404s). Binary search keeps it to
+	-- ~9 cheap requests; the list lands in the chapters_pages cache afterward,
+	-- so the cost is paid once per chapter. This assumes contiguous page
+	-- numbers, which is exactly what the authoritative paths above exist to
+	-- avoid. The extension varies per chapter (older chapters are .jpg, newer
+	-- ones .jpeg), so probe candidates once on page 1 instead of hardcoding one.
 	local ext
 	for _, c in ipairs({ "jpg", "jpeg", "png", "webp" }) do
 		local resp =
@@ -440,8 +460,12 @@ if not chapter then
 		end
 	end
 	if not ext then
-		log.error("1manga pages: page 1 missing for " .. chapterID)
-		return host.json.encode({})
+		-- No usable page 1 on the CDN: this chapter's files are letter-suffixed
+		-- (1a.jpg ...) and the authoritative payload was missing or unreadable,
+		-- so the probe is useless. Fail loudly: an empty chapter with a stated
+		-- cause beats a silently blank one.
+		log.error("1manga pages: no usable page 1 for " .. chapterID .. " (probe fallback, no pages field to parse)")
+		return nil, "page_list_failed"
 	end
 	local function pageExists(i)
 		local resp =
