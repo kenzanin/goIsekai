@@ -966,59 +966,18 @@
   // ===================================================================
   const LIB_VIEW_STORAGE_KEY = 'gsk:library-view';
 
-  // Restore persisted filters/sort only on a fresh tab (history.state === null):
-  // that is a user typing /view/library into the URL bar, where restoring the
-  // last view is wanted. A bare /view/library reached by an in-app navigation
-  // (history.state !== null) is an explicit "show everything" — an SPA link
-  // click or the reset button — so it must clear the stored view instead of
-  // letting it re-apply and bounce the page back to the old filter.
+  // Filters and sort live in the URL itself (?status=&tag=&sort=...), so the
+  // URL bar is the single source of truth and nothing is persisted. Older
+  // builds wrote gsk:library-view to localStorage and auto-restored it on a
+  // bare load, which made "All" bounce back to the last filter; wipe that
+  // legacy key on any bare load.
   const syncLibraryView = () => {
     var libPath = window.location.pathname;
     if (libPath !== '/view/library' && libPath !== '/') return;
-
-    const params = new URLSearchParams(window.location.search);
-    const hasParams = window.location.search && params.toString().length > 0;
-    if (!hasParams) {
-      const saved = localStorage.getItem(LIB_VIEW_STORAGE_KEY);
-      if (history.state === null && saved) {
-        // Fresh tab: jump straight to the saved view.
-        window.location.replace(window.location.pathname + '?' + saved);
-        return;
-      }
-      // In-app navigation to a bare URL: the user cleared the filters, so
-      // forget the stored view or it would fight the page on every reload.
+    if (window.location.search) return;
+    try {
       localStorage.removeItem(LIB_VIEW_STORAGE_KEY);
-    } else {
-      // Tag/status chips and pagination are plain links (no submit event),
-      // so a submit listener alone never sees them. Persist the canonical
-      // URL state on load instead; drop page so a stale page number is
-      // never restored.
-      params.delete('page');
-      const serialized = params.toString();
-      if (serialized) {
-        localStorage.setItem(LIB_VIEW_STORAGE_KEY, serialized);
-      }
-    }
-
-    document.addEventListener('submit', (e) => {
-      const form = e.target;
-      if (
-        form instanceof HTMLFormElement &&
-        form.action &&
-        form.action.includes('/view/library') &&
-        form.method.toLowerCase() === 'get'
-      ) {
-        const qs = new FormData(form);
-        const out = new URLSearchParams();
-        qs.forEach((v, k) => {
-          if (v !== '' && v != null) out.append(k, v);
-        });
-        const serialized = out.toString();
-        if (serialized) {
-          localStorage.setItem(LIB_VIEW_STORAGE_KEY, serialized);
-        }
-      }
-    });
+    } catch (e) {}
   };
   window.syncLibraryView = syncLibraryView;
   syncLibraryView();
