@@ -966,6 +966,12 @@
   // ===================================================================
   const LIB_VIEW_STORAGE_KEY = 'gsk:library-view';
 
+  // Restore persisted filters/sort only on a fresh tab (history.state === null):
+  // that is a user typing /view/library into the URL bar, where restoring the
+  // last view is wanted. A bare /view/library reached by an in-app navigation
+  // (history.state !== null) is an explicit "show everything" — an SPA link
+  // click or the reset button — so it must clear the stored view instead of
+  // letting it re-apply and bounce the page back to the old filter.
   const syncLibraryView = () => {
     var libPath = window.location.pathname;
     if (libPath !== '/view/library' && libPath !== '/') return;
@@ -974,10 +980,14 @@
     const hasParams = window.location.search && params.toString().length > 0;
     if (!hasParams) {
       const saved = localStorage.getItem(LIB_VIEW_STORAGE_KEY);
-      if (saved) {
+      if (history.state === null && saved) {
+        // Fresh tab: jump straight to the saved view.
         window.location.replace(window.location.pathname + '?' + saved);
         return;
       }
+      // In-app navigation to a bare URL: the user cleared the filters, so
+      // forget the stored view or it would fight the page on every reload.
+      localStorage.removeItem(LIB_VIEW_STORAGE_KEY);
     } else {
       // Tag/status chips and pagination are plain links (no submit event),
       // so a submit listener alone never sees them. Persist the canonical

@@ -95,6 +95,7 @@ return function(data)
 		{ "reading", "In progress" },
 		{ "unread", "Unread" },
 		{ "done", "Finished" },
+		{ "new", "New" },
 	}
 	local statusChips = ""
 	for _, o in ipairs(statusOpts) do
