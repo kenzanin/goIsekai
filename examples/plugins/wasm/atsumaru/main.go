@@ -83,7 +83,6 @@ func search(arg string) []types.Manga {
 	data, ok := getJSON(url)
 	out := []types.Manga{}
 	if !ok {
-		logInfo("atsumaru search: q=" + f.Query + " HTTP fetch failed")
 		return out
 	}
 	hitsVal := data["hits"]
@@ -111,7 +110,6 @@ func search(arg string) []types.Manga {
 			out = append(out, m)
 		}
 	}
-	logInfo("atsumaru search: q=" + f.Query + " found=" + itoa(len(out)))
 	return out
 }
 
@@ -181,7 +179,6 @@ func chapters(arg string) []types.Chapter {
 	if err := json.Unmarshal([]byte(arg), &id); err != nil {
 		id = strings.TrimSpace(arg)
 	}
-	logInfo("atsumaru chapters: id=" + id)
 	// The API endpoint wants the id directly (no JSON encoding)
 	data, ok := getJSON(base + "/api/manga/allChapters?mangaId=" + urlEncode(id))
 	if !ok {
@@ -223,7 +220,6 @@ func chapters(arg string) []types.Chapter {
 			}
 		}
 	}
-	logInfo("atsumaru chapters: id=" + id + " count=" + itoa(len(out)))
 	return out
 }
 
@@ -258,7 +254,6 @@ func pages(arg string) []types.Page {
 			}
 		}
 	}
-	logInfo("atsumaru pages: " + composite + " count=" + itoa(len(out)))
 	return out
 }
 

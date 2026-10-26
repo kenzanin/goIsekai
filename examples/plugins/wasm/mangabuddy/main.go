@@ -88,7 +88,6 @@ func search(arg string) []types.Manga {
 	if f.Page < 1 {
 		f.Page = 1
 	}
-	logInfo("mangabuddy search: q=" + f.Query + " page=" + itoa(f.Page))
 
 	out := []types.Manga{}
 
@@ -132,7 +131,6 @@ func search(arg string) []types.Manga {
 			}
 		}
 	}
-	logInfo("mangabuddy search: found " + itoa(len(out)))
 	return out
 }
 
@@ -228,7 +226,6 @@ func chapters(arg string) []types.Chapter {
 			}
 		}
 	}
-	logInfo("mangabuddy chapters: found " + itoa(len(out)))
 	return out
 }
 
@@ -242,7 +239,6 @@ func pages(arg string) []types.Page {
 		return nil
 	}
 	mangaID, chSlug := parts[0], parts[1]
-	logInfo("mangabuddy pages: " + mangaID + ":" + chSlug)
 
 	html := htmlGet(base + "/series/" + mangaID + "/" + chSlug)
 	if html == "" {
@@ -258,7 +254,6 @@ func pages(arg string) []types.Page {
 		seen[img] = true
 		out = append(out, types.Page{Index: len(out), URL: img})
 	}
-	logInfo("mangabuddy pages: found " + itoa(len(out)))
 	return out
 }
 

@@ -27,8 +27,6 @@ func search(arg string) []types.Manga {
 	if f.Page < 1 {
 		f.Page = 1
 	}
-	logInfo("lhtranslation search: q=" + f.Query + " page=" + itoa(f.Page))
-
 	var url string
 	if len(f.Genres) > 0 {
 		// Genre browsing: first genre wins. /manga-genre/<slug>/, page N under /page/N/.
@@ -56,7 +54,6 @@ func search(arg string) []types.Manga {
 		seen[slug] = true
 		out = append(out, types.Manga{ID: slug, Title: slug})
 	}
-	logInfo("lhtranslation search: found " + itoa(len(out)))
 	return out
 }
 
@@ -68,7 +65,6 @@ func detail(arg string) types.Manga {
 	if slug == "" {
 		return m
 	}
-	logInfo("lhtranslation detail: slug=" + slug)
 
 	body := htmlGet(base + "/manga/" + slug + "/")
 	if body == "" {
@@ -120,8 +116,6 @@ func chapters(arg string) []types.Chapter {
 	if slug == "" {
 		return nil
 	}
-	logInfo("lhtranslation chapters: slug=" + slug)
-
 	body := htmlPost(base+"/manga/"+slug+"/ajax/chapters/", "", `{"X-Requested-With":"xmlhttprequest"}`)
 	out := []types.Chapter{}
 	for _, li := range gAll(body, `(?s)<li\s+class="wp-manga-chapter[^>]*>(.*?)</li>`) {
@@ -151,7 +145,6 @@ func chapters(arg string) []types.Chapter {
 		out = append(out, c)
 	}
 	// Madara's /ajax/chapters/ returns newest-first already; keep site order.
-	logInfo("lhtranslation chapters: found " + itoa(len(out)))
 	return out
 }
 
@@ -164,16 +157,14 @@ func pages(arg string) []types.Page {
 	}
 	// "slug:chapter-N" → /manga/slug/chapter-N/
 	path := strings.ReplaceAll(composite, ":", "/")
-	logInfo("lhtranslation pages: " + path)
 
 	body := htmlGet(base + "/manga/" + path + "/")
 	out := []types.Page{}
-	for _, src := range firstCapAll(body, `data-src="([^"]*\n[^"]*)"`) {
+	for _, src := range firstCapAll(body, `data-src="([^"]*)"`) {
 		if src != "" {
 			out = append(out, types.Page{Index: len(out), URL: strings.TrimSpace(src)})
 		}
 	}
-	logInfo("lhtranslation pages: found " + itoa(len(out)))
 	return out
 }
 
