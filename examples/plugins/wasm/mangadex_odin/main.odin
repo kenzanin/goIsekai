@@ -327,11 +327,19 @@ search_impl :: proc (arg: string) -> string {
 	if title == "" {
 		title = strings.trim_space(f.Q)
 	}
-
+	// MangaDex API /manga?title= does exact-ish phrase matching that the
+	// website /search does not — a 4-word phrase (e.g. "Isekai
+	// Shoukansareta kedo") yields 0 API hits while the site shows matches.
+	// When the full phrase finds nothing, retry with progressively shorter
+	// prefixes (drop the last word each retry) until results come back or
+	// only one word remains. Mirrors the Lua reference, which falls back
+	// gracefully.
+	searchWords := strings.split(title, " ") if title != "" else nil
+	
 	out := make([dynamic]Manga_Out, 0)
 	defer delete(out)
 	// Every manga in the reply borrows its genre array from here, and all of
-	// them stay alive until this proc returns — i.e. until after the marshal.
+	// them stay alive until this proc returns — i.e. after the marshal.
 	keep := make([dynamic][dynamic]string, 0)
 	defer {
 		for g in keep {
@@ -339,69 +347,89 @@ search_impl :: proc (arg: string) -> string {
 		}
 		delete(keep)
 	}
-
-	offset := 0
-	total := 999_999
-	start := time.tick_now()
-	for offset < total {
-		if time.duration_seconds(time.tick_since(start)) > SEARCH_BUDGET {
-			break
+	
+	maxWords := len(searchWords)
+	// searchQuery is reassigned each pass — must be declared before the loop
+	// because Odin for-loops do not accept `var` declarations inside.
+	searchQuery: []string
+	for w := maxWords; w >= 1; w -= 1 {
+		searchQuery = nil
+		if w <= len(searchWords) {
+			searchQuery = searchWords[:w]
 		}
-
-		sb := strings.builder_make()
-		strings.write_string(&sb, kAPI)
-		strings.write_string(&sb, "/manga?limit=100&offset=")
-		strings.write_int(&sb, offset)
-		strings.write_string(&sb, "&includes[]=cover_art&includes[]=author")
-		strings.write_string(&sb, "&availableTranslatedLanguage[]=en")
-		if title == "" {
-			strings.write_string(&sb, "&order[followedCount]=desc")
-		} else {
-			strings.write_string(&sb, "&order[relevance]=desc&title=")
-			strings.write_string(&sb, url_encode(title))
+	
+		offset := 0
+		total := 999_999
+		start := time.tick_now()
+		hadResult := false
+		searchedOnce := false
+	
+		for offset < total {
+			if time.duration_seconds(time.tick_since(start)) > SEARCH_BUDGET {
+				break
+			}
+	
+			sb := strings.builder_make()
+			strings.write_string(&sb, kAPI)
+			strings.write_string(&sb, "/manga?limit=100&offset=")
+			strings.write_int(&sb, offset)
+			strings.write_string(&sb, "&includes[]=cover_art&includes[]=author")
+			strings.write_string(&sb, "&availableTranslatedLanguage[]=en")
+			if len(searchQuery) == 0 {
+				strings.write_string(&sb, "&order[followedCount]=desc")
+			} else {
+				strings.write_string(&sb, "&order[relevance]=desc&title=")
+				strings.write_string(&sb, url_encode(strings.join(searchQuery, " ")))
+			}
+			for g in f.Genres {
+				strings.write_string(&sb, "&includedTags[]=")
+				strings.write_string(&sb, url_encode(g))
+			}
+			strings.write_string(&sb, "&")
+			strings.write_string(&sb, kContentRating)
+	
+			body, ok := abi.http_body(strings.to_string(sb), kHeaders)
+			strings.builder_destroy(&sb)
+			if !ok {
+				break
+			}
+			resp: Manga_List_Resp
+			if json.unmarshal_string(body, &resp) != nil {
+				break
+			}
+	
+			searchedOnce = true
+			if resp.Total > 0 {
+				total = resp.Total
+			}
+			n := len(resp.Data)
+			if n == 0 {
+				break
+			}
+			hadResult = true
+			for md in resp.Data {
+				genres := make([dynamic]string, 0, len(md.Attributes.Tags))
+				manga_genres(md, &genres)
+				append(&out, manga_out(md, genres[:]))
+				append(&keep, genres)
+			}
+	
+			offset += n
+			if n < 100 {
+				break
+			}
+			if len(out) >= 2000 {
+				break
+			}
 		}
-		for g in f.Genres {
-			strings.write_string(&sb, "&includedTags[]=")
-			strings.write_string(&sb, url_encode(g))
-		}
-		strings.write_string(&sb, "&")
-		strings.write_string(&sb, kContentRating)
-
-		body, ok := abi.http_body(strings.to_string(sb), kHeaders)
-		strings.builder_destroy(&sb)
-		if !ok {
-			break
-		}
-		resp: Manga_List_Resp
-		if json.unmarshal_string(body, &resp) != nil {
-			break
-		}
-
-		if resp.Total > 0 {
-			total = resp.Total
-		}
-		n := len(resp.Data)
-		if n == 0 {
-			break
-		}
-		for md in resp.Data {
-			genres := make([dynamic]string, 0, len(md.Attributes.Tags))
-			manga_genres(md, &genres)
-			append(&out, manga_out(md, genres[:]))
-			append(&keep, genres)
-		}
-
-		offset += n
-		if n < 100 {
-			break
-		}
-		if len(out) >= 2000 {
+	
+		// Got results, or no query to fall back on further. Stop.
+		if hadResult || !searchedOnce || len(searchQuery) == 0 {
 			break
 		}
 	}
 	return abi.to_json(out[:])
 }
-
 // ─── detail ──────────────────────────────────────────────────────────────────
 
 detail_impl :: proc (arg: string) -> string {
