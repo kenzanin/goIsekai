@@ -1,3 +1,13 @@
+---
+id: three-lua-plugins-converted-to-tinygo-wasm
+title: atsumaru + lhtranslation + mangabuddy ported from Lua to TinyGo WASM
+description: Three Lua plugins converted to TinyGo WASM (Typesense/Madara-HTML/JSON+HTML), covering hit["document"] nesting, bareSlug, decodeString sandbox fallback, and the stale main.lua that made the manager load them as Lua.
+type: port
+tags: [goisekai, plugins, wasm, tinygo, atsumaru, lhtranslation, mangabuddy, port]
+generated:
+  at: "2026-10-26T00:00:00Z"
+---
+
 # Three Lua Plugins Converted to TinyGo WASM
 
 ## Summary

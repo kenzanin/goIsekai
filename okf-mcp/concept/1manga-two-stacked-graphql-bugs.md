@@ -1,3 +1,13 @@
+---
+id: 1manga-two-stacked-graphql-bugs
+title: 1manga search returned 0 results - two stacked GraphQL syntax bugs
+description: x: "mn03" was emitted as a GraphQL string instead of the mn03 enum (API 400), and the query ended with image}}} instead of image}} (syntax error); each bug masked the other so fixing one alone never worked.
+type: finding
+tags: [goisekai, plugins, 1manga, wasm, graphql, tinygo, search]
+generated:
+  at: "2026-10-26T00:00:00Z"
+---
+
 # 1manga: two stacked GraphQL syntax bugs
 
 ## Summary

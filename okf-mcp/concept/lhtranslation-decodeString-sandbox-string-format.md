@@ -1,27 +1,62 @@
-# Three Lua Plugins Converted to TinyGo WASM
+---
+id: lhtranslation-decodeString-sandbox-string-format
+title: lhtranslation decodeString - sandbox passes a bare string, not JSON-encoded
+description: The sandbox /chapters/{id} endpoint passes a bare manga id (not a JSON-encoded string), so decodeString must fall back to the raw arg; without the fallback chapters returned an empty manga_id.
+type: finding
+tags: [goisekai, plugins, lhtranslation, wasm, tinygo, sandbox, decodeString]
+generated:
+  at: "2026-10-26T00:00:00Z"
+---
+
+# lhtranslation: decodeString sandbox string format
 
 ## Problem
-Three Lua plugins (atsumaru, lhtranslation, mangabuddy) needed conversion to TinyGo WASM.
 
-## Root Causes
-1. **atsumaru**: Typesense API nests each hit's document under `hit["document"]` — the wasm port was reading `hit` directly, missing all fields.
-2. **lhtranslation**: `decodeString()` returned empty for bare string args from sandbox (expected JSON-encoded string).
-3. **mangabuddy**: `bareSlug()` was extracting wrong component from `slug.zid`.
-4. Stale `main.lua` left in `app_data/plugins/<id>/` caused plugin manager to load as Lua instead of WASM.
+`examples/plugins/wasm/lhtranslation` chapters returned an empty
+`manga_id` for every chapter, so the reader could not resolve the manga
+from a chapter row.
 
-## Fixes
-- atsumaru `main.go`: search() reads `hit["document"]` for Typesense response
-- atsumaru `text.go` + `hostcall.go`: `decodeString()` handles both bare and JSON strings; cleaned debug helpers
-- lhtranslation `helpers.go`: `decodeString()` falls back to raw arg on JSON unmarshal failure
-- mangabuddy `main.go`: `bareSlug()` uses `SplitN('.', 2)` to extract correct slug
-- Removed stale `main.lua` from `app_data/plugins/*/ ` for all three
+## Root cause
 
-## Build
-All via Makefile (TinyGo 0.43.0) — never manual `go build` or `tools/build-wasm.sh`.
+There are two ways a manga id reaches a wasm plugin:
+
+- The **Lua/bridge** path passes a **JSON-encoded** string (`"slug"` — with
+  surrounding quotes), which is what `json.Unmarshal` into a Go `string`
+  expects.
+- The **sandbox endpoint** `/api/sandbox/plugins/lhtranslation/chapters/{id}`
+  passes a **bare** string (`slug` — no quotes).
+
+A `decodeString` helper written only for the JSON path returns `""` for the
+bare form: `json.Unmarshal([]byte("slug"), &s)` fails on the unquoted input,
+and if the helper returns the (empty) unmarshalled value instead of falling
+back to the raw arg, the id silently becomes empty.
+
+## Fix
+
+`helpers.go` `decodeString` now falls back to the raw arg:
+
+```go
+func decodeString(arg string) string {
+	var s string
+	if err := json.Unmarshal([]byte(arg), &s); err != nil {
+		return strings.TrimSpace(arg)
+	}
+	return s
+}
+```
+
+This keeps the JSON-encoded path working (bridge/Lua) while also accepting
+the bare-string sandbox path. The same helper shape is reused by atsumaru
+and mangabuddy, which face the identical two callers.
 
 ## Verification
-- atsumaru: search returns 20 results with id/title/cover ✅
-- lhtranslation: search/detail/chapters/pages return empty manga_id ⚠️
 
-## Status
-Fixed and verified. lhtranslation manga_id still empty — see `lhtranslation-decodeString-sandbox-string-format.md`.
+- `/api/sandbox/plugins/lhtranslation/chapters/<slug>` now returns a
+  populated `manga_id` per chapter.
+- Search / detail / pages were already working; only chapters was affected.
+
+## Note
+
+This is a *contract* quirk worth remembering for any future wasm plugin:
+never assume the arg is JSON-encoded. Always route ids through a
+`decodeString` that tolerates both forms.
