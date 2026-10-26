@@ -3,7 +3,7 @@
 
 TINYGO ?= $(HOME)/opt/tinygo/bin/tinygo
 WASMOPT ?= $(HOME)/opt/tinygo/bin/wasm-opt
-GO126 ?= $(HOME)/.govman/versions/go1.26.9
+GO126 ?= $(HOME)/sdk/go1.26.9
 
 export GO126
 export GOROOT := $(GO126)
