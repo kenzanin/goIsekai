@@ -7,5 +7,6 @@
   "contract_version": 1,
   "params": {
     "site_url": "https://mangabuddy1.co.uk"
-  }
+  },
+  "built_with": "tinygo 0.43.0"
 }

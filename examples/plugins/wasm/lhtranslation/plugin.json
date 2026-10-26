@@ -7,5 +7,6 @@
   "contract_version": 1,
   "params": {
     "site_url": "https://lhtranslation.net"
-  }
+  },
+  "built_with": "tinygo 0.43.0"
 }

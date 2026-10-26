@@ -9,5 +9,6 @@
   "params": {
     "cdn": "https://cdn.atsu.moe",
     "site_url": "https://atsu.moe"
-  }
+  },
+  "built_with": "tinygo 0.43.0"
 }
