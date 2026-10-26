@@ -16,6 +16,10 @@ type Manga struct {
 	Description string   `json:"description,omitempty"`
 	Status      string   `json:"status,omitempty"`
 	Genres      []string `json:"genres,omitempty"`
+	// Rating is the source's user score for the series (e.g. 4.35 out of 5),
+	// when the site exposes one. Optional; 0 means the source did not supply a
+	// rating. Additive and omitempty, so plugins that never set it are unaffected.
+	Rating float64 `json:"rating,omitempty"`
 	// RawGenres is the plugin-supplied genres, preserved before any user override.
 	// Internal use only — not part of the plugin ABI.
 	RawGenres []string `json:"-"`
@@ -33,6 +37,11 @@ type Chapter struct {
 	VolumeNum  float64   `json:"volume_num,omitempty"`
 	ReleasedAt time.Time `json:"released_at"`
 	URL        string    `json:"url"`
+	// Scanlator is the scanlation group that produced the chapter, when the
+	// source names one (e.g. MangaDex's scanlation_group include). Optional;
+	// empty means the source did not supply a group. Additive and omitempty,
+	// so plugins that never set it are unaffected.
+	Scanlator string `json:"scanlator,omitempty"`
 }
 
 // Page is a single image page within a chapter. Headers holds optional
