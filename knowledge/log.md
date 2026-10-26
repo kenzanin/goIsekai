@@ -1,4 +1,13 @@
 ## 2026-10-26
+* **Creation**: Documented concept `doc_plugin-wasm-helpers.md` (WASM host helpers).
+* **Creation**: Documented concept `doc_ui-spec.md` (goIsekai UI Specification).
+* **Creation**: Documented concept `doc_feat_multiworker_arch.md` (Multi-Worker Architecture).
+* **Creation**: Documented concept `doc_reader-read-ahead-verification.md` (Reader read-ahead verification).
+* **Creation**: Documented concept `doc_host-native-helpers-plan.md` (Plan — Host-native helpers for JS/Lua plugins).
+* **Creation**: Documented concept `doc_ui-polish.md` (UI Polish Review).
+* **Creation**: Documented concept `doc_plugin-playground.md` (Plugin Playground).
+* **Creation**: Documented concept `doc_handover.md` (goIsekai agent handover).
+* **Creation**: Documented concept `doc_api.md` (goIsekai JSON API).
 * **Creation**: Documented concept `wails-desktop-client-and-tray.md` (Wails desktop client + tray wiring).
 * **Creation**: Documented concept `session-dailies-2026-08-29-to-09-30.md` (Session dailies 2026-08-29 to 2026-09-30).
 * **Creation**: Documented concept `wasm-backend-sizes-and-tinygo-port.md` (WASM backend sizes and the TinyGo port (Go vs TinyGo vs C++ vs Odin)).

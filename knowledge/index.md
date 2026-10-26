@@ -51,3 +51,12 @@ Persistent memory bundle for this repository.
 * [WASM backend sizes and the TinyGo port (Go vs TinyGo vs C++ vs Odin)](wasm-backend-sizes-and-tinygo-port.md) - Measured size comparison of 4 wasm backends (C++ 108KB, Odin 416KB, TinyGo 1.5MB, std-Go 3.7MB), why TinyGo needs an ABI split, and the bogus sync.Map.Clear build error.
 * [Session dailies 2026-08-29 to 2026-09-30](session-dailies-2026-08-29-to-09-30.md) - Roll-up of 8 daily scratchpads - tls-client migration, Human Verify/WebP ship, image burst pacing, tailwind path bug, wasm host helpers, decimal-chapter audit, FanFox.
 * [Wails desktop client + tray wiring](wails-desktop-client-and-tray.md) - Wails v2 desktop client (cmd/goisekai-wails, nested module) + tray wiring replacing Qt6. WebKitGTK tag webkit2_41, AVIF->JPEG display transcode, reader strip scroll native, logs server-rendered. Tray config renamed client_qt6->client_wails, green/red emoji status.
+* [goIsekai JSON API](doc_api.md) - Machine-facing JSON API for custom UIs, scripts, and wrappers.
+* [goIsekai agent handover](doc_handover.md) - Agent handover doc — project, commands, runtime state, shipped work, critical rules.
+* [Plugin Playground](doc_plugin-playground.md) - Sandbox API for developing and debugging goIsekai plugins from the terminal.
+* [UI Polish Review](doc_ui-polish.md) - Consolidated actionable UI/UX polish follow-up list for the reader.
+* [Plan — Host-native helpers for JS/Lua plugins](doc_host-native-helpers-plan.md) - Plan for host-native helpers reachable from JS/Lua plugins (P0-P5 implemented).
+* [Reader read-ahead verification](doc_reader-read-ahead-verification.md) - Verify read-ahead prefetch: chapters N+1..N+K pre-fetched in background when reading chapter N.
+* [Multi-Worker Architecture](doc_feat_multiworker_arch.md) - Multi-worker architecture proposal: separate lanes for interactive vs fetch vs image vs maintenance.
+* [goIsekai UI Specification](doc_ui-spec.md) - goIsekai UI specification v1.0 — screens, navigation, design system.
+* [WASM host helpers](doc_plugin-wasm-helpers.md) - WASM host helpers — helper library Lua/JS plugins use, via env.host_call dispatch.
