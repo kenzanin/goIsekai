@@ -1,0 +1,53 @@
+---
+okf_version: "0.2"
+---
+
+# goIsekai Knowledge Base
+
+Persistent memory bundle for this repository.
+* [1manga search returned 0 results - two stacked GraphQL syntax bugs](1manga-two-stacked-graphql-bugs.md) - x: "mn03" was emitted as a GraphQL string instead of the mn03 enum (API 400), and the query ended with image}}} instead of image}} (syntax error); each bug masked the other so fixing one alone never worked.
+* [Library view URL is the source of truth (no localStorage filter persistence)](library-view-url-is-source-of-truth.md) - The stuck-filter bug: gsk:library-view localStorage restore made All/New/In-progress chips bounce back to the last filter; the rule, the New status chip, and the jscpd-driven history/updates merge.
+* [1manga: port Lua to Go wasm via TinyGo](1manga-wasm-port.md) - 1manga ported from Lua to Go wasm via TinyGo 0.43.0 (own Makefile, ~1.2 MB) instead of the 3.4 MB std-Go wasip1 build that OOMs the wasm runtime.
+* [VioletManga search/detail selector findings](violetmanga-search-detail-findings.md) - Base: https://violetmanga.com.
+* [Zeroscann search/detail selector findings](zeroscann-search-detail-findings.md) - Base: https://zeroscann.com.
+* [MangaTaro.org API endpoints](mangataro-api-endpoints.md) - Base: https://mangataro.org.
+* [Enhance status startup log](enhance-status-log.md) - Startup log of effective image-enhance status per plugin — formatEnhanceStatus/LogEnhanceStatus wiring, log format examples, edge cases.
+* [Reader loading cancel fix](reader-loading-cancel-fix.md) - Cancel button during reader loading — AbortController aborts in-flight fetches, nav bar visible during load, spinner flash prevention in reader.lua.
+* [Comix.to plugin build spec](comix-plugin-build-spec.md) - Comix.to plugin build spec - CSR Next.js, encrypted page blob harvested via CDP DOM, no Referer on images.
+* [Cover refresh vs clear actions](cover-refresh-vs-clear-actions.md) - What Refetch and Clear do on the manga detail cover menu, grounded in actions_covers.go and detail.lua.
+* [ABI extension: Manga.Rating + Chapter.Scanlator](abi-extend-rating-scanlator.md) - Added Manga.Rating + Chapter.Scanlator to pkg/types (additive + omitempty). Root cause: Go json.Unmarshal silently drops unknown fields, so plugins parsing rating/scanlator lost the data at the ABI boundary.
+* [Plugin logo sources and cache](plugin-logo-sources-and-cache.md) - The three agreed logo sources (file, URL, inline svg/base64), where the cached logo lives (<data_dir>/cache/images/plugins/<pluginID>/logo.*), and that the plugin-page Refresh resets it.
+* [library_fts index sync and auto-heal](library-fts-index-sync.md) - FTS5 library_fts sync choke points, CAST(manga_row_id AS TEXT) key-comparison fix, LibraryFTSDrift/EnsureLibraryFTS auto-heal, scalability ceiling.
+* [Wasm plugin local helpers decision](wasm-plugin-local-helpers-decision.md) - Why wasm plugins keep local helpers instead of per-row hostCall — ABI/JSON roundtrip cost, status-map plugin ownership, coregex/go-json binary-size tradeoff.
+* [atsumaru released_at bug: epoch-millis field was never read](atsumaru-released-at-epoch-millis.md) - atsumaru released_at returned zero time for all chapters - allChapters API returns createdAt as epoch millis, but chapters() never read it. Fixed via strconv.FormatInt (int64) -> dateToISO -> parseTime.
+* [Bulk "set this and before/after as read" hit the whole manga when chapter_num is 0](chapter-bound-zero-chapter-num.md) - Bulk "set this and before/after as read" hit the whole manga when chapter_num is 0
+* [Home reload NS_BINDING_ABORTED (saved-filter redirect)](home-reload-ns-binding-aborted.md) - Why Firefox logs NS_BINDING_ABORTED on plugin logos/favicon when the library reloads — the client-side location.replace() that restores the saved filter aborts the in-flight first navigation. Benign.
+* [MangaBuddy returned zero pages for every chapter - stale CDN host + cached empty answer](mangabuddy-empty-chapter-pages.md) - MangaBuddy returned zero pages for every chapter - the site moved its CDN and the plugin had pinned the old host, while the host cached the empty answer.
+* [Onisaga Cloudflare challenge behavior](onisaga-cloudflare-challenge.md) - Observed Cloudflare blocking on onisaga fetches and the cookie/TLS evidence so far.
+* [Sync upserts chapters but never pruned superseded rows - 196 removed](stale-chapter-rows-prune.md) - Sync upserts chapters but never pruned the rows a plugin re-issued - 196 rows were provably superseded duplicates, now removed.
+* [Dead code and merge candidates audit (2026-10-17)](dead-code-and-merge-audit-2026-10-17.md) - Sweep of 2026-10-17: 19 unreachable functions, unused migrate_candidates.go, six merge candidates, and a real Permanent() bug (never called in prod) fixed in df349e5.
+* [Detail-page read toggle, genre tags, and reader-prefs persistence](detail-page-read-genre-readerprefs-fixes.md) - Three detail-page/reader bugs and their root causes
+* [Host helper surface registry](host-helper-surface-registry.md) - One Go table (internal/pluginmanager/host_surface.go) now defines every helper a plugin may call; lua, js and wasm read it instead of restating it, with a three-way parity test.
+* [Hostnet CDP timeouts and page waits for SPA sites](hostnet-cdp-timeout-waits.md) - Hostnet CDP timeouts and page waits for SPA sites
+* [Enrichment (info) scripts run as Odin wasm — discovery load-path fix](info-scripts-as-odin-wasm.md) - Enrichment (info) scripts run as Odin wasm — the blocker was the load path, not the helper surface.
+* [Comizy.io plugin build spec](comizy-plugin-build-spec.md) - Source: comizy_io_lengkap.har (559 entries, read-only dissection).
+* [Library duplicate-group colour bands](library-duplicate-colour-bands.md) - How the library grid flags duplicate groups with a per-group left colour band, why the palette is indexed by group position, and the determinism it depends on.
+* [1manga runs as a native .so plugin](native-1manga-plugin.md) - 1manga runs as a native .so plugin - the Lua original stays in the archive as the reference, and the two are byte-identical on all four ABI calls.
+* [Native .so plugin ABI (purego loader)](native-so-plugin-abi.md) - How goIsekai loads C/C++ .so plugins without cgo — the ownership contract, the export set, and why stdlib plugin could never work.
+* [Native .so plugins build with zig c++ against static musl](native-zig-build.md) - Native .so plugins now build with zig c++ against static musl for zero DT_NEEDED entry, with portability + build-cache trade-offs.
+* [Native .so plugins are self-contained with zero DT_NEEDED entries](static-musl-so.md) - Native .so plugins are self-contained - zig c++ against static musl gives a shared object with zero DT_NEEDED entries.
+* [Reader two-page view (side-by-side and stacked)](reader-two-page-view.md) - The reader's spread layouts for sites that split one original page into two images, the counter/step contract, and the canvas render geometry for each.
+* [Chapter lists came out oldest-first for weebcentral and comizy](chapter-order-newest-first-abi.md) - Chapter lists came out oldest-first for weebcentral and comizy - two plugins reversed the site's newest-first fragment.
+* [Test coverage gaps in internal/pluginmanager](pluginmanager-test-coverage-gaps.md) - What the pluginmanager test suite still does not reach after the 2026-10-18 coverage pass (60% -> 70.7%), plus the two known live defects.
+* [1manga: pages field arrives as plaintext JSON, not enc:v1](1manga-plaintext-pages-field.md) - 1manga chapter.pages arrives as plaintext JSON {p,i} not an enc:v1 blob, so letter-suffixed pages 404'd and the reader rendered empty; both shapes now parsed.
+* [Three Lua Plugins Converted to TinyGo WASM](three-lua-plugins-converted-to-tinygo-wasm.md) - Converted three Lua plugins (atsumaru, lhtranslation, mangabuddy) to TinyGo WASM, mirroring the 1manga plugin structure.
+* [Weebcentral search covers landed on the wrong title - one card renders two img](weebcentral-search-card-cover-alignment.md) - Weebcentral search covers landed on the wrong title - 2 img per card, positional zip drifted. Fix: match cover by ULID in URL, not by position.
+* [Installing a wasm plugin deadlocked the host - ensureWasmRuntime took the manager lock its caller already held](wasm-install-deadlock.md) - Installing a wasm plugin deadlocked the host - ensureWasmRuntime took m.mu which its caller Install already held. Fixed with a separate runtimeMu.
+* [Plugin detail view on /view/plugins (design)](plugin-detail-page-on-plugins-view.md) - Design for a richer per-plugin detail section on /view/plugins cards: collapsible Details panel, version field in plugin.json, feature table sourced from plugin.json. DESIGN ONLY, NOT implemented.
+* [The released_at column was added on 20 Oct but the rows synced before it were never backfilled - the plugin was always right](released-at-backfill-gap.md) - released_at was empty on old rows, not the plugin - the column was added (79fc8f0) but pre-existing rows were never backfilled. Closed by re-syncing the library.
+* [weebcentral.com plugin build spec from weebcentral_com_complete.har](weebcentral-plugin-build-spec.md) - weebcentral.com plugin build spec dissected from a 20MB HAR (468 entries, 14 HTML docs) - endpoint shapes and anti-bot notes.
+* [A plugin reads its own volatile facts from plugin.json](plugin-json-params.md) - A plugin reads its own volatile facts from plugin.json params via host.plugin.param; host reads at load, values ready before code runs.
+* [Plugin runtime export matrix (lua vs js vs yaegi vs go vs wasm)](plugin-runtime-export-matrix.md) - Per-runtime ABI export names, metadata source, contract-version enforcement, and host-helper surface across lua/js/yaegi/go/wasm.
+* [WASM backend sizes and the TinyGo port (Go vs TinyGo vs C++ vs Odin)](wasm-backend-sizes-and-tinygo-port.md) - Measured size comparison of 4 wasm backends (C++ 108KB, Odin 416KB, TinyGo 1.5MB, std-Go 3.7MB), why TinyGo needs an ABI split, and the bogus sync.Map.Clear build error.
+* [Session dailies 2026-08-29 to 2026-09-30](session-dailies-2026-08-29-to-09-30.md) - Roll-up of 8 daily scratchpads - tls-client migration, Human Verify/WebP ship, image burst pacing, tailwind path bug, wasm host helpers, decimal-chapter audit, FanFox.
+* [Wails desktop client + tray wiring](wails-desktop-client-and-tray.md) - Wails v2 desktop client (cmd/goisekai-wails, nested module) + tray wiring replacing Qt6. WebKitGTK tag webkit2_41, AVIF->JPEG display transcode, reader strip scroll native, logs server-rendered. Tray config renamed client_qt6->client_wails, green/red emoji status.
