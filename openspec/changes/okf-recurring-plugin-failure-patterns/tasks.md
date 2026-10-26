@@ -11,11 +11,11 @@
 
 ## 2. Wire into the bundle
 
-- [ ] 2.1 Add the concept entry to `okf-mcp/index.md`.
-- [ ] 2.2 Re-run `qmd update -c okf-mcp` so BM25 can find it.
-- [ ] 2.3 Validate the bundle (frontmatter/description/tags/index/dangling-refs all 0).
+- [x] 2.1 Add the concept entry to `okf-mcp/index.md`.
+- [x] 2.2 Re-run `qmd update -c okf-mcp` so BM25 can find it.
+- [x] 2.3 Validate the bundle (frontmatter/description/tags/index/dangling-refs all 0).
 
 ## 3. Finish
 
-- [ ] 3.1 Set `skip_specs: true` in the change's `.openspec.yaml` (docs-only).
-- [ ] 3.2 `openspec validate` the change; commit + push.
+- [x] 3.1 Set `skip_specs: true` in the change's `.openspec.yaml` (docs-only).
+- [x] 3.2 `openspec validate` the change; commit + push.
