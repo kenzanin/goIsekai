@@ -2,10 +2,12 @@
 
 ## 1. Create the concept
 
-- [ ] 1.1 Write `okf-mcp/concept/plugin-failure-patterns.md` with full frontmatter
+- [x] 1.1 Write `okf-mcp/concept/plugin-failure-patterns.md` with full frontmatter
       (`id`, `title`, `description`, `type: Concept`, `tags`, `generated.at`).
-- [ ] 1.2 Add the six patterns per design.md (symptom / silent-failure signal /
+- [x] 1.2 Add the six patterns per design.md (symptom / silent-failure signal /
       root cause / fix / references), plus the cross-cutting "fails silently" note.
+- [x] 1.3 Document the fixed find_all row shape in `three-lua-plugins-converted-to-tinygo-wasm`
+      (mangabuddy pages gAll fix) and `plugin-failure-patterns` Pattern 1 (wasmRegexRow).
 
 ## 2. Wire into the bundle
 
