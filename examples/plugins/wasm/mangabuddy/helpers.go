@@ -10,30 +10,33 @@ import (
 // gAll returns every full match of a global regex pattern in s. The host's
 // regex.find_all reports capture ranges per match; these patterns are all
 // anchored on the wanted text as group 1, so this reads range 1.
+// gAll extracts every capture group 1 match of pattern in s.
+// regex.find_all returns rows of capture groups ([][string]), so this parses
+// the JSON as []json.RawMessage rows then []string per row and takes vals[0].
 func gAll(s, pattern string) []string {
 	res := hostCall("regex.find_all", s, pattern)
-	if res == "" || res == "null" {
+	if res == "null" || res == "" {
 		return nil
 	}
-	var ranges []int
-	if json.Unmarshal([]byte(res), &ranges) == nil {
-		var out []string
-		for i := 0; i+1 < len(ranges); i += 2 {
-			out = append(out, s[ranges[i]:ranges[i+1]])
-		}
-		return out
+	var rows []json.RawMessage
+	if json.Unmarshal([]byte(res), &rows) != nil {
+		return nil
 	}
-	var group0s [][]int
-	if json.Unmarshal([]byte(res), &group0s) == nil {
-		var out []string
-		for _, r := range group0s {
-			if len(r) >= 2 {
-				out = append(out, s[r[0]:r[1]])
+	var out []string
+	for _, row := range rows {
+		var vals []string
+		if json.Unmarshal(row, &vals) == nil {
+			if len(vals) > 0 && vals[0] != "" {
+				out = append(out, vals[0])
 			}
+			continue
 		}
-		return out
+		var single string
+		if json.Unmarshal(row, &single) == nil && single != "" {
+			out = append(out, single)
+		}
 	}
-	return nil
+	return out
 }
 
 // ponytail: text helpers are one-line host delegations; ceiling is one IPC

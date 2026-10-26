@@ -1,9 +1,9 @@
 ---
 id: three-lua-plugins-converted-to-tinygo-wasm
 title: atsumaru + lhtranslation + mangabuddy ported from Lua to TinyGo WASM
-description: Three Lua plugins converted to TinyGo WASM (Typesense/Madara-HTML/JSON+HTML), covering hit["document"] nesting, bareSlug, decodeString sandbox fallback, and the stale main.lua that made the manager load them as Lua.
+description: Three Lua plugins converted to TinyGo WASM (Typesense/Madara-HTML/JSON+HTML), covering hit["document"] nesting, bareSlug, decodeString sandbox fallback, the stale main.lua that made the manager load them as Lua, and the gAll helper mis-parsing regex.find_all's [][]string rows (silently returned 0 pages).
 type: port
-tags: [goisekai, plugins, wasm, tinygo, atsumaru, lhtranslation, mangabuddy, port]
+tags: [goisekai, plugins, wasm, tinygo, atsumaru, lhtranslation, mangabuddy, port, regex]
 generated:
   at: "2026-10-26T00:00:00Z"
 ---
@@ -37,6 +37,13 @@ Converted three Lua plugins (`atsumaru`, `lhtranslation`, `mangabuddy`) to TinyG
   - pages via `/series/<mangaID>/<chSlug>` (HTML) → `data-src="https://{cdn}/{path}.webp"`
 - **`bareSlug()`**: returns first `.`-delimited segment (strips `.ZDOePg` / `.zid` suffixes).
 - **Safe type assertions** (comma-ok) throughout to prevent wasm panic on missing JSON fields.
+
+#### mangabuddy `pages()` returned 0 images — `gAll` mis-parsed the host's regex response
+
+`pages()` regex is correct (live chapter HTML has `data-src="https://cdn4.sags2mobile.com/<slug>/<ch>/<i>.webp"`, 17–56 imgs/chapter). The bug was the `gAll()` helper in `helpers.go`: it unmarshalled the host's `regex.find_all` response as `[]int` (ranges) with a `[][]int` fallback — but the host returns **`[][]string` rows of capture groups**, so both unmarshals failed, `gAll` returned `nil`, and `pages()` yielded 0. lhtranslation's known-good `gAll` (→ `firstCapAll`) parses `[]json.RawMessage` rows → `[]string` and takes `vals[0]`. Fix: mangabuddy `gAll` now uses the same row parsing.
+
+- **Trap:** `regex.find_all` (host) ≠ `regex.find`. `find` returns one flat `[]int` of ranges (`[start,end,...]`); `find_all` returns `[][]string` (per-match capture groups). A helper written for one shape silently returns empty on the other — no error, just 0 results.
+- Live after fix: chapter-10=17, chapter-5=46, chapter-1=56; second manga chapter-3=17.
 
 ## Build Process
 
