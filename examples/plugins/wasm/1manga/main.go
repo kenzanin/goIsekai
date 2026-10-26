@@ -126,7 +126,7 @@ func encryptedPageList(blob, slug, number string) ([]types.Page, string) {
 
 func graphqlQuery(query string) (string, bool) {
 	gqlError = ""
-	for attempt := 0; attempt < 2; attempt++ {
+	for range 2 {
 		key := cachedKey
 		if key == "" {
 			key = fetchAccessKey()
@@ -201,7 +201,21 @@ func search(arg string) []types.Manga {
 	logInfo("1manga search: q=" + f.Query + " page=" + itoa(f.Page))
 
 	offset := (f.Page - 1) * 30
-	gql := `{search(x: "` + sourceID + `", q: "` + escapeGQL(f.Query) + `", genre: "` + escapeGQL(genre) + `", mod: POPULAR, offset: ` + itoa(offset) + `) {rows {title, slug, image}}}`
+	var sb strings.Builder
+	sb.WriteString(`{search(x: `)
+	sb.WriteString(escapeGQL(sourceID))
+	sb.WriteString(`, q: "`)
+	if f.Query != "" {
+		sb.WriteString(escapeGQL(f.Query))
+	} else {
+		sb.WriteString(" ")
+	}
+	sb.WriteString(`", genre: "`)
+	sb.WriteString(escapeGQL(genre))
+	sb.WriteString(`", mod: POPULAR, offset: `)
+	sb.WriteString(itoa(offset))
+	sb.WriteString(`) {rows {title, slug, image}}}`)
+	gql := sb.String()
 
 	data, ok := graphqlQuery(gql)
 	if !ok {
@@ -237,7 +251,7 @@ func detail(arg string) types.Manga {
 	}
 	logInfo("1manga detail: slug=" + slug)
 
-	gql := `{manga(x: sourceID, slug: "` + escapeGQL(slug) + `") {title, slug, status, image, author, artist, genres, description, alternativeTitle}}`
+	gql := `{manga(x: ` + sourceID + `, slug: "` + escapeGQL(slug) + `") {title, slug, status, image, author, artist, genres, description, alternativeTitle}}`
 	data, ok := graphqlQuery(gql)
 	if !ok {
 		return m
@@ -267,7 +281,7 @@ func detail(arg string) types.Manga {
 	m.Author, _ = man["author"].(string)
 	m.Description, _ = man["description"].(string)
 	if g, isStr := man["genres"].(string); isStr {
-		for _, part := range strings.Split(g, ",") {
+		for part := range strings.SplitSeq(g, ",") {
 			if name := strings.TrimSpace(part); name != "" {
 				m.Genres = append(m.Genres, name)
 			}
@@ -292,7 +306,7 @@ func chapters(arg string) []types.Chapter {
 	}
 	logInfo("1manga chapters: slug=" + slug)
 
-	gql := `{manga(x: sourceID, slug: "` + escapeGQL(slug) + `") {chapters {number, title, date}}}`
+	gql := `{manga(x: ` + sourceID + `, slug: "` + escapeGQL(slug) + `") {chapters {number, title, date}}}`
 	data, ok := graphqlQuery(gql)
 	if !ok {
 		return nil
@@ -345,7 +359,7 @@ func pages(arg string) []types.Page {
 	slug, number := chapterID[:i], chapterID[i+len(":chapter-"):]
 	logInfo("1manga pages: slug=" + slug + " ch=" + number)
 
-	gql := `{chapter(x: sourceID, slug: "` + escapeGQL(slug) + `", number: ` + number + `) {pages, mangaID, number}}`
+	gql := `{chapter(x: ` + sourceID + `, slug: "` + escapeGQL(slug) + `", number: ` + number + `) {pages, mangaID, number}}`
 	data, ok := graphqlQuery(gql)
 	if !ok {
 		return nil

@@ -10,23 +10,24 @@ export GOROOT := $(GO126)
 export GOTOOLCHAIN = local
 export CGO_ENABLED = 0
 
-ROOT := $(shell cd $(CURDIR) && pwd | sed 's|/examples/plugins/wasm/1manga||')
-
-.PHONY: all build clean
+.PHONY: all build clean lint test
 
 all: build
 
 build: main.wasm
 
-main.wasm: *.go
-	# Temporarily rewrite go.mod go 1.27 -> go 1.26 for TinyGo
-	sed -i 's/go 1.27.1/go 1.26/' go.mod
-	sed -i 's/go 1.27.1/go 1.26/' $(ROOT)/go.mod
+main.wasm: main.go hostcall.go text.go text_host.go abi.go
 	$(TINYGO) build -target wasi -buildmode=c-shared -o main.wasm .
-	sed -i 's/go 1.26/go 1.27.1/' go.mod
-	sed -i 's/go 1.26/go 1.27.1/' $(ROOT)/go.mod
 	$(WASMOPT) -O4 main.wasm -o main.wasm
 	@echo "Built main.wasm: $$($(TINYGO) version | awk '{print $$3}')"
 
 clean:
 	rm -f main.wasm
+
+lint:
+	go vet .
+	@fmtout=$$(gofmt -l .); if [ -n "$$fmtout" ]; then echo "gofmt: $$fmtout"; exit 1; fi
+	@echo "lint OK"
+
+test:
+	go test .

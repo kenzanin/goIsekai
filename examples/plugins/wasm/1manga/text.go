@@ -1,5 +1,3 @@
-//go:build wasip1
-
 package main
 
 import (
@@ -7,18 +5,6 @@ import (
 	"strings"
 	"time"
 )
-
-func chapterNum(s string) float64 {
-	var f float64
-	if json.Unmarshal([]byte(hostCall("text.chapter_num", s)), &f) != nil {
-		return 0
-	}
-	return f
-}
-
-func dateToISO(s string) string {
-	return hostString("text.date_to_iso", s)
-}
 
 func parseTime(s string) time.Time {
 	for _, layout := range []string{time.RFC3339, time.RFC3339Nano, "2006-01-02"} {

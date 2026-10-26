@@ -147,11 +147,11 @@ type Config struct {
 	// derives the default at startup (server binary next to the tray, client
 	// next to the server binary, URL from Host/Port, log under DataDir,
 	// repo-relative icon), so a plain deployment needs no [tray] section.
-	TrayServerBin    string
-	TrayClientWails  string
-	TrayURL          string
-	TrayLogFile      string
-	TrayIcon         string
+	TrayServerBin   string
+	TrayClientWails string
+	TrayURL         string
+	TrayLogFile     string
+	TrayIcon        string
 
 	// aliasTouched records the names a config file line already supplied, so
 	// the first line for a name replaces the built-in variants instead of

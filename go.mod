@@ -1,6 +1,10 @@
 module goisekai
 
-go 1.27.1
+go 1.27.2
+
+require (
+	goisekai/pkg/types v0.0.0
+)
 
 require (
 	fyne.io/systray v1.11.0
@@ -29,6 +33,8 @@ require (
 	gopkg.in/ini.v1 v1.67.3
 	modernc.org/sqlite v1.57.0
 )
+
+replace goisekai/pkg/types => ./pkg/types
 
 require (
 	github.com/antchfx/xpath v1.3.8 // indirect
