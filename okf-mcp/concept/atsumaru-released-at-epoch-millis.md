@@ -1,14 +1,18 @@
 ---
 id: atsumaru-released-at-epoch-millis
-title: atsumaru released_at was the Go zero time - createdAt epoch millis never read
-description: allChapters returns createdAt as epoch millis but chapters() never read it, and ReleasedAt time.Time has no omitempty so the zero time leaked into every chapter; fixed with strconv.FormatInt (wasm32 int overflows 13-digit millis).
+title: atsumaru released_at epoch-millis — fixed (createdAt never read)
+description: atsumaru allChapters returns createdAt as epoch millis; chapters() read it as float64 but wasm32 int overflows, so strconv.FormatInt was the fix. ReleasedAt has no omitempty so zero-time leaked until fixed. Cache-clear required after rebuild. Fixed and verified in 68c3a13.
 type: finding
-tags: [goisekai, plugins, atsumaru, wasm, tinygo, dates, released_at]
+tags: [goisekai, plugins, atsumaru, wasm, tinygo, dates, released_at, epoch-millis]
 generated:
   at: "2026-10-26T00:00:00Z"
 ---
 
-# atsumaru released_at bug: the epoch-millis field was never read
+# atsumaru released_at bug: epoch-millis field was read with the wrong integer width
+
+## Status
+
+Fixed and verified — committed in `68c3a13`.
 
 ## Summary
 
