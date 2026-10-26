@@ -1,3 +1,11 @@
+---
+id: weebcentral-plugin-build-spec
+title: "weebcentral.com — plugin build spec from weebcentral_com_complete.har"
+description: "weebcentral.com plugin build spec dissected from a 20 MB HAR (468 entries, 14 HTML docs) — endpoint shapes and anti-bot notes for a future plugin."
+type: Concept
+tags: [goisekai, plugins, weebcentral, har, build-spec]
+---
+
 # weebcentral.com — plugin build spec from weebcentral_com_complete.har
 
 Source: `weebcentral_com_complete.har` (20 MB, 468 entries, 14 HTML docs, 0 non-GET, 0 cookies).

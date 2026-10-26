@@ -1,3 +1,11 @@
+---
+id: 1manga-wasm-port
+title: "1manga: port Lua to Go wasm via TinyGo"
+description: "1manga ported from Lua to Go wasm via TinyGo 0.43.0 (own Makefile, ~1.2 MB) instead of the 3.4 MB std-Go wasip1 build that OOMs the wasm runtime."
+type: port
+tags: [goisekai, plugins, 1manga, wasm, tinygo, port]
+---
+
 # 1manga: port Lua to Go wasm via TinyGo
 
 ## Summary

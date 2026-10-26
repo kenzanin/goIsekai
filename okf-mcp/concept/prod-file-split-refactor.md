@@ -1,4 +1,5 @@
 ---
+description: "Every prod source file over 200 lines that held many functions is now split"
 id: prod-file-split-refactor
 title: Every prod source file over 200 lines that held many functions is now split - the rule, the tool, and the two traps
 type: finding

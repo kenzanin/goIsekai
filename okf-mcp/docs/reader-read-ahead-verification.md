@@ -1,3 +1,11 @@
+---
+id: reader-read-ahead-verification
+title: "Reader read-ahead verification"
+description: "Recorded verification evidence for reader read-ahead tasks 4.3-4.5"
+type: reference
+tags: [goisekai, reader, verification]
+---
+
 # Reader read-ahead verification
 
 Recorded evidence for tasks 4.3-4.5 of the `harden-runtime-contention-and-cancel`

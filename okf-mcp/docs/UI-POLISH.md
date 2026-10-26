@@ -1,3 +1,11 @@
+---
+id: ui-polish
+title: "UI Polish Review"
+description: "UI/UX polish review — consolidated actionable follow-up list for the reader"
+type: reference
+tags: [goisekai, reader, ui, polish]
+---
+
 # UI Polish Review
 
 Purpose: consolidate the UI/UX polish state of the goIsekai reader into one actionable list for follow-up fixes.

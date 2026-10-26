@@ -1,4 +1,5 @@
 ---
+description: "C++ WASM plugin toolchain (wasi-sdk) and binary-size comparison"
 id: wasm-cpp-plugin-toolchain
 title: C++ WASM plugin toolchain (wasi-sdk) and binary-size comparison
 type: finding

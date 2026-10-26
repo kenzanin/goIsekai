@@ -1,3 +1,11 @@
+---
+id: 1manga-plaintext-pages-field
+title: "1manga: pages field arrives as plaintext JSON, not enc:v1"
+description: "1manga chapter.pages arrives as plaintext JSON {p,i} not an enc:v1 blob, so letter-suffixed pages 404'd and the reader rendered empty; both shapes now parsed."
+type: finding
+tags: [goisekai, plugins, 1manga, wasm, reader, pages, json]
+---
+
 # 1manga: pages field arrives as plaintext JSON, not enc:v1 (2026-10-24)
 
 ## Situation

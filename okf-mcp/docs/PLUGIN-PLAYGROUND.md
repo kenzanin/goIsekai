@@ -1,3 +1,11 @@
+---
+id: plugin-playground
+title: "Plugin Playground"
+description: "Sandbox API for developing and debugging plugins entirely from the browser"
+type: reference
+tags: [goisekai, plugins, sandbox, reference]
+---
+
 # Plugin Playground
 
 The sandbox API lets you develop and debug goIsekai plugins entirely from the

@@ -1,7 +1,9 @@
 ---
+description: "Pond v2 is a modern Go worker pool library with bounded/unbounded queues, task groups, subpools, and dynamic resizing."
 status: draft
-type: concept
+type: Concept
 category: architecture
+tags: [goisekai, workers, pool, migration, library]
 ---
 
 # Pond v2 Migration Assessment

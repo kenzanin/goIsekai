@@ -1,4 +1,5 @@
 ---
+description: "Native .so plugins: a self-contained shared object"
 id: static-musl-so
 title: Native .so plugins are self-contained - zig c++ against static musl gives a shared object with zero DT_NEEDED entries
 type: finding

@@ -1,4 +1,5 @@
 ---
+description: "Chapter upload dates showed the sync day"
 id: chapter-release-date-column
 title: Chapter upload dates showed the sync day - fetched_at was overwritten and then read back as the release date
 type: finding

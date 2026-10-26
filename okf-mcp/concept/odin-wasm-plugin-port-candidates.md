@@ -1,4 +1,5 @@
 ---
+type: port
 id: odin-wasm-plugin-port-candidates
 title: Odin WASM plugin port candidates (Lua -> Odin)
 description: >

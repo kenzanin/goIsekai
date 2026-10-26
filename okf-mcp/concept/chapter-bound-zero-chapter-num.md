@@ -1,4 +1,5 @@
 ---
+description: "Bulk \"set this and before/after as read\" hit the whole manga when chapter_num is 0"
 id: chapter-bound-zero-chapter-num
 title: Bulk "set this and before/after as read" hit the whole manga when chapter_num is 0
 type: finding

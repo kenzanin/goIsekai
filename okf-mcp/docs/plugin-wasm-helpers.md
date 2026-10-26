@@ -1,3 +1,11 @@
+---
+id: plugin-wasm-helpers
+title: "WASM host helpers"
+description: "WASM host helpers — the same helper library Lua/JS plugins use"
+type: reference
+tags: [goisekai, plugins, wasm, helpers, reference]
+---
+
 # WASM host helpers
 
 WASM plugins (TinyGo `wasip1`) reach the same helper library the Lua and JS

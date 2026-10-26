@@ -8,6 +8,19 @@ Progressive disclosure index for this OKF bundle.
 
 ## Concepts
 
+* [1manga: port Lua to Go wasm via TinyGo](concept/1manga-wasm-port.md) - 1manga ported from Lua to Go wasm via TinyGo 0.43.0 (own Makefile, ~1.2 MB) instead of the 3.4 MB std-Go wasip1 build that OOMs the wasm runtime.
+* [Comix.to plugin build spec](concept/comix-plugin-build-spec.md) - Source: comix_to.har + live rod probes (commit 9ac8fda arc).
+* [Comizy.io plugin build spec](concept/comizy-plugin-build-spec.md) - Source: comizy_io_lengkap.har (559 entries, read-only dissection).
+* [Hostnet CDP timeouts and page waits for SPA sites](concept/hostnet-cdp-timeout-waits.md) - Hostnet CDP timeouts and page waits for SPA sites
+* [lhtranslation decodeString - sandbox passes a bare string, not JSON-encoded](concept/lhtranslation-decodeString-sandbox-string-format.md) - The sandbox /chapters/{id} endpoint passes a bare manga id (not a JSON-encoded string), so decodeString must fall back to the raw arg; without the fallback chapters returned an empty manga_id.
+* [MangaTaro.org API endpoints](concept/mangataro-api-endpoints.md) - Base: https://mangataro.org.
+* [Plugin logo sources and cache](concept/plugin-logo-sources-and-cache.md) - The three agreed logo sources (file, URL, inline svg/base64), where the cached logo lives (<data_dir>/cache/images/plugins/<pluginID>/logo.*), and that the plugin-page Refresh resets it.
+* [pond-v2-migration-assessment](concept/pond-v2-migration-assessment.md) - Pond v2 is a modern Go worker pool library with bounded/unbounded queues, task groups, subpools, and dynamic resizing.
+* [atsumaru + lhtranslation + mangabuddy ported from Lua to TinyGo WASM](concept/three-lua-plugins-converted-to-tinygo-wasm.md) - Three Lua plugins converted to TinyGo WASM (Typesense/Madara-HTML/JSON+HTML), covering hit["document"] nesting, bareSlug, decodeString sandbox fallback, the stale main.lua that made the manager load them as Lua, and the gAll helper mis-parsing regex.find_all's [][]string rows (silently returned 0 pages).
+* [WASM backend sizes and the TinyGo port (Go vs TinyGo vs C++ vs Odin)](concept/wasm-backend-sizes-and-tinygo-port.md) - Measured size comparison of the four wasm backends, why TinyGo needed an ABI split, and the half-finished-TinyGo-upgrade failure mode that produced a bogus "sync.Map.Clear already declared" error.
+* [WASM plugin build scripts (TinyGo pinned to Go 1.26.9)](concept/wasm-plugin-build-scripts.md) - How to rebuild every wasm plugin's main.wasm; TinyGo 0.41 needs Go <=1.26 so the build pins goup's 1.26.9 and relaxes go.mod temporarily.
+* [weebcentral.com — plugin build spec from weebcentral_com_complete.har](concept/weebcentral-plugin-build-spec.md) - weebcentral.com plugin build spec dissected from a 20 MB HAR (468 entries, 14 HTML docs) — endpoint shapes and anti-bot notes for a future plugin.
+* [Workers Audit Report](concept/workers-audit.md) - goIsekai worker-pool audit: per-lane worker/queue counts (Interactive 4/32, Fetch 2/8, Image 8/64, Maintenance 1/8, CDP 4/16) and sub-queue layout.
 * [Example concept](concept.md) - Sample concept document with full frontmatter
 * [Cover refresh vs clear actions](concept/cover-refresh-vs-clear-actions.md) - What Refetch and Clear do on the manga detail cover menu
 * [Enhance status startup log](concept/enhance-status-log.md) - Startup log of effective image-enhance status per plugin, with format examples and edge cases
@@ -51,3 +64,17 @@ Progressive disclosure index for this OKF bundle.
 * [Library view URL is the source of truth](concept/library-view-url-is-source-of-truth.md) - the stuck-filter bug: gsk:library-view localStorage auto-restore made All/New/In-progress chips bounce back to the last filter; URL-only rule, the New status chip (?status=new -> HasNew), and the jscpd-driven history/updates row merge into partials/manga_list_row
 * [1manga: pages field is plaintext JSON, not enc:v1](concept/1manga-plaintext-pages-field.md) - the API now answers chapter.pages as {"p":"<prefix>/","i":["1a.jpg",...]}; the plugin only recognised the encrypted enc:v1 blob, so letter-suffixed pages fell through to a numeric CDN probe that 404'd and the reader rendered an empty chapter with no error; both shapes are now parsed and the probe fails loudly instead of emitting a silent empty list
 * [1manga: two stacked GraphQL syntax bugs](concept/1manga-two-stacked-graphql-bugs.md) - search silently returned 0 results because two bugs masked each other: the MangaHub source id was emitted as a quoted string (`x: "mn03"`) where the API wants a `MangaSource` enum value, and the search query closed with three braces instead of two; the third failure mode was a 3.4 MB std-Go build OOMing the wasm runtime — always build via the plugin Makefile (TinyGo, 1.2 MB)
+
+## Docs
+
+* [goIsekai JSON API](docs/API.md) - Machine-facing JSON API for custom UIs, scripts, and wrappers
+* [Handover](docs/HANDOVER.md) - Agent handover doc — everything needed to resume without prior session memory
+* [Plugin Playground](docs/PLUGIN-PLAYGROUND.md) - Sandbox API for developing and debugging plugins entirely from the browser
+* [UI Polish Review](docs/UI-POLISH.md) - UI/UX polish review — consolidated actionable follow-up list for the reader
+* [Multi-Worker Architecture](docs/feat_multiworker_arch.md) - Multi-worker (Lane*) architecture proposal and analysis (no code landed)
+* [Plan — Host-native helpers for JS/Lua plugins](docs/host-native-helpers-plan.md) - Plan for host-native helpers reachable from JS/Lua plugins (P0-P5 implemented)
+* [WASM host helpers](docs/plugin-wasm-helpers.md) - WASM host helpers — the same helper library Lua/JS plugins use
+* [QML Desktop Client — Library Page Parity Implementation Plan](docs/qml-client-library-plan.md) - QML desktop client library-page parity implementation plan
+* [Reader Features Plan](docs/reader-features-plan.md) - Reader features plan (status: live — reference only)
+* [Reader read-ahead verification](docs/reader-read-ahead-verification.md) - Recorded verification evidence for reader read-ahead tasks 4.3-4.5
+* [goIsekai UI Specification](docs/ui-spec.md) - goIsekai UI specification v1.0

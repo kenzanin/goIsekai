@@ -1,3 +1,11 @@
+---
+id: qml-client-library-plan
+title: "QML Desktop Client — Library Page Parity Implementation Plan"
+description: "QML desktop client library-page parity implementation plan"
+type: reference
+tags: [goisekai, qml, desktop, plan]
+---
+
 # QML Desktop Client — Library Page Parity Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.

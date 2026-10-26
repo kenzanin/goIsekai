@@ -1,7 +1,8 @@
 ---
+description: "A plugin reads its own volatile facts from plugin.json"
 id: plugin-json-params
 title: A plugin reads its own volatile facts from plugin.json, not from its source
-type: concept
+type: Concept
 tags: [goisekai, plugins, plugin-json, host-surface, lua, wasm, js, yaegi, native, params]
 ---
 

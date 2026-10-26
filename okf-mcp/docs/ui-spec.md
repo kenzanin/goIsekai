@@ -1,3 +1,11 @@
+---
+id: ui-spec
+title: "goIsekai UI Specification"
+description: "goIsekai UI specification v1.0"
+type: reference
+tags: [goisekai, ui, spec, reference]
+---
+
 # goIsekai UI Specification
 
 > **Version**: 1.0  

@@ -1,4 +1,5 @@
 ---
+description: "Enrichment (info) scripts run as Odin wasm"
 id: info-scripts-as-odin-wasm
 title: Enrichment (info) scripts run as Odin wasm — the blocker was the load path, not the helper surface
 type: finding

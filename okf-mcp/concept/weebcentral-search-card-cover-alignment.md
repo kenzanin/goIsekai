@@ -1,4 +1,5 @@
 ---
+description: "Weebcentral search covers landed on the wrong title"
 id: weebcentral-search-card-cover-alignment
 title: Weebcentral search covers were shifted onto the wrong title — one card renders two <img>, so covers must be matched by ULID, never by position
 type: finding

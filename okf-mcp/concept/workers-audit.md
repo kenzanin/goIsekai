@@ -1,3 +1,11 @@
+---
+id: workers-audit
+title: "Workers Audit Report"
+description: "goIsekai worker-pool audit: per-lane worker/queue counts (Interactive 4/32, Fetch 2/8, Image 8/64, Maintenance 1/8, CDP 4/16) and sub-queue layout."
+type: Concept
+tags: [goisekai, workers, audit, pool, architecture]
+---
+
 # Workers Audit Report
 
 ## Current Pool Implementation

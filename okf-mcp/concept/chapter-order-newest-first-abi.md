@@ -1,4 +1,5 @@
 ---
+description: "Chapter lists came out oldest-first for weebcentral and comizy"
 id: chapter-order-newest-first-abi
 title: Chapter lists came out oldest-first for weebcentral and comizy - two plugins reversed the site's newest-first fragment
 type: finding

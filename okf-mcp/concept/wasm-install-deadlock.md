@@ -1,4 +1,5 @@
 ---
+description: "Installing a wasm plugin deadlocked the host"
 id: wasm-install-deadlock
 title: Installing a wasm plugin deadlocked the host — ensureWasmRuntime took the manager lock its caller already held
 type: finding

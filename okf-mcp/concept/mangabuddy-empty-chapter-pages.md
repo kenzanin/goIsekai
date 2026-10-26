@@ -1,4 +1,5 @@
 ---
+description: "MangaBuddy returned zero pages for every chapter"
 id: mangabuddy-empty-chapter-pages
 title: MangaBuddy returned zero pages for every chapter - the site moved its CDN and the plugin had pinned the old host, while the host then cached the empty answer
 type: finding

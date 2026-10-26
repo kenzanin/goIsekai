@@ -1,4 +1,6 @@
 ---
+description: "Three detail-page/reader bugs and their root causes"
+type: finding
 title: Detail-page read toggle, genre tags, and reader-prefs persistence
 tags: [bugfix, reader, detail-page, enrichment, genres, sqlite]
 ---

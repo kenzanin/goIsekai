@@ -1,4 +1,5 @@
 ---
+description: "BatCave and Manga-Bay: a DLE guard solved without a browser"
 id: batcave-mangabay-dle-plugins
 title: BatCave and Manga-Bay plugins solve a custom DLE proof-of-work guard over plain HTTP
 type: finding

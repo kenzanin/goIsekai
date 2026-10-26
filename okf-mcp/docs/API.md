@@ -1,3 +1,11 @@
+---
+id: api
+title: "goIsekai JSON API"
+description: "Machine-facing JSON API for custom UIs, scripts, and wrappers"
+type: reference
+tags: [goisekai, api, json, reference]
+---
+
 # goIsekai JSON API
 
 Machine-facing API for custom UIs, scripts, and wrappers. Same bridge service

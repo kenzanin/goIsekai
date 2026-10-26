@@ -1,4 +1,5 @@
 ---
+description: "Base: https://zeroscann.com."
 id: zeroscann-search-detail-findings
 title: Zeroscann search/detail selector findings
 type: finding

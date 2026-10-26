@@ -1,4 +1,5 @@
 ---
+description: "Source: comizy_io_lengkap.har (559 entries, read-only dissection)."
 id: comizy-plugin-build-spec
 title: Comizy.io plugin build spec
 type: finding

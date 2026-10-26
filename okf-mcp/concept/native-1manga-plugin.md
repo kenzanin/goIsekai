@@ -1,4 +1,5 @@
 ---
+description: "Request: \"buatkan native plugin untuk 1manga dan gantikan prod plugin ingat"
 id: native-1manga-plugin
 title: 1manga runs as a native .so plugin - the Lua original stays in the archive as the reference, and the two are byte-identical on all four ABI calls
 type: finding

@@ -1,4 +1,5 @@
 ---
+description: "Hostnet CDP timeouts and page waits for SPA sites"
 id: hostnet-cdp-timeout-waits
 title: Hostnet CDP timeouts and page waits for SPA sites
 type: finding

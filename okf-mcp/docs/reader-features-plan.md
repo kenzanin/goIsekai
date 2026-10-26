@@ -1,3 +1,11 @@
+---
+id: reader-features-plan
+title: "Reader Features Plan"
+description: "Reader features plan (status: live — reference only)"
+type: reference
+tags: [goisekai, reader, plan]
+---
+
 # Reader Features Plan
 
 > **Status: LIVE** — Features are already implemented in `cmd/goisekai/frontend/lib/reader.js`. This document is for reference only.

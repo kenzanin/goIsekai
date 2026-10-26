@@ -1,3 +1,11 @@
+---
+id: handover
+title: "Handover"
+description: "Agent handover doc — everything needed to resume without prior session memory"
+type: reference
+tags: [goisekai, handover, agent, reference]
+---
+
 # Handover — goIsekai (2026-10-10)
 
 Handover doc for switching agent harness (pi → omp). Everything an agent needs to resume without the previous session's memory.

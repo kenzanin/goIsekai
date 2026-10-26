@@ -1,4 +1,5 @@
 ---
+description: "Base: https://violetmanga.com."
 id: violetmanga-search-detail-findings
 title: VioletManga search/detail selector findings
 type: finding

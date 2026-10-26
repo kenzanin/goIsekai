@@ -1,4 +1,5 @@
 ---
+description: "Source: comix_to.har + live rod probes (commit 9ac8fda arc)."
 id: comix-plugin-build-spec
 title: Comix.to plugin build spec
 type: finding

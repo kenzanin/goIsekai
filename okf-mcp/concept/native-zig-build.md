@@ -1,4 +1,5 @@
 ---
+description: "Native .so plugins now build with zig c++"
 id: native-zig-build
 title: Native .so plugins build with zig c++ against static musl - a self-contained .so with zero DT_NEEDED entries
 type: finding

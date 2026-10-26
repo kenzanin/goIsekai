@@ -1,3 +1,11 @@
+---
+id: host-native-helpers-plan
+title: "Plan — Host-native helpers for JS/Lua plugins"
+description: "Plan for host-native helpers reachable from JS/Lua plugins (P0-P5 implemented)"
+type: reference
+tags: [goisekai, plugins, helpers, plan]
+---
+
 # Plan — Host-native helpers for JS/Lua plugins
 
 Status: **P0–P5 fully implemented**

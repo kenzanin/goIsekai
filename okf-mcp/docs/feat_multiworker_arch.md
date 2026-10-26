@@ -1,3 +1,11 @@
+---
+id: feat-multiworker-arch
+title: "Multi-Worker Architecture"
+description: "Multi-worker (Lane*) architecture proposal and analysis (no code landed)"
+type: reference
+tags: [goisekai, workers, architecture, plan]
+---
+
 # Multi-Worker Architecture — `feat_multiworker`
 
 Status: **proposal / analysis only** (no code landed).

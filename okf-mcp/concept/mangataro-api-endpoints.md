@@ -1,4 +1,5 @@
 ---
+description: "Base: https://mangataro.org."
 id: mangataro-api-endpoints
 title: MangaTaro.org API endpoints
 type: finding

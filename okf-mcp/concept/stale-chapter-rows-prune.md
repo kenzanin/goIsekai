@@ -1,4 +1,5 @@
 ---
+description: "Sync never pruned the chapter rows a plugin re-issued"
 id: stale-chapter-rows-prune
 title: Sync upserts chapters but never pruned the rows a plugin re-issued - 196 rows were provably superseded duplicates, now removed under a proof rule
 type: finding

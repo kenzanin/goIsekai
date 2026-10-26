@@ -1,4 +1,5 @@
 ---
+description: "released_at was empty on old rows, not on the plugin's answer"
 id: released-at-backfill-gap
 title: The released_at column was added on 20 Oct but the rows synced before it were never backfilled - the plugin was always right
 type: finding
