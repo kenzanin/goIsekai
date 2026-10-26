@@ -8,6 +8,7 @@ import (
 	"github.com/goccy/go-json"
 
 	"goisekai/internal/htmldoc"
+	"goisekai/internal/logger"
 	"goisekai/internal/pluginutil"
 )
 
@@ -59,7 +60,19 @@ func (m *Manager) dispatchHostCall(ctx context.Context, id, fn string, args []st
 		}
 		out := make([]any, 0, len(rows))
 		for _, row := range rows {
-			out = append(out, wasmRegexRow(row))
+			r := wasmRegexRow(row)
+			out = append(out, r)
+			// Task 1.3: structured host warning when a row cannot be shaped
+			// into the expected row form (e.g. a 1-capture row that wasmRegexRow
+			// would flatten to a bare string, or an empty row from no captures).
+			// The row is a []string of length >=1 from RegexFindAll, so a nil
+			// result here is impossible today; this guard fires if that
+			// invariant ever breaks, naming the plugin + pattern instead of
+			// returning a silently empty result.
+			if r == nil {
+				logger.Warn("regex.find_all: row could not be shaped to expected row form (silently empty result suppressed)",
+					"plugin", id, "pattern", wasmArg(args, 1))
+			}
 		}
 		return out, nil
 	case "regex.find_index":

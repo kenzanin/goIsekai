@@ -115,6 +115,29 @@ func TestRegexFindAll(t *testing.T) {
 		}
 	})
 
+	t.Run("one capture row is a []string, not a bare string (B-2.1)", func(t *testing.T) {
+		got, err := RegexFindAll(subject, `href="/(manga/[^"]+)"`)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(got) == 0 {
+			t.Fatal("expected at least one row")
+		}
+		// The row must always be a []string, even for a one-capture pattern.
+		// A regression to wasmRegexRow's old flattening (row -> bare string)
+		// would make the host return a JSON string here instead of an array.
+		rv := reflect.ValueOf(got[0])
+		if rv.Kind() != reflect.Slice {
+			t.Fatalf("1-capture row kind = %v, want slice (not a bare string)", rv.Kind())
+		}
+		if rv.Len() != 1 {
+			t.Fatalf("1-capture row len = %d, want 1", rv.Len())
+		}
+		if rv.Index(0).String() != "manga/one/" {
+			t.Fatalf("1-capture row[0] = %q, want %q", rv.Index(0).String(), "manga/one/")
+		}
+	})
+
 	t.Run("no capture returns whole matches", func(t *testing.T) {
 		got, err := RegexFindAll("a1 b2 c3", `[a-z]\d`)
 		if err != nil {
