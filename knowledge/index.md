@@ -60,3 +60,4 @@ Persistent memory bundle for this repository.
 * [Multi-Worker Architecture](doc_feat_multiworker_arch.md) - Multi-worker architecture proposal: separate lanes for interactive vs fetch vs image vs maintenance.
 * [goIsekai UI Specification](doc_ui-spec.md) - goIsekai UI specification v1.0 — screens, navigation, design system.
 * [WASM host helpers](doc_plugin-wasm-helpers.md) - WASM host helpers — helper library Lua/JS plugins use, via env.host_call dispatch.
+* [go-dl Go launcher reference](go-dl-toolchain-reference.md) - Reference for the go-dl Go toolchain launcher (go1.26.9 for TinyGo wasm builds, go1.27.3 for host builds, no bare 'go' on PATH).

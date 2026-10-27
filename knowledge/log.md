@@ -1,3 +1,6 @@
+## 2026-10-27
+* **Creation**: Documented concept `go-dl-toolchain-reference.md` (go-dl Go launcher reference).
+
 ## 2026-10-26
 * **Creation**: Documented concept `doc_plugin-wasm-helpers.md` (WASM host helpers).
 * **Creation**: Documented concept `doc_ui-spec.md` (goIsekai UI Specification).
