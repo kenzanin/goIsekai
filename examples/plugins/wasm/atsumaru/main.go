@@ -78,7 +78,7 @@ func search(arg string) []types.Manga {
 		"&filter_by=" + urlEncode(filter) +
 		"&query_by=" + urlEncode("title,englishTitle,otherNames,authors") +
 		"&page=" + itoa(f.Page) +
-		"&per_page=20"
+		"&per_page=30"
 
 	data, ok := getJSON(url)
 	out := []types.Manga{}

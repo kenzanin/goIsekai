@@ -120,13 +120,14 @@ func (s *Server) viewSearch(w http.ResponseWriter, r *http.Request) {
 	start, end := 0, total
 	hasNext := false
 	if pluginMeta.Paginates {
-		// The plugin pages upstream and does not report a total, so any results
-		// mean there may be a next page. That can offer one empty page past the
-		// end; hiding Next instead would make paging unusable on sources that
-		// return fewer rows per page than searchPageSize.
+		// The plugin pages upstream and does not report a total. A result set
+		// can fill the page (→ a next page may exist) or be short (→ we are on
+		// the last page). Using len(result)>0 always would surface one empty
+		// "next" page after the last non-empty one (e.g. 1 result → page 2
+		// link that returns []), so gate on whether the page looks full.
 		// ponytail: add a has_next field to the plugin ABI when an extra click
 		// starts mattering.
-		hasNext = total > 0
+		hasNext = total >= pageSize
 	} else {
 		start = min((page-1)*pageSize, total)
 		end = min(start+pageSize, total)
