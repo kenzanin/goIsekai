@@ -151,8 +151,13 @@
           if (window.Alpine && Alpine.initTree) {
             Alpine.initTree(main);
           }
-          if (window.syncEnrichmentPanel) syncEnrichmentPanel();
-          rememberListPage();
+          // Only enrichment actions (fetch/reset-enrichment) need the panel
+          // re-synced after the partial swap; doing it on every form submit (e.g.
+          // the "Covers" fetch-covers button) makes the enrichment panel pop open
+          // when the user only asked for the alt-cover picker.
+          if (window.syncEnrichmentPanel && /fetch-enrichment|reset-enrichment/.test(action)) {
+            syncEnrichmentPanel();
+          }
           // Find-covers just re-rendered the picker: open it so fetch →
           // pick → set is one flow instead of two buttons.
           if (form.getAttribute('data-open-covers')) {
