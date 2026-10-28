@@ -148,11 +148,18 @@ function get_chapter_list(arg)
             -- get_page_list only receives the chapter id, so the manga id rides
             -- along in a composite; the page list needs both to query the API.
             local label = trim(c.title or ("Chapter " .. tostring(c.number or "")))
-            chapters[#chapters + 1] = {
+            local ch = {
                 id = id .. ":" .. c.id,
                 chapter_num = host.text.chapter_num(label),
                 title = label,
             }
+            -- allChapters API returns createdAt as epoch milliseconds
+            -- (int64). The host date_to_iso() understands epoch/ISO, so pass
+            -- the number straight through. (See knowledge concept
+            -- atsumaru-released-at-epoch-millis.)
+            local iso = host.text.date_to_iso(tostring(c.createdAt or 0))
+            if iso ~= "" then ch.released_at = iso end
+            chapters[#chapters + 1] = ch
         end
     end
 
