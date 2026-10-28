@@ -58,10 +58,12 @@ return function(data)
 		pluginBadge = pluginBadge .. h(pluginName) .. "</span>"
 	end
 
-	-- Build genre options (only when the selected plugin advertises genres)
-	local genreOpts = ""
+	-- Build genre checkboxes (only when the selected plugin advertises genres).
+	-- Rendered as a multi-column checkbox grid below the search bar; the area is
+	-- hidden entirely for plugins without genre support (genreOpts == "").
+	-- Browsers submit every checked [name="genre"] as separate ?genre=<slug> params.
+	local genreBoxes = ""
 	if pluginID ~= "" and #genres > 0 then
-		genreOpts = ' <option value="">All genres</option>\n'
 		for _, g in ipairs(genres) do
 			local isSel = false
 			for _, sel in ipairs(genresSelected) do
@@ -70,14 +72,20 @@ return function(data)
 					break
 				end
 			end
-			genreOpts = genreOpts
-				.. ' <option value="'
+			genreBoxes = genreBoxes
+				.. '<div class="flex items-center gap-2">'
+				.. '<input type="checkbox" id="genre_'
+				.. h(g.Slug)
+				.. '" name="genre" value="'
 				.. h(g.Slug)
 				.. '"'
-				.. (isSel and " selected" or "")
-				.. ">"
+				.. (isSel and " checked" or "")
+				.. ' class="rounded bg-neutral-800 border-neutral-600 text-indigo-600 focus:ring-indigo-500">'
+				.. '<label for="genre_'
+				.. h(g.Slug)
+				.. '" class="text-sm text-neutral-300 cursor-pointer">'
 				.. h(g.Name)
-				.. "</option>\n"
+				.. "</label></div>"
 		end
 	end
 
@@ -241,12 +249,15 @@ return function(data)
 		.. '"><select id="pluginIDNative" class="hidden">'
 		.. pluginOpts
 		.. "</select></div>"
-		.. (genreOpts ~= "" and ('<div><label for="genre" class="block text-xs text-neutral-400 mb-1">Category</label><select id="genre" name="genre" multiple size="4" class="bg-neutral-900 border border-neutral-700 rounded-md px-3 py-2 text-sm">' .. genreOpts .. "</select></div>") or "")
 		.. '<div class="flex-1"><label for="q" class="block text-xs text-neutral-400 mb-1">&nbsp;</label><input id="q" name="q" type="text" value="'
 		.. h(q)
 		.. '" placeholder="Manga title..." class="w-full bg-neutral-900 border border-neutral-700 rounded-md px-3 py-2 text-sm"></div>'
 		.. '<button type="submit" class="bg-indigo-600 hover:bg-indigo-500 text-white rounded-md px-4 py-2 text-sm font-medium">Search</button>'
 		.. "</div>"
+		-- Genre/tag selector area: only when the selected plugin advertises genres.
+		-- Full-width multi-select below the search bar so category browsing has its
+		-- own region, and is hidden entirely for plugins without genre support.
+		.. (genreBoxes ~= "" and ('<div class="mt-4"><label class="block text-xs text-neutral-400 mb-1">Categories</label><div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-x-4 gap-y-2 bg-neutral-900 border border-neutral-700 rounded-md px-3 py-3">' .. genreBoxes .. "</div></div>") or "")
 		.. (topPagination ~= "" and ('<div class="mt-3">' .. topPagination .. "</div>") or "")
 		.. "</form>"
 		.. '<div id="search-history" class="mb-8"></div>'
@@ -284,10 +295,13 @@ return function(data)
   }
   function save(h) { try { localStorage.setItem(KEY, JSON.stringify(h.slice(0, MAX))); } catch (e) {} }
   var qEl = document.getElementById("q"), pEl = document.getElementById("pluginID"), gEl = document.getElementById("genre");
+  // Genres = checkbox selections, collected so old single-value history entries
+  // keep working. Submitted as separate ?genre=<slug> params by the browser.
+  var cbxs = gEl ? gEl.querySelectorAll('input[name="genre"]') : null;
   var genres = [];
-  if (gEl) {
-    for (var i = 0; i < gEl.options.length; i++) {
-      if (gEl.options[i].selected && gEl.options[i].value) genres.push(gEl.options[i].value);
+  if (cbxs) {
+    for (var i = 0; i < cbxs.length; i++) {
+      if (cbxs[i].checked && cbxs[i].value) genres.push(cbxs[i].value);
     }
   }
   // Joined so old single-value history entries keep working unchanged.
