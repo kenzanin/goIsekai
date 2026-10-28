@@ -1,23 +1,10 @@
 ---
-id: plugin-failure-patterns
-title: Recurring plugin failure patterns in goIsekai
-description: >
-  Catalog of the six plugin failure modes that resurface across goIsekai
-  ports and sessions, why each one is silent (produces no error), and the
-  fix. A plugin author matches a symptom to its known root cause instead
-  of re-deriving it from code.
 type: Concept
-tags:
-  - plugins
-  - debugging
-  - wasm
-  - lua
-  - abi
-  - regex
-  - released-at
-  - cache
-generated:
-  at: "2026-10-26T00:00:00Z"
+title: Recurring plugin failure patterns in goIsekai
+description: "Catalog of the six plugin failure modes that resurface across goIsekai ports and sessions, why each is silent (no error), and the fix — a plugin author matches a symptom to its known root cause instead of re-deriving from code."
+tags: [plugins, debugging, wasm, lua, abi, regex, released-at, cache]
+generated: { by: agent/cli, at: "2026-10-28T07:02:37Z" }
+id: "plugin-failure-patterns"
 ---
 
 # Plugin Failure Patterns

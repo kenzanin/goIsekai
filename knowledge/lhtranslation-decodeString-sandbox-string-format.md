@@ -1,11 +1,10 @@
 ---
-id: lhtranslation-decodeString-sandbox-string-format
-title: lhtranslation decodeString - sandbox passes a bare string, not JSON-encoded
-description: The sandbox /chapters/{id} endpoint passes a bare manga id (not a JSON-encoded string), so decodeString must fall back to the raw arg; without the fallback chapters returned an empty manga_id.
 type: finding
+title: "lhtranslation decodeString - sandbox passes a bare string, not JSON-encoded"
+description: "The sandbox /chapters/{id} endpoint passes a bare manga id (not a JSON-encoded string), so decodeString must fall back to the raw arg; without the fallback chapters returned an empty manga_id."
 tags: [goisekai, plugins, lhtranslation, wasm, tinygo, sandbox, decodeString]
-generated:
-  at: "2026-10-26T00:00:00Z"
+generated: { by: human/kenzanin, at: "2026-10-28T07:10:59Z" }
+id: "lhtranslation-decodeString-sandbox-string-format"
 ---
 
 # lhtranslation: decodeString sandbox string format

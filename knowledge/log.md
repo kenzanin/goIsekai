@@ -1,3 +1,71 @@
+## 2026-10-28
+* **Update**: Linked `0149-live-plugins-audit-and-builder-versions.md` to `mangadex-api-title-phrase-vs-website-search.md` (Live-plugins audit enumerates this plugin/source as part of coverage.).
+* **Update**: Linked `0149-live-plugins-audit-and-builder-versions.md` to `weebcentral-search-card-cover-alignment.md` (Live-plugins audit enumerates this plugin/source as part of coverage.).
+* **Update**: Linked `0149-live-plugins-audit-and-builder-versions.md` to `plugin-logo-sources-and-cache.md` (Live-plugins audit enumerates this plugin/source as part of coverage.).
+* **Update**: Linked `0149-live-plugins-audit-and-builder-versions.md` to `native-zig-build.md` (Live-plugins audit enumerates this plugin/source as part of coverage.).
+* **Update**: Linked `0149-live-plugins-audit-and-builder-versions.md` to `native-so-plugin-abi.md` (Live-plugins audit enumerates this plugin/source as part of coverage.).
+* **Update**: Linked `0149-live-plugins-audit-and-builder-versions.md` to `1manga-wasm-port.md` (Live-plugins audit enumerates this plugin/source as part of coverage.).
+* **Update**: Linked `0149-live-plugins-audit-and-builder-versions.md` to `three-lua-plugins-converted-to-tinygo-wasm.md` (Live-plugins audit enumerates this plugin/source as part of coverage.).
+* **Update**: Linked `0149-live-plugins-audit-and-builder-versions.md` to `reader-loading-cancel-fix.md` (Live-plugins audit enumerates this plugin/source as part of coverage.).
+* **Update**: Linked `0149-live-plugins-audit-and-builder-versions.md` to `library-view-url-is-source-of-truth.md` (Live-plugins audit enumerates this plugin/source as part of coverage.).
+* **Update**: Linked `0149-live-plugins-audit-and-builder-versions.md` to `doc_plugin-playground.md` (Live-plugins audit enumerates this plugin/source as part of coverage.).
+* **Update**: Linked `0149-live-plugins-audit-and-builder-versions.md` to `doc_feat_multiworker_arch.md` (Live-plugins audit enumerates this plugin/source as part of coverage.).
+* **Update**: Linked `0149-live-plugins-audit-and-builder-versions.md` to `1manga-two-stacked-graphql-bugs.md` (Live-plugins audit enumerates this plugin/source as part of coverage.).
+* **Update**: Linked `0149-live-plugins-audit-and-builder-versions.md` to `native-1manga-plugin.md` (Live-plugins audit enumerates this plugin/source as part of coverage.).
+* **Update**: Linked `0149-live-plugins-audit-and-builder-versions.md` to `library-fts-index-sync.md` (Live-plugins audit enumerates this plugin/source as part of coverage.).
+* **Update**: Linked `0149-live-plugins-audit-and-builder-versions.md` to `doc_ui-spec.md` (Live-plugins audit enumerates this plugin/source as part of coverage.).
+* **Update**: Linked `0149-live-plugins-audit-and-builder-versions.md` to `chapter-bound-zero-chapter-num.md` (Live-plugins audit enumerates this plugin/source as part of coverage.).
+* **Update**: Linked `0149-live-plugins-audit-and-builder-versions.md` to `violetmanga-search-detail-findings.md` (Live-plugins audit enumerates this plugin/source as part of coverage.).
+* **Update**: Linked `0149-live-plugins-audit-and-builder-versions.md` to `static-musl-so.md` (Live-plugins audit enumerates this plugin/source as part of coverage.).
+* **Update**: Linked `0149-live-plugins-audit-and-builder-versions.md` to `mangataro-api-endpoints.md` (Live-plugins audit enumerates this plugin/source as part of coverage.).
+* **Update**: Linked `0149-live-plugins-audit-and-builder-versions.md` to `home-reload-ns-binding-aborted.md` (Live-plugins audit enumerates this plugin/source as part of coverage.).
+* **Update**: Linked `0149-live-plugins-audit-and-builder-versions.md` to `doc_api.md` (Live-plugins audit enumerates this plugin/source as part of coverage.).
+* **Update**: Linked `0149-live-plugins-audit-and-builder-versions.md` to `wasm-install-deadlock.md` (Live-plugins audit enumerates this plugin/source as part of coverage.).
+* **Update**: Linked `0149-live-plugins-audit-and-builder-versions.md` to `released-at-backfill-gap.md` (Live-plugins audit enumerates this plugin/source as part of coverage.).
+* **Update**: Linked `0149-live-plugins-audit-and-builder-versions.md` to `go-dl-toolchain-reference.md` (Live-plugins audit enumerates this plugin/source as part of coverage.).
+* **Update**: Linked `0149-live-plugins-audit-and-builder-versions.md` to `dead-code-and-merge-audit-2026-10-17.md` (Live-plugins audit enumerates this plugin/source as part of coverage.).
+* **Update**: Linked `0149-live-plugins-audit-and-builder-versions.md` to `session-dailies-2026-08-29-to-09-30.md` (Live-plugins audit enumerates this plugin/source as part of coverage.).
+* **Update**: Linked `0149-live-plugins-audit-and-builder-versions.md` to `pluginmanager-test-coverage-gaps.md` (Live-plugins audit enumerates this plugin/source as part of coverage.).
+* **Update**: Linked `0149-live-plugins-audit-and-builder-versions.md` to `doc_plugin-wasm-helpers.md` (Live-plugins audit enumerates this plugin/source as part of coverage.).
+* **Update**: Linked `0149-live-plugins-audit-and-builder-versions.md` to `wasm-plugin-local-helpers-decision.md` (Live-plugins audit enumerates this plugin/source as part of coverage.).
+* **Update**: Linked `0149-live-plugins-audit-and-builder-versions.md` to `wasm-backend-sizes-and-tinygo-port.md` (Live-plugins audit enumerates this plugin/source as part of coverage.).
+* **Update**: Linked `0149-live-plugins-audit-and-builder-versions.md` to `wails-desktop-client-and-tray.md` (Live-plugins audit enumerates this plugin/source as part of coverage.).
+* **Update**: Linked `0149-live-plugins-audit-and-builder-versions.md` to `lhtranslation-decodeString-sandbox-string-format.md` (Live-plugins audit enumerates this plugin/source as part of coverage.).
+* **Update**: Linked `0149-live-plugins-audit-and-builder-versions.md` to `onisaga-cloudflare-challenge.md` (Live-plugins audit enumerates this plugin/source as part of coverage.).
+* **Update**: Linked `0149-live-plugins-audit-and-builder-versions.md` to `info-scripts-as-odin-wasm.md` (Live-plugins audit enumerates this plugin/source as part of coverage.).
+* **Update**: Linked `0149-live-plugins-audit-and-builder-versions.md` to `doc_handover.md` (Live-plugins audit enumerates this plugin/source as part of coverage.).
+* **Update**: Linked `0149-live-plugins-audit-and-builder-versions.md` to `stale-chapter-rows-prune.md` (Live-plugins audit enumerates this plugin/source as part of coverage.).
+* **Update**: Linked `0149-live-plugins-audit-and-builder-versions.md` to `plugin-json-params.md` (Live-plugins audit enumerates this plugin/source as part of coverage.).
+* **Update**: Linked `0149-live-plugins-audit-and-builder-versions.md` to `cover-refresh-vs-clear-actions.md` (Live-plugins audit enumerates this plugin/source as part of coverage.).
+* **Update**: Linked `0149-live-plugins-audit-and-builder-versions.md` to `comix-plugin-build-spec.md` (Live-plugins audit enumerates this plugin/source as part of coverage.).
+* **Update**: Linked `0149-live-plugins-audit-and-builder-versions.md` to `abi-extend-rating-scanlator.md` (Live-plugins audit enumerates this plugin/source as part of coverage.).
+* **Update**: Linked `0149-live-plugins-audit-and-builder-versions.md` to `enhance-status-log.md` (Live-plugins audit enumerates this plugin/source as part of coverage.).
+* **Update**: Linked `0149-live-plugins-audit-and-builder-versions.md` to `doc_ui-polish.md` (Live-plugins audit enumerates this plugin/source as part of coverage.).
+* **Update**: Linked `0149-live-plugins-audit-and-builder-versions.md` to `doc_host-native-helpers-plan.md` (Live-plugins audit enumerates this plugin/source as part of coverage.).
+* **Update**: Linked `0149-live-plugins-audit-and-builder-versions.md` to `detail-page-read-genre-readerprefs-fixes.md` (Live-plugins audit enumerates this plugin/source as part of coverage.).
+* **Update**: Linked `0149-live-plugins-audit-and-builder-versions.md` to `chapter-order-newest-first-abi.md` (Live-plugins audit enumerates this plugin/source as part of coverage.).
+* **Update**: Linked `0149-live-plugins-audit-and-builder-versions.md` to `host-helper-surface-registry.md` (Live-plugins audit enumerates this plugin/source as part of coverage.).
+* **Update**: Linked `0149-live-plugins-audit-and-builder-versions.md` to `zeroscann-search-detail-findings.md` (Live-plugins audit enumerates this plugin/source as part of coverage.).
+* **Update**: Linked `0149-live-plugins-audit-and-builder-versions.md` to `plugin-runtime-export-matrix.md` (Live-plugins audit enumerates this plugin/source as part of coverage.).
+* **Update**: Linked `0149-live-plugins-audit-and-builder-versions.md` to `mangabuddy-empty-chapter-pages.md` (Live-plugins audit enumerates this plugin/source as part of coverage.).
+* **Update**: Linked `0149-live-plugins-audit-and-builder-versions.md` to `comizy-plugin-build-spec.md` (Live-plugins audit enumerates this plugin/source as part of coverage.).
+* **Update**: Linked `0149-live-plugins-audit-and-builder-versions.md` to `doc_reader-read-ahead-verification.md` (Live-plugins audit enumerates this plugin/source as part of coverage.).
+* **Update**: Linked `0149-live-plugins-audit-and-builder-versions.md` to `1manga-plaintext-pages-field.md` (Live-plugins audit enumerates this plugin/source as part of coverage.).
+* **Update**: Linked `0149-live-plugins-audit-and-builder-versions.md` to `library-duplicate-colour-bands.md` (Live-plugins audit enumerates this plugin/source as part of coverage.).
+* **Update**: Linked `0149-live-plugins-audit-and-builder-versions.md` to `weebcentral-plugin-build-spec.md` (Live-plugins audit enumerates this plugin/source as part of coverage.).
+* **Update**: Linked `0149-live-plugins-audit-and-builder-versions.md` to `hostnet-cdp-timeout-waits.md` (Live-plugins audit enumerates this plugin/source as part of coverage.).
+* **Update**: Linked `0149-live-plugins-audit-and-builder-versions.md` to `reader-two-page-view.md` (Live-plugins audit enumerates this plugin/source as part of coverage.).
+* **Update**: Linked `0149-live-plugins-audit-and-builder-versions.md` to `plugin-detail-page-on-plugins-view.md` (Live-plugins audit enumerates this plugin/source as part of coverage.).
+* **Update**: Updated concept `0149-live-plugins-audit-and-builder-versions.md`.
+* **Update**: Updated concept `lhtranslation-decodeString-sandbox-string-format.md`.
+* **Update**: Updated concept `mangadex-api-title-phrase-vs-website-search.md`.
+* **Update**: Linked `0149-live-plugins-audit-and-builder-versions.md` to `odin-wasm-plugin-port-candidates.md` (Audit cites this concept: odin-wasm-plugin-port-candidates).
+* **Update**: Linked `0149-live-plugins-audit-and-builder-versions.md` to `plugin-failure-patterns.md` (Audit cites this concept: plugin-failure-patterns).
+* **Update**: Linked `0149-live-plugins-audit-and-builder-versions.md` to `atsumaru-released-at-epoch-millis.md` (Audit cites this concept: atsumaru-released-at-epoch-millis).
+* **Update**: Updated concept `odin-wasm-plugin-port-candidates.md`.
+* **Update**: Updated concept `plugin-failure-patterns.md`.
+* **Creation**: Documented concept `0149-live-plugins-audit-and-builder-versions.md` (Live plugins audit: builder/runner versions and released_at parsing status).
+
 ## 2026-10-27
 * **Creation**: Documented concept `go-dl-toolchain-reference.md` (go-dl Go launcher reference).
 

@@ -1,103 +1,69 @@
-# Live plugins audit — builder/runner versions & `released_at` status
-
-- generated: { by: "Reasonix agent", at: "2026-10-28T05:30:00+07:00" }
-
-## Context
-Audit all installed (live) plugins under `app_data/plugins/` to record:
-- plugin kind + builder/runner version,
-- whether each parses `released_at` on chapters (host ABI field `pkg/types/types.go:39` — `ReleasedAt time.Time json:"released_at"`; there is NO `created_at`).
-
-Motivation: a report claimed "mangaread plugin tidak punya data created_at". Audit shows mangaread uses `released_at` (correct ABI field), not `created_at` — and **mangaread_odin already parses it**. The "unreachable" live behaviour is a network/human-verification issue, not a missing-field bug.
-
-- note: `qmd` / OKF MCP tools were unavailable in this session (not on PATH, no `okf-mcp/` index existed). This doc was written as a plain markdown file so `qmd search` can discover it after `qmd init`/`qmd update`.
-
+---
+type: audit
+title: "Live plugins audit: builder/runner versions and released_at parsing status"
+description: "Audit of all 43 installed (live) plugins under app_data/plugins/. Records builder/runner versions (Odin dev-2026-10:84bc3fc21, TinyGo 0.43.0/LLVM 22.1.4, Go 1.26.9 pinned, Lua/JS/yaegi host-runtime) and per-plugin released_at parsing status (host ABI field pkg/types/types.go:39 ReleasedAt; there is NO created_at). Findings: mangaread_odin ALREADY parses released_at and live wasm contains the parser (the 'unreachable' live behaviour is a network/human-verification issue, not a missing-field bug); mangapill intentionally omits released_at (source HTML publishes no per-chapter date); 21 other plugins do not parse dates. Lists 8 representative plugins that DO parse dates as patterns to follow."
+generated: { by: agent/cli, at: "2026-10-28T07:13:59Z" }
+status: stable
 ---
 
-## Builder / runner versions (verified)
-
-| Toolchain | Version (verified) | Path used |
-|-----------|--------------------|-----------|
-| Odin compiler | `odin version dev-2026-10:84bc3fc21` | `/sbin/odin -> /usr/lib/odin/odin` |
-| TinyGo | `tinygo version 0.43.0 linux/amd64 (LLVM 22.1.4)` | `~/opt/tinygo/bin/tinygo` |
-| Go (host) | `go 1.27` (module) | system `go` |
-| Go (wasm plugin build) | `go 1.26.9` (pinned, `GOTOOLCHAIN=local`) | `~/sdk/go1.26.9` |
-| Lua | 5.x (lunar VM, host-runtime) | host `internal/pluginmanager/lua.go` |
-| JS / yaegi | goja / yaegi interp | host |
-
-All 15 `*_odin` wasm plugins build with Odin `dev-2026-10` + TinyGo 0.43.0 cross-compiler (see `examples/plugins/wasm/*_odin/build.sh` comments: Odin emits wasm exports itself, no wasi-sdk, `core:mem` allocator, imports `wasi_snapshot_preview1` + `env.host_call`).
-
----
-
-## Live plugins (`app_data/plugins/`) — count / kind mix
-
-43 live plugins: 15 Lua, 13 wasm (Go/TinyGo), 13 wasm (Odin), 1 yaegi, 1 wasm (komix_to_cpp). Full ID list:
-
-1manga, atsumaru, bato1, batcave, comicasura_odin, comix, comizy, dynastyscan, en-thunderscan, fanfox, komix_to, ksgroupscans, kunmanga_online, lhtranslation, madaradex, madarascans, manga_uno, mangabay, mangabuddy, mangade, mangadex, mangafire, mangafreak, mangahere, mangahub, mangak, mangakakalot, mangakatana, **mangapill**, **mangaread**, mangasushi, mangataro, mangatown, mangzio, manhawato, onisaga, reimanga_net, roliascan, topmanhua, violetmanga, weebcentral, zeroscann.
-
----
-
-## `released_at` parsing status (source scan)
-
-Scan key: `grep -cE 'released_at|ReleasedAt|date_to_iso|chapter-date|release.date|<date tag>'` per plugin source. Count 0 = does NOT parse dates.
-
-### mangaread — ALREADY HAS released_at (not a "missing" case)
-Source: `examples/plugins/wasm/mangaread_odin/main.odin` — **3 matches**:
-- `//  manga_id and released_at too, matching the primary path.` (comment, line 32)
-- line 69: `Released_At: string `json:"released_at,omitempty"``
-- line 263: `raw_date := abi.find_one(li, `(?s)chapter-release-date[^>]*>.*?<i>([^<]+)</i>`)`
-- line 269: `Released_At = abi.date_to_iso(strings.trim_space(raw_date))`
-
-Verified at deploy: `app_data/plugins/mangaread/main.wasm` (413244 bytes, mtime 2026-10-20 G*KH15) **identical size/strings** to `examples/plugins/wasm/mangaread_odin/main.wasm` — both contain the literal `chapter-release-date` (1 hit via `strings`). So the **deployed wasm already includes the date parser**.
-
-Live fetch test:
-```
-GET /api/sandbox/plugins/mangaread/chapters/mangaread:12345
-→ {"error":"bridge: plugin mangaread is unreachable and manga mangaread:12345 has no cached copy"}
-```
-This is a **network/human-verification** failure (plugin unreachable), NOT a missing-field bug. Need a real manga id + human-verify cookies to test the parser end-to-end.
-
-### mangapill — intentionally NO release date
-`wasm/mangapill/main.go` — count 0. mangapill.com chapter listing HTML does not publish a per-chapter release date in the scraped markup, so the plugin intentionally omits `released_at` (empty). This is by design, not a bug.
-
-### 21 live plugins that do NOT parse `released_at`/dates (count = 0)
-
-| Plugin | Kind | Source path |
-|--------|------|-------------|
-| atsumaru | lua | `lua/atsumaru/main.lua` |
-| comix | lua | `lua/comix/main.lua` |
-| dynastyscan | lua | `lua/dynastyscan/main.lua` |
-| fanfox | lua | `lua/fanfox/main.lua` |
-| htmlscrape | lua | `lua/htmlscrape/main.lua` |
-| kaliscan | lua | `lua/kaliscan/main.lua` |
-| madaradex | lua | `lua/madaradex/main.lua` |
-| mangade | lua | `lua/mangade/main.lua` |
-| mangafreak | lua | `lua/mangafreak/main.lua` |
-| mangahere | lua | `lua/mangahere/main.lua` |
-| mangakatana | lua | `lua/mangakatana/main.lua` |
-| mangatown | lua | `lua/mangatown/main.lua` |
-| topmanhua | lua | `lua/topmanhua/main.lua` |
-| valirscans | lua | `lua/valirscans.lua` |
-| violetmanga | lua | `lua/violetmanga/main.lua` |
-| zeroscann | lua | `lua/zeroscann/main.lua` |
-| ksgroupscans | wasm (Go) | `wasm/ksgroupscans/main.go` |
-| mangade_odin | wasm (Odin) | `wasm/mangade_odin/main.odin` |
-| mangakatana_odin | wasm (Odin) | `wasm/mangakatana_odin/main.odin` |
-| violetmanga_odin | wasm (Odin) | `wasm/violetmanga_odin/main.odin` |
-| bato1 | yaegi | `yaegi/bato1/main.go` |
-
-(mangapill also count 0 — see note above.)
-
-### Representative "has released_at" plugins (for pattern reference)
-- `wasm/1manga/main.go:337` — `c.ReleasedAt = parseTime(hostString("text.date_to_iso", numStr(ch.Date)))`.
-- `wasm/mangak/main.go`, `wasm/reimanga_net/main.go`, `wasm/komix_to/main.go`, `wasm/manga_uno/main.go`, `wasm/lhtranslation/main.go` — all use `time.ParseInLocation` / `parseTime` + `ReleasedAt`.
-- `lua/mangaread/main.lua`, `lua/mangabuddy/main.lua`, `lua/mangasushi/main.lua` — Lua equivalents set `released_at`.
-- `wasm/atsumaru_odin/main.odin`, `wasm/dynastyscan_odin/main.odin`, `wasm/manga_uno_odin/main.odin`, `wasm/weebcentral_odin/main.odin` — Odin `abi.date_to_iso`.
-
----
-
-## Decision log
-- "tambahkan released_at ke mangaread" → **SKIPPED (N/A)**: mangaread_odin already parses `released_at` and live wasm contains the parser. Adding it would duplicate. If mangaread detail pages show no date, the cause is the live fetch failing (unreachable/challenge) — needs human-verify cookies, not plugin edits.
-- "tambahkan released_at ke X" for any of the 21 above → open new task; each needs source-HTML date-field discovery + `time.Parse`/`abi.date_to_iso` wiring + rebuild + `POST /reload`.
-
-## Next-action trigger
-- If/when a plugin from the "0 date" list is selected: `okf_search(query="released_at date_to_iso pattern", limit=3)` → follow 1manga/Odin pattern → deploy + `POST .../reload` + clear `plugin_cache` → `GET /api/sandbox/plugins/{id}/chapters/{mangaID:ch}`.
+# Related Concepts
+- [atsumaru released_at bug: epoch-millis field was never read](atsumaru-released-at-epoch-millis.md): Audit cites this concept: atsumaru-released-at-epoch-millis
+- [Recurring plugin failure patterns in goIsekai](plugin-failure-patterns.md): Audit cites this concept: plugin-failure-patterns
+- [Odin WASM plugin port candidates (Lua -> Odin)](odin-wasm-plugin-port-candidates.md): Audit cites this concept: odin-wasm-plugin-port-candidates
+- [Plugin detail view on /view/plugins (design)](plugin-detail-page-on-plugins-view.md): Live-plugins audit enumerates this plugin/source as part of coverage.
+- [Reader two-page view (side-by-side and stacked)](reader-two-page-view.md): Live-plugins audit enumerates this plugin/source as part of coverage.
+- [Hostnet CDP timeouts and page waits for SPA sites](hostnet-cdp-timeout-waits.md): Live-plugins audit enumerates this plugin/source as part of coverage.
+- [weebcentral.com plugin build spec from weebcentral_com_complete.har](weebcentral-plugin-build-spec.md): Live-plugins audit enumerates this plugin/source as part of coverage.
+- [Library duplicate-group colour bands](library-duplicate-colour-bands.md): Live-plugins audit enumerates this plugin/source as part of coverage.
+- [1manga: pages field arrives as plaintext JSON, not enc:v1](1manga-plaintext-pages-field.md): Live-plugins audit enumerates this plugin/source as part of coverage.
+- [Reader read-ahead verification](doc_reader-read-ahead-verification.md): Live-plugins audit enumerates this plugin/source as part of coverage.
+- [Comizy.io plugin build spec](comizy-plugin-build-spec.md): Live-plugins audit enumerates this plugin/source as part of coverage.
+- [MangaBuddy returned zero pages for every chapter - stale CDN host + cached empty answer](mangabuddy-empty-chapter-pages.md): Live-plugins audit enumerates this plugin/source as part of coverage.
+- [Plugin runtime export matrix (lua vs js vs yaegi vs go vs wasm)](plugin-runtime-export-matrix.md): Live-plugins audit enumerates this plugin/source as part of coverage.
+- [Zeroscann search/detail selector findings](zeroscann-search-detail-findings.md): Live-plugins audit enumerates this plugin/source as part of coverage.
+- [Host helper surface registry](host-helper-surface-registry.md): Live-plugins audit enumerates this plugin/source as part of coverage.
+- [Chapter lists came out oldest-first for weebcentral and comizy](chapter-order-newest-first-abi.md): Live-plugins audit enumerates this plugin/source as part of coverage.
+- [Detail-page read toggle, genre tags, and reader-prefs persistence](detail-page-read-genre-readerprefs-fixes.md): Live-plugins audit enumerates this plugin/source as part of coverage.
+- [Plan — Host-native helpers for JS/Lua plugins](doc_host-native-helpers-plan.md): Live-plugins audit enumerates this plugin/source as part of coverage.
+- [UI Polish Review](doc_ui-polish.md): Live-plugins audit enumerates this plugin/source as part of coverage.
+- [Enhance status startup log](enhance-status-log.md): Live-plugins audit enumerates this plugin/source as part of coverage.
+- [ABI extension: Manga.Rating + Chapter.Scanlator](abi-extend-rating-scanlator.md): Live-plugins audit enumerates this plugin/source as part of coverage.
+- [Comix.to plugin build spec](comix-plugin-build-spec.md): Live-plugins audit enumerates this plugin/source as part of coverage.
+- [Cover refresh vs clear actions](cover-refresh-vs-clear-actions.md): Live-plugins audit enumerates this plugin/source as part of coverage.
+- [A plugin reads its own volatile facts from plugin.json](plugin-json-params.md): Live-plugins audit enumerates this plugin/source as part of coverage.
+- [Sync upserts chapters but never pruned superseded rows - 196 removed](stale-chapter-rows-prune.md): Live-plugins audit enumerates this plugin/source as part of coverage.
+- [goIsekai agent handover](doc_handover.md): Live-plugins audit enumerates this plugin/source as part of coverage.
+- [Enrichment (info) scripts run as Odin wasm — discovery load-path fix](info-scripts-as-odin-wasm.md): Live-plugins audit enumerates this plugin/source as part of coverage.
+- [Onisaga Cloudflare challenge behavior](onisaga-cloudflare-challenge.md): Live-plugins audit enumerates this plugin/source as part of coverage.
+- [lhtranslation decodeString - sandbox passes a bare string, not JSON-encoded](lhtranslation-decodeString-sandbox-string-format.md): Live-plugins audit enumerates this plugin/source as part of coverage.
+- [Wails desktop client + tray wiring](wails-desktop-client-and-tray.md): Live-plugins audit enumerates this plugin/source as part of coverage.
+- [WASM backend sizes and the TinyGo port (Go vs TinyGo vs C++ vs Odin)](wasm-backend-sizes-and-tinygo-port.md): Live-plugins audit enumerates this plugin/source as part of coverage.
+- [Wasm plugin local helpers decision](wasm-plugin-local-helpers-decision.md): Live-plugins audit enumerates this plugin/source as part of coverage.
+- [WASM host helpers](doc_plugin-wasm-helpers.md): Live-plugins audit enumerates this plugin/source as part of coverage.
+- [Test coverage gaps in internal/pluginmanager](pluginmanager-test-coverage-gaps.md): Live-plugins audit enumerates this plugin/source as part of coverage.
+- [Session dailies 2026-08-29 to 2026-09-30](session-dailies-2026-08-29-to-09-30.md): Live-plugins audit enumerates this plugin/source as part of coverage.
+- [Dead code and merge candidates audit (2026-10-17)](dead-code-and-merge-audit-2026-10-17.md): Live-plugins audit enumerates this plugin/source as part of coverage.
+- [go-dl Go launcher reference](go-dl-toolchain-reference.md): Live-plugins audit enumerates this plugin/source as part of coverage.
+- [The released_at column was added on 20 Oct but the rows synced before it were never backfilled - the plugin was always right](released-at-backfill-gap.md): Live-plugins audit enumerates this plugin/source as part of coverage.
+- [Installing a wasm plugin deadlocked the host - ensureWasmRuntime took the manager lock its caller already held](wasm-install-deadlock.md): Live-plugins audit enumerates this plugin/source as part of coverage.
+- [goIsekai JSON API](doc_api.md): Live-plugins audit enumerates this plugin/source as part of coverage.
+- [Home reload NS_BINDING_ABORTED (saved-filter redirect)](home-reload-ns-binding-aborted.md): Live-plugins audit enumerates this plugin/source as part of coverage.
+- [MangaTaro.org API endpoints](mangataro-api-endpoints.md): Live-plugins audit enumerates this plugin/source as part of coverage.
+- [Native .so plugins are self-contained with zero DT_NEEDED entries](static-musl-so.md): Live-plugins audit enumerates this plugin/source as part of coverage.
+- [VioletManga search/detail selector findings](violetmanga-search-detail-findings.md): Live-plugins audit enumerates this plugin/source as part of coverage.
+- [Bulk "set this and before/after as read" hit the whole manga when chapter_num is 0](chapter-bound-zero-chapter-num.md): Live-plugins audit enumerates this plugin/source as part of coverage.
+- [goIsekai UI Specification](doc_ui-spec.md): Live-plugins audit enumerates this plugin/source as part of coverage.
+- [library_fts index sync and auto-heal](library-fts-index-sync.md): Live-plugins audit enumerates this plugin/source as part of coverage.
+- [1manga runs as a native .so plugin](native-1manga-plugin.md): Live-plugins audit enumerates this plugin/source as part of coverage.
+- [1manga search returned 0 results - two stacked GraphQL syntax bugs](1manga-two-stacked-graphql-bugs.md): Live-plugins audit enumerates this plugin/source as part of coverage.
+- [Multi-Worker Architecture](doc_feat_multiworker_arch.md): Live-plugins audit enumerates this plugin/source as part of coverage.
+- [Plugin Playground](doc_plugin-playground.md): Live-plugins audit enumerates this plugin/source as part of coverage.
+- [Library view URL is the source of truth (no localStorage filter persistence)](library-view-url-is-source-of-truth.md): Live-plugins audit enumerates this plugin/source as part of coverage.
+- [Reader loading cancel fix](reader-loading-cancel-fix.md): Live-plugins audit enumerates this plugin/source as part of coverage.
+- [Three Lua Plugins Converted to TinyGo WASM](three-lua-plugins-converted-to-tinygo-wasm.md): Live-plugins audit enumerates this plugin/source as part of coverage.
+- [1manga: port Lua to Go wasm via TinyGo](1manga-wasm-port.md): Live-plugins audit enumerates this plugin/source as part of coverage.
+- [Native .so plugin ABI (purego loader)](native-so-plugin-abi.md): Live-plugins audit enumerates this plugin/source as part of coverage.
+- [Native .so plugins build with zig c++ against static musl](native-zig-build.md): Live-plugins audit enumerates this plugin/source as part of coverage.
+- [Plugin logo sources and cache](plugin-logo-sources-and-cache.md): Live-plugins audit enumerates this plugin/source as part of coverage.
+- [Weebcentral search covers landed on the wrong title - one card renders two img](weebcentral-search-card-cover-alignment.md): Live-plugins audit enumerates this plugin/source as part of coverage.
+- [MangaDex API /manga?title= returns 0 for multi-word phrases that the website /search matches](mangadex-api-title-phrase-vs-website-search.md): Live-plugins audit enumerates this plugin/source as part of coverage.

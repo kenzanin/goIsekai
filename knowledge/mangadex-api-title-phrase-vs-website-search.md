@@ -1,15 +1,10 @@
 ---
-id: mangadex-api-title-phrase-vs-website-search
-title: MangaDex API /manga?title= returns 0 for multi-word phrases that the website /search matches
-description: >
-  The MangaDex REST API (api.mangadex.org/manga?title=<q>) uses exact-ish phrase
-  matching that differs from mangadex.org/search. A 4-word phrase
-  ("Isekai Shoukansareta kedo") yields 0 API hits while the site shows matches.
-  The mangadex Odin wasm plugin now falls back to shorter title prefixes.
 type: finding
+title: "MangaDex API /manga?title= returns 0 for multi-word phrases that the website /search matches"
+description: ">"
 tags: [goisekai, plugin, mangadex, wasm, odin, search, api, phrase-matching, fallback]
-generated:
-  at: "2026-10-27T04:30:00Z"
+generated: { by: human/kenzanin, at: "2026-10-28T07:10:59Z" }
+id: "mangadex-api-title-phrase-vs-website-search"
 ---
 
 # MangaDex API `/manga?title=` returns 0 for phrases the website `/search` matches

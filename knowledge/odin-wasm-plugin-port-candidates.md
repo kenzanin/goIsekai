@@ -1,20 +1,10 @@
 ---
 type: port
-id: odin-wasm-plugin-port-candidates
-title: Odin WASM plugin port candidates (Lua -> Odin)
-description: >
-  Tier-ranked list of Lua plugins that are already ported to Odin in
-  examples/plugins/wasm/*_odin/, plus the verification state and next
-  candidate for migration. Based on the helper-parity gate and live A/B.
-tags:
-  - goisekai
-  - plugins
-  - wasm
-  - odin
-  - migration
-generated:
-  by: process:reasonix
-  at: "2026-10-19T00:00:00Z"
+title: "Odin WASM plugin port candidates (Lua -> Odin)"
+description: "Tier-ranked list of Lua plugins already ported to Odin in examples/plugins/wasm/*_odin/, with verification state and the next candidate for migration, based on the helper-parity gate and live A/B."
+tags: [goisekai, plugins, wasm, odin, migration]
+generated: { by: agent/cli, at: "2026-10-28T07:02:37Z" }
+id: "odin-wasm-plugin-port-candidates"
 ---
 
 # Odin WASM plugin port candidates (Lua -> Odin)
