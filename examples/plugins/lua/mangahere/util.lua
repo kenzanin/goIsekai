@@ -84,26 +84,34 @@ function util.parse_manga_detail(html, manga_id)
 end
 
 -- ─── Chapter list parsing ──────────────────────────────────────────────────
--- Same detail page. Links: href="/manga/{slug}/c080/1.html" with title
--- "Kumo desu ga, nani ka? Ch.080" and a date in <p class="title2">Nov 18,2016 </p>.
--- The number is rebuilt from the path (c([0-9.]+)) — padded/decimal safe.
+-- Same detail page. Each chapter row is a link to /manga/{slug}/{cXX}/1.html
+-- followed by a <p class="title2">Nov 18,2016 </p> release date. Capture
+-- (path, raw_date) pairs in one gmatch so every date stays pinned to its row;
+-- the number is rebuilt from the path (c([0-9.]+)) — padded/decimal safe.
 
 function util.parse_chapter_list(html, manga_id)
 	local chapters = {}
 	local seen = {}
-	local pattern = [[href="/manga/]] .. manga_id .. [[/(c[0-9.]+)/1\.html" title="[^"]*"]]
 
-	for rest in host.regex.gmatch(html, pattern) do
-		local num = tonumber(host.regex.find(rest, [[c([0-9][0-9.]*)$]]))
-		if num ~= nil and not seen[rest] then
-			seen[rest] = true
-			chapters[#chapters + 1] = {
-				id = manga_id .. "/" .. rest,
+	-- Capture only the chapter slug (c021.5), not the full /1.html path, so the
+	-- num extraction ('c([0-9][0-9.]*)$') still anchors at the string end. The
+	-- URL is rebuilt as {slug}/{c-num}/1.html below. Capturing [^"]+ would drag
+	-- /1.html into the capture and silently drop every chapter.
+	local pattern = '<a href="/manga/' .. manga_id .. '/(c[0-9.]+)/1\\.html"[^>]*>.*?<p class="title2">([^<]+)</p>'
+	for path, raw_date in host.regex.gmatch(html, pattern) do
+		local num = tonumber(host.regex.find(path, 'c([0-9][0-9.]*)$'))
+		if num ~= nil and not seen[path] then
+			seen[path] = true
+			local iso = host.text.date_to_iso(host.text.trim(raw_date or ""))
+			local ch = {
+				id = manga_id .. "/" .. path,
 				manga_id = manga_id,
 				chapter_num = num,
 				title = string.format("Chapter %g", num),
-				url = "https://www.mangahere.cc/manga/" .. manga_id .. "/" .. rest .. "/1.html",
+				url = "https://www.mangahere.cc/manga/" .. manga_id .. "/" .. path .. "/1.html",
 			}
+			if iso ~= "" then ch.released_at = iso end
+			chapters[#chapters + 1] = ch
 		end
 	end
 

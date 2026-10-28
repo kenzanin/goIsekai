@@ -26,6 +26,7 @@ func TestParseDateVectors(t *testing.T) {
 		{"relative weeks", "3 weeks ago", now.Add(-3 * 7 * 24 * time.Hour)},
 		{"iso date", "2024-03-05", time.Date(2024, 3, 5, 0, 0, 0, 0, time.UTC)},
 		{"us written", "Jan 2, 2006", time.Date(2006, 1, 2, 0, 0, 0, 0, time.UTC)},
+		{"us written no space", "Jan 2,2006", time.Date(2006, 1, 2, 0, 0, 0, 0, time.UTC)},
 		{"rfc3339", "2024-03-05T10:30:00Z", time.Date(2024, 3, 5, 10, 30, 0, 0, time.UTC)},
 	}
 	for _, tc := range cases {
