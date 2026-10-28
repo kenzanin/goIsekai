@@ -99,6 +99,33 @@ first_of :: proc (subject: string, patterns: ..string) -> string {
 	return ""
 }
 
+// normalize_mangaread_date converts mangaread's dotted day-first dates
+// ("15.10.2026") into the ISO "2006-01-02" shape that the host's date_to_iso
+// understands. Other shapes are passed through untouched; an unparseable value
+// becomes "" so the field is omitted rather than emitted as the zero time.
+normalize_mangaread_date :: proc (s: string) -> string {
+	if s == "" {
+		return ""
+	}
+	// DD.MM.YYYY (optionally zero-padded).
+	matches := abi.find_all(s, `(\d+)`)
+	if len(matches) == 3 {
+		day := matches[0]
+		mon := matches[1]
+		year := matches[2]
+		// pad day and month to two digits
+		if len(day) == 1 {
+			day = strings.concatenate({"0", day})
+		}
+		if len(mon) == 1 {
+			mon = strings.concatenate({"0", mon})
+		}
+		return strings.concatenate({year, "-", mon, "-", day})
+	}
+	// Pass through anything the host's date_to_iso may already understand.
+	return s
+}
+
 // ─── search ─────────────────────────────────────────────────────────────────
 
 search_impl :: proc (arg: string) -> string {
@@ -260,13 +287,13 @@ chapters_impl :: proc (arg: string) -> string {
 			continue
 		}
 		seen[cid] = true
-		raw_date := abi.find_one(li, `(?s)chapter-release-date[^>]*>.*?<i>([^<]+)</i>`)
+		raw_date := strings.trim_space(abi.find_one(li, `(?s)chapter-release-date[^>]*>.*?<i>([^<]+)</i>`))
 		append(&out, Chapter_Out {
 			ID = strings.concatenate({slug, ":", cid}),
 			Manga_ID = slug,
 			Title = label,
 			Chapter_Num = abi.chapter_num(label),
-			Released_At = abi.date_to_iso(strings.trim_space(raw_date)),
+			Released_At = abi.date_to_iso(normalize_mangaread_date(raw_date)),
 			URL = href,
 		})
 	}
