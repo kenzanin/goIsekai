@@ -1,4 +1,9 @@
 ## 2026-10-28
+* **Update**: Linked `0150-live-plugins-date-info-status.md` to `1manga-plaintext-pages-field.md` (0150 audit: 1manga-plaintext-pages-field is among the 17 live plugins that do not parse a chapter release date (hits=0 in source scan).).
+* **Update**: Linked `0150-live-plugins-date-info-status.md` to `comix-plugin-build-spec.md` (0150 audit: comix-plugin-build-spec is among the 17 live plugins that do not parse a chapter release date (hits=0 in source scan).).
+* **Update**: Linked `0150-live-plugins-date-info-status.md` to `atsumaru-released-at-epoch-millis.md` (0150 audit: atsumaru-released-at-epoch-millis is among the 17 live plugins that do not parse a chapter release date (hits=0 in source scan).).
+* **Update**: Linked `0150-live-plugins-date-info-status.md` to `0149-live-plugins-audit-and-builder-versions.md` (Extends the live plugins + builder-versions audit with an explicit released_at/chapter-date parsing checklist across all 41 live plugins (supersedes the partial date note in 0149).).
+* **Creation**: Documented concept `0150-live-plugins-date-info-status.md` (Live plugin released_at/chapter-date parsing status across all 41 live plugins).
 * **Update**: Linked `0149-live-plugins-audit-and-builder-versions.md` to `mangadex-api-title-phrase-vs-website-search.md` (Live-plugins audit enumerates this plugin/source as part of coverage.).
 * **Update**: Linked `0149-live-plugins-audit-and-builder-versions.md` to `weebcentral-search-card-cover-alignment.md` (Live-plugins audit enumerates this plugin/source as part of coverage.).
 * **Update**: Linked `0149-live-plugins-audit-and-builder-versions.md` to `plugin-logo-sources-and-cache.md` (Live-plugins audit enumerates this plugin/source as part of coverage.).
