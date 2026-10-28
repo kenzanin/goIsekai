@@ -1,4 +1,9 @@
 ## 2026-10-28
+* **Update**: Linked `cef-embedded-browser-for-smooth-render.md` to `wails-desktop-client-and-tray.md` (CEF approach replaces Wails/WebKit for smooth reader view rendering where WebKit shows scroll jank on image-heavy content.).
+* **Creation**: Documented concept `cef-embedded-browser-for-smooth-render.md` (CEF embedded browser for smooth UI rendering + CF bypass option).
+* **Update**: Updated concept `cef-embedded-browser-for-cf-bypass.md`.
+* **Creation**: Documented concept `cef-embedded-browser-for-cf-bypass.md` (CEF embedded browser for Cloudflare bypass).
+* **Update**: Updated concept `0150-live-plugins-date-info-status.md`.
 * **Update**: Linked `0150-live-plugins-date-info-status.md` to `1manga-plaintext-pages-field.md` (0150 audit: 1manga-plaintext-pages-field is among the 17 live plugins that do not parse a chapter release date (hits=0 in source scan).).
 * **Update**: Linked `0150-live-plugins-date-info-status.md` to `comix-plugin-build-spec.md` (0150 audit: comix-plugin-build-spec is among the 17 live plugins that do not parse a chapter release date (hits=0 in source scan).).
 * **Update**: Linked `0150-live-plugins-date-info-status.md` to `atsumaru-released-at-epoch-millis.md` (0150 audit: atsumaru-released-at-epoch-millis is among the 17 live plugins that do not parse a chapter release date (hits=0 in source scan).).

@@ -142,21 +142,29 @@ function get_chapter_list(arg)
         log.error("comix: browser fetch failed for chapters: " .. slug)
         return nil, "upstream_unavailable"
     end
-    -- <a class="mchap-row__primary" href="/title/<slug>/<id>-chapter-<num>">
-    --   <span class="mchap-row__ch">Ch.43.2</span>
+    -- Chapters are client-rendered; use the browser. Link + span:
+    --   <a class="mchap-row__primary" href="/title/<slug>/<id>-chapter-<num>">
+    --     <span class="mchap-row__ch">Ch.43.2</span>
+    --     ... <time datetime="YYYY-MM-DD">...</time>
     local out = {}
-    for _, m in ipairs(find_all(html, [[(?s)<a class="mchap-row__primary" href="(/title/[^"]+/([^"]+))">.*?<span class="mchap-row__ch">([^<]+)</span>]]) or {}) do
-        local href, chid, chtitle = m[1], m[2], m[3]
+    for _, m in ipairs(find_all(html, [[(?s)<a class="mchap-row__primary" href="(/title/[^"]+/([^"]+))">.*?<span class="mchap-row__ch">([^<]+)</span>.*?<time datetime="([^"]+)">]]) or {}) do
+        local href, chid, chtitle, raw_date = m[1], m[2], m[3], m[4]
         -- Chapter number from "Ch.43.2" or the URL tail.
         local num = string.match(chtitle, "Ch%.([%d%.]+)")
         if not num then
             num = string.match(chid, "chapter%-([%d%.]+)")
         end
-        out[#out + 1] = {
+        local ch = {
             id = slug .. ":" .. chid,
             chapter_num = tonumber(num) or 0,
             title = chtitle,
         }
+        -- <time datetime="2026-07-04"> is already ISO-8601 date — host
+        -- date_to_iso accepts "2006-01-02" directly. Mirrors atsumaru
+        end pattern, skip if absent (host keeps zero value).
+        local iso = host.text.date_to_iso(host.text.trim(raw_date or ""))
+        if iso ~= "" then ch.released_at = iso end
+        out[#out + 1] = ch
     end
 log.info("comix: found " .. tostring(#out) .. " chapters for " .. slug)
     -- Site already renders newest first; keep document order.

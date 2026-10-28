@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Goisekai</title>
+  <link rel="stylesheet" href="./lib/tailwind.css">
+</head>
+<body x-cloak>
+  <!-- Reader/scroll container: rendered by the CEF webview.
+       Plain Alpine.js (no rewrite needed) — the migration keeps
+       cmd/goisekai/frontend/lib/alpine-components.js verbatim. -->
+  <div id="app" x-data="appState" x-init="init()">
+    <template x-if="view === 'reader'">
+      <div id="reader-scroll" style="overflow-y:auto">
+        <!-- image list injected here; CEF native scroll avoids Qt6 WebEngine jank -->
+      </div>
+    </template>
+  </div>
+  <script src="./lib/alpine.min.js" defer></script>
+  <script src="./lib/alpine-components.js" defer></script>
+  <script src="./lib/reader.js" defer></script>
+</body>
+</html>

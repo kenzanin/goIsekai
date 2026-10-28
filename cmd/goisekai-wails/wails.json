@@ -1,0 +1,30 @@
+{
+  "wailsversion": "v3",
+  "projectName": "goisekai-wails",
+  "outputfilename": "goisekai-wails",
+  "mainbridge": {
+    "enabled": true,
+    "html": "GoisekaiWails",
+    "classname": "GoisekaiWails"
+  },
+  "window": {
+    "Title": "Goisekai",
+    "Width": 1280,
+    "Height": 800,
+    "Resizable": true,
+    "Fullscreen": false,
+    "DisableWindowDecorations": false
+  },
+  "frontend": {
+    "dir": "frontend"
+  },
+  "cef": {
+    "enabled": true,
+    "libcefPath": "/usr/lib/cef/libcef.so",
+    "useSystemCef": true
+  },
+  "build": {
+    "useModernBuild": true,
+    "productName": "Goisekai"
+  }
+}
