@@ -1,3 +1,6 @@
+## 2026-10-29
+* **Creation**: Documented concept `plans/alt-cover-picker-cache-mismatch.md` (Alt-cover picker cache mismatch (thumb vs full-size URL)).
+
 ## 2026-10-28
 * **Creation**: Documented concept `plans/har-plugin-candidates-sanascans-first.md` (HAR plugin candidates: sanascans first).
 * **Update**: Linked `cef-embedded-browser-for-smooth-render.md` to `wails-desktop-client-and-tray.md` (CEF approach replaces Wails/WebKit for smooth reader view rendering where WebKit shows scroll jank on image-heavy content.).

@@ -1,2 +1,3 @@
 # Plans
 * [HAR plugin candidates: sanascans first](har-plugin-candidates-sanascans-first.md) - HAR-vs-plugin audit 2026-10-29: 7 HARs lack plugins; sanascans (SSR TanStack, ISO dates, no auth) chosen as easiest next plugin; full plan with search/detail/chapter strategy and fallbacks recorded.
+* [Alt-cover picker cache mismatch (thumb vs full-size URL)](alt-cover-picker-cache-mismatch.md) - Why picking an alt cover re-downloads although the grid showed it: the picker displays .256.jpg thumbs while setCover stores/downloads the full-size URL — different cache keys by design. Deferred fix: background-prefetch full-size candidates when the picker opens (option B).
