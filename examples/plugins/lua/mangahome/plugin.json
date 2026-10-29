@@ -1,0 +1,10 @@
+{
+  "name": "MangaHome",
+  "timeout": 60,
+  "site_url": "https://www.mangahome.com",
+  "logo": "logo.png",
+  "contract_version": 1,
+  "params": {
+    "site_url": "https://www.mangahome.com"
+  }
+}
