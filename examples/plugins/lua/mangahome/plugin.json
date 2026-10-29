@@ -4,6 +4,7 @@
   "site_url": "https://www.mangahome.com",
   "logo": "logo.png",
   "contract_version": 1,
+  "paginates": true,
   "params": {
     "site_url": "https://www.mangahome.com"
   }

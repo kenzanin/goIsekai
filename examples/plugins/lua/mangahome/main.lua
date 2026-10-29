@@ -43,17 +43,38 @@ end
 
 -- ─── ABI: search ───────────────────────────────────────────────────────────
 -- SSR cards: <a title="<title>" href="/manga/<slug>">...<img src="<cover>">.
--- Cover img follows the title anchor inside the card row.
+-- Pagination: ?page=N (12 cards/page, ~2015 results for "dungeon").
+-- Genre filter: /<genre-slug>?name=<q> (e.g. /action?name=dungeon) — the
+-- directory's own browse path; slugs from get_genres.
 function search(arg)
 	local a = host.json.decode(arg)
 	if type(a) == "string" then a = { query = a, page = 1 } end
 	local query = (a and a.query) or ""
-	if query == "" then
-		return host.json.encode({})
+	local page = tonumber(a.page) or 1
+	local genres = a and (a.genres or {})
+	local url
+	if #genres > 0 then
+		-- Genre browse: first genre wins. Empty query is valid — the genre
+		-- page lists everything in the genre.
+		url = BASE .. "/" .. tostring(genres[1])
+		if query ~= "" then
+			url = url .. "?name=" .. host.text.url_encode(query)
+		end
+		if page > 1 then
+			url = url .. (query ~= "" and "&" or "?") .. "page=" .. tostring(page)
+		end
+	else
+		if query == "" then
+			return host.json.encode({})
+		end
+		url = BASE .. "/search?name=" .. host.text.url_encode(query)
+		if page > 1 then
+			url = url .. "&page=" .. tostring(page)
+		end
 	end
-	local body = host.http.get_body(BASE .. "/search?name=" .. host.text.url_encode(query))
+	local body = host.http.get_body(url)
 	if not body or body == "" then
-		log.error("search fetch failed for: " .. query)
+		log.error("search fetch failed for: " .. url)
 		return nil, "upstream_unavailable"
 	end
 	-- Cards: title anchor then the cover img; scan each /manga/ link and take
@@ -210,15 +231,38 @@ function get_page_list(arg)
 end
 
 -- ─── ABI: get_genres ──────────────────────────────────────────────────────
--- /directory genre chips (same taxonomy as mangahere).
+-- Directory genre chips: <a href="/<slug>" title="<Name>">Name</a> under the
+-- "Genres:" filter. Slugs double as browse paths (/action?name=<q>).
 function get_genres()
 	return host.json.encode({
-		"action", "adventure", "comedy", "detective", "drama", "fantasy",
-		"gender-bender", "harem", "historical", "horror", "josei", "magic",
-		"martial-arts", "mature", "mecha", "mystery", "one-shot",
-		"psychological", "romance", "school-life", "sci-fi", "seinen",
-		"shoujo", "shoujo-ai", "shounen", "shounen-ai", "slice-of-life",
-		"sports", "supernatural", "tragedy", "webtoons", "yuri",
+		{ name = "Action",        slug = "action" },
+		{ name = "Adventure",     slug = "adventure" },
+		{ name = "Comedy",        slug = "comedy" },
+		{ name = "Doujinshi",     slug = "doujinshi" },
+		{ name = "Drama",         slug = "drama" },
+		{ name = "Ecchi",         slug = "ecchi" },
+		{ name = "Fantasy",       slug = "fantasy" },
+		{ name = "Harem",         slug = "harem" },
+		{ name = "Historical",    slug = "historical" },
+		{ name = "Horror",        slug = "horror" },
+		{ name = "Josei",         slug = "josei" },
+		{ name = "Mature",        slug = "mature" },
+		{ name = "Mecha",         slug = "mecha" },
+		{ name = "Mystery",       slug = "mystery" },
+		{ name = "Psychological", slug = "psychological" },
+		{ name = "Romance",       slug = "romance" },
+		{ name = "Sci-fi",        slug = "sci-fi" },
+		{ name = "Seinen",        slug = "seinen" },
+		{ name = "Shoujo",        slug = "shoujo" },
+		{ name = "Shounen",       slug = "shounen" },
+		{ name = "Sports",        slug = "sports" },
+		{ name = "Supernatural",  slug = "supernatural" },
+		{ name = "Tragedy",       slug = "tragedy" },
+		{ name = "Yaoi",          slug = "yaoi" },
+		{ name = "Yuri",          slug = "yuri" },
+		{ name = "Manga",         slug = "manga" },
+		{ name = "Manhwa",        slug = "manhwa" },
+		{ name = "Manhua",        slug = "manhua" },
 	})
 end
 
