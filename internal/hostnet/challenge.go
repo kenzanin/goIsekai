@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"strings"
 	"time"
 
@@ -22,6 +23,35 @@ func isChallengeResponse(resp types.HTTPResponse) bool {
 		return false
 	}
 	return IsChallengeResponse(resp.Status, []byte(resp.Body))
+}
+
+// isTransientReadErr reports whether a body-read failure is a flaky-network
+// reset worth retrying the whole request for: RST mid-stream from a flaky ISP
+// edge, connection timeouts, and the EOF variants a truncated body raises. A
+// clean 4xx/5xx status never lands here — that path fails before the body
+// read — so this only ever sees transport-level damage.
+func isTransientReadErr(err error) bool {
+	if err == nil {
+		return false
+	}
+	if errors.Is(err, context.DeadlineExceeded) || errors.Is(err, context.Canceled) {
+		return false // caller gave up; do not burn another connection
+	}
+	msg := err.Error()
+	for _, marker := range []string{
+		"connection reset by peer",
+		"connection reset",
+		"unexpected EOF",
+		"broken pipe",
+		"connection reset",
+		"read: connection",
+		"EOF",
+	} {
+		if strings.Contains(msg, marker) {
+			return true
+		}
+	}
+	return errors.Is(err, io.ErrUnexpectedEOF)
 }
 
 // solveAndSeed runs the browser engine against targetURL and seeds the

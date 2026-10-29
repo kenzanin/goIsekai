@@ -128,9 +128,26 @@ func (p *Proxy) doRequestProfile(ctx context.Context, pluginID, profileName stri
 	}
 	defer func() { _ = resp.Body.Close() }()
 
-	raw, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return types.HTTPResponse{}, fmt.Errorf("hostnet: read response body: %w", err)
+	// Flaky ISP edges reset the TCP connection mid-body-read ("read:
+	// connection reset by peer"). The response headers already committed, so
+	// a partial body is unrecoverable — but a fresh connection usually
+	// succeeds, so retry the whole request a couple of times on that specific
+	// transient read error before giving up.
+	var raw []byte
+	for readAttempt := range 3 {
+		raw, err = io.ReadAll(resp.Body)
+		if err == nil {
+			break
+		}
+		if !isTransientReadErr(err) || ctx.Err() != nil {
+			return types.HTTPResponse{}, fmt.Errorf("hostnet: read response body: %w", err)
+		}
+		resp.Body.Close()
+		resp, err = client.Do(httpReq)
+		if err != nil {
+			return types.HTTPResponse{}, fmt.Errorf("hostnet: retry execute request: %w", err)
+		}
+		_ = readAttempt
 	}
 
 	return types.HTTPResponse{

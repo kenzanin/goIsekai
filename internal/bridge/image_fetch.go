@@ -91,35 +91,37 @@ func (s *AppService) fetchImage(ctx context.Context, pluginID, url string, heade
 			logger.Debug("image fetch abandoned", "url", url, "plugin", pluginID, "reason", ctx.Err())
 			return nil, ctx.Err()
 		}
-		var won string
-		for _, ref := range refs {
-			// Only at-home nodes burst-reject; pacing a CDN that serves bursts
-			// just adds a needless ~1.1s per image to the cover picker.
-			if pace {
-				s.paceImage(host)
-			}
-			resp, err = s.proxy.RequestContext(ctx, pluginID, types.HTTPRequest{
-				Method:  http.MethodGet,
-				URL:     url,
-				Headers: withReferer(headers, ref),
-			})
-			if ctx.Err() == nil && err == nil && resp.Status >= 200 && resp.Status < 300 {
-				// MangaDex serves a deterministic placeholder (59480 B, 600x642,
-				// SHA256 699b7af3...) with HTTP 200 when a foreign Referer is sent.
-				// It is a valid JPEG so validateImageFull passes it; reject it
-				// explicitly and don't memoize the ref that returned it.
-				if isPlaceholderImage([]byte(resp.Body)) {
-					logger.Warn("image placeholder rejected", "url", url, "ref", ref, "bytes", len(resp.Body))
-					resp = types.HTTPResponse{Status: 0}
-					err = fmt.Errorf("placeholder image")
-					continue
-				}
-				won = ref
-				break
-			}
+		// One request per attempt, cycling the referer ladder in round-robin.
+		// A connection reset (flaky ISP / mid-body RST from the CDN edge) is a
+		// transient host-level failure, not a referer problem, so the same ref
+		// gets another shot on the next attempt instead of every attempt
+		// spending its whole ladder on requests that all get reset the same
+		// way. The round-robin keeps the HTTP-status ladder intact: a 4xx/5xx
+		// rejection means "this referer is wrong", so the next attempt moves
+		// to the next candidate (the memoized win still stops the cycle).
+		ref := refs[attempt%len(refs)]
+		// Only at-home nodes burst-reject; pacing a CDN that serves bursts
+		// just adds a needless ~1.1s per image to the cover picker.
+		if pace {
+			s.paceImage(host)
 		}
-		if won != "" {
-			s.memorizeReferer(host, won)
+		resp, err = s.proxy.RequestContext(ctx, pluginID, types.HTTPRequest{
+			Method:  http.MethodGet,
+			URL:     url,
+			Headers: withReferer(headers, ref),
+		})
+		if ctx.Err() == nil && err == nil && resp.Status >= 200 && resp.Status < 300 {
+			// MangaDex serves a deterministic placeholder (59480 B, 600x642,
+			// SHA256 699b7af3...) with HTTP 200 when a foreign Referer is sent.
+			// It is a valid JPEG so validateImageFull passes it; reject it
+			// explicitly and don't memoize the ref that returned it.
+			if isPlaceholderImage([]byte(resp.Body)) {
+				logger.Warn("image placeholder rejected", "url", url, "ref", ref, "bytes", len(resp.Body))
+				resp = types.HTTPResponse{Status: 0}
+				err = fmt.Errorf("placeholder image")
+			} else {
+				s.memorizeReferer(host, ref)
+			}
 		}
 		if ctx.Err() != nil {
 			logger.Debug("image fetch abandoned", "url", url, "plugin", pluginID, "reason", ctx.Err())

@@ -457,10 +457,10 @@ func TestGetImageNonSuccessNotCached(t *testing.T) {
 		t.Fatal("expected error on second call too")
 	}
 	// Each GetImage retries up to 3 attempts (at-home burst rate-limit
-	// workaround) with 2 referer candidates per attempt, so two calls
-	// observe 12 upstream hits.
-	if got := hits.Load(); got != 12 {
-		t.Errorf("expected 12 network hits (2 calls x 3 attempts x 2 refs, errors not cached), got %d", got)
+	// workaround), one referer candidate per attempt (round-robin), so two
+	// calls observe 6 upstream hits.
+	if got := hits.Load(); got != 6 {
+		t.Errorf("expected 6 network hits (2 calls x 3 attempts x 1 ref, errors not cached), got %d", got)
 	}
 }
 

@@ -69,12 +69,14 @@ function search(arg)
         log.error("search fetch failed for: " .. query)
         return nil, "upstream_unavailable"
     end
-    -- Cards: <a href="/series/<slug>" ...><img class=... alt="<title>" src="<cover>"...>
-    -- (attribute order is alt BEFORE src on sanascans).
+    -- Cards: <a href="/series/<slug>" ...><img ... alt="Cover of <title>" src="<cover>">
+    -- (attribute order is alt BEFORE src; the site prefixes many card alts
+    -- with "Cover of " — strip it so titles stay clean.)
     local out, seen = {}, {}
     for _, m in ipairs(find_all(body,
         [[(?s)<a href="/series/([^"]+)"[^>]*>.*?<img[^>]*alt="([^"]*)"[^>]*src="([^"]+)"]]) or {}) do
         local slug, title, cover = m[1], m[2], m[3]
+        title = string.gsub(title, "^Cover [Oo]f%s+", "")
         if not seen[slug] then
             seen[slug] = true
             out[#out + 1] = {
@@ -101,9 +103,11 @@ function get_manga_detail(arg)
         log.error("detail fetch failed for: " .. slug)
         return nil, "upstream_unavailable"
     end
-    -- SEO / OpenGraph metadata is the most stable source on sanascans.
-    local cover = first_iso(body) and nil  -- placeholder; cover extracted below
-    cover = html_decode((string.match(body, 'property="og:image" content="([^"]+)"'))
+    -- Real cover: the itemProp="image" img src (full art). og:image on this
+    -- site is a generated og-card with title overlay — cropped, so use it
+    -- only as fallback.
+    cover = html_decode((string.match(body, 'itemProp="image"[^>]-src="([^"]+)"'))
+           or (string.match(body, 'property="og:image" content="([^"]+)"'))
            or (string.match(body, '"image":"([^"]+)"')) or "")
     local title = html_decode((string.match(body, 'property="og:title" content="([^"]+)"'))
             or (string.match(body, '"name":"([^"]*)"')) or slug)
