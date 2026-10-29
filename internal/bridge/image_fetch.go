@@ -60,9 +60,26 @@ func (s *AppService) fetchImage(ctx context.Context, pluginID, url string, heade
 	refs := []string{""}
 	if !hasHeader(headers, "Referer") {
 		if w, ok := s.memorizedReferer(host); ok {
+			// The memo leads but must not BE the ladder: MangaDex serves a
+			// 200 placeholder for some covers with a ref that worked for
+			// others, so a single-ref ladder burns all three attempts on
+			// the same wrong Referer.
 			refs = []string{w}
+			for _, cand := range refererCandidates(url, s.mgr.SiteURL(pluginID)) {
+				refs = appendUnique(refs, cand)
+			}
 		} else {
 			refs = refererCandidates(url, s.mgr.SiteURL(pluginID))
+		}
+	} else {
+		// A caller-supplied Referer leads, but it is not authoritative:
+		// MangaDex answers a foreign Referer with an HTTP 200 placeholder,
+		// which is indistinguishable from success until the body is
+		// validated. Append the standard ladder so a placeholder caller ref
+		// falls through to the image origin and no-referer candidates
+		// instead of exhausting all three attempts on the same wrong ref.
+		for _, cand := range refererCandidates(url, s.mgr.SiteURL(pluginID)) {
+			refs = appendUnique(refs, cand)
 		}
 	}
 	var resp types.HTTPResponse
