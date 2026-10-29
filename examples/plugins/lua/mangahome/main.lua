@@ -72,14 +72,34 @@ function search(arg)
 			url = url .. "&page=" .. tostring(page)
 		end
 	end
-	local body = host.http.get_body(url)
-	if not body or body == "" then
-		log.error("search fetch failed for: " .. url)
+	-- The host slices searchPageSize (30) rows per UI page and gates the pager
+	-- on a full page, but mangahome serves only 12 cards per upstream page —
+	-- a 12-row answer reads as "last page" and the pager never renders. So one
+	-- plugin invoke fetches 3 upstream pages (36 rows >= 30): UI page P maps to
+	-- upstream pages (P-1)*3+1 .. P*3 for plain searches. Genre browse keeps a
+	-- single upstream fetch (the combined filter is a niche path).
+	local bodies = {}
+	if #genres == 0 then
+		local first = (page - 1) * 3 + 1
+		for p = first, first + 2 do
+			local u = BASE .. "/search?name=" .. host.text.url_encode(query)
+			if p > 1 then u = u .. "&page=" .. tostring(p) end
+			local b = host.http.get_body(u)
+			if b and b ~= "" then bodies[#bodies + 1] = b end
+			if not b or b == "" then break end
+		end
+	else
+		local b = host.http.get_body(url)
+		if b and b ~= "" then bodies[1] = b end
+	end
+	if #bodies == 0 then
+		log.error("search fetch failed for: " .. query)
 		return nil, "upstream_unavailable"
 	end
 	-- Cards: title anchor then the cover img; scan each /manga/ link and take
 	-- the first following <img src="//...">.
 	local out, seen = {}, {}
+	for _, body in ipairs(bodies) do
 	local pos = string.find(body, 'href="/manga/', 1, true)
 	while pos do
 		local slug = string.match(body, 'href="/manga/([%w_]+)"', pos)
@@ -101,6 +121,7 @@ function search(arg)
 			end
 		end
 		pos = string.find(body, 'href="/manga/', pos + 12, true)
+	end
 	end
 	log.info("search found " .. tostring(#out) .. " for " .. query)
 	return host.json.encode(out)
