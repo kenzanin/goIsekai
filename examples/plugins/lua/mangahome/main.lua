@@ -78,18 +78,22 @@ function search(arg)
 	-- plugin invoke fetches 3 upstream pages (36 rows >= 30): UI page P maps to
 	-- upstream pages (P-1)*3+1 .. P*3 for plain searches. Genre browse keeps a
 	-- single upstream fetch (the combined filter is a niche path).
+	-- The site serves different HTML depending on User-Agent: the Go default
+	-- returns a JS shell without the manga card, but a browser UA triggers the
+	-- full SSR markup. We carry a browser-like UA on all content-page fetches.
+	local browser_ua = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
 	local bodies = {}
 	if #genres == 0 then
 		local first = (page - 1) * 3 + 1
 		for p = first, first + 2 do
 			local u = BASE .. "/search?name=" .. host.text.url_encode(query)
 			if p > 1 then u = u .. "&page=" .. tostring(p) end
-			local b = host.http.get_body(u)
+			local b = host.http.get_body(u, { ["User-Agent"] = browser_ua })
 			if b and b ~= "" then bodies[#bodies + 1] = b end
 			if not b or b == "" then break end
 		end
 	else
-		local b = host.http.get_body(url)
+		local b = host.http.get_body(url, { ["User-Agent"] = browser_ua })
 		if b and b ~= "" then bodies[1] = b end
 	end
 	if #bodies == 0 then
@@ -135,7 +139,9 @@ function get_manga_detail(arg)
 	if not id or id == "" then
 		return host.json.encode({})
 	end
-	local body = host.http.get_body(BASE .. "/manga/" .. id)
+	local body = host.http.get_body(BASE .. "/manga/" .. id, {
+		["User-Agent"] = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+	})
 	if not body or body == "" then
 		log.error("detail fetch failed for: " .. id)
 		return nil, "upstream_unavailable"
@@ -145,9 +151,31 @@ function get_manga_detail(arg)
 	raw = string.gsub(raw, "Manga%s*-%s*Read.*$", "")
 	raw = string.gsub(raw, "Manga%s*$", "")
 	local title = html_decode(trim(raw))
-	local cover = string.match(body, '<img[^>]*class="[^"]*manga[^"]*"[^>]*src="((?:https?:)?//[^"]+)"')
+	log.debug("mangahome detail body=" .. tostring(#body) .. " bytes; detail-cover hits="
+		.. tostring((select(2, body:gsub("detail-cover", ""))))
+		.. "; ocover hits=" .. tostring((select(2, body:gsub("ocover", ""))))
+		.. "; postbig hits=" .. tostring((select(2, body:gsub("postbig-cover", "")))))
+	-- The manga's own cover is the <img class="detail-cover">; its src comes
+	-- FIRST (attribute order), so capture src anywhere and require the class
+	-- marker to follow within the tag. (The "latest/recommended" cards use
+	-- class="postbig-cover" — they also carry an ocover.jpg src but never
+	-- the detail-cover class.)
+	-- Debug: log the first ocover src we actually see, so we can diagnose
+	-- what HTML the host fetched when the detail-cover pattern misses.
+	local ocover_src = string.match(body, 'src="([^"]*ocover%.jpg[^"]*)"')
+	if ocover_src then
+		log.debug("mangahome detail ocover src found: " .. ocover_src:sub(1, 90))
+	else
+		log.debug("mangahome detail: no ocover src at all in body")
+	end
+	local cover =
+		string.match(body, 'src="([^"]*ocover%.jpg[^"]*)"[^>]*class="detail-cover"')
+		or string.match(body, 'class="detail-cover"[^>]*src="([^"]+)"')
+		or ocover_src
 		or string.match(body, 'property="og:image" content="([^"]+)"') or ""
-	if string.sub(cover, 1, 2) == "//" then cover = "https:" .. cover end
+	if string.sub(cover, 1, 2) == "//" then
+		cover = "https:" .. cover
+	end
 	-- genres: chips linking into /directory
 	local genres = {}
 	for g in string.gmatch(body, 'href="/directory/[^"]*"[^>]*>([^<]+)</a>') do
@@ -177,7 +205,9 @@ function get_chapter_list(arg)
 	if not id or id == "" then
 		return host.json.encode({})
 	end
-	local body = host.http.get_body(BASE .. "/manga/" .. id)
+	local body = host.http.get_body(BASE .. "/manga/" .. id, {
+		["User-Agent"] = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+	})
 	if not body or body == "" then
 		log.error("chapter fetch failed for: " .. id)
 		return nil, "upstream_unavailable"
@@ -227,7 +257,9 @@ function get_page_list(arg)
 		return host.json.encode({})
 	end
 	local url = BASE .. "/manga/" .. slug .. "/c" .. num
-	local body = host.http.get_body(url)
+	local body = host.http.get_body(url, {
+		["User-Agent"] = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+	})
 	if not body or body == "" then
 		log.error("page fetch failed for: " .. composite)
 		return nil, "upstream_unavailable"
