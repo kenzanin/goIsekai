@@ -109,7 +109,11 @@ function get_manga_detail(arg)
         log.error("detail fetch failed for: " .. id)
         return nil, "upstream_unavailable"
     end
-    local title = html_decode(trim((string.match(body, "<title>([^<]*)</title>") or id)
+    -- <title> carries attrs on this site ("<title :>"), so allow them. The
+    -- tag title is already the English display title; alias lists in the
+    -- Qwik state mix anilist/mangaupdates cross-refs (novels with other
+    -- titles), so don't substitute from those.
+    local title = html_decode(trim((string.match(body, "<title[^>]*>([^<]*)</title>") or id)
         :gsub("%s*::%s*COMIK%.TO%s*$", "")))
     -- cover: first large _f webp referenced in the page header area
     local cover = string.match(body, '<img[^>]*src="(/_f/[^"]+%.webp)"') or ""
