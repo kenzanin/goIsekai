@@ -40,24 +40,25 @@ function search_manga(arg)
     if query == "" then
         return host.json.encode({})
     end
-    local url = BASE .. "/browse?q=" .. host.text.url_encode(query)
-    local html = host.browser.fetch(url)
-    if not html or html == "" then
-        log.error("comix: browser fetch failed for search: " .. query)
-        return nil, "upstream_unavailable"
-    end
-    -- <a class="lrow__poster" href="/title/<slug>" aria-label="<title>">...
-    --   <img ... src="<cover>">
-    local out = {}
-    for _, m in ipairs(find_all(html, [[(?s)<a class="lrow__poster" href="(/title/([^"]+))" aria-label="([^"]+)">.*?src="([^"]+)"]]) or {}) do
-        local href, slug, title, cover = m[1], m[2], m[3], m[4]
-        -- aria-label is HTML-escaped; decode entities.
-        title = host.text.html_decode(title)
-        out[#out + 1] = {
-            id = slug,
-            title = title,
-            cover_url = cover,
-        }
+    -- The browse page paginates (~30 per page; site showed 323 results for
+    -- "dungeon"). Fetch pages until one returns no new rows, dedup by slug.
+    local out, seen = {}, {}
+    local BASE_URL = BASE .. "/browse?q=" .. host.text.url_encode(query)
+    for page = 1, 40 do
+        local url = BASE_URL .. "&page=" .. page
+        local html = host.browser.fetch(url)
+        if not html or html == "" then break end
+        local added = 0
+        for _, m in ipairs(find_all(html, [[(?s)<a class="lrow__poster" href="(/title/([^"]+))" aria-label="([^"]+)">.*?src="([^"]+)"]]) or {}) do
+            local slug, title, cover = m[2], m[3], m[4]
+            if not seen[slug] then
+                seen[slug] = true
+                -- aria-label is HTML-escaped; decode entities.
+                out[#out + 1] = { id = slug, title = host.text.html_decode(title), cover_url = cover }
+                added = added + 1
+            end
+        end
+        if added == 0 then break end
     end
     log.info("comix: search found " .. tostring(#out) .. " for " .. query)
     return host.json.encode(out)
@@ -70,8 +71,11 @@ function get_manga_detail(arg)
     if not slug then
         return host.json.encode({})
     end
-    -- The detail JSON is embedded in static HTML, so plain HTTP works.
-    local body = host.http.get_body(BASE .. "/title/" .. host.text.url_encode(slug))
+    -- The detail JSON is embedded in static SSR HTML, but plain HTTP
+    -- (host.http.get_body) dies under the ISP's certificate shadowing
+    -- (comix.to resolves to a *.ioh.co.id cert on this network) while the
+    -- browser engine is unaffected. Fetch through the browser.
+    local body = host.browser.fetch(BASE .. "/title/" .. host.text.url_encode(slug))
     if not body or body == "" then
         log.error("comix: detail fetch failed: " .. slug)
         return nil, "upstream_unavailable"
@@ -136,39 +140,87 @@ function get_chapter_list(arg)
     if not slug then
         return host.json.encode({})
     end
-    -- Chapters are client-rendered; use the browser.
-    local html = host.browser.fetch(BASE .. "/title/" .. host.text.url_encode(slug))
-    if not html or html == "" then
-        log.error("comix: browser fetch failed for chapters: " .. slug)
+    -- Chapter rows (and their relative dates, e.g. "2mos ago") are
+    -- client-rendered by the SPA from a signed/encrypted API payload. A
+    -- JSON.parse-sniffing init hook was tried and is not viable: the site's
+    -- bundled JS captures its own JSON.parse reference before any init script
+    -- runs (probe showed 0 hook invocations). Read the rendered .mchap-row DOM
+    -- rows instead — proven path (9/9 chapters with released_at).
+    local jsDom = [[async () => {
+            for (let i = 0; i < 25; i++) {
+                if (document.querySelector('.mchap-row')) break;
+                await new Promise(r => setTimeout(r, 400));
+            }
+            const rows = [];
+            document.querySelectorAll('a.mchap-row__primary').forEach((a) => {
+                const row = a.closest('.mchap-row') || a.parentElement;
+                const chEl = row && row.querySelector('.mchap-row__ch');
+                const timeEl = row && row.querySelector('.mchap-row__time');
+                rows.push({
+                    href: a.getAttribute('href') || '',
+                    ch: chEl ? chEl.textContent.trim() : '',
+                    time: timeEl ? timeEl.textContent.trim() : '',
+                });
+            });
+            return JSON.stringify({ via: 'dom', rows });
+        }]]
+    local raw = host.browser.evaluate_with_init(BASE .. "/title/" .. host.text.url_encode(slug), "", jsDom)
+    if not raw or raw == "" then
+        log.error("comix: browser evaluate failed for chapters: " .. slug)
         return nil, "upstream_unavailable"
     end
-    -- Chapters are client-rendered; use the browser. Link + span:
-    --   <a class="mchap-row__primary" href="/title/<slug>/<id>-chapter-<num>">
-    --     <span class="mchap-row__ch">Ch.43.2</span>
-    --     ... <time datetime="YYYY-MM-DD">...</time>
-    local out = {}
-    for _, m in ipairs(find_all(html, [[(?s)<a class="mchap-row__primary" href="(/title/[^"]+/([^"]+))">.*?<span class="mchap-row__ch">([^<]+)</span>.*?<time datetime="([^"]+)">]]) or {}) do
-        local href, chid, chtitle, raw_date = m[1], m[2], m[3], m[4]
-        -- Chapter number from "Ch.43.2" or the URL tail.
-        local num = string.match(chtitle, "Ch%.([%d%.]+)")
-        if not num then
-            num = string.match(chid, "chapter%-([%d%.]+)")
-        end
-        local ch = {
-            id = slug .. ":" .. chid,
-            chapter_num = tonumber(num) or 0,
-            title = chtitle,
-        }
-        -- <time datetime="2026-07-04"> is already ISO-8601 date — host
-        -- date_to_iso accepts "2006-01-02" directly. Mirrors atsumaru
-        end pattern, skip if absent (host keeps zero value).
-        local iso = host.text.date_to_iso(host.text.trim(raw_date or ""))
-        if iso ~= "" then ch.released_at = iso end
-        out[#out + 1] = ch
+    local parsed = host.json.decode(raw)
+    local rows = parsed and parsed.rows or nil
+    if not rows or #rows == 0 then
+        log.error("comix: no chapter rows rendered for " .. slug)
+        return nil, "no_chapters"
     end
-log.info("comix: found " .. tostring(#out) .. " chapters for " .. slug)
+    local out = {}
+    for _, r in ipairs(rows) do
+        local chid = string.match(r.href or "", "/([^/]+)$") or ""
+        if chid ~= "" then
+            -- Chapter number from "Ch.43.2" or the URL tail.
+            local num = string.match(r.ch or "", "Ch%.([%d%.]+)")
+            if not num then
+                num = string.match(chid, "chapter%-([%d%.]+)")
+            end
+            local ch = {
+                id = slug .. ":" .. chid,
+                chapter_num = tonumber(num) or 0,
+                title = r.ch or "",
+            }
+            local iso = relative_to_iso(r.time or "")
+            if iso ~= "" then ch.released_at = iso end
+            out[#out + 1] = ch
+        end
+    end
+    log.info("comix: found " .. tostring(#out) .. " chapters for " .. slug)
     -- Site already renders newest first; keep document order.
     return host.json.encode(out)
+end
+
+-- relative_to_iso converts comix's relative chapter dates ("2mos ago", "5h ago")
+-- to RFC 3339 UTC via host.text.date_to_iso, which parses relative phrases.
+-- Unit map mirrors the reference comix extension (Dto.kt parseRelativeDate):
+-- s/m/h/d/w/mo/y and their plurals/aliases. Returns "" when unparseable so the
+-- host keeps the zero value.
+function relative_to_iso(s)
+    s = host.text.trim(s or "")
+    if s == "" then return "" end
+    local iso = host.text.date_to_iso(s)
+    if iso ~= "" then return iso end
+    -- date_to_iso may miss short aliases ("2mos"); normalize to long form.
+    local n, unit = string.match(string.lower(s), "^(%d+)%s*(%a+)%s+ago$")
+    if not n then return "" end
+    local long = ({ s="second", sec="second", secs="second",
+        m="minute", min="minute", mins="minute",
+        h="hour", hr="hour", hrs="hour",
+        d="day", day="day", days="day",
+        w="week", week="week", weeks="week",
+        mo="month", mos="month", month="month", months="month",
+        y="year", yr="year", yrs="year", year="year", years="year" })[unit]
+    if not long then return "" end
+    return host.text.date_to_iso(n .. " " .. long .. " ago")
 end
 
 -- ─── ABI: get_page_list ──────────────────────────────────────────────────

@@ -1,6 +1,6 @@
 {
   "name": "Comix",
-  "timeout": 60,
+  "timeout": 180,
   "site_url": "https://comix.to",
   "logo": "logo.png",
   "contract_version": 1,

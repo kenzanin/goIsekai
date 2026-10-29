@@ -1,4 +1,5 @@
 ## 2026-10-28
+* **Creation**: Documented concept `plans/har-plugin-candidates-sanascans-first.md` (HAR plugin candidates: sanascans first).
 * **Update**: Linked `cef-embedded-browser-for-smooth-render.md` to `wails-desktop-client-and-tray.md` (CEF approach replaces Wails/WebKit for smooth reader view rendering where WebKit shows scroll jank on image-heavy content.).
 * **Creation**: Documented concept `cef-embedded-browser-for-smooth-render.md` (CEF embedded browser for smooth UI rendering + CF bypass option).
 * **Update**: Updated concept `cef-embedded-browser-for-cf-bypass.md`.

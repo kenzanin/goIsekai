@@ -15,9 +15,10 @@ const interactiveEnqueueTimeout = 5 * time.Second
 
 // interactiveExecTimeout bounds how long the plugin call itself may run inside
 // the worker. This is independent of enqueue timeout: a job may wait in queue
-// < enqueue timeout, but once running it must not hog the lane. 30s covers a
-// worst-case CDP challenge solve; anything longer is treated as hung.
-const interactiveExecTimeout = 30 * time.Second
+// < enqueue timeout, but once running it must not hog the lane. 120s covers a
+// worst-case CDP challenge solve plus paginated search (comix fetches ~11
+// browse pages x ~5s via the browser engine); anything longer is hung.
+const interactiveExecTimeout = 120 * time.Second
 
 // interactiveAwaitTimeout bounds how long a caller blocks on the job's future:
 // enqueue (5s) + exec (30s) + 5s queue slack. Without it a request whose job is

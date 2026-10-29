@@ -39,13 +39,28 @@ func (p *Proxy) BrowserFetch(pluginID, url string) (string, error) {
 	defer browser.MustClose()
 	logger.Debug("cdp fetch connected", "plugin", pluginID, "elapsed", time.Since(connStart).String())
 
-	page, err := browser.Page(proto.TargetCreateTarget{URL: url})
+	// Create the target at about:blank and navigate explicitly. SPAs like
+	// comix.to fire a client-side router chain (>10 navigations) on load, which
+	// trips Chromium's CDP hard limit "{-32000 Too many client-initiated
+	// navigations, the chain reached its limit of 10 documents}" when the URL is
+	// passed to TargetCreateTarget (it waits for the chain to settle). Opening
+	// at about:blank and navigating ourselves lets us tolerate that error: the
+	// page still renders, so we give JS a bounded window and read the DOM
+	// regardless of the mid-flight nav-chain abort.
+	page, err := browser.Page(proto.TargetCreateTarget{})
 	if err != nil {
 		logger.Debug("cdp fetch new page fail", "plugin", pluginID, "elapsed", time.Since(start).String(), "error", err)
 		return "", fmt.Errorf("hostnet: rod new page %s: %w", url, err)
 	}
 	logger.Debug("cdp fetch page created", "plugin", pluginID, "elapsed", time.Since(start).String())
 	page = page.Context(ctx)
+	if navErr := page.Navigate(url); navErr != nil {
+		// Tolerate the 10-document nav-chain limit: the document is still
+		// loading and renders usable DOM; proceed to wait+read below.
+		logger.Debug("cdp fetch navigate tolerated", "plugin", pluginID, "elapsed", time.Since(start).String(), "navigate_err", navErr)
+	} else {
+		logger.Debug("cdp fetch navigated", "plugin", pluginID, "elapsed", time.Since(start).String())
+	}
 	// SPA pages (e.g. mangataro) never fire loadEventFired and never idle, so
 	// WaitStable/WaitLoad block until the full ctx budget. page.Navigate
 	// returns on commit; give lazy JS a bounded window (ctx-bounded) to render
@@ -124,9 +139,11 @@ func (p *Proxy) browserEvaluateWithInit(pluginID, url, initJS, js string) (strin
 		}
 	}
 	navStart := time.Now()
-	if err := page.Navigate(url); err != nil {
-		logger.Debug("cdp evaluate navigate fail", "plugin", pluginID, "elapsed", time.Since(start).String(), "error", err)
-		return "", fmt.Errorf("hostnet: browser navigate %s: %w", url, err)
+	if navErr := page.Navigate(url); navErr != nil {
+		// Tolerate Chromium's nav-chain limit: SPAs like comix.to fire >10
+		// client-side navigations on load; the document still renders, so
+		// proceed to the challenge wait + eval below. Mirrors BrowserFetch.
+		logger.Debug("cdp evaluate navigate tolerated", "plugin", pluginID, "elapsed", time.Since(start).String(), "navigate_err", navErr)
 	}
 	logger.Debug("cdp evaluate navigated", "plugin", pluginID, "elapsed", time.Since(start).String(), "nav_elapsed", time.Since(navStart).String())
 	page = page.Context(ctx)
