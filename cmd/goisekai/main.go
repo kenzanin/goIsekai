@@ -17,10 +17,8 @@ import (
 	"goisekai/internal/bridge"
 	"goisekai/internal/config"
 	"goisekai/internal/database"
-	"goisekai/internal/enrich"
 	"goisekai/internal/httpserver"
 	"goisekai/internal/logger"
-	"goisekai/internal/pluginmanager"
 	"goisekai/internal/templates"
 	"goisekai/internal/version"
 )
@@ -76,21 +74,7 @@ func main() {
 	}
 
 	// CLI flags override config values.
-	if *host != "" {
-		cfg.Host = *host
-	}
-	if *port != 0 {
-		cfg.Port = *port
-	}
-	if *cdpEngine != "" {
-		cfg.CDPEngine = *cdpEngine
-	}
-	if *cdpPath != "" {
-		cfg.CDPPath = *cdpPath
-	}
-	if *apiKey != "" {
-		cfg.APIKey = *apiKey
-	}
+	applyFlagOverrides(cfg, host, cdpEngine, cdpPath, apiKey, port)
 
 	// Logger level: flag overrides config, config overrides the "info" default.
 	level := cfg.LogLevel
@@ -130,34 +114,15 @@ func main() {
 	maxCacheGB.Store(int64(math.Float64bits(cfg.MaxCacheGB)))
 	startConfigWatch(cfgPath, proxy, maxCacheGB)
 
-	mgr := pluginmanager.NewManager(proxy, pluginsDir)
-	mgr.SetInfoDir(infoDir)
-	mgr.SetDB(db, detailTTL)
-	mgr.SetChapterCacheTTL(chapterTTL)
-	if err := mgr.Discover(); err != nil {
-		logger.Fatal("discover plugins", "error", err)
-	}
+	mgr := buildPluginManager(proxy, pluginsDir, infoDir, db, detailTTL, chapterTTL)
 
-	// Track known hosts and trigger preconnect for all discovered plugins.
+	// Track known hosts, warm the connection pool and persist the plugins
+	// loaded from the plugins dir (Discover only loads them into memory).
 	mgr.TrackKnownHosts()
-
-	// Preconnect all known hosts on startup (warm connection pool).
 	go preconnectHosts(mgr)
-
-	// Register plugins loaded from the plugins dir so they appear in
-	// ListPlugins (Discover only loads them into memory).
 	registerLoadedPlugins(db, mgr)
 
-	// Build the enrichment registry. It starts empty: every provider is
-	// plugin-declared and registers itself when its plugin first loads, so
-	// changing what a source returns is a plugin edit, not a host rebuild.
-	enrichReg := enrich.NewRegistry()
-
-	svc := bridge.NewAppService(db, mgr, proxy, cfgPath, cacheDir, enrichReg)
-	svc.LogEnhanceStatus()
-	svc.SeedVerifyCookies() // re-seed saved human-verify cookies into the proxy
-	mgr.SetOnLoad(svc.SyncPluginMeta)
-	mgr.SetEnrichRegistry(enrichReg)
+	svc := buildAppService(db, mgr, proxy, cfgPath, cacheDir)
 
 	// Signal handling: wait for SIGTERM/SIGINT, then shut down gracefully.
 	mainCtx, stop := signal.NotifyContext(context.Background(), syscall.SIGTERM, syscall.SIGINT)

@@ -51,3 +51,28 @@ func runStop() {
 
 	logger.Info("sent SIGTERM", "pid", pid)
 }
+
+// applyFlagOverrides copies non-empty CLI flag values over the loaded config.
+// Called after config.Load and before anything reads the config, so an unset
+// flag never clobbers a value the ini file provided.
+func applyFlagOverrides(
+	cfg *config.Config,
+	host, cdpEngine, cdpPath, apiKey *string,
+	port *int,
+) {
+	if *host != "" {
+		cfg.Host = *host
+	}
+	if *port != 0 {
+		cfg.Port = *port
+	}
+	if *cdpEngine != "" {
+		cfg.CDPEngine = *cdpEngine
+	}
+	if *cdpPath != "" {
+		cfg.CDPPath = *cdpPath
+	}
+	if *apiKey != "" {
+		cfg.APIKey = *apiKey
+	}
+}
