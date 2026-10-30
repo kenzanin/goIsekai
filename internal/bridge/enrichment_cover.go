@@ -3,12 +3,20 @@ package bridge
 import (
 	"context"
 	"fmt"
+
+	"goisekai/internal/database"
 )
 
 // FetchCovers fetches alternative cover candidates from enrichment sources
 // (mangadex, mangaupdates, ...) and stores them for picking on the detail page.
 func (s *AppService) FetchCovers(pluginID, mangaID, title string) error {
 	return s.FetchEnrichment(pluginID, mangaID, title, s.EnrichmentSources())
+}
+
+// CachedCover returns the stored cover URL and title for a manga without
+// touching the plugin — used by the fetch-covers partial render.
+func (s *AppService) CachedCover(pluginID, mangaID string) (database.Manga, error) {
+	return s.db.GetMangaCached(pluginID, mangaID)
 }
 
 // SetCover makes url the manga's cover: evicts existing cache entries for the

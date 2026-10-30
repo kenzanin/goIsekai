@@ -24,7 +24,47 @@ func (s *Server) handleFetchCovers(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusBadGateway)
 		return
 	}
-	s.viewMangaDetail(w, r)
+	// Separation of concerns: the Covers button only refreshes the picker
+	// modal, not the whole detail page. Read the cached manga + alt covers —
+	// no plugin detail fetch — and render just the modal partial.
+	cached, err := s.service.CachedCover(pluginID, mangaID)
+	if err != nil {
+		s.logger.Error("fetch covers: load cached manga", "pluginID", pluginID, "mangaID", mangaID, "error", err)
+		http.Error(w, err.Error(), http.StatusBadGateway)
+		return
+	}
+	altCovers, err := s.service.ListAltCovers(pluginID, mangaID)
+	if err != nil {
+		s.logger.Error("fetch covers: list alt covers", "pluginID", pluginID, "mangaID", mangaID, "error", err)
+		http.Error(w, err.Error(), http.StatusBadGateway)
+		return
+	}
+	coverVersions := make(map[string]string, len(altCovers)+1)
+	for _, c := range altCovers {
+		if c.URL != "" {
+			if v := s.service.CoverCacheVersion(pluginID, c.URL); v != "" {
+				coverVersions[c.URL] = v
+			}
+		}
+	}
+	if cached.CoverURL != "" {
+		if v := s.service.CoverCacheVersion(pluginID, cached.CoverURL); v != "" {
+			coverVersions[cached.CoverURL] = v
+		}
+	}
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	if err := s.engine.RenderPartial(w, "partials/cover_modal", map[string]any{
+		"PluginID":      pluginID,
+		"MangaID":       mangaID,
+		"Manga":         cached,
+		"AltCovers":     altCovers,
+		"CoverVersions": coverVersions,
+		"CurrentTitle":  cached.Title,
+		csrfField:       s.csrfToken,
+	}); err != nil {
+		s.logger.Error("render cover modal", "error", err)
+		http.Error(w, "render failed", http.StatusInternalServerError)
+	}
 }
 
 // handleSetCover promotes one alternative cover URL to the manga's cover.

@@ -139,6 +139,23 @@
           }
           const main = document.getElementById('content');
           if (!main || !html) return;
+          // fetch-covers returns ONLY the cover-picker modal partial now —
+          // swap that element in place and open it; the rest of the detail
+          // page (synopsis, genres, chapters) is untouched.
+          if (/fetch-covers/.test(action)) {
+            const tpl = document.createElement('div');
+            tpl.innerHTML = html;
+            const fresh = tpl.querySelector('#cover-modal');
+            if (fresh) {
+              const old = document.getElementById('cover-modal');
+              if (old) old.replaceWith(fresh); else main.appendChild(fresh);
+              if (window.Alpine && Alpine.initTree) Alpine.initTree(fresh);
+              if (window.openCoverModal) window.openCoverModal();
+              // No toast here: the opened modal IS the feedback, and the
+              // compat showToast treats a Response as a message string.
+            }
+            return;
+          }
           const match = html.match(/<main[^>]*id="content"[\s\S]*?>([\s\S]*?)<\/main>/i);
           main.innerHTML = match ? match[1] : html;
           // innerHTML does not execute <script> — re-raise script nodes so
@@ -821,6 +838,23 @@
               }
               const main = document.getElementById('content');
               if (!main || !html) return;
+              // fetch-covers returns ONLY the cover-picker modal partial —
+              // swap that element in place and open it; the rest of the
+              // detail page is untouched. No toast: the opened modal is the
+              // feedback, and showToast renders a Response as [object Response].
+              if (/fetch-covers/.test(action)) {
+                const tpl = document.createElement('div');
+                tpl.innerHTML = html;
+                const fresh = tpl.querySelector('#cover-modal');
+                if (fresh) {
+                  const old = document.getElementById('cover-modal');
+                  if (old) old.replaceWith(fresh); else main.appendChild(fresh);
+                  if (window.Alpine && Alpine.initTree) Alpine.initTree(fresh);
+                  if (window.openCoverModal) window.openCoverModal();
+                }
+                rememberListPage();
+                return;
+              }
               // Parse the partial response to extract just the <main> content
               // in case the redirect returned a full page.
               const match = html.match(/<main[^>]*id="content"[\s\S]*?>([\s\S]*?)<\/main>/i);
