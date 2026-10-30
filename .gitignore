@@ -75,3 +75,4 @@ CLAUDE.md
 /goisekai-qt6/build/
 # Private session notes
 session-
+.envrc
