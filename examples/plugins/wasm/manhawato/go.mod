@@ -1,6 +1,6 @@
 module manhawato
 
-go 1.27.1
+go 1.26.9
 
 require goisekai/pkg/types v0.0.0
 

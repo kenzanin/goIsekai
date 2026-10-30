@@ -1,4 +1,4 @@
-# Build MangaUno wasm plugin for goIsekai
+# Build manga_uno wasm plugin for goIsekai
 # TinyGo-only build, no dependency on tools/build-wasm.sh
 
 TINYGO ?= $(HOME)/opt/tinygo/bin/tinygo
@@ -19,7 +19,7 @@ all: build
 
 build: main.wasm
 
-main.wasm: main.go abi_tinygo.go abi_std.go
+main.wasm: *.go
 	$(TINYGO) build -target wasi -buildmode=c-shared -o main.wasm .
 	$(WASMOPT) -O4 main.wasm -o main.wasm
 	@echo "Built main.wasm: $$($(TINYGO) version | awk '{print $$3}')"
@@ -30,3 +30,7 @@ clean:
 lint:
 	@fmtout=$$(gofmt -l .); if [ -n "$$fmtout" ]; then echo "gofmt: $$fmtout"; exit 1; fi
 	@echo "lint OK"
+
+# go1.26.9 (the pinned toolchain, already first on PATH) rewrites old APIs.
+fix: **.go
+	$(GO126)/bin/go fix ./**.go

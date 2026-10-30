@@ -2,5 +2,5 @@
   "name": "MangaK",
   "site_url": "https://mangak.io",
   "logo": "logo.png",
-  "built_with": "tinygo 0.43.0"
+  "built_with": "tinygo 0.44.0"
 }
