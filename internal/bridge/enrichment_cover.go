@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"goisekai/internal/database"
+	"goisekai/internal/logger"
 )
 
 // FetchCovers fetches alternative cover candidates from enrichment sources
@@ -40,9 +41,11 @@ func (s *AppService) setCover(pluginID, mangaID, url string) error {
 	s.imageMu.Lock()
 	delete(s.imageCache, cached.CoverURL)
 	s.imageMu.Unlock()
+	logger.Debug("setCover: downloading new cover image", "pluginID", pluginID, "mangaID", mangaID, "url", url)
 	if _, err := s.GetImage(context.Background(), pluginID, url, nil, "", "", PrioHigh); err != nil {
 		return fmt.Errorf("bridge: set cover download: %w", err)
 	}
+	logger.Debug("setCover: download done, promoting to manga row", "pluginID", pluginID, "mangaID", mangaID)
 	// Force-write the pick: this is the user's explicit choice, so it must
 	// land even if custom_cover is already set (re-picking another cover).
 	if err := s.db.SetMangaCover(pluginID, mangaID, url); err != nil {

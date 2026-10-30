@@ -12,6 +12,7 @@ import (
 // GetMangaDetail runs a plugin's GetMangaDetail function and decodes its result.
 // It uses a cached response if available and not expired.
 func (m *Manager) GetMangaDetail(pluginID, mangaID string) (types.Manga, error) {
+	logger.Debug("GetMangaDetail invoked", "pluginID", pluginID, "mangaID", mangaID)
 	p, err := m.get(pluginID)
 	if err != nil {
 		return types.Manga{}, err

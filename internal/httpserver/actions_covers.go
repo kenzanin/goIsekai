@@ -19,6 +19,7 @@ func (s *Server) handleFetchCovers(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	title := r.FormValue("manga_title")
+	s.logger.Debug("fetch-covers request", "pluginID", pluginID, "mangaID", mangaID, "title", title)
 	if err := s.service.FetchCovers(pluginID, mangaID, title); err != nil {
 		s.logger.Error("fetch covers", "pluginID", pluginID, "mangaID", mangaID, "error", err)
 		http.Error(w, err.Error(), http.StatusBadGateway)
@@ -118,6 +119,7 @@ func (s *Server) handleSetCover(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	url := r.FormValue("url")
+	s.logger.Debug("set-cover request", "pluginID", pluginID, "mangaID", mangaID, "url", url)
 	if err := s.service.SetCover(pluginID, mangaID, url); err != nil {
 		s.logger.Error("set cover", "pluginID", pluginID, "mangaID", mangaID, "url", url, "error", err)
 		http.Error(w, err.Error(), http.StatusBadGateway)
@@ -137,6 +139,7 @@ func (s *Server) handleSetCover(w http.ResponseWriter, r *http.Request) {
 func (s *Server) handleRefetchCover(w http.ResponseWriter, r *http.Request) {
 	pluginID := param(r, "pluginID")
 	mangaID := param(r, "mangaID")
+	s.logger.Debug("refetch-cover request", "pluginID", pluginID, "mangaID", mangaID)
 	if err := s.service.RefetchCover(pluginID, mangaID); err != nil {
 		s.logger.Error("refetch cover", "pluginID", pluginID, "mangaID", mangaID, "error", err)
 		http.Error(w, err.Error(), http.StatusBadGateway)
@@ -156,6 +159,7 @@ func (s *Server) handleRefetchCover(w http.ResponseWriter, r *http.Request) {
 func (s *Server) handleToggleCoverDim(w http.ResponseWriter, r *http.Request) {
 	pluginID := param(r, "pluginID")
 	mangaID := param(r, "mangaID")
+	s.logger.Debug("toggle-cover-dim request", "pluginID", pluginID, "mangaID", mangaID)
 	dim, err := s.service.ToggleCoverDim(pluginID, mangaID)
 	if err != nil {
 		s.logger.Error("toggle cover dim", "pluginID", pluginID, "mangaID", mangaID, "error", err)
@@ -206,6 +210,7 @@ func (s *Server) handleSaveReaderPrefs(w http.ResponseWriter, r *http.Request) {
 func (s *Server) handleClearCovers(w http.ResponseWriter, r *http.Request) {
 	pluginID := param(r, "pluginID")
 	mangaID := param(r, "mangaID")
+	s.logger.Debug("clear-covers request", "pluginID", pluginID, "mangaID", mangaID)
 	if err := s.service.ClearCovers(pluginID, mangaID); err != nil {
 		s.logger.Error("clear covers", "pluginID", pluginID, "mangaID", mangaID, "error", err)
 		http.Error(w, err.Error(), http.StatusBadRequest)
