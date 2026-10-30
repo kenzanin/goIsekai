@@ -25,6 +25,27 @@ func TestImageFetchBudgetIsSane(t *testing.T) {
 	}
 }
 
+// A 404 means the page is absent, not that the referer is wrong, so the whole
+// backoff ladder (2.5s + 10s) must not be spent before returning the same 404.
+// manga.uno serves chapter JSON listing 24 page URLs while the CDN still 404s
+// every one of them, which cost 12.5s per image before this.
+func TestNotFoundIsNotRetried(t *testing.T) {
+	var hits atomic.Int32
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		hits.Add(1)
+		w.WriteHeader(http.StatusNotFound)
+	}))
+	t.Cleanup(srv.Close)
+
+	s := newTestServiceWithCache(t)
+	if _, err := s.GetImage(t.Context(), "p", srv.URL+"/missing.webp", nil, "m", "c", PrioLow); err == nil {
+		t.Fatal("GetImage succeeded against a 404 server")
+	}
+	if got := hits.Load(); got != 1 {
+		t.Errorf("upstream hits = %d, want 1 (a 404 is permanent, not a wrong referer)", got)
+	}
+}
+
 // A fast failure costs nothing to repeat, so it must still be retried. The
 // budget only stops attempts that have already spent it.
 func TestFastFailureStillRetries(t *testing.T) {

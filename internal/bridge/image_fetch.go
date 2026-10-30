@@ -145,6 +145,20 @@ func (s *AppService) fetchImage(ctx context.Context, pluginID, url string, heade
 			return nil, ctx.Err()
 		}
 		if err != nil || resp.Status < 200 || resp.Status >= 300 {
+			// A 404 means the page is not on the CDN, which no referer and no
+			// retry can change: manga.uno serves chapter JSON with 24 page
+			// URLs while the files are still uncached, and every one of them
+			// 404s from nginx. Retrying burned the full 12.5s backoff ladder
+			// per image (2.5s + 10s) before the same 404 came back.
+			//
+			// The exception is an at-home node, the one host documented to
+			// 404 on bursts (see the pacing comment above): there a 404 is
+			// rate limiting, not absence, so it keeps retrying.
+			if resp.Status == http.StatusNotFound && !pace {
+				logger.Warn("image 404, not retrying", "url", url, "plugin", pluginID,
+					"ref", ref, "attempts", attempt+1)
+				break
+			}
 			spent := time.Since(start)
 			if spent >= imageFetchBudget {
 				logger.Warn("image fetch giving up, retry budget spent",
