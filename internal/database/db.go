@@ -18,8 +18,12 @@ type Manga struct {
 	Status        string
 	CoverDim      int64
 	InLibrary     bool
-	CreatedAt     time.Time
-	UpdatedAt     time.Time
+	// AddedAt is when the user added the manga to the library. NULL/zero
+	// when never added — distinct from CreatedAt, which is when WE first
+	// cached the row (a detail-page visit creates it too).
+	AddedAt   time.Time
+	CreatedAt time.Time
+	UpdatedAt time.Time
 }
 
 type Chapter struct {

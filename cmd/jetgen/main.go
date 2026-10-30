@@ -32,6 +32,7 @@ var ddl = []string{
     in_library INTEGER DEFAULT 0,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    added_at TIMESTAMP,
     UNIQUE(plugin_id, source_manga_id)
 );`,
 	`CREATE TABLE IF NOT EXISTS chapters (

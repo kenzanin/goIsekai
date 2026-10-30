@@ -243,6 +243,9 @@ return function(data)
 		.. '<option value="recent_read"'
 		.. (sortKey == "recent_read" and " selected" or "")
 		.. ">Recently read</option>"
+		.. '<option value="recent_added"'
+		.. (sortKey == "recent_added" and " selected" or "")
+		.. ">Recently added</option>"
 		.. '<option value="duplicates"'
 		.. (sortKey == "duplicates" and " selected" or "")
 		.. ">Duplicates first</option>"

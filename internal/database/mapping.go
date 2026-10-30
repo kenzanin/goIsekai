@@ -63,6 +63,7 @@ func mangaFromModel(m model.Mangas) Manga {
 		Status:        derefStr(m.Status),
 		CoverDim:      derefInt64(m.CoverDim),
 		InLibrary:     derefBool(m.InLibrary),
+		AddedAt:       derefTime(m.AddedAt),
 		CreatedAt:     derefTime(m.CreatedAt),
 		UpdatedAt:     derefTime(m.UpdatedAt),
 	}

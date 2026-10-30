@@ -80,10 +80,15 @@ func (d *DB) UpsertManga(m Manga) (int64, error) {
 }
 
 // ToggleLibrary flips the in_library flag (0 <-> 1) for a manga and keeps the
-// search index in step with the new membership.
+// search index in step with the new membership. Adding stamps added_at so
+// "recently added" reflects the add moment, not when the row was first
+// cached; removing leaves added_at (history survives a toggle cycle).
 func (d *DB) ToggleLibrary(mangaID int64) error {
 	_, err := Mangas.UPDATE().
-		SET(Mangas.InLibrary.SET(Int(1).SUB(Mangas.InLibrary))).
+		SET(
+			Mangas.InLibrary.SET(Int(1).SUB(Mangas.InLibrary)),
+			Mangas.AddedAt.SET(RawTimestamp("CASE WHEN mangas.in_library = 0 THEN CURRENT_TIMESTAMP ELSE mangas.added_at END")),
+		).
 		WHERE(Mangas.ID.EQ(Int(mangaID))).
 		Exec(d.db)
 	if err != nil {

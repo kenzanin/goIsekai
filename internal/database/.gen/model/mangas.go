@@ -22,6 +22,7 @@ type Mangas struct {
 	InLibrary         *int64
 	CreatedAt         *time.Time
 	UpdatedAt         *time.Time
+	AddedAt           *time.Time
 	NewSince          *time.Time
 	Author            string
 	CustomCover       int64

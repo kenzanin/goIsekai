@@ -43,6 +43,10 @@ const readerPrefsMigration = 29
 // (the site's own upload date for a chapter). Idempotent for the same reason.
 const releasedAtMigration = 30
 
+// addedAtMigration is the index for the mangas.added_at ALTER TABLE
+// migration. Idempotent: test fixtures may pre-create the column.
+const addedAtMigration = 31
+
 // migrations is an ordered list of DDL statements applied in sequence.
 // Version is tracked via PRAGMA user_version; migrations[i] is applied when
 // user_version < len(migrations) so partial upgrades resume correctly.
@@ -203,4 +207,8 @@ var migrations = []string{
 	// plugin. NULL means the plugin knows no date — distinct from fetched_at,
 	// which records when WE last synced the row.
 	`ALTER TABLE chapters ADD COLUMN released_at TIMESTAMP;`,
+	// Index 31: when the user added the manga to the library. NULL = never
+	// added — created_at is "when we first cached the row" and a detail-page
+	// visit creates that, so it cannot answer "recently added".
+	`ALTER TABLE mangas ADD COLUMN added_at TIMESTAMP;`,
 }
