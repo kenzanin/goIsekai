@@ -5,13 +5,19 @@ import (
 	"fmt"
 
 	"goisekai/internal/database"
+	"goisekai/internal/enrich"
 	"goisekai/internal/logger"
 )
 
 // FetchCovers fetches alternative cover candidates from enrichment sources
 // (mangadex, mangaupdates, ...) and stores them for picking on the detail page.
 func (s *AppService) FetchCovers(pluginID, mangaID, title string) error {
-	return s.FetchEnrichment(pluginID, mangaID, title, s.EnrichmentSources())
+	// Covers-only: walk the full source list but ask every provider for
+	// KindCovers alone. FetchEnrichment's default (no-kinds) path also
+	// pulls titles/summaries/categories/related/authors, which silently
+	// populated the alt-detail panel from a cover pick — the reported
+	// "fetch detail leak".
+	return s.fetchEnrichmentKinds(pluginID, mangaID, title, s.EnrichmentSources(), []enrich.Kind{enrich.KindCovers})
 }
 
 // CachedCover returns the stored cover URL and title for a manga without

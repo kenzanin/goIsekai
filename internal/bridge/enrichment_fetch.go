@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"slices"
 	"strings"
 
 	"goisekai/internal/enrich"
@@ -14,14 +15,21 @@ import (
 // When sources is empty, fetches from all enabled providers; when non-empty,
 // fetches only from those sources (backward-compatible single-source mode).
 func (s *AppService) FetchEnrichment(pluginID, mangaID, title string, sources []string) error {
+	return s.fetchEnrichmentKinds(pluginID, mangaID, title, sources, nil)
+}
+
+// fetchEnrichmentKinds is FetchEnrichment with an optional kinds filter:
+// kinds == nil fetches every kind (the enrichment panel button), a subset
+// restricts what providers are asked for (covers-only fetch).
+func (s *AppService) fetchEnrichmentKinds(pluginID, mangaID, title string, sources []string, kinds []enrich.Kind) error {
 	// task 3.1: ride the fetch lane so a slow source serializes only its own
 	// enrichment work, not the whole request path.
 	return s.runOnFetch(context.Background(), pluginID, func(context.Context) error {
-		return s.fetchEnrichment(pluginID, mangaID, title, sources)
+		return s.fetchEnrichment(pluginID, mangaID, title, sources, kinds)
 	})
 }
 
-func (s *AppService) fetchEnrichment(pluginID, mangaID, title string, sources []string) error {
+func (s *AppService) fetchEnrichment(pluginID, mangaID, title string, sources []string, kinds []enrich.Kind) error {
 	if s.enrich == nil {
 		return fmt.Errorf("enrichment provider not configured")
 	}
@@ -43,7 +51,7 @@ func (s *AppService) fetchEnrichment(pluginID, mangaID, title string, sources []
 		}
 	}
 
-	logger.Debug("enrich fetch start", "title", title, "sources", sources)
+	logger.Debug("enrich fetch start", "title", title, "sources", sources, "kinds", kinds)
 
 	var items map[enrich.Kind][]enrich.Item
 
@@ -51,17 +59,25 @@ func (s *AppService) fetchEnrichment(pluginID, mangaID, title string, sources []
 	// stays first-source-wins only when the request names sources explicitly
 	// (the per-source API), so the UI button fills gaps from every source.
 	if len(sources) == 0 {
-		items = s.enrich.FetchAll(context.Background(), &http.Client{}, title, []enrich.Kind{
-			enrich.KindTitles, enrich.KindSummaries,
-			enrich.KindCategories, enrich.KindRelated, enrich.KindAuthors,
-			enrich.KindCovers,
-		})
+		if kinds == nil {
+			kinds = []enrich.Kind{
+				enrich.KindTitles, enrich.KindSummaries,
+				enrich.KindCategories, enrich.KindRelated, enrich.KindAuthors,
+				enrich.KindCovers,
+			}
+		}
+		items = s.enrich.FetchAll(context.Background(), &http.Client{}, title, kinds)
 	} else if len(sources) == 1 {
 		items = s.enrich.FetchFirst(context.Background(), &http.Client{}, title, sources)
 	} else {
 		merged := make(map[enrich.Kind][]enrich.Item)
 		for _, source := range sources {
 			for kind, kindItems := range s.enrich.FetchFirst(context.Background(), &http.Client{}, title, []string{source}) {
+				// Covers-only requests skip other kinds here: FetchFirst
+				// always answers every kind the provider supports.
+				if kinds != nil && !slices.Contains(kinds, kind) {
+					continue
+				}
 				merged[kind] = append(merged[kind], kindItems...)
 			}
 		}
