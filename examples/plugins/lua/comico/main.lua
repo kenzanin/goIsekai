@@ -139,10 +139,13 @@ function get_manga_detail(arg)
 end
 
 -- ─── get_chapter_list ──────────────────────────────────────────────────────
--- GET /api/manga/{uuid}/chapters?language=en&order=desc&sort=number
--- `source` is optional; omitting it returns every source's chapters.
--- items: [{id, mangaId, sourceId, title, volume, number, pageCount,
---          scanlationGroup, publishedAt}]
+-- GET /api/manga/{uuid}/languages -> ["id"]  (available chapter languages)
+-- GET /api/manga/{uuid}/chapters?language=X&order=desc&sort=number&limit=100
+--
+-- The chapters endpoint filters to one language per request and never
+-- returns a cross-language list (no `language=` yields total 0), so the
+-- available languages must be fetched first or a manga translated only to
+-- Indonesian looks chapterless.
 
 function get_chapter_list(arg)
 	local manga_id = decode_id(arg)
@@ -150,28 +153,41 @@ function get_chapter_list(arg)
 		return host.json.encode({}), nil
 	end
 
-	-- The API rejects limit > 100 (400), so page through in 100s.
-	local base = API .. "/manga/" .. manga_id
-		.. "/chapters?language=en&order=desc&sort=number&limit=100"
+	local langs = http_get(API .. "/manga/" .. manga_id .. "/languages")
+	if type(langs) ~= "table" or #langs == 0 then langs = { "en" } end
+
 	local chapters = {}
-	local offset = 0
-	for _ = 1, 20 do
-		local data = http_get(base .. "&offset=" .. tostring(offset))
-		if not data or not data.items or #data.items == 0 then break end
-		for _, ch in ipairs(data.items) do
-			chapters[#chapters + 1] = {
-				id          = tostring(ch.id or ""),
-				manga_id    = tostring(manga_id),
-				title       = host.text.trim(ch.title or ""),
-				chapter_num = tonumber(ch.number) or 0,
-				released_at = ch.publishedAt or "",
-				url         = SITE .. "/manga/" .. manga_id,
-				scanlator   = ch.scanlationGroup or "",
-			}
+	for _, lang in ipairs(langs) do
+		if type(lang) == "string" then
+			-- The API rejects limit > 100 (400), so page through in 100s.
+			local base = API .. "/manga/" .. manga_id
+				.. "/chapters?order=desc&sort=number&limit=100"
+				.. "&language=" .. host.text.url_encode(lang)
+			local offset = 0
+			for _ = 1, 20 do
+				local data = http_get(base .. "&offset=" .. tostring(offset))
+				if not data or not data.items or #data.items == 0 then break end
+				for _, ch in ipairs(data.items) do
+					chapters[#chapters + 1] = {
+						id          = tostring(ch.id or ""),
+						manga_id    = tostring(manga_id),
+						title       = host.text.trim(ch.title or ""),
+						chapter_num = tonumber(ch.number) or 0,
+						released_at = ch.publishedAt or "",
+						url         = SITE .. "/manga/" .. manga_id,
+						scanlator   = ch.scanlationGroup or "",
+					}
+				end
+				offset = offset + #data.items
+				if offset >= (tonumber(data.total) or 0) then break end
+			end
 		end
-		offset = offset + #data.items
-		if offset >= (tonumber(data.total) or 0) then break end
 	end
+
+	-- Newest first across every language.
+	table.sort(chapters, function(a, b)
+		return tostring(a.released_at or "") > tostring(b.released_at or "")
+	end)
 	return host.json.encode(chapters), nil
 end
 
