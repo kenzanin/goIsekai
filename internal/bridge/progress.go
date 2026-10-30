@@ -118,27 +118,33 @@ func (s *AppService) refetchCover(pluginID, mangaID string) error {
 			_ = os.Remove(base + ext)
 		}
 	}
-	// A signed CDN may have rotated the URL; refresh it from the plugin.
-	if s.mgr != nil {
-		if detail, err := s.mgr.GetMangaDetail(pluginID, mangaID); err == nil && detail.CoverURL != "" && detail.CoverURL != cached.CoverURL {
-			if _, err := s.db.UpsertManga(database.Manga{
-				PluginID:      pluginID,
-				SourceMangaID: mangaID,
-				Title:         cached.Title,
-				CoverURL:      detail.CoverURL,
-				Description:   cached.Description,
-				Status:        cached.Status,
-				InLibrary:     cached.InLibrary,
-			}); err != nil {
-				return fmt.Errorf("bridge: refetch cover update url: %w", err)
-			}
-			cached.CoverURL = detail.CoverURL
-		}
-	}
-	// Cover refetch is a one-shot background download, not the reader's per-page
-	// path, so it keeps a background context.
+	// A signed CDN may have rotated the URL — but probing the plugin's
+	// detail for every refetch costs a full GetMangaDetail call. Only fall
+	// back to that probe when the cached URL itself fails to download
+	// (404/gone), which is the actual signal that the URL rotated.
 	if _, err := s.GetImage(context.Background(), pluginID, cached.CoverURL, nil, "", "", PrioHigh); err != nil {
-		return fmt.Errorf("bridge: refetch cover download: %w", err)
+		if s.mgr == nil {
+			return fmt.Errorf("bridge: refetch cover download: %w", err)
+		}
+		detail, derr := s.mgr.GetMangaDetail(pluginID, mangaID)
+		if derr != nil || detail.CoverURL == "" || detail.CoverURL == cached.CoverURL {
+			return fmt.Errorf("bridge: refetch cover download: %w", err)
+		}
+		if _, err := s.db.UpsertManga(database.Manga{
+			PluginID:      pluginID,
+			SourceMangaID: mangaID,
+			Title:         cached.Title,
+			CoverURL:      detail.CoverURL,
+			Description:   cached.Description,
+			Status:        cached.Status,
+			InLibrary:     cached.InLibrary,
+		}); err != nil {
+			return fmt.Errorf("bridge: refetch cover update url: %w", err)
+		}
+		// Download from the rotated URL.
+		if _, err := s.GetImage(context.Background(), pluginID, detail.CoverURL, nil, "", "", PrioHigh); err != nil {
+			return fmt.Errorf("bridge: refetch cover download: %w", err)
+		}
 	}
 	return nil
 }
