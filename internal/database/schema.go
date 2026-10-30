@@ -1,5 +1,16 @@
 package database
 
+// This file is intentionally kept as one unit (214 LOC, evaluated 2026-10-31).
+//
+// It holds no functions: 10 named index constants plus the single ordered
+// `migrations` slice. The indices are positional — migrations[i] is applied
+// when user_version < i+1, and every special-case const (altTitlesMigration,
+// skipColumnMigration, authorMigration, …) names a literal slot in that list.
+// Splitting the DDL literals into sibling files would either break the
+// index↔statement correspondence or force the list back together, so the
+// line count is the price of keeping migration order readable in one place.
+// Add new migrations at the end; never renumber existing entries.
+
 // altTitlesMigration is the index in the migrations slice that is handled by
 // migrateAltTitles() (Go-side JSON→table copy, DROP COLUMN, FTS5) rather than
 // a plain DDL Exec.
