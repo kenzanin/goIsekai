@@ -149,20 +149,22 @@ func (s *AppService) refetchCover(pluginID, mangaID string) error {
 	return nil
 }
 
-// ToggleCoverDim toggles the cover dim overlay flag on the manga.
-func (s *AppService) ToggleCoverDim(pluginID, mangaID string) error {
+// ToggleCoverDim toggles the cover dim overlay flag on the manga and
+// returns the new dim state (0 or 1) so callers update UI without a
+// re-read or a full page render.
+func (s *AppService) ToggleCoverDim(pluginID, mangaID string) (int64, error) {
 	mangaIntID, err := s.db.ResolveMangaIntID(pluginID, mangaID)
 	if err != nil {
-		return fmt.Errorf("bridge: resolve manga: %w", err)
+		return 0, fmt.Errorf("bridge: resolve manga: %w", err)
 	}
 	dim, _, err := s.db.GetMangaCoverDim(mangaIntID)
 	if err != nil {
-		return fmt.Errorf("bridge: get cover_dim: %w", err)
+		return 0, fmt.Errorf("bridge: get cover_dim: %w", err)
 	}
 	if err := s.db.SetMangaCoverDim(mangaIntID, 1-dim); err != nil {
-		return fmt.Errorf("bridge: set cover_dim: %w", err)
+		return 0, fmt.Errorf("bridge: set cover_dim: %w", err)
 	}
-	return nil
+	return 1 - dim, nil
 }
 
 // SaveReaderPrefs stores the per-manga reader prefs JSON blob.

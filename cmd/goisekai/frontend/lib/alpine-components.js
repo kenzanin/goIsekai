@@ -139,6 +139,17 @@
           }
           const main = document.getElementById('content');
           if (!main || !html) return;
+          // toggle-cover-dim answers JSON {dim} — flip the overlay and the
+          // button label in place; a page reload here re-renders the whole
+          // detail page (plugin detail fetch + alt-detail repopulate).
+          if (/toggle-cover-dim/.test(action)) {
+            const dim = html.trim() === '{"dim":1}';
+            const overlay = document.getElementById('cover-dim');
+            if (overlay) overlay.style.display = dim ? 'block' : 'none';
+            const btn = document.getElementById('cover-dim-btn');
+            if (btn) btn.textContent = dim ? 'Show cover' : 'Hide cover';
+            return;
+          }
           // Cover actions return ONLY the cover-picker modal partial —
           // swap it in place; the detail page (and its GetMangaDetail
           // plugin call) stays untouched.
@@ -160,8 +171,10 @@
                 const picked = form.querySelector('input[name="url"]');
                 const img = document.querySelector('#cover-wrap img');
                 if (picked && img && picked.value) {
+                  // action = /action/set-cover/<pluginID>/<mangaID> — the
+                  // plugin id is segment index 3 (0 is the empty lead).
                   img.src = '/image?pluginID=' + encodeURIComponent(
-                    action.split('/')[2] || '') + '&url=' +
+                    action.split('/')[3] || '') + '&url=' +
                     encodeURIComponent(picked.value) + '&prio=high&cb=' + Date.now();
                 }
                 if (window.openCoverModal) {
@@ -856,6 +869,16 @@
               }
               const main = document.getElementById('content');
               if (!main || !html) return;
+              // toggle-cover-dim answers JSON {dim} — flip overlay + label
+              // in place, no page render.
+              if (/toggle-cover-dim/.test(action)) {
+                const dim = html.trim() === '{"dim":1}';
+                const overlay = document.getElementById('cover-dim');
+                if (overlay) overlay.style.display = dim ? 'block' : 'none';
+                const btn = document.getElementById('cover-dim-btn');
+                if (btn) btn.textContent = dim ? 'Show cover' : 'Hide cover';
+                return;
+              }
               // Cover actions return ONLY the cover-picker modal partial —
               // swap it in place; the detail page (and its GetMangaDetail
               // plugin call) stays untouched.
@@ -875,8 +898,9 @@
                     const picked = form.querySelector('input[name="url"]');
                     const img = document.querySelector('#cover-wrap img');
                     if (picked && img && picked.value) {
+                      // plugin id is segment index 3 (0 is the empty lead).
                       img.src = '/image?pluginID=' + encodeURIComponent(
-                        action.split('/')[2] || '') + '&url=' +
+                        action.split('/')[3] || '') + '&url=' +
                         encodeURIComponent(picked.value) + '&prio=high&cb=' + Date.now();
                     }
                     const m = document.getElementById('cover-modal');

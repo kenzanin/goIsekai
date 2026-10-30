@@ -149,16 +149,21 @@ func (s *Server) handleRefetchCover(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// handleToggleCoverDim toggles the cover dim overlay on a manga.
+// handleToggleCoverDim toggles the cover dim overlay flag and returns the
+// current dim state as JSON — the client updates the overlay in place.
+// No page redirect: a redirect re-renders the whole detail page, which
+// re-invokes the plugin's GetMangaDetail and repopulates alt details.
 func (s *Server) handleToggleCoverDim(w http.ResponseWriter, r *http.Request) {
 	pluginID := param(r, "pluginID")
 	mangaID := param(r, "mangaID")
-	if err := s.service.ToggleCoverDim(pluginID, mangaID); err != nil {
+	dim, err := s.service.ToggleCoverDim(pluginID, mangaID)
+	if err != nil {
 		s.logger.Error("toggle cover dim", "pluginID", pluginID, "mangaID", mangaID, "error", err)
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	s.hxRedirect(w, r, "/view/manga/"+pluginID+"/"+mangaID)
+	w.Header().Set("Content-Type", "application/json")
+	_ = json.NewEncoder(w).Encode(map[string]any{"dim": dim})
 }
 
 // handleSaveReaderPrefs stores the per-manga reader prefs JSON blob.
