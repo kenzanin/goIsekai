@@ -154,6 +154,8 @@ func splitHostName(name string) (ns, fn string) {
 }
 
 // hostSurfaceNames returns every name in the table, in declaration order.
+//
+//nolint:unused // test-only helper (helper_parity_test.go)
 func hostSurfaceNames() []string {
 	out := make([]string, 0, len(hostSurface))
 	for _, h := range hostSurface {

@@ -142,7 +142,7 @@ func (p *Proxy) doRequestProfile(ctx context.Context, pluginID, profileName stri
 		if !isTransientReadErr(err) || ctx.Err() != nil {
 			return types.HTTPResponse{}, fmt.Errorf("hostnet: read response body: %w", err)
 		}
-		resp.Body.Close()
+		_ = resp.Body.Close()
 		resp, err = client.Do(httpReq)
 		if err != nil {
 			return types.HTTPResponse{}, fmt.Errorf("hostnet: retry execute request: %w", err)

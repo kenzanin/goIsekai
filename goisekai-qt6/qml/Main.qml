@@ -1,7 +1,7 @@
+import Goisekai
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
-import Goisekai
 
 // Window shell. Owns only the nav bar and which tab is active; every page is a
 // self-contained component (LibraryPage, …) that keeps its own state, so adding
@@ -15,17 +15,33 @@ ApplicationWindow {
     // which fetches it itself.
     property string detailKey: ""
     // Forwarded from LibraryPage so MangaDetailPage can resolve plugin labels.
-    property var _libPluginNames: ({})
-    readonly property var navTabs: [
-        { "key": "library", "label": "goIsekai" },
-        { "key": "search", "label": "Search" },
-        { "key": "updates", "label": "Updates" },
-        { "key": "history", "label": "History" },
-        { "key": "plugins", "label": "Plugins" },
-        { "key": "settings", "label": "Settings" },
-        { "key": "logs", "label": "Logs" },
-        { "key": "about", "label": "About" }
-    ]
+    property var _libPluginNames: ({
+    })
+    readonly property var navTabs: [{
+        "key": "library",
+        "label": "goIsekai"
+    }, {
+        "key": "search",
+        "label": "Search"
+    }, {
+        "key": "updates",
+        "label": "Updates"
+    }, {
+        "key": "history",
+        "label": "History"
+    }, {
+        "key": "plugins",
+        "label": "Plugins"
+    }, {
+        "key": "settings",
+        "label": "Settings"
+    }, {
+        "key": "logs",
+        "label": "Logs"
+    }, {
+        "key": "about",
+        "label": "About"
+    }]
 
     visible: true
     width: 1280
@@ -34,73 +50,6 @@ ApplicationWindow {
     minimumHeight: 480
     title: "goIsekai"
     color: Theme.bg
-
-    // Nav bar: always visible, on every tab (mirrors partials/nav.lua).
-    header: Rectangle {
-        implicitHeight: 52
-        color: Theme.panel
-
-        Rectangle {
-            anchors.bottom: parent.bottom
-            anchors.left: parent.left
-            anchors.right: parent.right
-            height: 1
-            color: Theme.line
-        }
-
-        RowLayout {
-            anchors.fill: parent
-            anchors.leftMargin: Theme.gap
-            anchors.rightMargin: Theme.gap
-            spacing: 4
-
-            Repeater {
-                model: root.navTabs
-
-                delegate: Rectangle {
-                    required property var modelData
-                    readonly property bool on: modelData.key === root.currentTab
-                    readonly property bool brand: modelData.key === "library"
-
-                    Layout.preferredHeight: 36
-                    Layout.alignment: Qt.AlignVCenter
-                    implicitWidth: navLabel.implicitWidth + (brand ? 28 : 24)
-                    radius: 6
-                    color: on ? Theme.accentWash : (navMouse.containsMouse ? Theme.field : "transparent")
-
-                    Label {
-                        id: navLabel
-                        anchors.centerIn: parent
-                        text: modelData.label
-                        color: parent.on ? Theme.accentText
-                                         : (parent.brand ? Theme.text : Theme.textDim)
-                        font.pixelSize: Theme.fsBody
-                        font.bold: parent.brand
-                    }
-
-                    // Active underline, like the web nav's border-b-2.
-                    Rectangle {
-                        visible: parent.on
-                        anchors.bottom: parent.bottom
-                        anchors.left: parent.left
-                        anchors.right: parent.right
-                        height: 2
-                        color: Theme.accentSoft
-                    }
-
-                    MouseArea {
-                        id: navMouse
-                        anchors.fill: parent
-                        hoverEnabled: true
-                        cursorShape: Qt.PointingHandCursor
-                        onClicked: root.currentTab = modelData.key
-                    }
-                }
-            }
-
-            Item { Layout.fillWidth: true }
-        }
-    }
 
     // ---- Tab content ------------------------------------------------------
     // Only the library page exists so far; every other tab renders a
@@ -142,11 +91,89 @@ ApplicationWindow {
                 font.pixelSize: Theme.fsTitle
                 font.bold: true
             }
+
             Label {
                 text: "not implemented yet"
                 color: Theme.textFaint
                 font.pixelSize: Theme.fsBody
             }
+
         }
+
     }
+
+    // Nav bar: always visible, on every tab (mirrors partials/nav.lua).
+    header: Rectangle {
+        implicitHeight: 52
+        color: Theme.panel
+
+        Rectangle {
+            anchors.bottom: parent.bottom
+            anchors.left: parent.left
+            anchors.right: parent.right
+            height: 1
+            color: Theme.line
+        }
+
+        RowLayout {
+            anchors.fill: parent
+            anchors.leftMargin: Theme.gap
+            anchors.rightMargin: Theme.gap
+            spacing: 4
+
+            Repeater {
+                model: root.navTabs
+
+                delegate: Rectangle {
+                    required property var modelData
+                    readonly property bool on: modelData.key === root.currentTab
+                    readonly property bool brand: modelData.key === "library"
+
+                    Layout.preferredHeight: 36
+                    Layout.alignment: Qt.AlignVCenter
+                    implicitWidth: navLabel.implicitWidth + (brand ? 28 : 24)
+                    radius: 6
+                    color: on ? Theme.accentWash : (navMouse.containsMouse ? Theme.field : "transparent")
+
+                    Label {
+                        id: navLabel
+
+                        anchors.centerIn: parent
+                        text: modelData.label
+                        color: parent.on ? Theme.accentText : (parent.brand ? Theme.text : Theme.textDim)
+                        font.pixelSize: Theme.fsBody
+                        font.bold: parent.brand
+                    }
+
+                    // Active underline, like the web nav's border-b-2.
+                    Rectangle {
+                        visible: parent.on
+                        anchors.bottom: parent.bottom
+                        anchors.left: parent.left
+                        anchors.right: parent.right
+                        height: 2
+                        color: Theme.accentSoft
+                    }
+
+                    MouseArea {
+                        id: navMouse
+
+                        anchors.fill: parent
+                        hoverEnabled: true
+                        cursorShape: Qt.PointingHandCursor
+                        onClicked: root.currentTab = modelData.key
+                    }
+
+                }
+
+            }
+
+            Item {
+                Layout.fillWidth: true
+            }
+
+        }
+
+    }
+
 }

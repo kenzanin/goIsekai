@@ -40,8 +40,8 @@ func checkSingleInstance(dataDir string, host string, port int) {
 			if h, ok := cmdlineFlag(pid, "-host"); ok {
 				otherHost = h
 			}
-			logger.Fatalf("goIsekai is already running (pid %d) on %s:%d — use a different -port, or stop it first with: goisekai stop",
-				pid, otherHost, port)
+			logger.Fatal(fmt.Sprintf("goIsekai is already running (pid %d) on %s:%d — use a different -port, or stop it first with: goisekai stop",
+				pid, otherHost, port))
 		}
 	}
 }
@@ -52,15 +52,13 @@ func checkSingleInstance(dataDir string, host string, port int) {
 // undetermined — the caller then falls through to a port collision on bind.
 func cmdlinePortOf(pid int) (port int, ok bool) {
 	if p, ok := cmdlineFlag(pid, "-port"); ok {
-		return p, true
+		if n, err := strconv.Atoi(p); err == nil {
+			return n, true
+		}
+		return 0, false
 	}
 	// No -port flag: parse the config the process would load. The data dir
 	// default is <wd>/data, so read its goisekai.ini.
-	wd, err := os.Executable()
-	if err != nil {
-		return 0, false
-	}
-	_ = wd
 	for _, path := range []string{"goisekai.ini", filepath.Join("..", "goisekai.ini")} {
 		cfgPath := absFromProc(pid, path)
 		if cfgPath == "" {
@@ -85,7 +83,7 @@ func cmdlineFlag(pid int, f string) (string, bool) {
 		if a == f && i+1 < len(args) {
 			v := args[i+1]
 			if f == "-port" {
-				if n, err := strconv.Atoi(v); err == nil {
+				if _, err := strconv.Atoi(v); err == nil {
 					return v, true
 				}
 				return "", false
@@ -94,7 +92,7 @@ func cmdlineFlag(pid int, f string) (string, bool) {
 		}
 		if v, found := strings.CutPrefix(a, f+"="); found {
 			if f == "-port" {
-				if n, err := strconv.Atoi(v); err == nil {
+				if _, err := strconv.Atoi(v); err == nil {
 					return v, true
 				}
 				return "", false
@@ -124,7 +122,7 @@ func configPortFromIni(path string) (int, bool) {
 	if err != nil {
 		return 0, false
 	}
-	for _, line := range strings.Split(string(data), "\n") {
+	for line := range strings.SplitSeq(string(data), "\n") {
 		k, v, ok := strings.Cut(strings.TrimSpace(line), "=")
 		if ok && strings.TrimSpace(k) == "port" {
 			if n, err := strconv.Atoi(strings.TrimSpace(v)); err == nil {

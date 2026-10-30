@@ -104,6 +104,10 @@ func main() {
 
 	dataDir, pluginsDir, infoDir, cacheDir := setupDirs(cfg)
 
+	// Single-instance guard: fatal if another live process already holds
+	// this host:port (reads the PID file written by the previous run).
+	checkSingleInstance(dataDir, cfg.Host, cfg.Port)
+
 	// PID file — written after dataDir exists, removed on shutdown.
 	removePID := writePIDFile(dataDir)
 	defer removePID()

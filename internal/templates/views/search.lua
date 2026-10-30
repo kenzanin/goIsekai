@@ -257,7 +257,7 @@ return function(data)
 		-- Genre/tag selector area: only when the selected plugin advertises genres.
 		-- Full-width multi-select below the search bar so category browsing has its
 		-- own region, and is hidden entirely for plugins without genre support.
-		.. (genreBoxes ~= "" and ('<div class="mt-4"><label class="block text-xs text-neutral-400 mb-1">Categories</label><div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-x-4 gap-y-2 bg-neutral-900 border border-neutral-700 rounded-md px-3 py-3">' .. genreBoxes .. "</div></div>") or "")
+		.. (genreBoxes ~= "" and ('<div class="mt-4"><label class="block text-xs text-neutral-400 mb-1">Categories</label><div class="max-h-40 overflow-y-auto grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-x-4 gap-y-2 bg-neutral-900 border border-neutral-700 rounded-md px-3 py-3">' .. genreBoxes .. "</div></div>") or "")
 		.. (topPagination ~= "" and ('<div class="mt-3">' .. topPagination .. "</div>") or "")
 		.. "</form>"
 		.. '<div id="search-history" class="mb-8"></div>'

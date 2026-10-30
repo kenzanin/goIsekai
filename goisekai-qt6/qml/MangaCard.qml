@@ -10,7 +10,6 @@ Rectangle {
 
     property var item: null
     property string pluginName: ""
-
     readonly property bool done: item ? (item.total > 0 && item.read >= item.total) : false
 
     signal activated(var item)
@@ -35,6 +34,7 @@ Rectangle {
 
             Image {
                 id: cover
+
                 anchors.fill: parent
                 source: card.item ? card.item.cover : ""
                 sourceSize.width: parent.width * 2
@@ -46,8 +46,7 @@ Rectangle {
 
             Label {
                 anchors.centerIn: parent
-                visible: cover.status === Image.Error
-                         || (card.item && card.item.cover === "")
+                visible: cover.status === Image.Error || (card.item && card.item.cover === "")
                 text: cover.status === Image.Error ? "cannot decode" : "no cover"
                 color: Theme.textFaint
                 font.pixelSize: Theme.fsSmall
@@ -59,10 +58,20 @@ Rectangle {
                 anchors.left: parent.left
                 anchors.right: parent.right
                 height: 40
+
                 gradient: Gradient {
-                    GradientStop { position: 0; color: "transparent" }
-                    GradientStop { position: 1; color: "#cc000000" }
+                    GradientStop {
+                        position: 0
+                        color: "transparent"
+                    }
+
+                    GradientStop {
+                        position: 1
+                        color: "#cc000000"
+                    }
+
                 }
+
             }
 
             // Status overlay (status: ongoing/done) di cover — status manga dari plugin.
@@ -78,12 +87,14 @@ Rectangle {
 
                 Label {
                     id: statusLabel
+
                     anchors.centerIn: parent
                     text: card.done ? "Done" : "Ongoing"
                     color: card.done ? "#34c759" : "#6366f1"
                     font.pixelSize: 12
                     font.bold: true
                 }
+
             }
 
             // Plugin badge, bottom-left, like the web card's pluginBadge.
@@ -99,6 +110,7 @@ Rectangle {
 
                 Label {
                     id: pluginLabel
+
                     anchors.centerIn: parent
                     text: card.pluginName
                     color: "#f5f5f5"
@@ -106,7 +118,9 @@ Rectangle {
                     elide: Text.ElideRight
                     width: Math.min(implicitWidth, card.width - 40)
                 }
+
             }
+
         }
 
         // Title + progress.
@@ -149,7 +163,9 @@ Rectangle {
                     font.pixelSize: Theme.fsSmall
                 }
 
-                Item { Layout.fillWidth: true }
+                Item {
+                    Layout.fillWidth: true
+                }
 
                 // New wins over Done: a finished manga with a new chapter still
                 // needs the reader's attention, same as the web card.
@@ -162,12 +178,14 @@ Rectangle {
 
                     Label {
                         id: newLabel
+
                         anchors.centerIn: parent
                         text: "New"
                         color: "white"
                         font.pixelSize: 12
                         font.bold: true
                     }
+
                 }
 
                 Rectangle {
@@ -179,22 +197,29 @@ Rectangle {
 
                     Label {
                         id: doneLabel
+
                         anchors.centerIn: parent
                         text: "Done"
                         color: "white"
                         font.pixelSize: 12
                         font.bold: true
                     }
+
                 }
+
             }
+
         }
+
     }
 
     MouseArea {
         id: mouse
+
         anchors.fill: parent
         hoverEnabled: true
         cursorShape: Qt.PointingHandCursor
         onClicked: card.activated(card.item)
     }
+
 }

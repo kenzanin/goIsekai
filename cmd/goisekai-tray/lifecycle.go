@@ -154,7 +154,8 @@ func (a *app) stop() {
 		<-done
 	}
 	select {
-	case <-a.exited:
+	case err := <-a.exited:
+		_ = err
 	default:
 	}
 	_ = a.logF.Close()
