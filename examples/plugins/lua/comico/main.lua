@@ -65,40 +65,45 @@ local function tags_to_names(tags)
 end
 
 -- ─── search ────────────────────────────────────────────────────────────────
--- GET /api/search?source=comick&q=Q&limit=24&offset=O
+-- GET /api/search?source=comick&q=Q&limit=100&offset=O
 -- items: [{id, sourceId, sourceMangaId, title, coverUrl, status,
 --          contentRating, format, year, tags[], comickTags}]
+--
+-- The host owns paging (plugin.json has paginates:false), so we must return
+-- every match: fetch in 100-row slices until total is reached. limit>100 400s.
 
 function search(arg)
 	local f = host.json.decode(arg) or {}
 	local query = f.query or ""
-	local page = tonumber(f.page) or 1
 	local genres = f.genres or {}
 
-	local url = API .. "/search?source=comick&sort=relevance&limit=24"
-		.. "&offset=" .. tostring((page - 1) * 24)
+	local base = API .. "/search?source=comick&sort=relevance&limit=100"
 		.. "&contentRating=safe&contentRating=suggestive"
 	if query ~= "" then
-		url = url .. "&q=" .. host.text.url_encode(query)
+		base = base .. "&q=" .. host.text.url_encode(query)
 	end
 	if #genres > 0 then
-		url = url .. "&comickTags=" .. host.text.url_encode(genres[1])
+		base = base .. "&comickTags=" .. host.text.url_encode(genres[1])
 	end
 
-	local data = http_get(url)
-	if not data or not data.items then return host.json.encode({}), nil end
-
 	local results = {}
-	for _, item in ipairs(data.items) do
-		results[#results + 1] = {
-			id             = tostring(item.id or ""),
-			title          = host.text.trim(item.title or ""),
-			cover_url      = abs_url(item.coverUrl),
-			description    = item.description or "",
-			status         = item.status or "",
-			latest_chapter = "",
-			tags           = tags_to_names(item.tags),
-		}
+	local offset = 0
+	for _ = 1, 20 do
+		local data = http_get(base .. "&offset=" .. tostring(offset))
+		if not data or not data.items or #data.items == 0 then break end
+		for _, item in ipairs(data.items) do
+			results[#results + 1] = {
+				id             = tostring(item.id or ""),
+				title          = host.text.trim(item.title or ""),
+				cover_url      = abs_url(item.coverUrl),
+				description    = item.description or "",
+				status         = item.status or "",
+				latest_chapter = "",
+				tags           = tags_to_names(item.tags),
+			}
+		end
+		offset = offset + #data.items
+		if offset >= (tonumber(data.total) or 0) then break end
 	end
 	return host.json.encode(results), nil
 end
