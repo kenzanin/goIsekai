@@ -25,9 +25,14 @@ info_dir := "app_data/info"
 frontend_dir := "cmd/goisekai/frontend"
 lib_dir := "cmd/goisekai/frontend/lib"
 
+# Go compiler: the host has go1.27.3 (primary, satisfies the go.mod 1.27.2 pin)
+# and go1.26.9 (fallback) installed in ~/go/bin. Use the host binaries directly
+# so no toolchain is ever downloaded into the module cache.
+go_cmd := "go1.27.3"
+
 # compile the server binary (pure Go, CGO-free, cross-compilable)
 build: css br
-    CGO_ENABLED=0 go build -o {{binary}} ./cmd/goisekai
+    CGO_ENABLED=0 {{go_cmd}} build -o {{binary}} ./cmd/goisekai
 
 # compile the Qt Quick desktop client (C++ + Qt 6, separate from the CGO-free
 # server). The binary lands in goisekai-qt6/build/goisekai-qt6.
@@ -41,7 +46,7 @@ build-qml:
 # `go build` compiles stubs that refuse to run), and `webkit2_41` on distros
 # that ship webkit2gtk-4.1 instead of 4.0. CGO on for the same reason.
 build-wails:
-    cd cmd/goisekai-wails && CGO_ENABLED=1 go build -tags "desktop production webkit2_41" -o ../../bin/goisekai-wails .
+    cd cmd/goisekai-wails && CGO_ENABLED=1 {{go_cmd}} build -tags "desktop production webkit2_41" -o ../../bin/goisekai-wails .
 
 # compile the embedded stylesheet from the templates, if npx is available
 css:
@@ -89,23 +94,23 @@ open:
 
 # run every test in the repo
 test:
-    CGO_ENABLED=0 go test {{pkgs}}
+    CGO_ENABLED=0 {{go_cmd}} test {{pkgs}}
 
 # run every test under the race detector
 race:
-    CGO_ENABLED=1 go test -race {{pkgs}}
+    CGO_ENABLED=1 {{go_cmd}} test -race {{pkgs}}
 
 # format every Go package, tests included
 fmt:
-    go fmt {{pkgs}}
+    {{go_cmd}} fmt {{pkgs}}
 
 # format production Go packages (which is all of them; kept for the gate name)
 fmt-prod:
-    go fmt {{prod}}
+    {{go_cmd}} fmt {{prod}}
 
 # apply the stdlib/language modernizations for the Go version in go.mod
 modernize:
-    CGO_ENABLED=0 go fix {{pkgs}}
+    CGO_ENABLED=0 {{go_cmd}} fix {{pkgs}}
 
 # lint every Go package
 lint:
