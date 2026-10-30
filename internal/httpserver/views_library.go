@@ -118,17 +118,8 @@ func (s *Server) viewLibrary(w http.ResponseWriter, r *http.Request) {
 	// The colour is indexed by group position, so the group order has to be
 	// deterministic (FindPotentialDuplicates breaks ties on Key) or the bands
 	// would change colour between page loads.
-	dupColors := make(map[string]string, len(duplicateGroups)*2)
-	dupRank := make(map[string]int, len(duplicateGroups)*2)
-	for gi, g := range duplicateGroups {
-		color := dupPalette[gi%len(dupPalette)]
-		for _, m := range g.Members {
-			id := strconv.FormatInt(m.ID, 10)
-			dupColors[id] = color
-			dupRank[id] = gi
-		}
-	}
-	duplicateCount = len(dupColors)
+	dupColors, dupRank, dupCount := libraryDupMaps(duplicateGroups)
+	duplicateCount = dupCount
 
 	if viewFilter == "duplicate" {
 		kept := make([]database.Manga, 0, len(mangas))
@@ -156,57 +147,15 @@ func (s *Server) viewLibrary(w http.ResponseWriter, r *http.Request) {
 	for id, m := range metas {
 		ratios[id] = m.ThumbRatio
 	}
-	mangaPluginMap := make(map[string]string) // mangaID -> pluginID (from DB)
-	// Display names + icons: DB rows as base, runtime metas overlay; wasm
-	// plugins fall back to their on-disk logo.png (see pluginDisplayMaps).
 	pluginNameMap, pluginIconMap := s.pluginDisplayMaps()
-	rows, err := s.service.QueryMangaPluginIDs()
-	if err == nil {
-		for _, r := range rows {
-			mangaPluginMap[r.MangaID] = r.PluginID
-		}
-	}
-	statsMap := make(map[string]map[string]any) // mangaID -> {TotalChapters, ReadChapters, PluginName, HasNew}
-	for _, st := range libStats {
-		pluginID := mangaPluginMap[st.MangaID]
-		pluginName := pluginNameMap[pluginID]
-		if pluginName == "" {
-			pluginName = pluginID
-		}
-		pluginIcon := ""
-		if icon, ok := pluginIconMap[pluginID]; ok {
-			pluginIcon = icon
-		}
-		statsMap[st.MangaID] = map[string]any{
-			"TotalChapters": st.TotalChapters,
-			"ReadChapters":  st.ReadChapters,
-			"PluginName":    pluginName,
-			"PluginIcon":    pluginIcon,
-			"HasNew":        st.HasNew,
-		}
-	}
+	statsMap, _ := s.libraryStatsMap(libStats, pluginNameMap, pluginIconMap)
 	overview, err := s.service.LibraryOverview()
 	if err != nil {
 		s.logger.Warn("library overview", "error", err)
 	}
 	statusLine, readLine, readingTime, mostLine, fewestLine := buildOverviewStrings(overview)
 	// Per-plugin title counts for the sidebar card.
-	var pluginCounts []map[string]any
-	if q == "" {
-		if pc, pcErr := s.service.CountLibraryByPlugin(); pcErr != nil {
-			s.logger.Warn("library plugin counts", "error", pcErr)
-		} else {
-			pluginCounts = make([]map[string]any, 0, len(pc))
-			for _, p := range pc {
-				pluginCounts = append(pluginCounts, map[string]any{
-					"PluginID": p.PluginID,
-					"Name":     pluginNameMap[p.PluginID],
-					"Icon":     pluginIconMap[p.PluginID],
-					"Count":    p.Count,
-				})
-			}
-		}
-	}
+	pluginCounts := s.libraryPluginCounts(q, pluginNameMap, pluginIconMap)
 	// Display name for the pluginID filter chip (same fallback as statsMap).
 	pluginFilterName := pluginNameMap[pluginID]
 	if pluginFilterName == "" {
