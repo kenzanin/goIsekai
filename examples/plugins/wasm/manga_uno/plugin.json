@@ -2,5 +2,5 @@
   "name": "MangaUno",
   "site_url": "https://manga.uno",
   "logo": "logo.png",
-  "built_with": "tinygo 0.43.0"
+  "built_with": "tinygo 0.44.0"
 }
