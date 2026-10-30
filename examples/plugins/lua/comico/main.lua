@@ -139,13 +139,38 @@ function get_manga_detail(arg)
 end
 
 -- ─── get_chapter_list ──────────────────────────────────────────────────────
--- GET /api/manga/{uuid}/languages -> ["id"]  (available chapter languages)
--- GET /api/manga/{uuid}/chapters?language=X&order=desc&sort=number&limit=100
+-- GET /api/manga/{uuid}/sources
+--      -> [{sourceId, name, native, chapterCount, readableChapterCount}]
+-- GET /api/manga/{uuid}/languages?source=X -> ["id"]
+-- GET /api/manga/{uuid}/chapters?source=X&language=L&limit=100
 --
--- The chapters endpoint filters to one language per request and never
--- returns a cross-language list (no `language=` yields total 0), so the
--- available languages must be fetched first or a manga translated only to
--- Indonesian looks chapterless.
+-- comico.moe is a multi-source aggregator: one manga carries chapters from
+-- MangaDex plus several scraped sites (atsu, weebcentral, senmanga, ...).
+-- Reading only the native source hides most of the catalogue — one manga
+-- shows 3 native chapters where its atsu source has 19. Both endpoints are
+-- always single-source and single-language, so walk sources × languages.
+-- The reader proxies every source, so non-native chapters are readable too.
+
+local function chapter_pages(base, into)
+	local offset = 0
+	for _ = 1, 20 do
+		local data = http_get(base .. "&offset=" .. tostring(offset))
+		if not data or not data.items or #data.items == 0 then break end
+		for _, ch in ipairs(data.items) do
+			into[#into + 1] = {
+				id          = tostring(ch.id or ""),
+				manga_id    = tostring(ch.mangaId or ""),
+				title       = host.text.trim(ch.title or ""),
+				chapter_num = tonumber(ch.number) or 0,
+				released_at = ch.publishedAt or "",
+				url         = SITE .. "/manga/" .. tostring(ch.mangaId or ""),
+				scanlator   = ch.scanlationGroup or "",
+			}
+		end
+		offset = offset + #data.items
+		if offset >= (tonumber(data.total) or 0) then break end
+	end
+end
 
 function get_chapter_list(arg)
 	local manga_id = decode_id(arg)
@@ -153,38 +178,33 @@ function get_chapter_list(arg)
 		return host.json.encode({}), nil
 	end
 
-	local langs = http_get(API .. "/manga/" .. manga_id .. "/languages")
-	if type(langs) ~= "table" or #langs == 0 then langs = { "en" } end
+	local sources = http_get(API .. "/manga/" .. manga_id .. "/sources")
+	if type(sources) ~= "table" or #sources == 0 then
+		-- Fall back to the native catalogue rather than reporting no chapters.
+		sources = { { sourceId = "mangadex" } }
+	end
 
 	local chapters = {}
-	for _, lang in ipairs(langs) do
-		if type(lang) == "string" then
-			-- The API rejects limit > 100 (400), so page through in 100s.
-			local base = API .. "/manga/" .. manga_id
-				.. "/chapters?order=desc&sort=number&limit=100"
-				.. "&language=" .. host.text.url_encode(lang)
-			local offset = 0
-			for _ = 1, 20 do
-				local data = http_get(base .. "&offset=" .. tostring(offset))
-				if not data or not data.items or #data.items == 0 then break end
-				for _, ch in ipairs(data.items) do
-					chapters[#chapters + 1] = {
-						id          = tostring(ch.id or ""),
-						manga_id    = tostring(manga_id),
-						title       = host.text.trim(ch.title or ""),
-						chapter_num = tonumber(ch.number) or 0,
-						released_at = ch.publishedAt or "",
-						url         = SITE .. "/manga/" .. manga_id,
-						scanlator   = ch.scanlationGroup or "",
-					}
+	for _, src in ipairs(sources) do
+		local sid = type(src) == "table" and src.sourceId or nil
+		local readable = type(src) == "table" and tonumber(src.readableChapterCount) or nil
+		if sid and (readable == nil or readable > 0) then
+			local langs = http_get(API .. "/manga/" .. manga_id
+				.. "/languages?source=" .. host.text.url_encode(sid))
+			if type(langs) ~= "table" or #langs == 0 then langs = {} end
+			for _, lang in ipairs(langs) do
+				if type(lang) == "string" then
+					-- The API rejects limit > 100 (400), so page through in 100s.
+					chapter_pages(API .. "/manga/" .. manga_id
+						.. "/chapters?order=desc&sort=number&limit=100"
+						.. "&source=" .. host.text.url_encode(sid)
+						.. "&language=" .. host.text.url_encode(lang), chapters)
 				end
-				offset = offset + #data.items
-				if offset >= (tonumber(data.total) or 0) then break end
 			end
 		end
 	end
 
-	-- Newest first across every language.
+	-- Newest first across every source and language.
 	table.sort(chapters, function(a, b)
 		return tostring(a.released_at or "") > tostring(b.released_at or "")
 	end)
