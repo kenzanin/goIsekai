@@ -139,10 +139,10 @@
           }
           const main = document.getElementById('content');
           if (!main || !html) return;
-          // fetch-covers returns ONLY the cover-picker modal partial now —
-          // swap that element in place and open it; the rest of the detail
-          // page (synopsis, genres, chapters) is untouched.
-          if (/fetch-covers/.test(action)) {
+          // Cover actions return ONLY the cover-picker modal partial —
+          // swap it in place; the detail page (and its GetMangaDetail
+          // plugin call) stays untouched.
+          if (/fetch-covers|set-cover|clear-covers|refetch-cover/.test(action)) {
             const tpl = document.createElement('div');
             tpl.innerHTML = html;
             const fresh = tpl.querySelector('#cover-modal');
@@ -150,10 +150,28 @@
               const old = document.getElementById('cover-modal');
               if (old) old.replaceWith(fresh); else main.appendChild(fresh);
               if (window.Alpine && Alpine.initTree) Alpine.initTree(fresh);
-              if (window.openCoverModal) window.openCoverModal();
-              // No toast here: the opened modal IS the feedback, and the
-              // compat showToast treats a Response as a message string.
+              if (/fetch-covers|refetch-cover/.test(action)) {
+                // Fetch/refetch re-rendered the picker: open it so the
+                // flow stays fetch → pick → set in one modal.
+                if (window.openCoverModal) window.openCoverModal();
+              } else {
+                // set-cover: the pick is done — reflect it in the page's
+                // main cover and close the picker.
+                const picked = form.querySelector('input[name="url"]');
+                const img = document.querySelector('#cover-wrap img');
+                if (picked && img && picked.value) {
+                  img.src = '/image?pluginID=' + encodeURIComponent(
+                    action.split('/')[2] || '') + '&url=' +
+                    encodeURIComponent(picked.value) + '&prio=high&cb=' + Date.now();
+                }
+                if (window.openCoverModal) {
+                  // hide the swapped-in modal again
+                  const m = document.getElementById('cover-modal');
+                  if (m) { m.classList.add('hidden'); m.style.display = 'none'; }
+                }
+              }
             }
+            showToast(resp, 'success');
             return;
           }
           const match = html.match(/<main[^>]*id="content"[\s\S]*?>([\s\S]*?)<\/main>/i);
@@ -838,11 +856,10 @@
               }
               const main = document.getElementById('content');
               if (!main || !html) return;
-              // fetch-covers returns ONLY the cover-picker modal partial —
-              // swap that element in place and open it; the rest of the
-              // detail page is untouched. No toast: the opened modal is the
-              // feedback, and showToast renders a Response as [object Response].
-              if (/fetch-covers/.test(action)) {
+              // Cover actions return ONLY the cover-picker modal partial —
+              // swap it in place; the detail page (and its GetMangaDetail
+              // plugin call) stays untouched.
+              if (/fetch-covers|set-cover|clear-covers|refetch-cover/.test(action)) {
                 const tpl = document.createElement('div');
                 tpl.innerHTML = html;
                 const fresh = tpl.querySelector('#cover-modal');
@@ -850,8 +867,23 @@
                   const old = document.getElementById('cover-modal');
                   if (old) old.replaceWith(fresh); else main.appendChild(fresh);
                   if (window.Alpine && Alpine.initTree) Alpine.initTree(fresh);
-                  if (window.openCoverModal) window.openCoverModal();
+                  if (/fetch-covers|refetch-cover/.test(action)) {
+                    if (window.openCoverModal) window.openCoverModal();
+                  } else {
+                    // set-cover: reflect the pick in the page's main cover
+                    // and close the picker.
+                    const picked = form.querySelector('input[name="url"]');
+                    const img = document.querySelector('#cover-wrap img');
+                    if (picked && img && picked.value) {
+                      img.src = '/image?pluginID=' + encodeURIComponent(
+                        action.split('/')[2] || '') + '&url=' +
+                        encodeURIComponent(picked.value) + '&prio=high&cb=' + Date.now();
+                    }
+                    const m = document.getElementById('cover-modal');
+                    if (m) { m.classList.add('hidden'); m.style.display = 'none'; }
+                  }
                 }
+                showToast(resp, 'success');
                 rememberListPage();
                 return;
               }

@@ -67,6 +67,47 @@ func (s *Server) handleFetchCovers(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// renderCoverModal fetches cached cover + alt-covers from the DB (no plugin
+// detail fetch) and renders the cover-picker partial. It accepts an optional
+// toast message that the JS submit handler reads from the X-Toast header to
+// surface a success confirmation to the user.
+func (s *Server) renderCoverModal(w http.ResponseWriter, pluginID, mangaID, toast string) error {
+	cached, err := s.service.CachedCover(pluginID, mangaID)
+	if err != nil {
+		return err
+	}
+	altCovers, err := s.service.ListAltCovers(pluginID, mangaID)
+	if err != nil {
+		return err
+	}
+	coverVersions := make(map[string]string, len(altCovers)+1)
+	for _, c := range altCovers {
+		if c.URL != "" {
+			if v := s.service.CoverCacheVersion(pluginID, c.URL); v != "" {
+				coverVersions[c.URL] = v
+			}
+		}
+	}
+	if cached.CoverURL != "" {
+		if v := s.service.CoverCacheVersion(pluginID, cached.CoverURL); v != "" {
+			coverVersions[cached.CoverURL] = v
+		}
+	}
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	if toast != "" {
+		w.Header().Set("X-Toast", toast)
+	}
+	return s.engine.RenderPartial(w, "partials/cover_modal", map[string]any{
+		"PluginID":      pluginID,
+		"MangaID":       mangaID,
+		"Manga":         cached,
+		"AltCovers":     altCovers,
+		"CoverVersions": coverVersions,
+		"CurrentTitle":  cached.Title,
+		csrfField:       s.csrfToken,
+	})
+}
+
 // handleSetCover promotes one alternative cover URL to the manga's cover.
 func (s *Server) handleSetCover(w http.ResponseWriter, r *http.Request) {
 	pluginID := param(r, "pluginID")
@@ -82,7 +123,14 @@ func (s *Server) handleSetCover(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusBadGateway)
 		return
 	}
-	s.toastRedirect(w, r, "/view/manga/"+pluginID+"/"+mangaID, "Cover updated")
+	// Swap modal in-place so the detail page (and its GetMangaDetail call)
+	// stays untouched — same pattern as fetch-covers. The caller already
+	// swapped #cover-modal in when it opened the picker, so swapping it
+	// out again closes the picker without a reload.
+	if err := s.renderCoverModal(w, pluginID, mangaID, "Cover updated"); err != nil {
+		s.logger.Error("render cover modal after set", "error", err)
+		http.Error(w, "render failed", http.StatusInternalServerError)
+	}
 }
 
 // handleRefetchCover re-downloads a manga's cover, busting the caches.
@@ -94,7 +142,11 @@ func (s *Server) handleRefetchCover(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusBadGateway)
 		return
 	}
-	s.toastRedirect(w, r, "/view/manga/"+pluginID+"/"+mangaID, "Cover re-fetched")
+	// In-place modal swap: avoids re-invoking the plugin's GetMangaDetail.
+	if err := s.renderCoverModal(w, pluginID, mangaID, "Cover re-fetched"); err != nil {
+		s.logger.Error("render cover modal after refetch", "error", err)
+		http.Error(w, "render failed", http.StatusInternalServerError)
+	}
 }
 
 // handleToggleCoverDim toggles the cover dim overlay on a manga.
@@ -154,5 +206,9 @@ func (s *Server) handleClearCovers(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	s.toastRedirect(w, r, "/view/manga/"+pluginID+"/"+mangaID, "Cover candidates cleared")
+	// In-place modal swap: avoids re-invoking the plugin's GetMangaDetail.
+	if err := s.renderCoverModal(w, pluginID, mangaID, "Cover candidates cleared"); err != nil {
+		s.logger.Error("render cover modal after clear", "error", err)
+		http.Error(w, "render failed", http.StatusInternalServerError)
+	}
 }
