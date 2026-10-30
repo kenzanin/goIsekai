@@ -107,14 +107,20 @@ func hostCall(fn string, args ...string) string {
 
 func getJSON(u string) (string, bool) {
 	raw := hostCall("http.get_body", u, acceptJSON)
-	if raw == "" || raw == "null" || strings.HasPrefix(raw, "{") && strings.Contains(raw, "error") {
+	if raw == "" || raw == "null" {
 		return "", false
 	}
-	var s string
-	if json.Unmarshal([]byte(raw), &s) != nil {
-		return "", false
+	// ponytail: API used to double-encode (a JSON string wrapping JSON); it
+	// now returns the object directly. If a future endpoint re-wraps, decode
+	// that string form again.
+	if strings.HasPrefix(raw, "\"") {
+		var s string
+		if json.Unmarshal([]byte(raw), &s) != nil {
+			return "", false
+		}
+		raw = s
 	}
-	return s, s != ""
+	return raw, strings.HasPrefix(raw, "{") || strings.HasPrefix(raw, "[")
 }
 
 func main() {}
@@ -158,7 +164,9 @@ type searchResp struct {
 }
 
 type mangaDetail struct {
-	ID        string `json:"id"`
+	// id is a number in the API; typing it string made the whole detail
+	// unmarshal fail (json: cannot unmarshal number into string).
+	ID        int64  `json:"id"`
 	Slug      string `json:"slug"`
 	Title     string `json:"title"`
 	English   string `json:"english_title"`
