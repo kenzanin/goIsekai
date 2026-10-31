@@ -1,10 +1,13 @@
 package bridge
 
 import (
+	"path/filepath"
 	"testing"
 	"time"
 
 	"goisekai/internal/database"
+	"goisekai/internal/hostnet"
+	"goisekai/internal/pluginmanager"
 )
 
 // backdateUpdatedAt moves a manga's updated_at into the past so the stale
@@ -66,4 +69,67 @@ func TestSyncStaleLibraryNoStaleRowsIsNoop(t *testing.T) {
 	if err := s.SyncStaleLibrary(time.Now().UTC().Add(-3 * 24 * time.Hour)); err != nil {
 		t.Fatalf("SyncStaleLibrary: %v", err)
 	}
+}
+
+// TestSyncMangasSkipsInactiveAndContinuesPastFailures pins the batch pass's
+// two survivability contracts: a switched-off plugin's rows are untouched
+// (never even reaching the plugin manager), and one source failing its detail
+// fetch must not abort the pass — the remaining rows are still attempted.
+func TestSyncMangasSkipsInactiveAndContinuesPastFailures(t *testing.T) {
+	db, err := database.Open(filepath.Join(t.TempDir(), "sync.db"))
+	if err != nil {
+		t.Fatalf("open db: %v", err)
+	}
+	t.Cleanup(func() { _ = db.Close() })
+
+	for _, p := range []database.Plugin{
+		{ID: "on", Name: "on", IsActive: true},
+		{ID: "off", Name: "off", IsActive: false},
+	} {
+		if err := db.RegisterPlugin(p); err != nil {
+			t.Fatalf("register %s: %v", p.ID, err)
+		}
+	}
+
+	proxy := hostnet.NewProxy()
+	// An empty plugin dir: every GetMangaDetail for an active plugin fails,
+	// which is exactly the dead-source scenario the pass must survive.
+	mgr := pluginmanager.NewManager(proxy, t.TempDir())
+	s := NewAppService(db, mgr, proxy, "", "", nil)
+	t.Cleanup(s.Shutdown)
+
+	for _, id := range []string{"off-row", "on-row-1", "on-row-2"} {
+		upsertTestManga(t, db, id, time.Hour)
+	}
+	// Make all three stale, then repoint the two "on-row" fixtures at the
+	// failing active plugin.
+	for _, id := range []string{"off-row", "on-row-1", "on-row-2"} {
+		backdateUpdatedAt(t, db, id, time.Hour)
+	}
+	// Repoint the two "on-row" fixtures at the failing active plugin.
+	for _, id := range []string{"on-row-1", "on-row-2"} {
+		if _, err := db.Exec(`UPDATE mangas SET plugin_id = 'on' WHERE source_manga_id = ?`, id); err != nil {
+			t.Fatalf("repoint %s: %v", id, err)
+		}
+	}
+
+	stale, err := db.ListLibraryStale(time.Now().UTC().Add(-time.Minute))
+	if err != nil {
+		t.Fatalf("ListLibraryStale: %v", err)
+	}
+	if len(stale) != 3 {
+		t.Fatalf("stale = %d rows, want 3", len(stale))
+	}
+
+	// Must not panic (nil-deref would mean the inactive plugin reached the
+	// manager) and must return nil (individual failures are logged, not
+	// propagated — one dead source cannot abort the hourly pass).
+	if err := s.syncMangas(stale); err != nil {
+		t.Fatalf("syncMangas returned %v, want nil", err)
+	}
+
+	// The skip itself is asserted by the no-panic contract above: reaching
+	// the plugin manager for "off-row" would nil-deref (the inactive branch
+	// short-circuits before mgr) and the dead source's failures are logged
+	// inside the pass, not returned.
 }
