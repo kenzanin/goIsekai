@@ -58,36 +58,17 @@ func jsVRFStages(v goja.Value) ([]pluginutil.VRFStageB64, error) {
 	return stages, nil
 }
 
-// jsNormalizeStatus creates a callable function with a .default property.
-// Usage: host.text.normalize_status(raw) for the default vocabulary, or
-// host.text.normalize_status(map, raw) to extend it. An empty map means
-// "use the defaults".
+// jsNormalizeStatus creates the host.text.normalize_status(raw) callable.
+// It returns the canonical status label, or "" when raw is not part of the
+// host's canonical vocabulary. The host owns the vocabulary; a plugin scraping
+// a site-specific word translates it itself.
 func jsNormalizeStatus(vm *goja.Runtime) *goja.Object {
 	fn := func(call goja.FunctionCall) goja.Value {
-		var m map[string]string
 		var raw string
-		if len(call.Arguments) > 1 {
-			if arg := call.Arguments[0]; !arg.SameAs(goja.Undefined()) && !arg.SameAs(goja.Null()) {
-				if obj, ok := arg.(*goja.Object); ok {
-					keys := obj.Keys()
-					if len(keys) > 0 {
-						m = make(map[string]string, len(keys))
-						for _, k := range keys {
-							if v := obj.Get(k); v != nil {
-								m[k] = v.String()
-							}
-						}
-					}
-				}
-			}
-			raw = call.Arguments[1].String()
-		} else if len(call.Arguments) > 0 {
+		if len(call.Arguments) > 0 {
 			raw = call.Arguments[0].String()
 		}
-		return vm.ToValue(pluginutil.NormalizeStatus(m, raw))
+		return vm.ToValue(pluginutil.NormalizeStatus(raw))
 	}
-	fnVal := vm.ToValue(fn)
-	fnObj := fnVal.ToObject(vm)
-	_ = fnObj.Set("default", vm.ToValue(pluginutil.DefaultStatusMap()))
-	return fnObj
+	return vm.ToValue(fn).ToObject(vm)
 }

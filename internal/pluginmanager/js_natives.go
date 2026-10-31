@@ -38,7 +38,6 @@ func registerJSHostNatives(vm *goja.Runtime, m *Manager, id string) error {
 	}
 
 	// Helpers whose call shape is JS-specific.
-	// host.text.normalize_status also carries a .default property.
 	normalize := jsNormalizeStatus(vm)
 	if err := groupOf("text").Set("normalize_status", normalize); err != nil {
 		return err

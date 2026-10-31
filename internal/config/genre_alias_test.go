@@ -4,6 +4,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"strings"
 	"testing"
 )
 
@@ -20,6 +21,9 @@ Doujinshi = doujin, dj
 [status]
 Hiatus = hiatus, uncertain
 `
+
+	// The [status] section above is deliberately still present: an INI written by an
+	// older version must load without error, and the section is simply ignored.
 	if err := os.WriteFile(path, []byte(ini), 0o600); err != nil {
 		t.Fatal(err)
 	}
@@ -34,7 +38,6 @@ Hiatus = hiatus, uncertain
 	}{
 		{"Sci-Fi", c.GenreAlias["Sci-Fi"], []string{"scifi", "sci-fi"}},
 		{"Doujinshi", c.GenreAlias["Doujinshi"], []string{"doujin", "dj"}},
-		{"Hiatus", c.StatusAlias["Hiatus"], []string{"hiatus", "uncertain"}},
 	} {
 		if len(tc.got) != len(tc.want) {
 			t.Errorf("%s = %v, want %v", tc.name, tc.got, tc.want)
@@ -52,8 +55,8 @@ Hiatus = hiatus, uncertain
 		t.Error("Action default should still be present")
 	}
 	// A file line replaces the built-in variants instead of appending to them.
-	if got := c.StatusAlias["Hiatus"]; len(got) != 2 {
-		t.Errorf("Hiatus = %v, want exactly the 2 variants from the file", got)
+	if got := c.GenreAlias["Sci-Fi"]; len(got) != 2 {
+		t.Errorf("Sci-Fi = %v, want exactly the 2 variants from the file", got)
 	}
 }
 
@@ -63,7 +66,6 @@ func TestSaveRoundTripsAliases(t *testing.T) {
 	c := Default()
 	c.DataDir = dir
 	c.GenreAlias["Sci-Fi"] = []string{"scifi"}
-	c.StatusAlias["Hiatus"] = []string{"uncertain"}
 	if err := c.Save(path); err != nil {
 		t.Fatal(err)
 	}
@@ -75,8 +77,29 @@ func TestSaveRoundTripsAliases(t *testing.T) {
 	if g := got.GenreAlias["Sci-Fi"]; len(g) != 1 || g[0] != "scifi" {
 		t.Errorf("Sci-Fi = %v, want [scifi]", g)
 	}
-	if s := got.StatusAlias["Hiatus"]; len(s) != 1 || s[0] != "uncertain" {
-		t.Errorf("Hiatus = %v, want [uncertain]", s)
+}
+
+// TestSaveWritesNoStatusSection pins the removal of the [status] alias
+// vocabulary: the host owns the canonical status list, so saving a config must
+// not write a section plugins could mistake for a supported override.
+func TestSaveWritesNoStatusSection(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "goisekai.ini")
+	c := Default()
+	c.DataDir = filepath.Dir(path)
+	if err := c.Save(path); err != nil {
+		t.Fatal(err)
+	}
+
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(raw), "[status]") {
+		t.Errorf("saved config still carries a [status] section:\n%s", raw)
+	}
+	// The genre section is untouched by this change.
+	if !strings.Contains(string(raw), "[genre]") {
+		t.Error("saved config lost its [genre] section")
 	}
 }
 

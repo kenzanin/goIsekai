@@ -42,21 +42,11 @@ func wasmRegexRow(row []string) any {
 	}
 }
 
-// wasmNormalizeStatus is host.text.normalize_status in its two call shapes:
-// (raw) with the default vocabulary, or (mapJSON, raw) with a plugin-supplied
-// map of lowercased keys to canonical values.
+// wasmNormalizeStatus is host.text.normalize_status(raw) — one argument, the
+// raw status value. Returns the canonical label, or "" when the value is not
+// part of the host's canonical vocabulary.
 func wasmNormalizeStatus(args []string) (any, error) {
-	if len(args) < 2 {
-		return pluginutil.NormalizeStatus(nil, wasmArg(args, 0)), nil
-	}
-	m := map[string]string{}
-	if err := json.Unmarshal([]byte(args[0]), &m); err != nil {
-		return nil, fmt.Errorf("normalize_status: %w", err)
-	}
-	if len(m) == 0 {
-		m = nil
-	}
-	return pluginutil.NormalizeStatus(m, args[1]), nil
+	return pluginutil.NormalizeStatus(wasmArg(args, 0)), nil
 }
 
 // wasmHTML parses the markup and runs one lookup. It is the stateless

@@ -45,7 +45,7 @@ var yaegiHelpers = []yaegiHelper{
 	{goName: "NormalizeTitle", helper: "text.normalize_title"},
 	{goName: "StripLinkBlocks", helper: "text.strip_link_blocks"},
 	{goName: "NormalizeStatus", fn: pluginutil.NormalizeStatus, helper: "text.normalize_status",
-		note: "Go passes the override map directly; Lua/JS wrap it differently"},
+		note: "one string argument; returns the canonical label or \"\""},
 	{goName: "HTMLEntityUnescape", helper: "text.unescape"},
 	{goName: "TrimSpace", helper: "text.trim"},
 	{goName: "LuaEscape", helper: "text.lua_escape"},

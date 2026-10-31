@@ -74,7 +74,6 @@ func (c *Config) Save(path string) error {
 		"cdp_size", strconv.Itoa(c.WorkersCDPSize),
 		"cdp_queue", strconv.Itoa(c.WorkersCDPQueue))
 	putAlias(f, "genre", c.GenreAlias)
-	putAlias(f, "status", c.StatusAlias)
 	// [tray] is always written (like [enhance]) so the keys are discoverable
 	// in a generated file; empty values mean "derive the default".
 	put(f, "tray",

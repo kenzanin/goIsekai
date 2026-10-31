@@ -32,8 +32,7 @@ func Default() *Config {
 		ChapterCacheTTLHours: 168,
 		PreconnectEnabled:    false,
 
-		GenreAlias:  DefaultGenreAlias(),
-		StatusAlias: DefaultStatusAlias(),
+		GenreAlias: DefaultGenreAlias(),
 
 		ImageFormat: "webp",
 		CoverMaxDim: 720,

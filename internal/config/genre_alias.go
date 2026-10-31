@@ -47,25 +47,6 @@ func (c *Config) addGenreAlias(canonical, variants string) {
 	c.GenreAlias = addAliasLine(c.GenreAlias, &c.aliasTouched, canonical, variants)
 }
 
-// DefaultStatusAlias lists the publication statuses the UI distinguishes and
-// the spellings plugins send for them. A status matching nothing is stored as
-// "Unknown" rather than as the raw plugin word.
-func DefaultStatusAlias() map[string][]string {
-	return map[string][]string{
-		"Ongoing":   {"ongoing", "publishing", "releasing", "on going"},
-		"Completed": {"completed", "complete", "finished", "ended"},
-		"Hiatus":    {"hiatus", "uncertain", "on hold", "paused"},
-		"Cancelled": {"cancelled", "canceled", "dropped", "axed"},
-		"Unknown":   {},
-	}
-}
-
-// addStatusAlias records one `[status]` line the same way addGenreAlias does
-// for `[genre]`.
-func (c *Config) addStatusAlias(canonical, variants string) {
-	c.StatusAlias = addAliasLine(c.StatusAlias, &c.aliasTouched, canonical, variants)
-}
-
 // addAliasLine registers one canonical name and its variant list, replacing the
 // built-in variants the first time a name appears in a config file.
 func addAliasLine(m map[string][]string, touched *map[string]bool, canonical, variants string) map[string][]string {

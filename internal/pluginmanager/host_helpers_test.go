@@ -39,31 +39,28 @@ func TestLuaLuaEscape(t *testing.T) {
 	}
 }
 
-// TestLuaNormalizeStatusForms covers both call shapes plugins use: the
-// one-argument default-vocabulary form, and the two-argument form with a
-// plugin-supplied map. An empty map must mean "use the defaults", not
-// "pass everything through untouched".
+// TestLuaNormalizeStatusForms covers the single-argument contract: the native
+// accepts a status value and returns its canonical label, or "" when the value
+// is not part of the host vocabulary. Site-specific words no longer resolve.
 func TestLuaNormalizeStatusForms(t *testing.T) {
 	chunk := `
 		assert(host.text.normalize_status("ongoing") == "Ongoing")
-		assert(host.text.normalize_status("RELEASING") == "Ongoing")
-		assert(host.text.normalize_status("cancelled") == "Dropped")
-		assert(host.text.normalize_status("On-Going") == "Ongoing")
+		assert(host.text.normalize_status("COMPLETED") == "Completed")
+		assert(host.text.normalize_status("cancelled") == "Cancelled")
+		assert(host.text.normalize_status("Upcoming") == "Upcoming")
 		assert(host.text.normalize_status("") == "")
-		-- unknown values pass through, not blanked
-		assert(host.text.normalize_status("Weird Status") == "Weird Status")
-		-- empty map == defaults
-		assert(host.text.normalize_status({}, "completed") == "Completed")
-		-- explicit map wins
-		assert(host.text.normalize_status({serialised = "Ongoing"}, "serialised") == "Ongoing")
+		-- site-specific words are not canonical: the plugin maps them itself
+		assert(host.text.normalize_status("publishing") == "")
+		assert(host.text.normalize_status("Weird Status") == "")
+		-- retired label
+		assert(host.text.normalize_status("Dropped") == "")
 	`
 	if err := luaEval(t, chunk); err != nil {
 		t.Fatalf("host.text.normalize_status: %v", err)
 	}
 }
 
-// TestJSNormalizeStatusForms mirrors the Lua coverage for the JS runtime,
-// which exposes the same callable with a .default property attached.
+// TestJSNormalizeStatusForms mirrors the Lua coverage for the JS runtime.
 func TestJSNormalizeStatusForms(t *testing.T) {
 	vm := goja.New()
 	mgr := NewManager(hostnet.NewProxy(), t.TempDir())
@@ -74,11 +71,10 @@ func TestJSNormalizeStatusForms(t *testing.T) {
 	chunk := `
 		function assert(c, msg) { if (!c) throw new Error(msg || "assertion failed"); }
 		assert(host.text.normalize_status("ongoing") === "Ongoing");
-		assert(host.text.normalize_status("RELEASING") === "Ongoing");
-		assert(host.text.normalize_status("cancelled") === "Dropped");
-		assert(host.text.normalize_status("Weird Status") === "Weird Status");
-		assert(host.text.normalize_status({}, "completed") === "Completed");
-		assert(host.text.normalize_status({serialised: "Ongoing"}, "serialised") === "Ongoing");
+		assert(host.text.normalize_status("RELEASING") === "");
+		assert(host.text.normalize_status("cancelled") === "Cancelled");
+		assert(host.text.normalize_status("Weird Status") === "");
+		assert(host.text.normalize_status("Upcoming") === "Upcoming");
 	`
 	if _, err := vm.RunString(chunk); err != nil {
 		t.Fatalf("host.text helpers in goja: %v", err)

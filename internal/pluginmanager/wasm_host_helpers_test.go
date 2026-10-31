@@ -22,8 +22,8 @@ func TestWasmHostCallDispatch(t *testing.T) {
 	}{
 		{"text.titlecase", []string{"hello world"}, `"Hello world"`},
 		{"text.normalize_status", []string{"ongoing"}, `"Ongoing"`},
-		{"text.normalize_status", []string{`{"serialised":"Ongoing"}`, "serialised"}, `"Ongoing"`},
-		{"text.normalize_status", []string{`{}`, "completed"}, `"Completed"`},
+		{"text.normalize_status", []string{"COMPLETED"}, `"Completed"`},
+		{"text.normalize_status", []string{"publishing"}, `""`},
 		{"text.chapter_num", []string{"Chapter 230.5"}, `230.5`},
 		{"text.json_blob", []string{"xx {" + `"a":1` + "} yy", ""}, `"{\"a\":1}"`},
 		{"codecs.base64_encode", []string{"hi"}, `"aGk="`},

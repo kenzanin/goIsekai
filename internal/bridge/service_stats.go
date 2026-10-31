@@ -124,7 +124,7 @@ func (s *AppService) ListLibraryWithProgress() ([]database.LibraryMangaStats, er
 
 // LibraryOverview returns aggregated library-wide stats for the stats row.
 func (s *AppService) LibraryOverview() (database.LibraryOverview, error) {
-	return s.db.LibraryOverview(database.StatusAlias(s.statusAlias))
+	return s.db.LibraryOverview()
 }
 
 // FindPotentialDuplicates returns groups of in-library manga that share a

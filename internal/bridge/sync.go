@@ -8,6 +8,7 @@ import (
 	"goisekai/internal/config"
 	"goisekai/internal/database"
 	"goisekai/internal/logger"
+	"goisekai/internal/pluginutil"
 	"goisekai/internal/workers"
 	"goisekai/pkg/types"
 )
@@ -93,7 +94,9 @@ func (s *AppService) persistMangaDetails(pluginID string, m types.Manga, chapter
 		Title:         m.Title,
 		CoverURL:      m.CoverURL,
 		Description:   m.Description,
-		Status:        m.Status,
+		// Normalize here as well as in the native: a plugin that skips the
+		// helper, or an older one, still must not store a non-canonical status.
+		Status: pluginutil.NormalizeStatus(m.Status),
 	})
 	if err != nil {
 		return err

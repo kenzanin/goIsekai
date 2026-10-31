@@ -40,7 +40,6 @@ type AppService struct {
 	imgRef      map[string]string // image host -> Referer that worked (process memo)
 	enrich      *enrich.Registry
 	genres      *genreIndex
-	statusAlias map[string][]string
 	imgFormat   ImageFormat
 	coverMaxDim int
 	enhance     enhanceConfig
@@ -75,7 +74,6 @@ func NewAppService(db *database.DB, mgr *pluginmanager.Manager, proxy *hostnet.P
 		pool:        pool,
 		enrich:      enrichReg,
 		genres:      loadGenreIndex(cfgPath),
-		statusAlias: loadStatusAlias(cfgPath),
 		imgFormat:   loadImageFormat(cfgPath),
 		coverMaxDim: loadCoverMaxDim(cfgPath),
 		enhance:     loadEnhanceConfig(cfgPath),

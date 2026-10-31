@@ -102,10 +102,6 @@ type Config struct {
 	// key; anything unmatched passes through unchanged.
 	GenreAlias map[string][]string
 
-	// StatusAlias maps a canonical publication status to the spellings plugins
-	// send for it, e.g. {"Hiatus": ["uncertain", "on hold"]}.
-	StatusAlias map[string][]string
-
 	// ImageFormat is the on-disk encoding for cached images: "webp" (default),
 	// "avif" (smaller, slower to encode), "jxl" (smallest on paper, but only
 	// Safari renders JPEG XL without a flag), or "original" (no conversion).

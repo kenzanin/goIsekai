@@ -1,60 +1,32 @@
 package pluginutil
 
-// DefaultStatusMap returns the canonical host status vocabulary as a map
-// from lowercase upstream values to the canonical labels (Ongoing, Completed,
-// Hiatus, Dropped, Upcoming). Plugins may extend this map with site-specific
-// keys before passing it to NormalizeStatus.
-func DefaultStatusMap() map[string]string {
-	return map[string]string{
-		// Ongoing
-		"ongoing":    "Ongoing",
-		"on-going":   "Ongoing",
-		"on going":   "Ongoing",
-		"on_going":   "Ongoing",
-		"releasing":  "Ongoing",
-		"release":    "Ongoing",
-		"publishing": "Ongoing",
-		"published":  "Ongoing",
-		"publish":    "Ongoing",
-		// Completed
-		"completed":   "Completed",
-		"complete":    "Completed",
-		"finished":    "Completed",
-		"finish":      "Completed",
-		"finished_up": "Completed",
-		// Hiatus
-		"hiatus":    "Hiatus",
-		"onhold":    "Hiatus",
-		"on hold":   "Hiatus",
-		"on_hold":   "Hiatus",
-		"on hiatus": "Hiatus",
-		// Dropped
-		"dropped":      "Dropped",
-		"drop":         "Dropped",
-		"cancelled":    "Dropped",
-		"canceled":     "Dropped",
-		"cancel":       "Dropped",
-		"discontinued": "Dropped",
-		// Upcoming
-		"upcoming":          "Upcoming",
-		"not_yet_published": "Upcoming",
-		"not_published":     "Upcoming",
-		"not yet published": "Upcoming",
-	}
+// Statuses returns the canonical host status vocabulary. These are the only
+// status values the host accepts; a plugin reporting a site-specific word
+// (publishing, finished, on hiatus, ...) must translate it to one of these
+// before returning it.
+//
+// The list is a contract, not configuration: library statistics compare stored
+// values against these labels directly, so they stay literals in one place.
+func Statuses() []string {
+	return []string{"Ongoing", "Completed", "Hiatus", "Cancelled", "Upcoming"}
 }
 
-// NormalizeStatus maps rawStatus to a canonical status using the provided
-// mapping. Keys are matched case-insensitively. When the map is nil,
-// DefaultStatusMap is used. The raw value is returned unchanged when it
-// matches no key.
-func NormalizeStatus(m map[string]string, raw string) string {
-	if m == nil {
-		m = DefaultStatusMap()
+// NormalizeStatus returns the canonical status label matching raw
+// case-insensitively, or the empty string when raw is not part of the
+// canonical vocabulary. The host never emits, echoes, or invents a
+// non-canonical status.
+//
+// Matching is exact rather than substring-based: a substring match would let
+// "not yet published" resolve through "published" and manufacture a status
+// from a word no plugin meant as one.
+func NormalizeStatus(raw string) string {
+	key := toLowerASCII(raw)
+	for _, status := range Statuses() {
+		if toLowerASCII(status) == key {
+			return status
+		}
 	}
-	if mapped, ok := m[toLowerASCII(raw)]; ok {
-		return mapped
-	}
-	return raw
+	return ""
 }
 
 // toLowerASCII returns a lowercase copy of s using only ASCII folding.

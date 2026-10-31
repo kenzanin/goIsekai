@@ -59,7 +59,7 @@ var hostSurface = []hostHelper{
 	{"text.titlecase", kindStr1, pluginutil.Titlecase, ""},
 	{"text.normalize_title", kindStr1, pluginutil.NormalizeTitle, ""},
 	{"text.strip_link_blocks", kindStr1, pluginutil.StripLinkBlocks, ""},
-	{"text.normalize_status", kindRuntime, nil, "one-arg and (map, raw) forms differ per runtime"},
+	{"text.normalize_status", kindRuntime, nil, "one string argument; returns the canonical label or \"\""},
 	{"text.unescape", kindStr1, pluginutil.HTMLEntityUnescape, ""},
 	{"text.trim", kindStr1, strings.TrimSpace, ""},
 	{"text.lua_escape", kindStr1, pluginutil.LuaEscape, ""},

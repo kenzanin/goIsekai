@@ -18,10 +18,6 @@ func (c *Config) set(section, key, val string) {
 		c.addGenreAlias(key, val)
 		return
 	}
-	if strings.EqualFold(section, "status") {
-		c.addStatusAlias(key, val)
-		return
-	}
 	// [enhance] is `default` plus one line per plugin ID, so it does not fit the
 	// key=field switch below.
 	if strings.EqualFold(section, "enhance") {

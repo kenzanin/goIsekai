@@ -27,57 +27,13 @@ type LibraryOverview struct {
 	FewestDup      int
 }
 
-// StatusAlias maps a canonical status name to the spellings plugins send for
-// it. It mirrors config.StatusAlias, declared here so this package stays free
-// of a config dependency.
-type StatusAlias map[string][]string
-
-// classifyStatus buckets a plugin's status word using the supplied aliases.
-// The match is substring-based and case-insensitive, so a plugin sending
-// "Completed (12 vol)" still lands in the right bucket. Anything matching no
-// alias is bucketed as unknown.
-func classifyStatus(s string, aliases StatusAlias) string {
-	s = normalizeStatusKey(s)
-	if s == "" {
-		return "unknown"
-	}
-	// Longest alias first so a more specific spelling wins over a shorter one
-	// that happens to be a substring of it.
-	best, bestLen := "", -1
-	for canonical, variants := range aliases {
-		for _, v := range append([]string{canonical}, variants...) {
-			key := normalizeStatusKey(v)
-			if key == "" || !strings.Contains(s, key) {
-				continue
-			}
-			if len(key) > bestLen {
-				best, bestLen = canonical, len(key)
-			}
-		}
-	}
-	if best == "" {
-		return "unknown"
-	}
-	return best
-}
-
-// normalizeStatusKey lowercases a status word and collapses its separators so
-// "On-Going", "on going" and "ongoing" share a key.
-func normalizeStatusKey(s string) string {
-	var b strings.Builder
-	b.Grow(len(s))
-	for _, r := range strings.ToLower(strings.TrimSpace(s)) {
-		switch r {
-		case ' ', '\t', '-', '_', '.', '/', ',', '(', ')':
-			continue
-		}
-		b.WriteRune(r)
-	}
-	return b.String()
-}
-
 // LibraryOverview returns high-level stats across all in-library manga.
-func (d *DB) LibraryOverview(aliases StatusAlias) (LibraryOverview, error) {
+// LibraryOverview returns high-level stats across all in-library manga.
+//
+// Stored statuses are already canonical (the write boundary normalizes them),
+// so the buckets compare the label directly; anything else, including rows
+// written before the vocabulary was enforced, counts as unknown.
+func (d *DB) LibraryOverview() (LibraryOverview, error) {
 	readCond := Chapters.IsRead.EQ(Int(1)).OR(
 		Chapters.TotalPages.GT(Int(0)).AND(Chapters.LastPageRead.GT_EQ(Chapters.TotalPages)))
 
@@ -114,13 +70,10 @@ func (d *DB) LibraryOverview(aliases StatusAlias) (LibraryOverview, error) {
 	// track most/fewest chapters with tie counts
 	maxCount, minCount := -1, -1
 	for _, r := range rows {
-		// classifyStatus returns the configured canonical name, so the bucket
-		// comparison is case-insensitive: a user may spell it "completed" or
-		// "Completed" and both land in the same bucket.
-		switch bucket := classifyStatus(r.Status, aliases); {
-		case strings.EqualFold(bucket, "Completed"):
+		switch {
+		case strings.EqualFold(r.Status, "Completed"):
 			ov.StatusDone++
-		case strings.EqualFold(bucket, "Ongoing"), strings.EqualFold(bucket, "Hiatus"):
+		case strings.EqualFold(r.Status, "Ongoing"), strings.EqualFold(r.Status, "Hiatus"):
 			ov.StatusOngoing++
 		default:
 			ov.StatusUnknown++
