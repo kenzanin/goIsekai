@@ -1,3 +1,6 @@
+## 2026-10-30
+* **Creation**: Documented concept `decisions/goisekai-fetch-detail-leak-audit.md` (goIsekai fetch-detail leak audit (2026-10-30)).
+
 ## 2026-10-29
 * **Creation**: Documented concept `plans/alt-cover-picker-cache-mismatch.md` (Alt-cover picker cache mismatch (thumb vs full-size URL)).
 

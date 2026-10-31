@@ -28,16 +28,16 @@
 
 ## 4. Unit-test completion for split Go units
 
-- [ ] 4.1 `views_library.go`: tests for `filterLibrary` each status branch (`reading`/`unread`/`done`/`new`) and tag filter case-insensitivity
-- [ ] 4.2 `actions_covers.go`: test set-cover happy path + error path returns 502; toggle-cover-dim returns `{"dim":n}` JSON
-- [ ] 4.3 `api_reader.go`: test reader-data 404 path and page-range clamping
-- [ ] 4.4 `bridge/image_fetch.go`: test retry budget exhaustion (non-404 persistent failure stops after budget)
-- [ ] 4.5 `bridge/sync.go`: test that inactive plugins are skipped and failures don't abort the batch
+- [x] 4.1 `views_library.go`: tests for `filterLibrary` each status branch (`reading`/`unread`/`done`/`new`) and tag filter case-insensitivity
+- [x] 4.2 `actions_covers.go`: test set-cover happy path + error path returns 502; toggle-cover-dim returns `{"dim":n}` JSON
+- [x] 4.3 `api_reader.go`: test reader-data 404 path and page-range clamping
+- [x] 4.4 `bridge/image_fetch.go`: test retry budget exhaustion (non-404 persistent failure stops after budget)
+- [x] 4.5 `bridge/sync.go`: test that inactive plugins are skipped and failures don't abort the batch
 
 ## 5. Final gate
 
-- [ ] 5.1 `scc` re-scan: every non-test source file in `internal/` + `cmd/` < 200 LOC (or explicitly marked intentionally kept in 2.3/2.4)
-- [ ] 5.2 `just check && just build && just test` green; restart server per deploy recipe; smoke test detail + library + search pages render identically
-- [ ] 5.3 Commit per-file splits (one commit per file) and the test-completion work separately
+- [x] 5.1 `scc` re-scan: every non-test source file in `internal/` + `cmd/` < 200 LOC (or explicitly marked intentionally kept in 2.3/2.4)
+- [x] 5.2 `just check && just build && just test` green; restart server per deploy recipe; smoke test detail + library + search pages render identically
+- [x] 5.3 Commit per-file splits (one commit per file) and the test-completion work separately
 
 > 3.7 note: the splits themselves created two new partials still >200 LOC (`logs_script` 237, `plugin_card` 210); both are scheduled under 5.1 alongside the Go re-scan.
