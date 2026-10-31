@@ -1,3 +1,7 @@
+## 2026-10-31
+* **Creation**: Documented concept `bugs/cover-button-fetch-detail.md` (Cover button on detail page silently triggers GetMangaDetail).
+* **Creation**: Documented concept `bugs/cover-button-fetch-detail.md` (Cover button triggers silent GetMangaDetail via enrichment fetch).
+
 ## 2026-10-30
 * **Creation**: Documented concept `decisions/goisekai-fetch-detail-leak-audit.md` (goIsekai fetch-detail leak audit (2026-10-30)).
 

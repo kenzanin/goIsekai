@@ -13,7 +13,7 @@ export CGO_ENABLED = 0
 # must be on PATH — GOROOT alone is not enough.
 export PATH := $(GO126)/bin:$(PATH)
 
-.PHONY: all build clean lint
+.PHONY: all build clean lint fix
 
 all: build
 
@@ -32,5 +32,7 @@ lint:
 	@echo "lint OK"
 
 # go1.26.9 (the pinned toolchain, already first on PATH) rewrites old APIs.
-fix: **.go
-	$(GO126)/bin/go fix ./**.go
+
+
+fix:
+	go1.26.9 fix ./**.go

@@ -10,7 +10,7 @@ export GOROOT := $(GO126)
 export GOTOOLCHAIN = local
 export CGO_ENABLED = 0
 
-.PHONY: all build clean lint
+.PHONY: all build clean lint fix
 
 all: build
 
@@ -29,5 +29,7 @@ lint:
 	@fmtout=$$(gofmt -l .); if [ -n "$$fmtout" ]; then echo "gofmt: $$fmtout"; exit 1; fi
 	@echo "lint OK"
 
-fix: **.go
-	go fix ./**.go
+
+
+fix:
+	go1.26.9 fix ./**.go

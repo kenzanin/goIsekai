@@ -10,7 +10,7 @@ export GOROOT := $(GO126)
 export GOTOOLCHAIN = local
 export CGO_ENABLED = 0
 
-.PHONY: all build clean
+.PHONY: all build clean fix
 
 all: build
 
@@ -24,5 +24,7 @@ main.wasm: *.go
 clean:
 	rm -f main.wasm
 
-fix: *.go
-	go fix ./**.go
+
+
+fix:
+	go1.26.9 fix ./**.go
