@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="csrf-token" content="">
+    <title>goIsekai</title>
+    <link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
+    <link rel="stylesheet" href="/static/lib/tailwind.css">
+    <style>
+        html { font-size: 17.5px; }
+        :root { color-scheme: dark; }
+        select option, select optgroup {
+            background-color: #171717;
+            color: #e5e5e5;
+        }
+        :where(a, button, input, select, textarea, summary):focus-visible {
+            outline: 2px solid #6366f1;
+            outline-offset: 2px;
+            border-radius: 4px;
+        }
+        a, button, input, select, textarea {
+            transition: color .15s, background-color .15s, border-color .15s;
+        }
+        @font-face {
+            font-family: 'Space Grotesk';
+            font-style: normal;
+            font-weight: 400;
+            font-display: swap;
+            src: url('/static/lib/fonts/space-grotesk-latin-400-normal.woff2') format('woff2');
+        }
+        @font-face {
+            font-family: 'Space Grotesk';
+            font-style: normal;
+            font-weight: 500;
+            font-display: swap;
+            src: url('/static/lib/fonts/space-grotesk-latin-500-normal.woff2') format('woff2');
+        }
+        @font-face {
+            font-family: 'Space Grotesk';
+            font-style: normal;
+            font-weight: 600;
+            font-display: swap;
+            src: url('/static/lib/fonts/space-grotesk-latin-600-normal.woff2') format('woff2');
+        }
+        @font-face {
+            font-family: 'Space Grotesk';
+            font-style: normal;
+            font-weight: 700;
+            font-display: swap;
+            src: url('/static/lib/fonts/space-grotesk-latin-700-normal.woff2') format('woff2');
+        }
+        h1, h2, h3 {
+            font-family: 'Space Grotesk', system-ui, sans-serif;
+            letter-spacing: -0.02em;
+        }
+        @media (prefers-reduced-motion: reduce) {
+            *, ::before, ::after {
+                transition-duration: 0.01ms !important;
+                animation-duration: 0.01ms !important;
+            }
+        }
+    </style>
+</head>
+<body class="bg-neutral-950 text-neutral-100 min-h-full">
+<nav class="flex items-center gap-2 overflow-x-auto whitespace-nowrap border-b border-neutral-800 bg-neutral-900 px-4 pt-4">
+    <a href="/" class="flex shrink-0 items-center gap-2 px-2 py-2" title="goIsekai home" aria-label="goIsekai home">
+        <svg width="20" height="20" viewBox="0 0 64 64" aria-hidden="true">
+            <rect width="64" height="64" rx="14" fill="#1e1b4b"/>
+            <path d="M32 18 C26 14 18 13 12 15 L12 46 C18 44 26 45 32 49 C38 45 46 44 52 46 L52 15 C46 13 38 14 32 18 Z" fill="#eef2ff"/>
+            <path d="M32 18 C26 14 18 13 12 15 L12 46 C18 44 26 45 32 49 Z" fill="#c7d2fe"/>
+            <path d="M17 22 C21 21 25 21.5 28 23 M17 28 C21 27 25 27.5 28 29 M17 34 C21 33 25 33.5 28 35 M47 22 C43 21 39 21.5 36 23 M47 28 C43 27 39 27.5 36 29 M47 34 C43 33 39 33.5 36 35" stroke="#6366f1" stroke-width="2" stroke-linecap="round" fill="none"/>
+            <path d="M40 38 h9 a4 4 0 0 1 4 4 v5 a4 4 0 0 1 -4 4 h-5 l-3 3 v-3 h-1 a4 4 0 0 1 -4 -4 v-5 a4 4 0 0 1 4 -4 z" fill="#f59e0b"/>
+            <circle cx="44.5" cy="44.5" r="1.3" fill="#1e1b4b"/>
+            <circle cx="48.5" cy="44.5" r="1.3" fill="#1e1b4b"/>
+        </svg>
+        <span style="font-family: 'Space Grotesk', system-ui, sans-serif; letter-spacing: -0.02em;">goIsekai</span>
+    </a>
+<a href="/view/search" class="rounded-md px-3 py-2 text-sm font-medium hover:bg-neutral-800" data-nav="search">Search</a>
+<a href="/view/updates" class="rounded-md px-3 py-2 text-sm font-medium hover:bg-neutral-800" data-nav="updates">Updates</a>
+<a href="/view/history" class="rounded-md px-3 py-2 text-sm font-medium hover:bg-neutral-800" data-nav="history">History</a>
+<a href="/view/plugins" class="rounded-md px-3 py-2 text-sm font-medium hover:bg-neutral-800" data-nav="plugins">Plugins</a>
+<a href="/view/settings" class="rounded-md px-3 py-2 text-sm font-medium hover:bg-neutral-800" data-nav="settings">Settings</a>
+<a href="/view/logs" class="rounded-md px-3 py-2 text-sm font-medium hover:bg-neutral-800" data-nav="logs">Logs</a>
+<a href="/view/about" class="rounded-md px-3 py-2 text-sm font-medium hover:bg-neutral-800 ml-auto" data-nav="about">About</a>
+</nav>
+    <main id="content" class="mx-auto w-full max-w-[95rem] px-4 py-8">
+<div class="mb-4"><a href="/view/manga/md/s1" class="inline-flex items-center gap-1.5 text-sm text-neutral-400 hover:text-neutral-200 transition"><svg xmlns="http://www.w3.org/2000/svg" class="size-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg> Back to detail</a></div><div class="flex gap-4 p-4 bg-neutral-900 rounded-lg border border-neutral-800 mb-4"><img src="/image?pluginID=md&url=https://cdn.test/c.jpg" alt="" class="w-20 h-28 object-cover rounded-md border border-neutral-800"><div class="flex-1 min-w-0"><div class="text-xs text-neutral-500 mb-1">Migrating from</div><h1 class="text-lg font-semibold mb-1 leading-tight">Golden Manga</h1><div class="text-xs text-neutral-400 mt-1">2 chapters in this entry</div><span class="inline-flex items-center gap-1.5 text-sm px-2.5 py-1 rounded-full bg-neutral-800 text-neutral-300"></span></div></div><p class="text-sm text-neutral-500 mb-4">Pick which source to move this entry to. Edit the query or filter by plugin — results are live search.</p><div class="p-4 rounded-lg border border-amber-500/30 bg-amber-500/10 mb-4"><p class="text-sm text-amber-300">Migrating will discard downloaded pages and per-chapter reading position on the previous source and cannot be recovered. Read/unread state carries over by chapter number (chapters with number ≤ last read become read).</p></div><form method="get" action="/view/migrate/md/s1" id="migrateForm" class="mb-3"><div class="mb-3"><div class="mb-2"><label class="block text-xs text-neutral-400 mb-1">Search</label><input type="text" id="migrateQ" name="q" value="golden" placeholder="Manga title..." class="w-full bg-neutral-900 border border-neutral-700 rounded-md px-3 py-2 text-sm"></div><div class="mb-2"><label class="block text-xs text-neutral-400 mb-1">Source plugins (select all to search all)</label><div class="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-5 gap-2 border border-neutral-700 rounded-md px-3 py-3 bg-neutral-900"><label class="inline-flex items-center gap-2 text-sm text-neutral-300 hover:text-neutral-100 cursor-pointer select-none"><input type="checkbox" name="pluginIDs" value="p" class="accent-indigo-500 w-4 h-4"><span class="font-medium">Plugin P</span></label></div></div><div class="flex justify-end"><button type="submit" class="bg-indigo-600 hover:bg-indigo-500 text-white rounded-md px-4 py-2 text-sm font-medium">Search</button></div></form><div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4"><div class="flex flex-col bg-neutral-900 rounded-lg overflow-hidden hover:-translate-y-0.5 hover:shadow-lg hover:shadow-black/40 hover:ring-1 hover:ring-amber-500/60 transition"><div class="relative overflow-hidden"><div class="absolute top-2 left-2 z-10 bg-emerald-500 text-white text-sm font-bold uppercase tracking-wide px-3 py-1 rounded-md shadow-lg shadow-black/50">EXACT</div><img src="/image?pluginID=p&url=https://cdn.test/1.jpg" alt="One" class="w-full aspect-[2/3] object-cover bg-neutral-800" loading="lazy" data-fallback="On"></div><div class="p-3 flex-1 flex flex-col"><div class="font-medium text-sm mb-1 truncate" title="One">One</div><div class="mb-1"><span class="text-xs text-neutral-400">2 chapters</span></div><div class="mb-2"><span class="inline-flex items-center gap-1.5 text-xs px-2 py-0.5 rounded-full bg-neutral-800 text-neutral-300">Plugin P</span></div><form method="post" action="/action/migrate-source/md/s1" class="mt-auto"><input type="hidden" name="csrf_token" value=""><input type="hidden" name="targetPluginID" value="p"><input type="hidden" name="targetMangaID" value="s"><button type="submit" class="w-full bg-amber-600 hover:bg-amber-500 text-white rounded-md px-3 py-1.5 text-xs font-medium">Migrate</button></form></div></div></div>
+    </main>
+    <script src="/static/lib/alpine-components.js"></script>
+    <script src="/static/lib/mermaid.min.js" defer></script>
+    <script defer src="/static/lib/alpine.min.js"></script>
+<div id="toast-region" x-data x-init="$store.toast.render($el)" class="fixed bottom-4 left-4 z-50 space-y-2"></div>
+
+<style>
+  .toast-item { opacity: 0; transform: translateY(8px); transition: opacity .18s ease, transform .18s ease; }
+  .toast-item.toast-visible { opacity: 1; transform: translateY(0); }
+  .toast-item.toast-leave { opacity: 0; transform: translateY(8px); }
+</style>
+
+<div id="confirm-modal" x-data x-init="$store.confirm.mount($el)" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/50" style="display:none">
+    <div class="relative bg-neutral-900 border border-neutral-700 rounded-lg shadow-xl w-full max-w-sm p-5">
+        <p id="confirm-message" class="text-sm text-neutral-200 mb-4"></p>
+        <div class="flex justify-end gap-2">
+            <button type="button" id="confirm-cancel" class="border border-neutral-700 hover:bg-neutral-800 text-neutral-300 rounded-md px-3 py-1.5 text-sm">Cancel</button>
+            <button type="button" id="confirm-ok" class="bg-red-600 hover:bg-red-500 text-white rounded-md px-3 py-1.5 text-sm font-medium">Confirm</button>
+        </div>
+    </div>
+</div>
+</body>
+</html>

@@ -1,0 +1,11 @@
+<div class="flex flex-row gap-4 items-start">
+<aside class="w-56 shrink-0 flex flex-col gap-3">
+    <div class="bg-neutral-900 border border-neutral-800 rounded-lg px-4 py-3">
+        <div class="flex flex-col gap-3"><a href="/view/library" onclick="window.resetLibraryView();return false" title="Reset view (grid + all filters)" class="bg-neutral-900 border border-indigo-500/30 rounded-lg px-4 py-3 hover:border-indigo-500 transition"><div class="text-3xl font-bold text-indigo-300">2</div><div class="text-xs text-neutral-400">titles</div></a></div>
+    </div>
+
+        <div class="bg-neutral-900 border border-neutral-800 rounded-lg px-4 py-3">
+            <div class="text-xs font-medium text-neutral-400 mb-2">titles per plugin</div>
+            <div class="flex flex-col gap-1.5"><a href="/view/library" onclick="try{localStorage.removeItem('gsk:library-view')}catch(e){}" class="flex items-center justify-between gap-2 text-sm rounded-md px-1.5 py-1 mb-1 border border-dashed border-indigo-500 bg-indigo-500/15"><span class="text-sm font-medium text-indigo-200">All</span><span class="text-xs text-neutral-500">all manga</span></a><a href="/view/library?pluginID=p" class="flex items-center justify-between gap-2 text-sm rounded-md px-1.5 py-1 border border-transparent"><span class="flex items-center gap-1.5 min-w-0"><span class="text-sm font-medium truncate text-neutral-200">Plugin P</span></span><span class="text-sm font-bold shrink-0 text-indigo-400">2</span></a></div>
+        </div></aside>
+    <div class="flex-1 min-w-0">
