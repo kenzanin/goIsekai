@@ -465,7 +465,7 @@ if not chapter then
 		-- so the probe is useless. Fail loudly: an empty chapter with a stated
 		-- cause beats a silently blank one.
 		log.error("1manga pages: no usable page 1 for " .. chapterID .. " (probe fallback, no pages field to parse)")
-		return nil, "page_list_failed"
+		return nil, "no_pages"
 	end
 	local function pageExists(i)
 		local resp =

@@ -61,11 +61,18 @@ func TestDropdownActionsAreAllHandled(t *testing.T) {
 // One flag must have one name. is_skipped is toggled per row as Skip/Unskip, so
 // the bulk action has to use the same word.
 func TestSkipActionUsesTheRowButtonWording(t *testing.T) {
+	// The skip form spans both split children: the bulk dropdown lives in
+	// detail_chapters.lua, the per-row toggle-skip form in
+	// detail_chapter_row.lua.
+	row, err := os.ReadFile(filepath.Join(tmplRoot, "partials", "detail_chapter_row.lua"))
+	if err != nil {
+		t.Fatalf("read row partial: %v", err)
+	}
 	body, err := os.ReadFile(filepath.Join(tmplRoot, "partials", "detail_chapters.lua"))
 	if err != nil {
 		t.Fatalf("read partial: %v", err)
 	}
-	src := string(body)
+	src := string(body) + "\n" + string(row)
 	if !strings.Contains(src, "toggle-skip/") {
 		t.Fatal("no per-row skip form found; this test needs updating")
 	}

@@ -42,22 +42,28 @@ func TestEveryCSRFPartialIsCalledWithAToken(t *testing.T) {
 // binding is parsed rather than guessed.
 func calledWithToken(t *testing.T, partial string) bool {
 	t.Helper()
-	dir := filepath.Join(tmplRoot, "views")
-	entries, err := os.ReadDir(dir)
-	if err != nil {
-		t.Fatalf("read views: %v", err)
-	}
+	// Callers can live in views/ or in split-out partials/ (a partial may
+	// itself compose another partial), so scan both directories.
 	want := "partials." + strings.TrimSuffix(partial, ".lua")
 	bind := regexp.MustCompile(`local\s+(\w+)\s*=\s*require\("` + regexp.QuoteMeta(want) + `"`)
-	for _, e := range entries {
-		body, err := os.ReadFile(filepath.Join(dir, e.Name()))
+	for _, dir := range []string{
+		filepath.Join(tmplRoot, "views"),
+		filepath.Join(tmplRoot, "partials"),
+	} {
+		entries, err := os.ReadDir(dir)
 		if err != nil {
-			t.Fatalf("read %s: %v", e.Name(), err)
+			t.Fatalf("read %s: %v", dir, err)
 		}
-		src := string(body)
-		for _, alias := range bind.FindAllStringSubmatch(src, -1) {
-			if tableLiteralHasToken(src, alias[1]) {
-				return true
+		for _, e := range entries {
+			body, err := os.ReadFile(filepath.Join(dir, e.Name()))
+			if err != nil {
+				t.Fatalf("read %s: %v", e.Name(), err)
+			}
+			src := string(body)
+			for _, alias := range bind.FindAllStringSubmatch(src, -1) {
+				if tableLiteralHasToken(src, alias[1]) {
+					return true
+				}
 			}
 		}
 	}
