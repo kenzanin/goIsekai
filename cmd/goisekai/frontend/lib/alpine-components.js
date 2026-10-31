@@ -7,6 +7,10 @@
   // CSRF token minted by the server and emitted into the page's meta tag by
   // layouts/base.lua. Plain forms carry it in a hidden field, but the fetches
   // below build their own bodies, so they send it as a header.
+  /**
+   * Read the page meta csrf token.
+   * @returns {string}
+   */
   function csrfToken() {
     var el = document.querySelector('meta[name="csrf-token"]');
     return el ? el.getAttribute('content') || '' : '';
@@ -21,6 +25,11 @@
   // (a cached document, a proxy holding HTML) we must not loop, so the second
   // refusal falls through to the normal error toast.
   var RELOAD_FLAG = 'gi_csrf_reloaded';
+  /**
+   * After a 419 (stale CSRF), reload the page once per session.
+   * @param {Response} resp
+   * @returns {boolean} true when the caller should abort and re-issue
+   */
   function recoverFromStaleToken(resp) {
     if (!resp.headers.get('X-GoIsekai-Reload')) return false;
     try {
@@ -52,6 +61,11 @@
   // Global helper: surface a server-sent toast. Handlers pass the fetch
   // response; the message may ride the 303 as X-Toast or as ?toast= on the
   // redirect target (fetch follows redirects, so only the target survives).
+  /**
+   * Surface a server-sent toast from a fetch response (X-Toast header or ?toast= on the redirect target).
+   * @param {Response} resp
+   * @param {string=} type override the toast kind
+   */
   window.showToast = (resp, type) => {
     if (!resp) return;
     var msg = resp.headers?.get('X-Toast');
@@ -70,6 +84,7 @@
   // where the user came from. history.back() is unreliable — the stack may
   // hold reader or stale entries — and the library fallback loses search
   // results. MangaDex-style back-to-list, no hack.
+  /** Remember the current list page (search/library/updates/history) so Back can return to it. */
   window.rememberListPage = () => {
     try {
       if (/^\/view\/(search|library|updates|history)/.test(window.location.pathname)) {
@@ -79,6 +94,7 @@
       /* storage unavailable */
     }
   };
+  /** Navigate back to the remembered list page. */
   window.backToList = () => {
     try {
       const u = sessionStorage.getItem('gsk:last-list');
@@ -103,6 +119,7 @@
   // Cover picker: the modal is server-rendered double-hidden (class +
   // inline style), so opening must clear both. Called from the detail
   // template buttons and auto-opened after a Find-covers fetch.
+  /** Show the cover picker modal on the detail page. */
   window.openCoverModal = () => {
     var m = document.getElementById('cover-modal');
     if (!m) return;
@@ -111,6 +128,11 @@
   };
   // Global helper: submit a form via SPA fetch (same as submit event handler).
   // Called as: @click="submitForm($el.closest('form'))"
+  /**
+   * SPA submit: POST /action/* forms via fetch and swap the response fragment in place.
+   * Non-/action/ and export-cbz/save-verify forms fall through to a classic submit.
+   * @param {HTMLFormElement} form
+   */
   window.submitForm = (form) => {
     if (!form) return;
     var method = (form.getAttribute('method') || 'get').toLowerCase();
@@ -267,6 +289,11 @@
     if (action.indexOf('sync-manga') !== -1) return 'sync-manga';
     return 'sync';
   };
+  /**
+   * Run a long action as a polled job (POST, then poll /api/jobs/:id).
+   * @param {HTMLFormElement} form
+   * @param {object=} opts {toastKey, pollMs}
+   */
   window.submitJobAction = (form, opts) => {
     if (!form) return;
     opts = opts || {};
@@ -1000,6 +1027,8 @@
   // =====================================================================
   // Enrichment panel — form is now a plain HTMX POST in the template.
   // Kept as no-op for callers that still reference it.
+  // No-op shim: enrichment panel sync was removed; kept as an export target.
+  // No-op shim: enrichment panel sync was removed; kept as an export target.
   const syncEnrichmentPanel = () => {};
 
   // =====================================================================
@@ -1014,6 +1043,7 @@
   // Reset view: back to grid AND drop the persisted filter/sort state so a bare
   // /view/library loads unfiltered (same pattern as the sidebar All). On window
   // so the sidebar "titles" card resets through the same code as the toolbar.
+  /** Clear the persisted library view mode (grid/rows). */
   window.resetLibraryView = () => {
     try { localStorage.removeItem('gsk:view-mode'); } catch (e) {}
     try { localStorage.removeItem('gsk:library-view'); } catch (e) {}
@@ -1095,6 +1125,11 @@
   };
 
   // Toggle visibility of genre tags (show more/less)
+  /**
+   * Toggle a genre/tag grid between collapsed (first N rows) and full.
+   * @param {string} btnId id of the button whose data-show drives state
+   * @param {number} maxVisible rows shown when collapsed
+   */
   window.toggleGenreTags = (btnId, maxVisible) => {
     var tags = document.querySelectorAll('.genre-tag');
     var btn = document.getElementById(btnId);
@@ -1111,6 +1146,11 @@
 // =====================================================================
 // Loading state helpers for buttons
 // =====================================================================
+/**
+ * Put a button into/out of its loading state (disabled + opacity).
+ * @param {HTMLButtonElement} btn
+ * @param {boolean} loading
+ */
 window.setLoading = (btn, loading) => {
   if (!btn) return;
   btn.disabled = loading;

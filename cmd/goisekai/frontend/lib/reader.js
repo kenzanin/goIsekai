@@ -1,4 +1,14 @@
 (() => {
+
+  /** Reader per-manga prefs (server + localStorage mirror). */
+  /**
+   * @typedef {Object} ReaderPrefs
+   * @property {string} viewMode fitWidth|fitHeight|original
+   * @property {string} direction ltr|rtl
+   * @property {string} spread side|stack|none
+   * @property {string} strip continuous|paged
+   * @property {number} zoom
+   */
   var root = document.getElementById('reader');
   var canvas = document.getElementById('page-canvas');
   var ctx = canvas.getContext('2d');
@@ -30,6 +40,11 @@
     srvPrefs = {};
   }
   var scope = `${pid}.${mid}`;
+  /**
+   * True when the embedded server prefs object carries key `k`.
+   * @param {string} k pref key
+   * @returns {boolean}
+   */
   function hasSrv(k) {
     return Object.prototype.hasOwnProperty.call(srvPrefs, k);
   }
@@ -92,6 +107,9 @@
 
   // Pages on screen, in reading order. Side by side is reversed for rtl manga
   // so the earlier page sits on the right; a vertical stack keeps its order.
+  /** On-screen page images in display order (reversed for RTL side-spread).
+   * @returns {Array.<HTMLImageElement>}
+   */
   function viewPages() {
     var ims = [];
     if (img) ims.push(img);
@@ -101,6 +119,7 @@
 
   // Bounding box of the pages on screen, as one unit so both halves scale
   // together — side by side adds widths, stacked adds heights.
+  /** Bounding box of the visible pages as one unit. @returns {{w: number, h: number} | null} */
   function viewBox() {
     var ims = viewPages();
     if (!ims.length) return null;
@@ -121,6 +140,10 @@
   // Debug logger - sends to both browser console and backend server log
   var _debugSid = Math.random().toString(36).substring(2, 10);
   var _logToServer = true;
+  /** Log to console + POST to /api/frontend-log.
+   * @param {string} msg
+   * @param {string=} level log|warn|error (default log)
+   */
   function debugLog(msg, level) {
     level = level || 'log';
     var timestamp = new Date().toISOString().substring(11, 23);
@@ -134,7 +157,9 @@
       }).catch(function() {});
     }
   }
+  /** @param {string} msg warning text */
   function debugWarn(msg) { debugLog(msg, 'warn'); }
+  /** @param {string} msg error text */
   function debugError(msg) { debugLog(msg, 'error'); }
 
   var loadAbortController = null;
@@ -151,6 +176,9 @@
   // Debounced server save of the per-manga prefs blob. Wheel-zoom fires
   // per tick, so only the settled value is POSTed (600ms).
   var savePrefsTimer = null;
+  /** POST current prefs to the server (no debounce).
+   * @param {boolean} keepalive use keepalive so a pagehide flush lands
+   */
   function postPrefs(keepalive) {
     savePrefsTimer = null;
     fetch(`/action/reader-prefs/${[pid, mid].map(encodeURIComponent).join('/')}`, {
@@ -160,6 +188,7 @@
       body: JSON.stringify({ viewMode, direction, strip: stripMode, spread: spread, zoom, zoomMode: viewMode }),
     }).catch(() => {});
   }
+  /** Debounce (600ms) a postPrefs(false) */
   function savePrefs() {
     clearTimeout(savePrefsTimer);
     savePrefsTimer = setTimeout(() => postPrefs(false), 600);
@@ -167,6 +196,7 @@
   // Switching chapter reloads the page, which throws away a pending debounce:
   // the next chapter then opened with the previous settings and the change
   // looked lost. Flush the settled value before the page goes away.
+  /** Flush a pending debounced prefs POST immediately (pagehide) */
   function flushPrefs() {
     if (savePrefsTimer === null) return;
     clearTimeout(savePrefsTimer);
@@ -191,6 +221,7 @@
   var bottomBar = document.getElementById('bottom-bar');
   var zoneCenter = document.getElementById('zone-center');
 
+  /** Show/hide top+bottom bars; pageDots invert. @param {boolean} visible */
   function setBarsVisible(visible) {
     barsVisible = visible;
     if (visible) {
@@ -207,6 +238,7 @@
   }
 
   // Update page jumper with progress bar + clickable numbered steps
+  /** Rebuild the numbered-page step bar in #page-jumper */
   function updatePageJumper() {
     var total = pages.length || 1;
     if (!pageJumper || total === 0) return;
@@ -248,6 +280,7 @@
   }
 
   // Mini clickable dots for the hidden-bars state (bottom indicator)
+  /** Rebuild the page-dot strip. @param {number} total page count */
   function updatePageDots(total) {
     if (!pageDots || !total) return;
     pageDots.innerHTML = '';
@@ -279,11 +312,18 @@
   setBarsVisible(true);
 
   // Unified page-jumper + dots indicator (shown when bars hidden)
+  /** Page jumper + dots + progress. @param {number} total page count */
   function updateUnifiedPageIndicator(total) {
     // Update the page-jumper step bar (shows when bars hidden)
     updatePageJumper();
   }
 
+  /** Proxy URL for a page image.
+   * @param {object} p reader page {url, headers?}
+   * @param {string} chapterID source chapter id
+   * @param {string=} prio "high" bumps the bridge priority
+   * @returns {string}
+   */
   function imageUrl(p, chapterID, prio) {
     var h = p.headers || {};
     var ref = h.Referer || h.referer || '';
@@ -302,6 +342,7 @@
     );
   }
 
+  /** Constrain panX/panY to the reachable region of the current view */
   function clampPan() {
     var d = viewBox();
     if (!d) return;
@@ -319,6 +360,7 @@
     panY = Math.max(minY, Math.min(maxY, panY));
   }
 
+  /** Set baseScale from viewMode (fitWidth/fitHeight/original) */
   function calcBaseScale() {
     var d = viewBox();
     if (!d) return;
@@ -328,6 +370,7 @@
     else baseScale = 1; // original
   }
 
+  /** Resize canvas backing store to CSS size × DPR (call after paint) */
   function measure() {
     // Canvas must be sized while visible (hard-won lesson): call after paint.
     var rect = canvas.getBoundingClientRect();
@@ -345,6 +388,7 @@
     return true;
   }
 
+  /** Paint current(+spread) page image(s) into #page-canvas */
   function render() {
     var rect = canvas.getBoundingClientRect();
     ctx.clearRect(0, 0, rect.width, rect.height);
@@ -382,15 +426,18 @@
     }
   }
 
+  /** Toggle #spinner. @param {boolean} v */
   function showSpinner(v) {
     spinner.style.display = v ? 'flex' : 'none';
     loading = v;
   }
 
+  /** Toggle #error-panel. @param {boolean} v */
   function showError(v) {
     errPanel.style.display = v ? 'flex' : 'none';
   }
 
+  /** Abort an in-flight page-load fetch */
   function abortLoad() {
     if (loadAbortController) {
       loadAbortController.abort();
@@ -400,6 +447,7 @@
 
   // Drop in-flight read-ahead for one direction (or both). The fetch rejects with
   // an AbortError, which warmImage swallows — abandonment is not a failure.
+  /** Drop in-flight read-ahead for one direction. @param {string} dir "next"|"prev" */
   function abortWarm(dir) {
     var c = warmCtrl[dir];
     if (c) {
@@ -408,6 +456,7 @@
     }
   }
 
+  /** Abort read-ahead in both directions and clear the warming flags */
   function abortAllWarm() {
     abortWarm('next');
     abortWarm('prev');
@@ -419,6 +468,12 @@
   // display path gets an Image built from the same URL, which resolves from
   // cache instead of re-requesting. The URL is identical to the display URL on
   // purpose — the browser cache keys on the full URL.
+  /** Prefetch one page into the browser cache.
+   * @param {object} store target map (preloaded/next/prev)
+   * @param {string} key cache key
+   * @param {string} url image URL
+   * @param {string} dir "next"|"prev" abort lane
+   */
   function warmImage(store, key, url, dir) {
     if (store[key] || warming[key]) return;
     warming[key] = true;
@@ -442,6 +497,7 @@
       });
   }
 
+  /** Render a reader error into #error-panel. @param {string} msg */
   function showReaderError(msg) {
     var p = errPanel.querySelector('p');
     p.textContent = msg;
