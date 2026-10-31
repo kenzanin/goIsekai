@@ -6,39 +6,35 @@ Expose shared text utility functions from the host to Lua and JS plugins so plug
 
 ### Requirement: Status normalization native
 
-The host SHALL expose a `normalize_status` text native to both the Lua and JS plugin runtimes. The native SHALL accept a mapping table and a raw status string, and SHALL return the canonical status mapped from the raw value using a case-insensitive match on the mapping keys. When the raw value matches no key, the native SHALL return the raw value unchanged. The mapping values SHALL be the canonical vocabulary: `Ongoing`, `Completed`, `Hiatus`, `Dropped`, `Upcoming`.
+The host SHALL expose a `normalize_status` text native to both the Lua and JS plugin runtimes. The native SHALL accept exactly one argument, the raw status value, and SHALL return the canonical status label it matches case-insensitively. The canonical vocabulary SHALL be exactly `Ongoing`, `Completed`, `Hiatus`, `Cancelled`, `Upcoming`. When the raw value matches no canonical label the native SHALL return the empty string: the host SHALL NOT emit, echo, or invent a non-canonical status. The native SHALL NOT accept a caller-supplied mapping.
 
 #### Scenario: Known value is normalized
-- **WHEN** the native is called with a mapping that maps `releasing` to `Ongoing` and the raw value `Releasing`
-- **THEN** it returns `Ongoing`
+- **WHEN** the native is called with the canonical value `Completed`
+- **THEN** it returns `Completed`
 
 #### Scenario: Case-insensitive match
-- **WHEN** the raw value differs from the mapping key only in case
+- **WHEN** the raw value differs from a canonical label only in case
 - **THEN** it is still matched and normalized
 
 #### Scenario: Unknown value passes through
-- **WHEN** the raw value matches no mapping key
-- **THEN** the native returns the raw value unchanged
+- **WHEN** the raw value matches no canonical label, such as a site-specific word like `publishing`
+- **THEN** it does not pass through: the native returns the empty string
 
 #### Scenario: Available in both runtimes
-- **WHEN** a Lua plugin and a JS plugin each call the native with equivalent arguments
-- **THEN** both receive the same normalized result
+- **WHEN** a Lua plugin and a JS plugin each call the native with the same raw value
+- **THEN** both receive the same result
 
-### Requirement: Plugin-overridable default status map
+#### Scenario: Upcoming is part of the vocabulary
+- **WHEN** the native is called with `Upcoming`
+- **THEN** it returns `Upcoming`
 
-The host SHALL provide a default status mapping accessible to plugins, and plugins SHALL be able to pass their own mapping to the native so that site-specific upstream values (e.g. `on-going`, `publishing`) normalize correctly without a host change. Passing an empty or missing mapping SHALL fall back to the host default mapping.
+#### Scenario: Cancelled replaces Dropped
+- **WHEN** the native is called with `Dropped`
+- **THEN** it returns the empty string, and a plugin reporting a discontinued title SHALL send `Cancelled`
 
-#### Scenario: Host default map is readable by plugins
-- **WHEN** a plugin reads the default status mapping
-- **THEN** it receives the host's canonical mapping including at least `releasing`→`Ongoing`, `completed`→`Completed`, and `dropped`→`Dropped`
-
-#### Scenario: Plugin map overrides for site-specific values
-- **WHEN** a plugin passes a mapping containing a site-specific key (e.g. `on-going`→`Ongoing`) and the raw value is `ON-GOING`
-- **THEN** the native returns `Ongoing`
-
-#### Scenario: Missing map falls back to default
-- **WHEN** the native is called with no mapping argument
-- **THEN** it normalizes using the host default mapping
+#### Scenario: Caller-supplied mapping is not honored
+- **WHEN** the native is called with a mapping table as its first argument
+- **THEN** it returns the empty string rather than resolving the mapping
 
 ### Requirement: Chapter number extraction native
 
