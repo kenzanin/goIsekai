@@ -14,12 +14,6 @@ func (c *Config) set(section, key, val string) {
 	// Alias maps live in their own sections and carry the canonical name as
 	// the key, so they are matched before the key is normalized: the name
 	// keeps its capitalization, which is what gets displayed.
-	if strings.EqualFold(section, "genre") {
-		c.addGenreAlias(key, val)
-		return
-	}
-	// [enhance] is `default` plus one line per plugin ID, so it does not fit the
-	// key=field switch below.
 	if strings.EqualFold(section, "enhance") {
 		c.addEnhanceMode(key, val)
 		return

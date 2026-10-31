@@ -3,12 +3,10 @@ package bridge
 import (
 	"reflect"
 	"testing"
-
-	"goisekai/internal/config"
 )
 
 func TestGenreIndexNormalizesToCanonical(t *testing.T) {
-	idx := newGenreIndex(config.DefaultGenreAlias())
+	idx := newGenreIndex(CanonicalGenres)
 
 	cases := []struct {
 		name string
@@ -16,8 +14,8 @@ func TestGenreIndexNormalizesToCanonical(t *testing.T) {
 		want []string
 	}{
 		{
-			name: "aliases collapse to one canonical name",
-			in:   []string{"scifi", "SCI FI", "Science Fiction"},
+			name: "separator and case variants collapse onto the canonical name",
+			in:   []string{"scifi", "SCI FI", "Sci_Fi"},
 			want: []string{"Sci-Fi"},
 		},
 		{
@@ -64,25 +62,6 @@ func TestGenreIndexNormalizesToCanonical(t *testing.T) {
 				t.Errorf("normalize(%q) = %q, want %q", tc.in, got, tc.want)
 			}
 		})
-	}
-}
-
-func TestGenreIndexHonorsConfigOverrides(t *testing.T) {
-	idx := newGenreIndex(map[string][]string{
-		"Doujinshi": {"doujin", "dj"},
-		"Isekai":    {},
-	})
-
-	got := idx.normalize([]string{"doujin", "DJ", "Isekai", "isekai"})
-	want := []string{"Doujinshi", "Isekai"}
-	if !reflect.DeepEqual(got, want) {
-		t.Errorf("got %q, want %q", got, want)
-	}
-
-	// A canonical name with no variants still normalizes its own spelling.
-	got = idx.normalize([]string{"doujinshi"})
-	if want := []string{"Doujinshi"}; !reflect.DeepEqual(got, want) {
-		t.Errorf("got %q, want %q", got, want)
 	}
 }
 

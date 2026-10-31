@@ -46,13 +46,9 @@ func loadEnhanceConfig(cfgPath string) enhanceConfig {
 	return out
 }
 
-// loadGenreIndex reads the genre alias map from the INI at cfgPath, falling
-// back to the built-in defaults when the file is missing or unreadable. The
-// map is static, so it is resolved once here rather than per manga detail.
+// loadGenreIndex builds the host genre index from the canonical genre list.
+// The list is static and the index is resolved once here rather than per
+// manga detail, so config no longer plays any part.
 func loadGenreIndex(cfgPath string) *genreIndex {
-	cfg, err := config.Load(cfgPath)
-	if err != nil || cfg == nil {
-		return indexGenreAliases()
-	}
-	return newGenreIndex(cfg.GenreAlias)
+	return newGenreIndex(CanonicalGenres)
 }

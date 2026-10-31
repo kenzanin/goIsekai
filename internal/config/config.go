@@ -96,12 +96,6 @@ type Config struct {
 	// PreconnectEnabled toggles HTTP preconnect to plugin hosts at startup.
 	PreconnectEnabled bool
 
-	// GenreAlias maps a canonical genre name to the alternate spellings
-	// plugins may send for it, e.g. {"Sci-Fi": ["scifi", "sci fi"]}. Plugins
-	// disagree on spelling, so a match rewrites the value to the canonical
-	// key; anything unmatched passes through unchanged.
-	GenreAlias map[string][]string
-
 	// ImageFormat is the on-disk encoding for cached images: "webp" (default),
 	// "avif" (smaller, slower to encode), "jxl" (smallest on paper, but only
 	// Safari renders JPEG XL without a flag), or "original" (no conversion).
@@ -148,9 +142,4 @@ type Config struct {
 	TrayURL         string
 	TrayLogFile     string
 	TrayIcon        string
-
-	// aliasTouched records the names a config file line already supplied, so
-	// the first line for a name replaces the built-in variants instead of
-	// appending to them.
-	aliasTouched map[string]bool
 }

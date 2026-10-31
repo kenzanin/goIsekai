@@ -49,9 +49,9 @@ func writeGenreFixture(t *testing.T, id, body string) (*database.DB, *pluginmana
 }
 
 // TestListGenresFirstCallNormalizesAndPersists: the first ListGenres call
-// fetches from the plugin, rewrites alias spellings to canonical names
-// ("scifi" → "Sci-Fi", "bl" → "Boys' Love"), keeps slugs verbatim, and
-// persists the normalized list to plugins.genres.
+// fetches from the plugin, rewrites case and separator variants onto the
+// canonical name ("scifi" → "Sci-Fi"), keeps unrecognised names and every slug
+// verbatim ("bl" stays "bl"), and persists the result to plugins.genres.
 func TestListGenresFirstCallNormalizesAndPersists(t *testing.T) {
 	db, mgr := writeGenreFixture(t, "genretest", genreFixture)
 	s := NewAppService(db, mgr, hostnet.NewProxy(), "", "", nil)
@@ -61,7 +61,7 @@ func TestListGenresFirstCallNormalizesAndPersists(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ListGenres: %v", err)
 	}
-	want := []Genre{{Name: "Sci-Fi", Slug: "sci-fi"}, {Name: "Boys' Love", Slug: "bl"}, {Name: "Action", Slug: "action"}}
+	want := []Genre{{Name: "Sci-Fi", Slug: "sci-fi"}, {Name: "bl", Slug: "bl"}, {Name: "Action", Slug: "action"}}
 	if len(got) != len(want) {
 		t.Fatalf("got %d genres %v, want %d", len(got), got, len(want))
 	}

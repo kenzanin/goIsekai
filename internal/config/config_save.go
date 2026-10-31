@@ -3,7 +3,6 @@ package config
 import (
 	"sort"
 	"strconv"
-	"strings"
 
 	"gopkg.in/ini.v1"
 )
@@ -73,7 +72,6 @@ func (c *Config) Save(path string) error {
 		"maintenance_queue", strconv.Itoa(c.WorkersMaintenanceQueue),
 		"cdp_size", strconv.Itoa(c.WorkersCDPSize),
 		"cdp_queue", strconv.Itoa(c.WorkersCDPQueue))
-	putAlias(f, "genre", c.GenreAlias)
 	// [tray] is always written (like [enhance]) so the keys are discoverable
 	// in a generated file; empty values mean "derive the default".
 	put(f, "tray",
@@ -94,18 +92,6 @@ func put(f *ini.File, section string, kv ...string) *ini.Section {
 		_, _ = s.NewKey(kv[i], kv[i+1])
 	}
 	return s
-}
-
-// putAlias appends a [genre]/[status] section with the alias names sorted;
-// an empty map yields no section at all.
-func putAlias(f *ini.File, section string, aliases map[string][]string) {
-	if len(aliases) == 0 {
-		return
-	}
-	s, _ := f.NewSection(section)
-	for _, name := range sortedKeys(aliases) {
-		_, _ = s.NewKey(name, strings.Join(aliases[name], ", "))
-	}
 }
 
 // sortedKeys returns the map's keys sorted, for stable file output.
