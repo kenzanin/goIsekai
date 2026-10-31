@@ -6,6 +6,7 @@ import (
 	"image/png"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -86,5 +87,34 @@ func TestSuccessIsNotRetried(t *testing.T) {
 	}
 	if got := hits.Load(); got != 1 {
 		t.Errorf("upstream hits = %d, want 1", got)
+	}
+}
+
+// A persistent non-404 failure must stop at the ladder's hard cap of three
+// attempts and propagate the last error — never spin forever, never return
+// partial bytes. This is the exhaustion arm of the budget: TestNotFound-
+// IsNotRetried covers the break-early arm, TestFastFailureStillRetries the
+// retry arm.
+func TestPersistentFailureStopsAtBudget(t *testing.T) {
+	var hits atomic.Int32
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		hits.Add(1)
+		w.WriteHeader(http.StatusInternalServerError)
+	}))
+	t.Cleanup(srv.Close)
+
+	s := newTestServiceWithCache(t)
+	body, err := s.GetImage(t.Context(), "p", srv.URL+"/down.png", nil, "m", "c", PrioLow)
+	if err == nil {
+		t.Fatal("GetImage succeeded against a dead-origin 500 server")
+	}
+	if body != nil {
+		t.Error("error path must not return bytes")
+	}
+	if got := hits.Load(); got != 3 {
+		t.Errorf("upstream hits = %d, want exactly 3 (the ladder's hard cap)", got)
+	}
+	if !strings.Contains(err.Error(), srv.URL+"/down.png") && !strings.Contains(err.Error(), "500") {
+		t.Errorf("error should name the url or status, got: %v", err)
 	}
 }
