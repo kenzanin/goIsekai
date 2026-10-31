@@ -76,3 +76,4 @@ CLAUDE.md
 # Private session notes
 session-
 .envrc
+.autoenv.zsh
