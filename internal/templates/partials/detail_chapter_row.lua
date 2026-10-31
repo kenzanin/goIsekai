@@ -1,0 +1,150 @@
+--  partials/detail_chapter_row.lua
+--  One row of the detail page chapter list: selection checkbox, read link,
+--  page-info badge, release date, and the read/cbz/skip action forms.
+--  Returns that row's HTML so views/partials/detail_chapters.lua can stay a
+--  thin loop over the chapter slice.
+--  data.PluginID, data.MangaID, data.Manga, data.Progress, data.csrf_token,
+--  plus Chapter = the row's chapter table
+return function(data)
+	local pluginID = data.PluginID or ""
+	local mangaID = data.MangaID or ""
+	local manga = data.Manga or {}
+	local progress = data.Progress or {}
+	local c = data.Chapter or {}
+
+			local cID = c.ID or ""
+			local cTitle = c.Title or ""
+			local chapterNum = c.ChapterNum or 0
+			local p = progress[cID] or {}
+			local isDone = p.Done or false
+			local totalPages = p.TotalPages or 0
+			local lastPageRead = p.LastPageRead or 0
+			local cachedPages = p.CachedPages or 0
+
+			-- The checkbox is a selection, never a read indicator: it renders
+			-- empty on every load, so it is always empty again after an action.
+			-- It used to mirror the read state, which silently widened the range
+			-- actions - "set up to" takes an extreme of the ticked rows, so every
+			-- already-read chapter widened the range the user thought they picked.
+			-- Read state is still on the row: struck-through title plus a green tick.
+			local rowHTML = '<div class="flex items-center gap-3 py-3 px-2 -mx-2 rounded hover:bg-neutral-900 transition">'
+				.. '<input type="checkbox" name="chapterIDs" value="'
+				.. h(cID)
+				.. '" form="chapter-actions" class="size-4 accent-indigo-600 shrink-0">'
+				.. '<a href="/view/read/'
+				.. h(ue(pluginID))
+				.. "/"
+				.. h(ue(mangaID))
+				.. "/"
+				.. h(ue(cID))
+				.. '" class="flex-1 flex items-center justify-between gap-4 min-w-0">'
+				.. '<span class="text-sm">'
+				.. '<span class="text-neutral-400 mr-2">Ch. '
+				.. h(formatChapterNum(chapterNum))
+				.. "</span>"
+				.. (isDone and ('<span class="line-through text-neutral-500">' .. h(cTitle) .. "</span>") or (" " .. h(
+					cTitle
+				)))
+				.. "</span>"
+				.. '<span class="flex items-center gap-2 shrink-0">'
+
+			-- Page info: read progress + cached page count, per chapter. Was
+			-- dropped in 0560b51 and read state moved to the row's tick, which
+			-- lost the "N/M read" and cache signal. Restored for every plugin;
+			-- total pages is only known once the reader has fetched the chapter,
+			-- so an unopened chapter with nothing cached shows no badge.
+			if totalPages > 0 then
+				rowHTML = rowHTML
+					.. '<span class="text-xs px-2 py-0.5 rounded-full bg-neutral-800 text-neutral-400">'
+					.. h(tostring(lastPageRead))
+					.. "/"
+					.. h(tostring(totalPages))
+					.. " read"
+					.. (cachedPages > 0 and (" · " .. h(tostring(cachedPages)) .. " cached") or "")
+					.. "</span>"
+			elseif cachedPages > 0 then
+				rowHTML = rowHTML
+					.. '<span class="text-xs px-2 py-0.5 rounded-full bg-neutral-800 text-neutral-400">'
+					.. h(tostring(cachedPages))
+					.. " cached</span>"
+			end
+
+			-- Release date
+			if c.ReleasedAt then
+				local rawDate = ""
+				if type(c.ReleasedAt) == "table" and c.ReleasedAt.Format then
+					rawDate = c.ReleasedAt:Format("2006-01-02T15:04:05")
+				elseif type(c.ReleasedAt) == "string" then
+					rawDate = c.ReleasedAt
+				end
+				if rawDate ~= "" and string.sub(rawDate, 1, 4) ~= "0001" then
+					rowHTML = rowHTML
+						.. '<span class="text-xs text-neutral-500">'
+						.. h(formatDate(rawDate))
+						.. "</span>"
+				end
+			end
+			rowHTML = rowHTML .. "</span></a>"
+
+			-- Toggle read button (green check when read, white when not)
+			rowHTML = rowHTML
+				.. '<form method="post" action="/action/toggle-read/'
+				.. h(ue(pluginID))
+				.. "/"
+				.. h(ue(mangaID))
+				.. "/"
+				.. h(ue(cID))
+				.. '">'
+				.. csrfInput(data.csrf_token or "")
+				.. '<button type="submit" title="'
+				.. (isDone and "Unmark read" or "Mark read")
+				.. '" class="size-7 inline-flex items-center justify-center rounded-md border transition text-sm '
+				.. (isDone and "border-emerald-500/50 text-emerald-400 bg-emerald-500/10 hover:bg-emerald-500/20" or "border-neutral-700 hover:bg-neutral-800 text-neutral-500 hover:text-neutral-300")
+				.. '" aria-label="'
+				.. (isDone and "Unmark read" or "Mark read")
+				.. '">' .. (isDone and '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="size-4"><polyline points="20 6 9 17 4 12"/></svg>' or '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="size-4"><circle cx="12" cy="12" r="9"/><path d="m9 12 2 2 4-4"/></svg>')
+				.. '</button>'
+				.. "</form>"
+
+			-- CBZ download button
+			rowHTML = rowHTML
+				.. '<form method="post" data-job-action="export-cbz" action="/action/export-cbz/'
+				.. h(ue(pluginID))
+				.. "/"
+				.. h(ue(mangaID))
+				.. "/"
+				.. h(ue(cID))
+				.. '">'
+				.. csrfInput(data.csrf_token or "")
+				.. '<input type="hidden" name="title" value="'
+				.. h(manga.Title or "")
+				.. " - Ch. "
+				.. h(formatChapterNum(chapterNum))
+				.. '">'
+				.. '<button type="submit" title="Download this chapter as .cbz" class="h-7 px-2 inline-flex items-center justify-center rounded-md border border-neutral-700 hover:bg-neutral-800 text-sm whitespace-nowrap">⬇ cbz</button>'
+				.. "</form>"
+			-- Skip toggle button (eye icon)
+			local isSkipped = p.IsSkipped or false
+			rowHTML = rowHTML
+				.. '<form method="post" action="/action/toggle-skip/'
+				.. h(ue(pluginID))
+				.. "/"
+				.. h(ue(mangaID))
+				.. "/"
+				.. h(ue(cID))
+				.. '">'
+				.. csrfInput(data.csrf_token or "")
+				.. '<button type="submit" title="'
+				.. (isSkipped and "Unskip this chapter" or "Skip this chapter")
+				.. '" class="size-7 inline-flex items-center justify-center rounded-md border transition text-sm '
+				.. (isSkipped and "border-amber-600/50 text-amber-400 bg-amber-500/10 hover:bg-amber-500/20" or "border-neutral-700 hover:bg-neutral-800 text-neutral-500 hover:text-neutral-300")
+				.. '" aria-label="'
+				.. (isSkipped and "Unskip" or "Skip")
+				.. '">'
+				.. (isSkipped and '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="size-4"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>' or '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="size-4"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>')
+				.. "</button>"
+				.. "</form></div>"
+
+
+	return rowHTML
+end
