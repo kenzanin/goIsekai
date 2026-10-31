@@ -11,21 +11,12 @@
 
 local detailAlt = require("partials.detail_alt")
 local detailChapters = require("partials.detail_chapters")
+local detailCover = require("partials.detail_cover")
+local detailCoverModal = require("partials.detail_cover_modal")
+local detailMeta = require("partials.detail_meta")
+local detailActions = require("partials.detail_actions")
+local detailNotices = require("partials.detail_notices")
 local verifyWizard = require("partials.verify_wizard")
-
--- thumbURL returns the MangaDex thumbnail variant (.256.jpg) for a cover URL.
--- The full-size cover is ~545KB; the 256px thumbnail is ~60KB and is what the
--- alt-cover grid (w-32 = 128px) actually displays. Using the thumbnail reduces
--- CDN load and avoids the rate-limit that triggers placeholder responses.
-local function thumbURL(url)
-	if url:match("https://uploads%.mangadex%.org/covers/") then
-		local base = url:match("^(https://uploads%.mangadex%.org/covers/[^/]+/[^/]+)")
-		if base then
-			return base .. ".256.jpg"
-		end
-	end
-	return url
-end
 
 return function(data)
 	local pluginID = data.PluginID or ""
@@ -54,305 +45,36 @@ return function(data)
 	local verifyCookies = data.VerifyCookies or ""
 	local verifyUserAgent = data.VerifyUserAgent or ""
 
-	-- Back button
-	local body = [[<div class="mb-4">
-    <button onclick="window.backToList ? backToList() : (window.location.href = '/view/library')" class="inline-flex items-center gap-1.5 text-sm text-neutral-400 hover:text-neutral-200 transition" aria-label="Back">
-        <svg xmlns="http://www.w3.org/2000/svg" class="size-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg>
-        Back
-    </button></div>
-]]
-
-	-- Challenge warning
-	if challenge then
-		body = body
-			.. '<div class="bg-amber-500/15 border border-amber-500/40 text-amber-300 rounded-lg p-4 mb-6">This site needs human verification — go to <a href="/view/plugins" class="underline">Plugins → Human Verification</a> to paste your session cookies.</div>'
-	end
-
-	-- Cached data offline notice
-	if cachedData then
-		body = body
-			.. '<div class="bg-blue-500/15 border border-blue-500/40 text-blue-300 rounded-lg p-4 mb-6">Showing cached data — offline or plugin unavailable.</div>'
-	end
+	local body = detailNotices({Challenge = challenge, CachedData = cachedData})
 
 	-- Cover (left column)
-	local coverWrap = '<div id="cover-wrap" class="relative" data-key="' .. h(pluginID) .. ":" .. h(mangaID) .. '">'
-	local coverHTML
-	if manga.CoverURL and manga.CoverURL ~= "" then
-		coverHTML = coverWrap
-			.. '<img src="/image?pluginID='
-			.. h(pluginID)
-			.. "&url="
-			.. h(manga.CoverURL)
-			.. "&prio=high"
-			.. (coverVersions[manga.CoverURL] and coverVersions[manga.CoverURL] ~= "" and ("&cb=" .. h(
-				coverVersions[manga.CoverURL]
-			)) or "")
-			.. '" alt="'
-			.. h(manga.Title or "")
-			.. '" class="w-full aspect-[2/3] rounded-xl object-cover">'
-			.. '<div id="cover-dim" class="lib-dim" style="display:'
-			.. (data.CoverDim == 1 and "block" or "none")
-			.. ';position:absolute;top:0;left:0;right:0;bottom:0;border-radius:0.75rem;background:rgba(0,0,0,0.82);backdrop-filter:blur(3px);"></div>'
-			.. "</div>"
-			.. '<div class="mt-2 flex items-center gap-3 text-xs">'
-			.. '<form action="/action/toggle-cover-dim/'
-			.. h(pluginID)
-			.. "/"
-			.. h(data.MangaID)
-			.. '" method="POST" style="display:inline">'
-			.. '<button type="submit" id="cover-dim-btn" title="Dim the cover image" class="inline-flex items-center text-neutral-400 hover:text-neutral-200 transition cursor-pointer">'
-			.. (data.CoverDim == 1 and "Show cover" or "Hide cover")
-			.. "</button>"
-			.. "</form>"
-			.. '<form action="/action/fetch-covers/'
-			.. h(pluginID)
-			.. "/"
-			.. h(data.MangaID)
-			.. '" method="POST" style="display:inline" data-open-covers="1">'
-			.. csrfInput(data.csrf_token or "")
-			.. '<input type="hidden" name="manga_title" value="'
-			.. h(currentTitle)
-			.. '">'
-			.. '<button type="submit" title="Fetch cover candidates if needed, then pick the main cover" class="inline-flex items-center text-neutral-400 hover:text-neutral-200 transition cursor-pointer">Covers</button>'
-			.. "</form>"
-			.. '<form action="/action/clear-covers/'
-			.. h(pluginID)
-			.. "/"
-			.. h(data.MangaID)
-			.. '" method="POST" style="display:inline">'
-			.. csrfInput(data.csrf_token or "")
-			.. '<button type="submit" title="Drop stored cover candidates so the next fetch re-pulls them fresh" class="inline-flex items-center text-neutral-400 hover:text-neutral-200 transition cursor-pointer">Clear</button>'
-			.. "</form>"
-			.. '<form action="/action/refetch-cover/'
-			.. h(pluginID)
-			.. "/"
-			.. h(data.MangaID)
-			.. '" method="POST" style="display:inline">'
-			.. '<button type="submit" title="Re-download the cover from the source" class="inline-flex items-center text-neutral-400 hover:text-neutral-200 transition cursor-pointer">Refetch</button>'
-			.. "</form>"
-			.. "</div>"
-	else
-		coverHTML = '<div class="w-full aspect-[2/3] bg-neutral-800 rounded-xl flex items-center justify-center text-neutral-500 text-4xl font-semibold">'
-			.. h(getInitials(manga.Title or ""))
-			.. "</div>"
-			.. '<div class="mt-2 flex items-center gap-3 text-xs">'
-			.. '<form action="/action/fetch-covers/'
-			.. h(pluginID)
-			.. "/"
-			.. h(data.MangaID)
-			.. '" method="POST" style="display:inline" data-open-covers="1">'
-			.. csrfInput(data.csrf_token or "")
-			.. '<input type="hidden" name="manga_title" value="'
-			.. h(currentTitle)
-			.. '">'
-			.. '<button type="submit" title="Fetch cover candidates if needed, then pick the main cover" class="inline-flex items-center text-neutral-400 hover:text-neutral-200 transition cursor-pointer">Covers</button>'
-			.. "</form>"
-			.. '<form action="/action/clear-covers/'
-			.. h(pluginID)
-			.. "/"
-			.. h(data.MangaID)
-			.. '" method="POST" style="display:inline">'
-			.. csrfInput(data.csrf_token or "")
-			.. '<button type="submit" title="Drop stored cover candidates so the next fetch re-pulls them fresh" class="inline-flex items-center text-neutral-400 hover:text-neutral-200 transition cursor-pointer">Clear</button>'
-			.. "</form>"
-			.. "</div>"
-	end
+	local coverHTML = detailCover({
+		csrf_token = data.csrf_token or "",
+		PluginID = pluginID,
+		MangaID = mangaID,
+		Manga = manga,
+		CurrentTitle = currentTitle,
+		CoverVersions = coverVersions,
+		CoverDim = data.CoverDim,
+	})
 
-	-- Genre tags — toggle via Alpine (click adds/removes from user override)
-	local overrideGenres = data.OverrideGenres or {}
-	local maxVisible = 6
-	local genres = manga.Genres or {}
-	local genreCount = #genres
-	local genreTagsHTML = ""
-	for i, g in ipairs(genres) do
-		if not g or g == "" then
-			goto next
-		end
-		local isInOverride = false
-		for _, og in ipairs(overrideGenres) do
-			if og == g then
-				isInOverride = true
-				break
-			end
-		end
-		local hidden = i > maxVisible and ' style="display:none"' or ""
-		genreTagsHTML = genreTagsHTML
-			.. '<form method="post" action="/action/'
-			.. (isInOverride and "remove" or "add")
-			.. "-genre/"
-			.. h(pluginID)
-			.. "/"
-			.. h(mangaID)
-			.. '" class="inline genre-tag"'
-			.. hidden
-			.. ">"
-			.. csrfInput(data.csrf_token or "")
-			.. '<input type="hidden" name="genre" value="'
-			.. h(g)
-			.. '">'
-			.. '<span class="inline-flex items-center gap-1 rounded-full bg-indigo-500/15 text-indigo-400 text-xs pl-2 pr-1 cursor-pointer hover:bg-indigo-500/25" onclick="submitForm(this.closest(\'form\'))">'
-			.. h(g)
-			.. (isInOverride and '<span class="size-4 inline-flex items-center justify-center rounded-full text-indigo-500 hover:text-red-400 hover:bg-neutral-700" onclick="event.preventDefault();submitForm(this.closest(\'form\'))">&times;</span>' or "")
-			.. "</span></form>"
-		::next::
-	end
+	local genreTagsHTML, relatedTagsHTML, synopsisHTML = detailMeta({
+		csrf_token = data.csrf_token or "",
+		PluginID = pluginID,
+		MangaID = mangaID,
+		Manga = manga,
+		Related = rels,
+		OverrideGenres = data.OverrideGenres,
+	})
 
-	-- Show more toggle
-	local showMoreHTML = ""
-	if genreCount > maxVisible then
-		showMoreHTML = '<button type="button" id="genre-showmore" onclick="toggleGenreTags(\'genre-showmore\','
-			.. maxVisible
-			.. ')" class="text-xs text-indigo-400 hover:text-indigo-300 ml-1 cursor-pointer" data-show="0">Show more</button>'
-	end
-	genreTagsHTML = genreTagsHTML .. showMoreHTML
-
-	-- Related manga tags — click to remove (no confirm, capture-phase dispatch)
-	local relatedTagsHTML = ""
-	local seenRelated = {}
-	for _, r in ipairs(rels) do
-		local name = r.Value or ""
-		if name == "" or seenRelated[name] then
-			goto next
-		end
-		seenRelated[name] = true
-		relatedTagsHTML = relatedTagsHTML
-			.. '<form method="post" action="/action/remove-related/'
-			.. h(pluginID)
-			.. "/"
-			.. h(mangaID)
-			.. '" class="inline">'
-			.. csrfInput(data.csrf_token or "")
-			.. '<input type="hidden" name="title" value="'
-			.. h(name)
-			.. '">'
-			.. '<span class="inline-flex items-center gap-1 rounded-full bg-emerald-500/10 text-emerald-400 text-xs pl-2 pr-1 cursor-pointer hover:bg-emerald-500/20">'
-			.. (r.URL and r.URL ~= "" and ('<a href="' .. h(r.URL) .. '" target="_blank" class="hover:underline">' .. h(
-				name
-			) .. "</a>") or h(name))
-			.. '<span class="size-4 inline-flex items-center justify-center rounded-full text-emerald-500 hover:text-red-400 hover:bg-neutral-700" onclick="submitForm(this.closest(\'form\'))">&times;</span>'
-			.. "</span></form>"
-		::next::
-	end
-
-	-- Synopsis with read-more toggle (only when > 10 lines)
-	local synopsisHTML = ""
-	if manga.Description and manga.Description ~= "" then
-		-- Count lines robustly: split on newlines AND <br> tags
-		local lineCount = 1
-		local pos = 1
-		while true do
-			local nl = string.find(manga.Description, "\n", pos, true)
-			local br = string.find(manga.Description, "<br", pos, true)
-			if not nl and not br then
-				break
-			end
-			if nl and (not br or nl < br) then
-				lineCount = lineCount + 1
-				pos = nl + 1
-			else
-				lineCount = lineCount + 1
-				pos = br + 3
-			end
-		end
-		local needsToggle = lineCount > 10
-		local cls = "text-sm text-neutral-400 mt-1.5"
-		if needsToggle then
-			cls = cls .. " max-h-[4.5rem] overflow-hidden transition-all duration-300 relative"
-		end
-		synopsisHTML = '<div class="mb-3">'
-			.. '<span class="text-xs font-semibold text-neutral-300 uppercase tracking-wide">Synopsis</span>'
-			.. '<div id="synopsis-text" class="'
-			.. cls
-			.. '">'
-			.. h(manga.Description)
-			.. "</div>"
-		if needsToggle then
-			synopsisHTML = synopsisHTML
-				.. '<span id="synopsis-fade" class="absolute inset-x-0 bottom-0 h-8 bg-gradient-to-t from-neutral-950 to-transparent pointer-events-none"></span>'
-				.. "<button type=\"button\" id=\"synopsis-toggle\" onclick=\"var t=document.getElementById('synopsis-text');var f=document.getElementById('synopsis-fade');var b=document.getElementById('synopsis-toggle');t.classList.toggle('max-h-[4.5rem]');t.classList.toggle('max-h-none');f.style.display=t.classList.contains('max-h-none')?'none':'block';b.textContent=t.classList.contains('max-h-none')?'Show less':'Read more';\" class=\"text-xs text-indigo-400 hover:text-indigo-300 transition mt-1 cursor-pointer\">Read more</button>"
-		end
-		synopsisHTML = synopsisHTML .. "</div>"
-	end
-
-	-- Action buttons; syncedHTML carries the far-right Update button
-	local syncedHTML = ""
-	local actionsHTML = '<div class="flex flex-wrap items-center gap-2 mt-4">'
-		.. '<form method="post" action="/action/toggle-library/'
-		.. h(pluginID)
-		.. "/"
-		.. h(mangaID)
-		.. '">'
-		.. csrfInput(data.csrf_token or "")
-		.. (inLibrary and '<button type="submit" class="border border-emerald-600/50 text-emerald-400 bg-emerald-500/10 hover:bg-emerald-500/20 rounded-md px-4 py-2 text-sm">✓ In Library</button>' or '<button type="submit" class="bg-indigo-600 hover:bg-indigo-500 text-white rounded-md px-4 py-2 text-sm font-medium">+ Add to Library</button>')
-		.. "</form>"
-	if inLibrary then
-		local synced = data.LastSynced
-		syncedHTML = ""
-		if type(synced) == "string" and #synced >= 16 then
-			syncedHTML = '<form method="post" action="/action/sync-manga/'
-				.. h(pluginID)
-				.. "/"
-				.. h(mangaID)
-				.. '" class="ml-auto inline-flex items-center gap-2" data-job-action="sync-manga">'
-				.. csrfInput(data.csrf_token or "")
-				.. '<span class="text-xs text-neutral-500 cursor-default" title="Last refresh check - click Update to refresh now">updated '
-				.. synced:sub(1, 10)
-				.. " "
-				.. synced:sub(12, 16)
-				.. "</span>"
-				.. '<button type="submit" title="Refresh this manga now" class="border border-neutral-700 text-neutral-300 hover:bg-neutral-800 rounded-md px-4 py-2 text-sm cursor-pointer">⟳ Update</button>'
-				.. "</form>"
-		else
-			syncedHTML = '<form method="post" action="/action/sync-manga/'
-				.. h(pluginID)
-				.. "/"
-				.. h(mangaID)
-				.. '" class="ml-auto" data-job-action="sync-manga">'
-				.. csrfInput(data.csrf_token or "")
-				.. '<button type="submit" title="Refresh this manga now" class="border border-neutral-700 text-neutral-300 hover:bg-neutral-800 rounded-md px-4 py-2 text-sm cursor-pointer">⟳ Update</button>'
-				.. "</form>"
-		end
-	end
-
-	-- Migrate button (beside Update)
-	local migrateHTML = ""
-	if inLibrary then
-		migrateHTML = '<a href="/view/migrate/'
-			.. h(pluginID)
-			.. "/"
-			.. h(mangaID)
-			.. '" class="ml-auto border border-amber-500/40 bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 rounded-md px-4 py-2 text-sm">⤴ Migrate</a>'
-	end
-
-	if continuePoint then
-		local cp = continuePoint
-		local label, titleAttr
-		if cp.Page and cp.Page > 1 then
-			label = "▶ Continue · Ch." .. formatChapterNum(cp.ChapterN)
-			titleAttr = "Continue: Ch. " .. formatChapterNum(cp.ChapterN) .. ", page " .. tostring(cp.Page)
-		elseif cp.Started then
-			label = "▶ Continue · Ch." .. formatChapterNum(cp.ChapterN)
-			titleAttr = "Continue: Ch. " .. formatChapterNum(cp.ChapterN)
-		else
-			label = "▶ Start Reading"
-			titleAttr = "Start Reading"
-		end
-		actionsHTML = actionsHTML
-			.. '<a href="/view/read/'
-			.. h(ue(pluginID))
-			.. "/"
-			.. h(ue(mangaID))
-			.. "/"
-			.. h(ue(cp.ChapterID or ""))
-			.. "?page="
-			.. tostring(cp.Page or 1)
-			.. '" class="bg-indigo-600 hover:bg-indigo-500 text-white rounded-md px-4 py-2 text-sm font-medium" title="'
-			.. h(titleAttr)
-			.. '">'
-			.. h(label)
-			.. "</a>"
-	end
-	actionsHTML = actionsHTML .. migrateHTML .. (syncedHTML or "") .. "</div>"
+	local actionsHTML = detailActions({
+		csrf_token = data.csrf_token or "",
+		PluginID = pluginID,
+		MangaID = mangaID,
+		InLibrary = inLibrary,
+		Continue = continuePoint,
+		LastSynced = data.LastSynced,
+	})
 
 	-- Main 2-column layout
 	body = body
@@ -441,73 +163,17 @@ return function(data)
 			ChTotalPages = chTotalPages,
 		})
 
-	-- Cover picker modal: all fetched alternative covers + the current one.
-	local coverItems = {
-		{ url = manga.CoverURL or "", source = "current", current = true },
-	}
-	local seenCovers = {}
-	if manga.CoverURL and manga.CoverURL ~= "" then
-		seenCovers[manga.CoverURL] = true
-	end
-	for _, c in ipairs(altCovers) do
-		local u = c.URL or ""
-		if u ~= "" and not seenCovers[u] then
-			seenCovers[u] = true
-			coverItems[#coverItems + 1] = { url = u, source = c.Source or "" }
-		end
-	end
-	local coverGrid = ""
-	for _, c in ipairs(coverItems) do
-		if c.url ~= "" then
-			coverGrid = coverGrid
-				.. '<form action="/action/set-cover/'
-				.. h(pluginID)
-				.. "/"
-				.. h(mangaID)
-				.. '" method="POST" class="group relative w-32">'
-				.. csrfInput(data.csrf_token or "")
-				.. '<input type="hidden" name="url" value="'
-				.. h(c.url)
-				.. '">'
-				.. '<img src="/image?pluginID='
-				.. h(pluginID)
-				.. "&url="
-				.. h(thumbURL(c.url))
-				.. "&prio=high"
-				.. (coverVersions[c.url] and coverVersions[c.url] ~= "" and ("&cb=" .. h(coverVersions[c.url])) or "")
-				.. '" alt="cover" loading="lazy" class="w-32 aspect-[2/3] rounded-lg object-cover border-2 transition cursor-pointer '
-				.. (c.current and "border-emerald-500" or "border-transparent group-hover:border-blue-400")
-				.. '" onclick="submitForm(this.closest(\'form\'))" title="Use this cover">'
-				.. '<div class="text-xs text-neutral-400 text-center mt-1 truncate">'
-				.. h(c.current and "current" or c.source)
-				.. "</div>"
-				.. "</form>"
-		end
-	end
+	-- Cover picker modal (shared partial): current cover + fetched candidates.
 	body = body
-		.. [[<div id="cover-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center" style="display:none">
-    <div class="absolute inset-0 bg-black/70" onclick="var m=this.parentElement;m.classList.add('hidden');m.style.display='none'"></div>
-    <div class="relative bg-neutral-900 border border-neutral-700 rounded-xl p-4 max-w-3xl max-h-[80vh] overflow-y-auto">
-        <div class="flex items-center justify-between mb-3">
-            <h3 class="text-sm font-semibold text-neutral-200">Pick a cover</h3>
-            <button onclick="var m=this.closest('#cover-modal');m.classList.add('hidden');m.style.display='none'" class="text-neutral-400 hover:text-neutral-200 text-lg leading-none" aria-label="Close">&times;</button>
-        </div>
-        <div class="flex flex-wrap gap-3">]]
-		.. coverGrid
-		.. [[</div>
-        <div class="mt-4 flex items-center gap-2">
-            <form action="/action/clear-covers/]] .. h(pluginID) .. "/" .. h(mangaID) .. [[" method="POST" class="inline">
-                ]] .. csrfInput(data.csrf_token or "") .. [[
-                <button type="submit" class="text-xs text-red-400 hover:text-red-300 border border-red-600/50 rounded-md px-3 py-1" onclick="return confirm('Clear all cover candidates and fetch fresh?');">Clear Covers</button>
-            </form>
-            <form action="/action/fetch-covers/]] .. h(pluginID) .. "/" .. h(mangaID) .. [[" method="POST" class="inline">
-                ]] .. csrfInput(data.csrf_token or "") .. [[
-                <input type="hidden" name="manga_title" value="]] .. h(currentTitle) .. [[" />
-                <button type="submit" class="text-xs text-blue-400 hover:text-blue-300 border border-blue-600/50 rounded-md px-3 py-1">Refresh Covers</button>
-            </form>
-        </div>
-    </div>
-</div>]]
+		.. detailCoverModal({
+			csrf_token = data.csrf_token or "",
+			PluginID = pluginID,
+			MangaID = mangaID,
+			Manga = manga,
+			AltCovers = altCovers,
+			CoverVersions = coverVersions,
+			CurrentTitle = currentTitle,
+		})
 
 	-- Human verification wizard modal (shared partial; renders "" when hidden).
 	body = body
