@@ -23,10 +23,11 @@ func DefaultStatusMap() map[string]string {
 		"finish":      "Completed",
 		"finished_up": "Completed",
 		// Hiatus
-		"hiatus":  "Hiatus",
-		"onhold":  "Hiatus",
-		"on hold": "Hiatus",
-		"on_hold": "Hiatus",
+		"hiatus":    "Hiatus",
+		"onhold":    "Hiatus",
+		"on hold":   "Hiatus",
+		"on_hold":   "Hiatus",
+		"on hiatus": "Hiatus",
 		// Dropped
 		"dropped":      "Dropped",
 		"drop":         "Dropped",

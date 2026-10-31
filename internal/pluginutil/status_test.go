@@ -35,6 +35,7 @@ func TestNormalizeStatus(t *testing.T) {
 		{"dropped", "Dropped"},
 		{"upcoming", "Upcoming"},
 		{"on-going", "Ongoing"},              // site-specific
+		{"on hiatus", "Hiatus"},              // mangapill site value
 		{"unknown_status", "unknown_status"}, // passthrough
 		{"", ""},                             // empty passthrough
 	}

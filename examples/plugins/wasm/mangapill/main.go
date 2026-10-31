@@ -127,22 +127,6 @@ var mangaTitleRe = `font-black leading-tight line-clamp-2">([^<]+)<`
 var reMangaSlug = regexp.MustCompile(`/manga/(\d+)/([^"]+)`)
 var reChapterHref = regexp.MustCompile(`/chapters/(\d+)-(\d+)/`)
 
-// normalizeStatus maps mangapill's status strings to the host enum.
-func normalizeStatus(s string) string {
-	l := strings.ToLower(s)
-	switch {
-	case strings.Contains(l, "ongoing"):
-		return "Ongoing"
-	case strings.Contains(l, "completed"):
-		return "Completed"
-	case strings.Contains(l, "hiatus"):
-		return "Hiatus"
-	case strings.Contains(l, "cancelled"), strings.Contains(l, "dropped"):
-		return "Cancelled"
-	}
-	return ""
-}
-
 // parseQueryPage builds a /search URL honouring the SearchFilter. Mangapill
 // supports ?q= , &type= , &status= , repeated &genre=<slug>, and &page=.
 func parseQuery(f types.SearchFilter) string {
@@ -229,7 +213,10 @@ func detail(arg string) types.Manga {
 	}
 	m.Title = trim(unescape(m.Title))
 	m.Description = trim(firstCap(body, `<p class="text-sm text--secondary">([^<]+)</p`))
-	m.Status = normalizeStatus(firstCap(body, `Status</label>\s*<div>([^<]+)<`))
+	// Raw site value goes to the host's canonical vocabulary — the host owns
+	// the standard text (publishing/finished/on hiatus/... → enum labels).
+	m.Status = hostString("text.normalize_status",
+		strings.TrimSpace(firstCap(body, `Status</label>\s*<div>([^<]+)<`)))
 	m.CoverURL = firstCap(body, `og:image" content="([^"]+)"`)
 	if m.CoverURL == "" {
 		m.CoverURL = firstCap(body, `data-src="([^"]+)"`)
