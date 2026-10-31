@@ -18,8 +18,8 @@ func filterBranchFixture(stats map[string]database.LibraryMangaStats) []database
 	set(1, 10, 3, false) // reading
 	set(2, 10, 0, false) // unread
 	set(3, 10, 10, false)
-	set(4, 0, 0, false)  // no chapters
-	set(5, 5, 5, true)   // done + new
+	set(4, 0, 0, false) // no chapters
+	set(5, 5, 5, true)  // done + new
 	return []database.Manga{
 		{ID: 1}, {ID: 2}, {ID: 3}, {ID: 4}, {ID: 5},
 	}

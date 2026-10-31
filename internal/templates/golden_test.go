@@ -42,7 +42,7 @@ func goldenFixture(name string) map[string]any {
 	manga := map[string]any{
 		"ID": "s1", "Title": "Golden Manga", "CoverURL": "https://cdn.test/c.jpg",
 		"Description": "A description long enough to render the synopsis block.",
-		"Status": "ongoing", "Author": "Some Author",
+		"Status":      "ongoing", "Author": "Some Author",
 		"Genres": []any{"Action", "Comedy", "Drama"},
 	}
 	chapters := []any{
@@ -63,35 +63,35 @@ func goldenFixture(name string) map[string]any {
 	case strings.Contains(name, "detail_alt"):
 		return map[string]any{
 			"PluginID": "md", "MangaID": "s1", "CurrentTitle": "Golden Manga",
-			"AltTitles":     []any{map[string]any{"Title": "Alt One", "Source": "MangaDex"}},
-			"AltSummaries":  []any{map[string]any{"Description": "Alt synopsis.", "Source": "MU"}},
-			"Categories":    []any{map[string]any{"Value": "Action", "Source": "plugin"}},
-			"PluginGenres":  []any{"Action"},
+			"AltTitles":    []any{map[string]any{"Title": "Alt One", "Source": "MangaDex"}},
+			"AltSummaries": []any{map[string]any{"Description": "Alt synopsis.", "Source": "MU"}},
+			"Categories":   []any{map[string]any{"Value": "Action", "Source": "plugin"}},
+			"PluginGenres": []any{"Action"},
 		}
 	case strings.Contains(name, "detail_chapters"):
 		return map[string]any{
 			"PluginID": "md", "MangaID": "s1", "Chapters": chapters,
-			"Progress": map[string]any{"c1": map[string]any{"LastPageRead": 3}},
+			"Progress":      map[string]any{"c1": map[string]any{"LastPageRead": 3}},
 			"ChCurrentPage": 1, "ChTotalPages": 1,
 		}
 	case strings.Contains(name, "detail"):
 		return map[string]any{
 			"PluginID": "md", "PluginName": "MangaDex", "PluginIcon": "",
 			"MangaID": "s1", "Manga": manga, "CurrentTitle": "Golden Manga",
-			"AltTitles":  []any{map[string]any{"Title": "Alt One", "Source": "MangaDex"}},
+			"AltTitles":    []any{map[string]any{"Title": "Alt One", "Source": "MangaDex"}},
 			"AltSummaries": []any{map[string]any{"Description": "Alt synopsis."}},
-			"Chapters": chapters, "Progress": map[string]any{"c1": map[string]any{"LastPageRead": 3}},
+			"Chapters":     chapters, "Progress": map[string]any{"c1": map[string]any{"LastPageRead": 3}},
 			"Continue": map[string]any{"ChapterID": "c1"}, "InLibrary": true,
-			"Categories": []any{map[string]any{"Value": "Action"}},
-			"Related":    []any{map[string]any{"Value": "Other", "URL": "https://x"}},
-			"AltCovers":  []any{map[string]any{"URL": "https://cdn.test/alt.jpg"}},
+			"Categories":    []any{map[string]any{"Value": "Action"}},
+			"Related":       []any{map[string]any{"Value": "Other", "URL": "https://x"}},
+			"AltCovers":     []any{map[string]any{"URL": "https://cdn.test/alt.jpg"}},
 			"ChCurrentPage": 1, "ChTotalPages": 1,
 		}
 	case strings.Contains(name, "library_sidebar"):
 		return map[string]any{
 			"Mangas": cards, "Stats": map[string]any{"TotalTitles": 2},
 			"CategoryCounts": map[string]any{"Action": 3},
-			"PluginCounts": []any{map[string]any{"PluginID": "p", "Name": "Plugin P", "Count": 2}},
+			"PluginCounts":   []any{map[string]any{"PluginID": "p", "Name": "Plugin P", "Count": 2}},
 			"DuplicateCount": 0,
 		}
 	case strings.Contains(name, "plugin_cards"):
@@ -127,7 +127,7 @@ func goldenFixture(name string) map[string]any {
 			"Stats": map[string]any{"TotalTitles": 2}, "Page": 1, "TotalPages": 1,
 			"HasNext": false, "HasPrev": false, "Sort": "updated", "Status": "all",
 			"CategoryCounts": map[string]any{"Action": 3},
-			"DupColors": map[string]any{} , "DupRank": map[string]any{},
+			"DupColors":      map[string]any{}, "DupRank": map[string]any{},
 			"DuplicateCount": 0, "Tag": "", "View": "",
 		}
 	}
@@ -189,11 +189,8 @@ func fnvHash(s string) uint32 {
 // firstByteDiff reports where two strings diverge plus ~30 bytes around it,
 // which is how a move that reorders one tag shows up.
 func firstByteDiff(a, b string) (int, string) {
-	n := len(a)
-	if len(b) < n {
-		n = len(b)
-	}
-	for i := 0; i < n; i++ {
+	n := min(len(b), len(a))
+	for i := range n {
 		if a[i] != b[i] {
 			lo, hi := i-30, i+30
 			if lo < 0 {
@@ -206,10 +203,7 @@ func firstByteDiff(a, b string) (int, string) {
 		}
 	}
 	if len(a) != len(b) {
-		lo := len(a) - 30
-		if lo < 0 {
-			lo = 0
-		}
+		lo := max(len(a)-30, 0)
 		return len(a), "tail [" + a[lo:] + "]"
 	}
 	return -1, ""
@@ -219,8 +213,6 @@ func firstByteDiff(a, b string) (int, string) {
 // instead of asserting. Custom Go test flags live on the test binary's flag
 // set, not os.Args, so register one.
 var goldenUpdate = flag.Bool("update", false, "re-baseline the golden template renders instead of asserting against them")
-
-
 
 // goldenTargets is the set of files the split touches. Each entry is rendered
 // before and after its split; a green run means the move was byte-identical.
