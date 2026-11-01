@@ -1,4 +1,13 @@
 ## 2026-11-01
+* **Update**: Linked `substitute-cipher-hex-abi.md` to `host-helper-surface-registry.md` (The registry where crypto.substitute_cipher is declared for every runtime.).
+* **Update**: Linked `substitute-cipher-hex-abi.md` to `quickjs-go-js-boundary-gotchas.md` (The string-boundary corruption that forced this decision.).
+* **Update**: Linked `quickjs-go-js-boundary-gotchas.md` to `substitute-cipher-hex-abi.md` (Why binary data had to move to hex.).
+* **Update**: Linked `quickjs-go-js-boundary-gotchas.md` to `plugin-js-engine-quickjs-swap.md` (The decision these gotchas came out of, including the invoke budget and the registry leak fix.).
+* **Update**: Linked `plugin-js-engine-quickjs-swap.md` to `substitute-cipher-hex-abi.md` (The ABI change this swap forced.).
+* **Update**: Linked `plugin-js-engine-quickjs-swap.md` to `quickjs-go-js-boundary-gotchas.md` (The concrete value-conversion pitfalls hit during this swap.).
+* **Creation**: Documented concept `substitute-cipher-hex-abi.md` (substitute_cipher is a hex token on every runtime).
+* **Creation**: Documented concept `quickjs-go-js-boundary-gotchas.md` (quickjs Go/JS boundary gotchas that broke host natives).
+* **Creation**: Documented concept `plugin-js-engine-quickjs-swap.md` (JS plugins run on modernc.org/quickjs (CGO-free), goja dropped).
 * **Update**: Linked `host-genre-source-of-truth.md` to `detail-page-read-genre-readerprefs-fixes.md` (Genre tags are rendered on the detail page; that finding covers the detail-page genre-tag behaviour this canonical vocabulary now feeds.).
 * **Update**: Linked `host-date-source-of-truth.md` to `0150-live-plugins-date-info-status.md` (That audit records what the 41 live plugins currently send for released_at; this decision sets the wire format those plugins must move to (epoch seconds), which is the follow-up the audit feeds.).
 * **Creation**: Documented concept `host-genre-source-of-truth.md` (Host owns one canonical genre vocabulary; the [genre] alias map is gone).
