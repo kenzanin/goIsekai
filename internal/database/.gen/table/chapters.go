@@ -30,6 +30,7 @@ type chaptersTable struct {
 	FetchedAt       sqlite.ColumnTimestamp
 	TotalPages      sqlite.ColumnInteger
 	ReleasedAt      sqlite.ColumnTimestamp
+	ReleasedText    sqlite.ColumnString
 
 	AllColumns     sqlite.ColumnList
 	MutableColumns sqlite.ColumnList
@@ -84,8 +85,9 @@ func newChaptersTableImpl(schemaName, tableName, alias string) chaptersTable {
 		FetchedAtColumn       = sqlite.TimestampColumn("fetched_at")
 		TotalPagesColumn      = sqlite.IntegerColumn("total_pages")
 		ReleasedAtColumn      = sqlite.TimestampColumn("released_at")
-		allColumns            = sqlite.ColumnList{IDColumn, MangaIDColumn, SourceChapterIDColumn, TitleColumn, ChapterNumColumn, VolumeNumColumn, IsReadColumn, IsSkippedColumn, LastPageReadColumn, DownloadStatusColumn, FetchedAtColumn, TotalPagesColumn, ReleasedAtColumn}
-		mutableColumns        = sqlite.ColumnList{MangaIDColumn, SourceChapterIDColumn, TitleColumn, ChapterNumColumn, VolumeNumColumn, IsReadColumn, IsSkippedColumn, LastPageReadColumn, DownloadStatusColumn, FetchedAtColumn, TotalPagesColumn, ReleasedAtColumn}
+		ReleasedTextColumn    = sqlite.StringColumn("released_text")
+		allColumns            = sqlite.ColumnList{IDColumn, MangaIDColumn, SourceChapterIDColumn, TitleColumn, ChapterNumColumn, VolumeNumColumn, IsReadColumn, IsSkippedColumn, LastPageReadColumn, DownloadStatusColumn, FetchedAtColumn, TotalPagesColumn, ReleasedAtColumn, ReleasedTextColumn}
+		mutableColumns        = sqlite.ColumnList{MangaIDColumn, SourceChapterIDColumn, TitleColumn, ChapterNumColumn, VolumeNumColumn, IsReadColumn, IsSkippedColumn, LastPageReadColumn, DownloadStatusColumn, FetchedAtColumn, TotalPagesColumn, ReleasedAtColumn, ReleasedTextColumn}
 		defaultColumns        = sqlite.ColumnList{IsReadColumn, IsSkippedColumn, LastPageReadColumn, DownloadStatusColumn, FetchedAtColumn, TotalPagesColumn}
 	)
 
@@ -106,6 +108,7 @@ func newChaptersTableImpl(schemaName, tableName, alias string) chaptersTable {
 		FetchedAt:       FetchedAtColumn,
 		TotalPages:      TotalPagesColumn,
 		ReleasedAt:      ReleasedAtColumn,
+		ReleasedText:    ReleasedTextColumn,
 
 		AllColumns:     allColumns,
 		MutableColumns: mutableColumns,

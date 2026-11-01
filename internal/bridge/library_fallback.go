@@ -18,12 +18,13 @@ func (s *AppService) liveChaptersFallback(mangaIntID int64, liveChapters []types
 	out := make([]types.Chapter, len(dbChapters))
 	for i, c := range dbChapters {
 		out[i] = types.Chapter{
-			ID:         c.SourceChapterID,
-			MangaID:    fmt.Sprintf("%d", c.MangaID),
-			Title:      c.Title,
-			ChapterNum: c.ChapterNum,
-			VolumeNum:  c.VolumeNum,
-			ReleasedAt: c.ReleasedAt,
+			ID:           c.SourceChapterID,
+			MangaID:      fmt.Sprintf("%d", c.MangaID),
+			Title:        c.Title,
+			ChapterNum:   c.ChapterNum,
+			VolumeNum:    c.VolumeNum,
+			ReleasedAt:   c.ReleasedAt,
+			ReleasedText: c.ReleasedText,
 		}
 	}
 	return out
@@ -91,12 +92,13 @@ func (s *AppService) cachedMangaFallback(pluginID, mangaID string, mangaIntID in
 	chapters := make([]types.Chapter, len(dbChapters))
 	for i, c := range dbChapters {
 		chapters[i] = types.Chapter{
-			ID:         c.SourceChapterID,
-			MangaID:    mangaID,
-			Title:      c.Title,
-			ChapterNum: c.ChapterNum,
-			VolumeNum:  c.VolumeNum,
-			ReleasedAt: c.ReleasedAt,
+			ID:           c.SourceChapterID,
+			MangaID:      mangaID,
+			Title:        c.Title,
+			ChapterNum:   c.ChapterNum,
+			VolumeNum:    c.VolumeNum,
+			ReleasedAt:   c.ReleasedAt,
+			ReleasedText: c.ReleasedText,
 		}
 	}
 	return manga, chapters, nil

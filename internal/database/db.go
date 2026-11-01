@@ -42,6 +42,9 @@ type Chapter struct {
 	// by the plugin. Zero means the plugin knows no date. FetchedAt is when
 	// we last synced the row — a different thing entirely.
 	ReleasedAt time.Time
+	// ReleasedText is the source's own release wording (e.g. "recently") when
+	// no moment is known. Empty means the source reported nothing.
+	ReleasedText string
 }
 
 // ChapterProgress is the per-chapter read progress surfaced to the UI.

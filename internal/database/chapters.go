@@ -29,6 +29,16 @@ func chapterReleasedAt(t time.Time) TimestampExpression {
 	return TimestampExp(String(s))
 }
 
+// chapterReleasedText is the SQL expression for a chapter's release wording: the
+// source's own phrasing when the host could read no moment, or NULL when it has
+// none. NULL keeps "no wording" distinguishable from an empty string.
+func chapterReleasedText(s string) StringExpression {
+	if s == "" {
+		return StringExp(NULL)
+	}
+	return StringExp(String(s))
+}
+
 // UpsertChapter inserts a chapter or, on a duplicate (manga_id, source_chapter_id),
 // refreshes the identifying/metadata columns while preserving is_read, last_page_read
 // and download_status. Returns the integer chapter ID.
@@ -55,6 +65,7 @@ func (d *DB) UpsertChapter(c Chapter) (int64, error) {
 		Chapters.DownloadStatus,
 		Chapters.FetchedAt,
 		Chapters.ReleasedAt,
+		Chapters.ReleasedText,
 	).VALUES(
 		c.MangaID,
 		c.SourceChapterID,
@@ -66,6 +77,7 @@ func (d *DB) UpsertChapter(c Chapter) (int64, error) {
 		c.DownloadStatus,
 		RawTimestamp("CURRENT_TIMESTAMP"),
 		chapterReleasedAt(c.ReleasedAt),
+		chapterReleasedText(c.ReleasedText),
 	).ON_CONFLICT(Chapters.MangaID, Chapters.SourceChapterID).DO_UPDATE(
 		SET(
 			Chapters.Title.SET(Chapters.EXCLUDED.Title),
@@ -73,6 +85,7 @@ func (d *DB) UpsertChapter(c Chapter) (int64, error) {
 			Chapters.VolumeNum.SET(Chapters.EXCLUDED.VolumeNum),
 			Chapters.FetchedAt.SET(RawTimestamp("CURRENT_TIMESTAMP")),
 			Chapters.ReleasedAt.SET(chapterReleasedAt(c.ReleasedAt)),
+			Chapters.ReleasedText.SET(chapterReleasedText(c.ReleasedText)),
 		),
 	)
 
@@ -90,6 +103,7 @@ func (d *DB) UpsertChapter(c Chapter) (int64, error) {
 			Chapters.DownloadStatus,
 			Chapters.FetchedAt,
 			Chapters.ReleasedAt,
+			Chapters.ReleasedText,
 		).VALUES(
 			idVal,
 			c.MangaID,
@@ -102,6 +116,7 @@ func (d *DB) UpsertChapter(c Chapter) (int64, error) {
 			c.DownloadStatus,
 			RawTimestamp("CURRENT_TIMESTAMP"),
 			chapterReleasedAt(c.ReleasedAt),
+			chapterReleasedText(c.ReleasedText),
 		).ON_CONFLICT(Chapters.MangaID, Chapters.SourceChapterID).DO_UPDATE(
 			SET(
 				Chapters.Title.SET(Chapters.EXCLUDED.Title),
@@ -109,6 +124,7 @@ func (d *DB) UpsertChapter(c Chapter) (int64, error) {
 				Chapters.VolumeNum.SET(Chapters.EXCLUDED.VolumeNum),
 				Chapters.FetchedAt.SET(RawTimestamp("CURRENT_TIMESTAMP")),
 				Chapters.ReleasedAt.SET(chapterReleasedAt(c.ReleasedAt)),
+				Chapters.ReleasedText.SET(chapterReleasedText(c.ReleasedText)),
 			),
 		)
 	}

@@ -25,4 +25,5 @@ type Chapters struct {
 	FetchedAt       *time.Time
 	TotalPages      *int64
 	ReleasedAt      *time.Time
+	ReleasedText    *string
 }

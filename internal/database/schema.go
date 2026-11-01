@@ -58,6 +58,11 @@ const releasedAtMigration = 30
 // migration. Idempotent: test fixtures may pre-create the column.
 const addedAtMigration = 31
 
+// releasedTextMigration is the index for the chapters.released_text ALTER
+// TABLE migration (the source's own release wording when no moment known).
+// Idempotent: test fixtures may pre-create the column.
+const releasedTextMigration = 32
+
 // migrations is an ordered list of DDL statements applied in sequence.
 // Version is tracked via PRAGMA user_version; migrations[i] is applied when
 // user_version < len(migrations) so partial upgrades resume correctly.
@@ -222,4 +227,6 @@ var migrations = []string{
 	// added — created_at is "when we first cached the row" and a detail-page
 	// visit creates that, so it cannot answer "recently added".
 	`ALTER TABLE mangas ADD COLUMN added_at TIMESTAMP;`,
+	// Index 32: source's own release wording when no moment could be read
+	`ALTER TABLE chapters ADD COLUMN released_text TEXT;`,
 }

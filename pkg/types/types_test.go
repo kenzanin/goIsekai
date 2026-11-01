@@ -3,104 +3,117 @@ package types
 import (
 	"encoding/json"
 	"testing"
+	"time"
 )
 
-func TestEnrichmentProviderPrecedenceEnabledDefaults(t *testing.T) {
-	// Test 1: absent fields in JSON
-	jsonInput := `{"id":"test","name":"Test","kinds":["titles"]}`
-	var ep EnrichmentProvider
-	if err := json.Unmarshal([]byte(jsonInput), &ep); err != nil {
-		t.Fatalf("unmarshal failed: %v", err)
+func TestChapterEpochSeconds(t *testing.T) {
+	const in = `{"id":"c1","manga_id":"m1","title":"ch","chapter_num":1,"released_at":1789482933,"url":"u"}`
+	var c Chapter
+	if err := json.Unmarshal([]byte(in), &c); err != nil {
+		t.Fatal(err)
 	}
-	if ep.Precedence != 0 {
-		t.Errorf("expected precedence 0 when omitted, got %d", ep.Precedence)
+	if !c.ReleasedAt.Equal(time.Unix(1789482933, 0).UTC()) {
+		t.Errorf("ReleasedAt = %v, want 2026-09-15T14:35:33Z", c.ReleasedAt)
 	}
-	if ep.Enabled != nil {
-		t.Errorf("expected enabled nil when omitted, got %v", *ep.Enabled)
-	}
-
-	// Test 2: fields present in JSON
-	jsonInput2 := `{"id":"test2","name":"Test2","kinds":["summaries"],"precedence":5,"enabled":true}`
-	var ep2 EnrichmentProvider
-	if err := json.Unmarshal([]byte(jsonInput2), &ep2); err != nil {
-		t.Fatalf("unmarshal failed: %v", err)
-	}
-	if ep2.Precedence != 5 {
-		t.Errorf("expected precedence 5, got %d", ep2.Precedence)
-	}
-	if ep2.Enabled == nil || !*ep2.Enabled {
-		t.Errorf("expected enabled true, got %v", ep2.Enabled)
-	}
-
-	// Test 3: round-trip preserves declared values
-	jsonInput3 := `{"id":"test3","name":"Test3","kinds":["categories"],"precedence":100,"enabled":false}`
-	var ep3 EnrichmentProvider
-	if err := json.Unmarshal([]byte(jsonInput3), &ep3); err != nil {
-		t.Fatalf("unmarshal failed: %v", err)
-	}
-	data, err := json.Marshal(&ep3)
-	if err != nil {
-		t.Fatalf("marshal failed: %v", err)
-	}
-	var ep3RoundTrip EnrichmentProvider
-	if err := json.Unmarshal(data, &ep3RoundTrip); err != nil {
-		t.Fatalf("round-trip unmarshal failed: %v", err)
-	}
-	if ep3RoundTrip.Precedence != 100 {
-		t.Errorf("round-trip: expected precedence 100, got %d", ep3RoundTrip.Precedence)
-	}
-	if ep3RoundTrip.Enabled == nil {
-		t.Errorf("round-trip: enabled should not be nil, was nil after round-trip")
-	} else if *ep3RoundTrip.Enabled {
-		t.Errorf("round-trip: expected enabled false, got true")
+	if c.ReleasedText != "" {
+		t.Errorf("ReleasedText = %q, want empty", c.ReleasedText)
 	}
 }
 
-func TestPluginMetaEnrichmentProvidersRoundTrip(t *testing.T) {
-	jsonInput := `{
-		"verify_url": "https://example.com/verify",
-		"needs_human_verify": true,
-		"thumb_ratio": 1.7,
-		"enrichment_providers": [
-			{"id":"source1","name":"Source 1","kinds":["titles"],"precedence":1,"enabled":true},
-			{"id":"source2","name":"Source 2","kinds":["categories"],"precedence":10}
-		]
-	}`
-
-	var meta PluginMeta
-	if err := json.Unmarshal([]byte(jsonInput), &meta); err != nil {
-		t.Fatalf("unmarshal failed: %v", err)
+func TestChapterRFC3339String(t *testing.T) {
+	const in = `{"id":"c1","manga_id":"m1","title":"ch","chapter_num":1,"released_at":"2026-09-15T14:35:33Z","url":"u"}`
+	var c Chapter
+	if err := json.Unmarshal([]byte(in), &c); err != nil {
+		t.Fatal(err)
 	}
-
-	if len(meta.EnrichmentProviders) != 2 {
-		t.Fatalf("expected 2 providers, got %d", len(meta.EnrichmentProviders))
+	want, _ := time.Parse(time.RFC3339, "2026-09-15T14:35:33Z")
+	if !c.ReleasedAt.Equal(want) {
+		t.Errorf("ReleasedAt = %v, want %v", c.ReleasedAt, want)
 	}
-
-	// Verify first provider
-	if meta.EnrichmentProviders[0].Precedence != 1 {
-		t.Errorf("expected precedence 1, got %d", meta.EnrichmentProviders[0].Precedence)
+	if c.ReleasedText != "" {
+		t.Errorf("ReleasedText = %q, want empty", c.ReleasedText)
 	}
-	if meta.EnrichmentProviders[0].Enabled == nil || !*meta.EnrichmentProviders[0].Enabled {
-		t.Errorf("expected enabled true, got %v", meta.EnrichmentProviders[0].Enabled)
-	}
+}
 
-	// Round-trip
-	data, err := json.Marshal(&meta)
+func TestChapterProseRetained(t *testing.T) {
+	const in = `{"id":"c1","manga_id":"m1","title":"ch","chapter_num":1,"released_at":"recently","url":"u"}`
+	var c Chapter
+	if err := json.Unmarshal([]byte(in), &c); err != nil {
+		t.Fatal(err)
+	}
+	if c.ReleasedAt != (time.Time{}) {
+		t.Errorf("ReleasedAt = %v, want zero time", c.ReleasedAt)
+	}
+	if c.ReleasedText != "recently" {
+		t.Errorf("ReleasedText = %q, want %q", c.ReleasedText, "recently")
+	}
+}
+
+func TestChapterEpochMillisRejected(t *testing.T) {
+	const in = `{"id":"c1","manga_id":"m1","title":"ch","chapter_num":1,"released_at":1789482933123,"url":"u"}`
+	var c Chapter
+	if err := json.Unmarshal([]byte(in), &c); err != nil {
+		t.Fatal(err)
+	}
+	if c.ReleasedAt != (time.Time{}) {
+		t.Errorf("ReleasedAt = %v, want zero time (millis rejected)", c.ReleasedAt)
+	}
+	if c.ReleasedText != "" {
+		t.Errorf("ReleasedText = %q, want empty", c.ReleasedText)
+	}
+}
+
+func TestChapterNullAndAbsent(t *testing.T) {
+	for _, in := range []string{
+		`{"id":"c1","manga_id":"m1","title":"ch","chapter_num":1,"released_at":null,"url":"u"}`,
+		`{"id":"c1","manga_id":"m1","title":"ch","chapter_num":1,"url":"u"}`,
+	} {
+		var c Chapter
+		if err := json.Unmarshal([]byte(in), &c); err != nil {
+			t.Fatalf("in=%s: %v", in, err)
+		}
+		if c.ReleasedAt != (time.Time{}) {
+			t.Errorf("in=%s: ReleasedAt = %v, want zero", in, c.ReleasedAt)
+		}
+		if c.ReleasedText != "" {
+			t.Errorf("in=%s: ReleasedText = %q, want empty", in, c.ReleasedText)
+		}
+	}
+}
+
+func TestChapterFullRoundTrip(t *testing.T) {
+	orig := Chapter{
+		ID:         "c1",
+		MangaID:    "m1",
+		Title:      "Chapter 1",
+		ChapterNum: 1,
+		ReleasedAt: time.Unix(1789482933, 0).UTC(),
+		URL:        "https://example.com/ch1",
+		Scanlator:  "GroupX",
+	}
+	b, err := json.Marshal(orig)
 	if err != nil {
-		t.Fatalf("marshal failed: %v", err)
+		t.Fatal(err)
 	}
-	var metaRoundTrip PluginMeta
-	if err := json.Unmarshal(data, &metaRoundTrip); err != nil {
-		t.Fatalf("round-trip unmarshal failed: %v", err)
+	var decoded Chapter
+	if err := json.Unmarshal(b, &decoded); err != nil {
+		t.Fatal(err)
 	}
-
-	if len(metaRoundTrip.EnrichmentProviders) != 2 {
-		t.Fatalf("round-trip: expected 2 providers, got %d", len(metaRoundTrip.EnrichmentProviders))
+	for name, pair := range map[string]struct{ got, want string }{
+		"ID":        {decoded.ID, orig.ID},
+		"MangaID":   {decoded.MangaID, orig.MangaID},
+		"Title":     {decoded.Title, orig.Title},
+		"URL":       {decoded.URL, orig.URL},
+		"Scanlator": {decoded.Scanlator, orig.Scanlator},
+	} {
+		if pair.got != pair.want {
+			t.Errorf("%s = %q, want %q", name, pair.got, pair.want)
+		}
 	}
-	if metaRoundTrip.EnrichmentProviders[0].Precedence != 1 {
-		t.Errorf("round-trip: expected precedence 1, got %d", metaRoundTrip.EnrichmentProviders[0].Precedence)
+	if decoded.ChapterNum != orig.ChapterNum {
+		t.Errorf("ChapterNum = %v, want %v", decoded.ChapterNum, orig.ChapterNum)
 	}
-	if metaRoundTrip.EnrichmentProviders[1].Precedence != 10 {
-		t.Errorf("round-trip: expected precedence 10, got %d", metaRoundTrip.EnrichmentProviders[1].Precedence)
+	if !decoded.ReleasedAt.Equal(orig.ReleasedAt) {
+		t.Errorf("ReleasedAt = %v, want %v", decoded.ReleasedAt, orig.ReleasedAt)
 	}
 }

@@ -5,7 +5,12 @@
 // compatibility.
 package types
 
-import "time"
+import (
+	"encoding/json"
+	"log/slog"
+	"strings"
+	"time"
+)
 
 // Manga is a single manga series.
 type Manga struct {
@@ -36,12 +41,80 @@ type Chapter struct {
 	ChapterNum float64   `json:"chapter_num"`
 	VolumeNum  float64   `json:"volume_num,omitempty"`
 	ReleasedAt time.Time `json:"released_at"`
+	// ReleasedText holds the source's own release wording (e.g. "recently")
+	// when no moment could be read. Internal use only — output of JSON
+	// routing, plugins never send it.
+	ReleasedText string `json:"-"`
 	URL        string    `json:"url"`
 	// Scanlator is the scanlation group that produced the chapter, when the
 	// source names one (e.g. MangaDex's scanlation_group include). Optional;
 	// empty means the source did not supply a group. Additive and omitempty,
 	// so plugins that never set it are unaffected.
 	Scanlator string `json:"scanlator,omitempty"`
+}
+
+// ponytail: range guard checks t.Year() against 1970/2100; upgrade path: use named epoch-seconds constants if the boundary needs precision.
+func (c *Chapter) UnmarshalJSON(b []byte) error {
+	// Shadow struct: decode all normal fields, but capture released_at as raw
+	// so we can route on its JSON type (number vs string).
+	type chapterAlias Chapter // avoid recursive UnmarshalJSON
+	var shadow struct {
+		chapterAlias
+		ReleasedAt json.RawMessage `json:"released_at"`
+	}
+	if err := json.Unmarshal(b, &shadow); err != nil {
+		return err
+	}
+	*c = Chapter(shadow.chapterAlias)
+
+	raw := shadow.ReleasedAt
+	if len(raw) == 0 || string(raw) == "null" {
+		// Absent or null → zero time, empty text.
+		c.ReleasedAt = time.Time{}
+		c.ReleasedText = ""
+		return nil
+	}
+
+	// JSON number → epoch seconds (D1: seconds only; millis rejected by range guard).
+	if raw[0] == '0' || (raw[0] >= '1' && raw[0] <= '9') {
+		var n float64
+		if err := json.Unmarshal(raw, &n); err != nil {
+			return err
+		}
+		t := time.Unix(int64(n), 0).UTC()
+		// D4: values outside 1970..2100 are treated as no date, not a unit guess.
+		if t.Year() < 1970 || t.Year() > 2100 {
+			slog.Warn("released_at out of range, ignoring", "value", string(raw))
+			c.ReleasedAt = time.Time{}
+			c.ReleasedText = ""
+			return nil
+		}
+		c.ReleasedAt = t
+		c.ReleasedText = ""
+		return nil
+	}
+
+	// JSON string → try RFC 3339 first; otherwise retain as source wording (D3).
+	if raw[0] == '"' {
+		var s string
+		if err := json.Unmarshal(raw, &s); err != nil {
+			return err
+		}
+		if t, err := time.Parse(time.RFC3339, s); err == nil {
+			c.ReleasedAt = t
+			c.ReleasedText = ""
+		} else {
+			c.ReleasedAt = time.Time{}
+			c.ReleasedText = strings.TrimSpace(s)
+		}
+		return nil
+	}
+
+	// Unrecognized JSON type (bool, object, array) — no date, log warning.
+	slog.Warn("released_at unrecognized JSON type, ignoring", "value", string(raw))
+	c.ReleasedAt = time.Time{}
+	c.ReleasedText = ""
+	return nil
 }
 
 // Page is a single image page within a chapter. Headers holds optional

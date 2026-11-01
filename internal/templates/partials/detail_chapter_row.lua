@@ -69,20 +69,25 @@ return function(data)
 					.. " cached</span>"
 			end
 
-			-- Release date
+			-- Release date, else the source's own wording
+			local rawDate = ""
 			if c.ReleasedAt then
-				local rawDate = ""
 				if type(c.ReleasedAt) == "table" and c.ReleasedAt.Format then
 					rawDate = c.ReleasedAt:Format("2006-01-02T15:04:05")
 				elseif type(c.ReleasedAt) == "string" then
 					rawDate = c.ReleasedAt
 				end
-				if rawDate ~= "" and string.sub(rawDate, 1, 4) ~= "0001" then
-					rowHTML = rowHTML
-						.. '<span class="text-xs text-neutral-500">'
-						.. h(formatDate(rawDate))
-						.. "</span>"
-				end
+			end
+			if rawDate ~= "" and string.sub(rawDate, 1, 4) ~= "0001" then
+				rowHTML = rowHTML
+					.. '<span class="text-xs text-neutral-500">'
+					.. h(formatDate(rawDate))
+					.. "</span>"
+			elseif c.ReleasedText and c.ReleasedText ~= "" then
+				rowHTML = rowHTML
+					.. '<span class="text-xs text-neutral-500">'
+					.. h(c.ReleasedText)
+					.. "</span>"
 			end
 			rowHTML = rowHTML .. "</span></a>"
 

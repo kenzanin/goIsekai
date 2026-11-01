@@ -154,12 +154,13 @@ func (s *AppService) GetChapterList(pluginID, mangaID string) ([]types.Chapter, 
 			out := make([]types.Chapter, len(dc))
 			for i, c := range dc {
 				out[i] = types.Chapter{
-					ID:         c.SourceChapterID,
-					MangaID:    mangaID,
-					Title:      c.Title,
-					ChapterNum: c.ChapterNum,
-					VolumeNum:  c.VolumeNum,
-					ReleasedAt: c.ReleasedAt,
+					ID:           c.SourceChapterID,
+					MangaID:      mangaID,
+					Title:        c.Title,
+					ChapterNum:   c.ChapterNum,
+					VolumeNum:    c.VolumeNum,
+					ReleasedAt:   c.ReleasedAt,
+					ReleasedText: c.ReleasedText,
 				}
 			}
 			return out, nil

@@ -84,6 +84,7 @@ func chapterFromModel(m model.Chapters) Chapter {
 		DownloadStatus:  derefStr(m.DownloadStatus),
 		FetchedAt:       derefTime(m.FetchedAt),
 		ReleasedAt:      derefTime(m.ReleasedAt),
+		ReleasedText:    derefStr(m.ReleasedText),
 	}
 }
 
