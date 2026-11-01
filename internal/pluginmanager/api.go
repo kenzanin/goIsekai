@@ -25,22 +25,11 @@ func (m *Manager) call(p *loadedPlugin, fnName, inputJSON string) (string, error
 	if err := m.ensureLoaded(p.id); err != nil {
 		return "", err
 	}
-	if p.kind == "lua" {
-		return callLua(p, fnName, inputJSON)
+	e, err := engineFor(p.kind)
+	if err != nil {
+		return "", fmt.Errorf("plugin %s %s: %w", p.id, fnName, err)
 	}
-	if p.kind == "js" {
-		return callJS(p, fnName, inputJSON)
-	}
-	if p.kind == "go" {
-		return callGo(p, fnName, inputJSON)
-	}
-	if p.kind == "yaegi" {
-		return callYaegi(m, p, fnName, inputJSON)
-	}
-	if p.kind == "wasm" {
-		return m.callWasm(p, fnName, inputJSON)
-	}
-	return "", fmt.Errorf("plugin %s %s: unsupported kind %q", p.id, fnName, p.kind)
+	return e.call(m, p, fnName, inputJSON)
 }
 
 // Search runs a plugin's Search function and decodes its result.

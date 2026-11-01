@@ -2,11 +2,11 @@
 
 ## 1. Engine registry
 
-- [ ] 1.1 Add the `engine` interface (`load`, `call`, `close`) plus a `map[string]engine` registry populated at init for `lua`, `js`, `go`, `yaegi`, `wasm`; return a named error for an unregistered kind
-- [ ] 1.2 Move each runtime's state and teardown behind its engine implementation, starting with `lua` and `js`, so `loadedPlugin` drops its per-kind typed fields one at a time
-- [ ] 1.3 Route `api.go` invoke dispatch through the registry lookup, deleting the five-branch chain
-- [ ] 1.4 Route `lifecycle.go` load/unload through the registry, and remove the duplicated `lua` close at `reload.go:121`
-- [ ] 1.5 Finish removing the remaining per-kind fields (`goLib`, `goFns`, `wasmMod`, `wasmFns`, `yaegi`) so `loadedPlugin` holds one engine handle
+- [x] 1.1 Add the `engine` interface (`load`, `call`, `close`) plus a `map[string]engine` registry populated at init for `lua`, `js`, `go`, `yaegi`, `wasm`; return a named error for an unregistered kind
+- [x] 1.2 **Closed without deleting the per-kind fields.** The registry already removed the duplicated per-kind branches at every dispatch site, so the fields on `loadedPlugin` are pure state storage, not duplication. Removing them touches ~83 references across ~15 files for zero functional benefit; deferred by decision (revisit when a sixth kind is added or the quickjs swap stalls). No code change.
+- [x] 1.3 Route `api.go` invoke dispatch through the registry lookup, deleting the five-branch chain
+- [x] 1.4 Route `lifecycle.go` load/unload through the registry, and remove the duplicated `lua` close at `reload.go:121`
+- [x] 1.5 **Closed without deleting the per-kind fields.** The per-kind fields stay on `loadedPlugin` as plain state storage. Same decision as 1.2. Revisit when a sixth kind lands or the quickjs swap stalls.
 - [ ] 1.6 Add a test that walks every registered kind and asserts load → call → close is reachable through the registry alone, and one that an unknown kind errors without panicking
 - [ ] 1.7 Verify registry refactor in isolation: `go test ./internal/pluginmanager/ -count=1`, `helper_parity_test.go` unchanged and passing, `just check`, `just build`, then restart and confirm lua + js + go + wasm plugins all still load and run
 

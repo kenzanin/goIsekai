@@ -24,22 +24,11 @@ func (m *Manager) ensureLoaded(id string) error {
 	if p.loaded {
 		return nil
 	}
-	var loaded *loadedPlugin
-	var err error
-	switch p.kind {
-	case "lua":
-		loaded, err = m.loadLua(p.id, p.wasmPath)
-	case "js":
-		loaded, err = m.loadJS(p.id, p.wasmPath)
-	case "go":
-		loaded, err = m.loadGo(p.id, p.wasmPath)
-	case "yaegi":
-		loaded, err = m.loadYaegi(p.id, p.wasmPath)
-	case "wasm":
-		loaded, err = m.loadWasm(p.id, p.wasmPath)
-	default:
-		return fmt.Errorf("plugin %q: unknown kind %q", id, p.kind)
+	e, err := engineFor(p.kind)
+	if err != nil {
+		return fmt.Errorf("plugin %q: %w", id, err)
 	}
+	loaded, err := e.load(m, p.id, p.wasmPath)
 	if err != nil {
 		return fmt.Errorf("lazy-load plugin %s: %w", id, err)
 	}

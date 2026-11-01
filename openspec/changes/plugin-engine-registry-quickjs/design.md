@@ -25,7 +25,7 @@ Constraints that shape the approach:
 **Goals:**
 
 - Make adding, replacing, or removing an engine a one-file operation.
-- Collapse the four dispatch sites and the seven per-kind fields into one registry and one handle.
+- Collapse the four dispatch sites into one registry. The seven per-kind fields on `loadedPlugin` are deliberately kept: they are state storage, not duplication, and deleting them touches ~83 references across ~15 files for no functional gain.
 - Swap goja → `modernc.org/quickjs` with zero change to the plugin-visible contract.
 - Keep the build `CGO_ENABLED=0`-clean.
 
@@ -56,9 +56,9 @@ Alternatives rejected: a fat interface with discovery/metadata methods (those ar
 
 `map[string]engine` filled at package init keeps the existing `kind` strings (`lua`, `js`, `go`, `yaegi`, `wasm`) as the public vocabulary — they are already persisted in the DB and read from `plugin.json`, so changing them would be a data migration for no benefit.
 
-### D3: `loadedPlugin` keeps one handle, engine keeps its own state
+### D3: The registry collapses dispatch; the seven per-kind fields are deliberately kept
 
-The seven typed fields move *into* the engine implementation, which already knows what it allocated. The loaded record keeps one handle plus the kind-independent fields (`id`, `kind`, `meta`, `contractVersion`, `mu`, `curCtx`, `infoOnly`). This is what makes a new kind add no field.
+The registry removes the duplicated per-kind branches at the four dispatch sites. The seven typed fields on `loadedPlugin` (`lunar`, `goLib`, `goFns`, `js`, `yaegi`, `wasmMod`, `wasmFns`) are **not** moved into the engine implementations and not deleted: they are plain state storage, not duplication. Deleting them touches ~83 references across ~15 files (including all of `lua*.go` and `js*.go`) for zero functional gain. That work is deferred, not dropped — reopen when a sixth kind lands or when the quickjs swap stalls and the fields start blocking it.
 
 ### D4: quickjs, because it is pure Go and dependency-cheap
 

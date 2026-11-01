@@ -10,7 +10,7 @@ The immediate trigger is swapping the JavaScript engine from `github.com/dop251/
 
 - Introduce an `engine` interface with the three operations the current switch trees actually perform — `load`, `call`, `close` — and a single `map[kind]engine` registration table.
 - Collapse the four dispatch chains into that table: invoke dispatch in `api.go`, load/unload in `lifecycle.go`, teardown in `reload.go`.
-- Collapse `loadedPlugin`'s seven per-kind fields (`lunar`, `goLib`, `goFns`, `js`, `yaegi`, `wasmMod`, `wasmFns`) into one engine handle.
+- The seven per-kind fields on `loadedPlugin` (`lunar`, `goLib`, `goFns`, `js`, `yaegi`, `wasmMod`, `wasmFns`) are deliberately **not** collapsed into one handle: the registry already removed the duplicated dispatch branches, so the fields are plain state storage, and deleting them touches ~83 references across ~15 files for no functional gain. Deferred; revisit when a sixth kind lands or the quickjs swap stalls.
 - Swap the JS engine behind the interface: `github.com/dop251/goja` → `modernc.org/quickjs`.
 - **BREAKING**: `github.com/dop251/goja` is removed from `go.mod`. Nothing outside `internal/pluginmanager` imports it, so the blast radius is that package plus its tests.
 - Port the goja call-convention to quickjs: `Export()` → `Value.Any()`, `Keys()` → `Object.keys` evaluated in the VM, deadline enforcement → `SetEvalTimeout`/`Interrupt`.

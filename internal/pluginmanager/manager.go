@@ -5,8 +5,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/dop251/goja"
 	lunar "github.com/mmcdole/lunar"
+	"modernc.org/quickjs"
 	"github.com/tetratelabs/wazero"
 	"github.com/tetratelabs/wazero/api"
 
@@ -33,8 +33,8 @@ type loadedPlugin struct {
 	goLib *nativeLib
 	// goFns caches resolved ABI symbols for go-kind plugins.
 	goFns map[string]any
-	// js holds the goja VM for js-kind plugins.
-	js *goja.Runtime
+	// js holds the quickjs VM for js-kind plugins.
+	js *quickjs.VM
 	// yaegi holds the Yaegi interpreter for yaegi-kind plugins.
 	yaegi *yaegiPlugin
 	// wasmMod is the instantiated wazero module for wasm-kind plugins.
@@ -50,7 +50,7 @@ type loadedPlugin struct {
 	// source ABI and is excluded from the manga-source plugin list.
 	infoOnly bool
 	// mu serializes invocations: concurrent calls to the same plugin must not interleave.
-	// It also guards curCtx: the JS runtime's goja natives receive no context, so
+	// It also guards curCtx: the JS runtime's quickjs natives receive no context, so
 	// callJS publishes the invoke ctx here for them to read.
 	mu sync.Mutex
 	// curCtx is the in-flight invocation's context, set by callJS while mu is

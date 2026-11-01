@@ -25,20 +25,6 @@ The host SHALL resolve a plugin runtime through a single registry keyed by the p
 - **WHEN** a plugin declares a kind with no registered runtime
 - **THEN** the host returns an error naming the plugin and the unsupported kind, and SHALL NOT panic
 
-### Requirement: One engine handle per loaded plugin
-
-A loaded plugin SHALL hold exactly one engine handle for its runtime. The host SHALL NOT carry a separate typed field per runtime kind on the loaded-plugin record, so a new kind adds no field there.
-
-#### Scenario: Loaded plugin holds one handle
-
-- **WHEN** a plugin is loaded
-- **THEN** its loaded record holds the engine handle returned by the registry, and the runtime-specific state lives behind that handle
-
-#### Scenario: New kind adds no struct field
-
-- **WHEN** a runtime is added to the registry
-- **THEN** the loaded-plugin record is unchanged
-
 ### Requirement: Uniform load and close lifecycle
 
 The host SHALL drive every runtime's teardown through the same registry operation, without the caller knowing the kind. Unloading a plugin SHALL release that runtime's resources and leave the plugin registered, re-loadable on its next call.

@@ -24,17 +24,8 @@ func (m *Manager) UnloadPlugin(id string) error {
 	if !p.loaded {
 		return nil
 	}
-	if p.kind == "lua" && p.lunar != nil {
-		_ = p.lunar.Close()
-	}
-	if p.kind == "js" && p.js != nil {
-		p.js.Interrupt("unloading")
-	}
-	if p.kind == "wasm" && p.wasmMod != nil {
-		_ = p.wasmMod.Close(m.ctx)
-	}
-	if p.kind == "go" && p.goLib != nil {
-		_ = p.goLib.close()
+	if e, err := engineFor(p.kind); err == nil {
+		_ = e.close(m, p)
 	}
 	p.lunar = nil
 	p.js = nil
@@ -118,8 +109,8 @@ func (m *Manager) Close() error {
 		if !p.loaded {
 			continue
 		}
-		if p.kind == "lua" && p.lunar != nil {
-			_ = p.lunar.Close()
+		if e, err := engineFor(p.kind); err == nil {
+			_ = e.close(m, p)
 		}
 	}
 	// runtimeMu, not mu: the wasm runtime is created under runtimeMu by
