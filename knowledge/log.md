@@ -1,3 +1,13 @@
+## 2026-11-01
+* **Update**: Linked `host-genre-source-of-truth.md` to `detail-page-read-genre-readerprefs-fixes.md` (Genre tags are rendered on the detail page; that finding covers the detail-page genre-tag behaviour this canonical vocabulary now feeds.).
+* **Update**: Linked `host-date-source-of-truth.md` to `0150-live-plugins-date-info-status.md` (That audit records what the 41 live plugins currently send for released_at; this decision sets the wire format those plugins must move to (epoch seconds), which is the follow-up the audit feeds.).
+* **Creation**: Documented concept `host-genre-source-of-truth.md` (Host owns one canonical genre vocabulary; the [genre] alias map is gone).
+* **Creation**: Documented concept `host-date-source-of-truth.md` (Host owns the chapter date format: epoch seconds or verbatim prose, never a layout guess).
+* **Update**: Linked `plugin-engine-registry-goja-to-quickjs.md` to `plugin-runtime-export-matrix.md` (That matrix records the per-runtime ABI and host-helper surface; this decision changes how those runtimes are registered and dispatched, and would add quickjs as the JS entry in place of goja.).
+* **Update**: Linked `library-grid-pagination-missing-props.md` to `library-view-url-is-source-of-truth.md` (Both are library-grid UI behaviour driven by the request URL: this finding records why the page controls disappeared, while that concept records the rule that the URL (not localStorage) is the source of truth for which filters and page the grid renders.).
+* **Creation**: Documented concept `plugin-engine-registry-goja-to-quickjs.md` (Replace goja with quickjs behind an engine registry).
+* **Creation**: Documented concept `library-grid-pagination-missing-props.md` (Library grid had no pagination: the view never passed Page/TotalPages to the toolbar partial).
+
 ## 2026-10-31
 * **Creation**: Documented concept `bugs/cover-button-fetch-detail.md` (Cover button on detail page silently triggers GetMangaDetail).
 * **Creation**: Documented concept `bugs/cover-button-fetch-detail.md` (Cover button triggers silent GetMangaDetail via enrichment fetch).

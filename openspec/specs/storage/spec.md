@@ -14,7 +14,7 @@ The system SHALL store manga in a `mangas` table with an integer primary key `id
 - **THEN** it persists `plugin_id`, `source_manga_id`, and `title` such that re-importing the same source manga does not create a duplicate row
 
 ### Requirement: Chapter persistence
-The system SHALL store chapters in a `chapters` table with an integer surrogate `id` primary key, an integer `manga_id` referencing the manga row, `source_chapter_id`, `title`, numeric `chapter_num`, optional `volume_num`, `is_read`, `last_page_read`, and a `download_status` field defaulting to `NOT_DOWNLOADED`. A unique constraint SHALL hold on `(manga_id, source_chapter_id)` and an index SHALL exist on `manga_id` so chapter lists are index lookups rather than scans.
+The system SHALL store chapters in a `chapters` table with an integer surrogate `id` primary key, an integer `manga_id` referencing the manga row, `source_chapter_id`, `title`, numeric `chapter_num`, optional `volume_num`, `is_read`, `last_page_read`, and a `download_status` field defaulting to `NOT_DOWNLOADED`. A unique constraint SHALL hold on `(manga_id, source_chapter_id)` and an index SHALL exist on `manga_id` so chapter lists are index lookups rather than scans. The table SHALL also carry `released_text` for the source's own release wording when the source supplied no usable moment, so the chapter row can show that wording verbatim; `released_at` SHALL remain NULL in that case, and both SHALL be empty for a source that reports nothing.
 
 #### Scenario: Record chapter read progress
 - **WHEN** the reader advances to a page within a chapter
@@ -27,6 +27,10 @@ The system SHALL store chapters in a `chapters` table with an integer surrogate 
 #### Scenario: Re-syncing does not duplicate chapters
 - **WHEN** the same chapter is persisted twice for the same manga
 - **THEN** the unique constraint on `(manga_id, source_chapter_id)` updates the existing row instead of inserting a duplicate
+
+#### Scenario: Release wording survives persistence
+- **WHEN** a chapter's source reports a release value the host cannot read as a moment
+- **THEN** the wording is stored in `released_text` and `released_at` stays NULL
 
 ### Requirement: Download status tracking
 The system SHALL track a chapter's download lifecycle using `download_status` values `NOT_DOWNLOADED`, `DOWNLOADING`, and `DOWNLOADED`.
