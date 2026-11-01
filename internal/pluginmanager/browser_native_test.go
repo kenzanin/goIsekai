@@ -3,7 +3,7 @@ package pluginmanager
 import (
 	"testing"
 
-	"github.com/dop251/goja"
+	"modernc.org/quickjs"
 
 	"goisekai/internal/hostnet"
 )
@@ -34,18 +34,23 @@ func TestLuaBrowserEvaluateDisabled(t *testing.T) {
 }
 
 // TestJSBrowserFetchDisabled verifies host.browser.fetch returns null when
-// CDP is off.
+// CDP is off. A JS null crosses into Go as a nil any.
 func TestJSBrowserFetchDisabled(t *testing.T) {
-	vm := goja.New()
+	vm, err := quickjs.NewVM()
+	if err != nil {
+		t.Fatalf("NewVM: %v", err)
+	}
+	defer func() { _ = vm.Close() }()
+
 	mgr := NewManager(hostnet.NewProxy(), t.TempDir())
 	if err := registerJSHostNatives(vm, mgr, "test"); err != nil {
 		t.Fatalf("registerJSHostNatives: %v", err)
 	}
-	v, err := vm.RunString(`host.browser.fetch("https://example.com/")`)
+	v, err := vm.Eval(`host.browser.fetch("https://example.com/")`, quickjs.EvalGlobal)
 	if err != nil {
 		t.Fatalf("run: %v", err)
 	}
-	if !v.SameAs(goja.Null()) {
+	if v != nil {
 		t.Fatalf("expected null, got %v", v)
 	}
 }
@@ -53,16 +58,21 @@ func TestJSBrowserFetchDisabled(t *testing.T) {
 // TestJSBrowserEvaluateDisabled verifies host.browser.evaluate returns null
 // when CDP is off.
 func TestJSBrowserEvaluateDisabled(t *testing.T) {
-	vm := goja.New()
+	vm, err := quickjs.NewVM()
+	if err != nil {
+		t.Fatalf("NewVM: %v", err)
+	}
+	defer func() { _ = vm.Close() }()
+
 	mgr := NewManager(hostnet.NewProxy(), t.TempDir())
 	if err := registerJSHostNatives(vm, mgr, "test"); err != nil {
 		t.Fatalf("registerJSHostNatives: %v", err)
 	}
-	v, err := vm.RunString(`host.browser.evaluate("https://example.com/", "() => document.title")`)
+	v, err := vm.Eval(`host.browser.evaluate("https://example.com/", "() => document.title")`, quickjs.EvalGlobal)
 	if err != nil {
 		t.Fatalf("run: %v", err)
 	}
-	if !v.SameAs(goja.Null()) {
+	if v != nil {
 		t.Fatalf("expected null, got %v", v)
 	}
 }

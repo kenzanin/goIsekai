@@ -43,13 +43,47 @@ func TestHostRegexReplaceFunction(t *testing.T) {
 		}
 	})
 
-	wantJSString(t, runJS(t, `
+	wantJSString(t, jsValString(runJS(t, `
 		host.regex.replace("slice-of-life", "([A-Za-z])([\\w']*)", function(a, b) {
 			return a.toUpperCase() + b;
 		});
-	`).String(), "Slice-Of-Life")
+	`)), "Slice-Of-Life")
 
-	wantJSString(t, runJS(t, `
+	wantJSString(t, jsValString(runJS(t, `
 		host.regex.replace("a1b2", "\\d", function(m) { return "[" + m + "]"; });
-	`).String(), "a[1]b[2]")
+	`)), "a[1]b[2]")
+}
+
+// TestHostRegexReplaceFunctionErrors pins the error path of host.regex.replace
+// in JS. A callback that throws must surface to the host call as an error that
+// carries the thrown message, with no partial output. A bad pattern must fail
+// the same way in both forms, and the wrapper must keep working after a throw.
+func TestHostRegexReplaceFunctionErrors(t *testing.T) {
+	_, err := runJSString(t, `
+		host.regex.replace("a1", "\\d", function(m) { throw new Error("boom"); });
+	`)
+	if err == nil {
+		t.Fatal("a throwing replacer should fail the host call")
+	}
+	if !strings.Contains(err.Error(), "boom") {
+		t.Fatalf("thrown message missing from error: %v", err)
+	}
+
+	for _, call := range []string{
+		`host.regex.replace("a1", "(", "x")`,
+		`host.regex.replace("a1", "(", function() { return "x"; })`,
+	} {
+		if _, err := runJSString(t, call); err == nil || !strings.Contains(err.Error(), "error parsing regexp") {
+			t.Fatalf("%s: expected a regexp parse error, got %v", call, err)
+		}
+	}
+
+	// Same VM: a throw is caught, then a normal replace still works.
+	wantJSString(t, jsValString(runJS(t, `
+		var caught;
+		try {
+			host.regex.replace("a1", "\\d", function() { throw new Error("boom"); });
+		} catch (e) { caught = e.message; }
+		caught + "|" + host.regex.replace("a1b2", "\\d", function(m) { return "[" + m + "]"; });
+	`)), "boom|a[1]b[2]")
 }

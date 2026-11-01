@@ -6,7 +6,7 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/dop251/goja"
+	"modernc.org/quickjs"
 )
 
 // captureSlog records every slog record so a test can assert on level and
@@ -61,10 +61,15 @@ func setSlogCapture(t *testing.T) *captureSlog {
 func TestJSConsoleRoutesLevelsAndJoinsArgs(t *testing.T) {
 	c := setSlogCapture(t)
 
-	vm := goja.New()
+	vm, err := quickjs.NewVM()
+	if err != nil {
+		t.Fatalf("NewVM: %v", err)
+	}
+	defer func() { _ = vm.Close() }()
+
 	// The real injection site is loadJS; this mirrors it.
-	if err := vm.Set("console", newJSConsole("jsconsole-test")); err != nil {
-		t.Fatalf("set console: %v", err)
+	if err := registerJSConsole(vm, "jsconsole-test"); err != nil {
+		t.Fatalf("registerJSConsole: %v", err)
 	}
 
 	cases := []struct {
@@ -79,7 +84,7 @@ func TestJSConsoleRoutesLevelsAndJoinsArgs(t *testing.T) {
 		{`console.debug("tick")`, slog.LevelDebug, "tick"},
 	}
 	for _, tc := range cases {
-		if _, err := vm.RunString(tc.call); err != nil {
+		if _, err := vm.Eval(tc.call, quickjs.EvalGlobal); err != nil {
 			t.Fatalf("%s: %v", tc.call, err)
 		}
 	}
@@ -108,13 +113,21 @@ func TestJSConsoleRoutesLevelsAndJoinsArgs(t *testing.T) {
 // The object exposes exactly the five familiar lowercase names. A Go struct
 // here would have mapped methods by exported name and left console.log missing.
 func TestJSConsoleExposesLowercaseNames(t *testing.T) {
-	console := newJSConsole("jsconsole-names")
-	for _, name := range []string{"log", "info", "warn", "error", "debug"} {
-		if _, ok := console[name]; !ok {
-			t.Errorf("console is missing %q", name)
-		}
+	vm, err := quickjs.NewVM()
+	if err != nil {
+		t.Fatalf("NewVM: %v", err)
 	}
-	if len(console) != 5 {
-		t.Fatalf("console has %d members, want 5", len(console))
+	defer func() { _ = vm.Close() }()
+
+	if err := registerJSConsole(vm, "jsconsole-names"); err != nil {
+		t.Fatalf("registerJSConsole: %v", err)
+	}
+
+	val, err := vm.Eval("Object.keys(console).length", quickjs.EvalGlobal)
+	if err != nil {
+		t.Fatalf("eval: %v", err)
+	}
+	if n, ok := val.(int); !ok || n != 5 {
+		t.Fatalf("console has %v members, want 5", val)
 	}
 }

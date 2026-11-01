@@ -115,38 +115,53 @@ func RegexReplace(subject, pattern, repl string) (string, error) {
 // pattern that does not compile, or an error from fn, aborts with no partial
 // result.
 func RegexReplaceFunc(subject, pattern string, fn func(captures []string) (string, error)) (string, error) {
-	re, err := regexCompile(pattern)
+	gaps, captures, err := RegexSplitMatches(subject, pattern)
 	if err != nil {
 		return "", err
 	}
-	matches := re.FindAllStringSubmatchIndex(subject, -1)
-	if len(matches) == 0 {
-		return subject, nil
-	}
-	groups := re.NumSubexp()
 	var out strings.Builder
 	out.Grow(len(subject))
-	last := 0
-	for _, match := range matches {
-		out.WriteString(subject[last:match[0]])
-		captures := make([]string, groups)
-		if groups == 0 {
-			captures = append(captures, subject[match[0]:match[1]])
-		}
-		for i := range groups {
-			if start, end := match[2*i+2], match[2*i+3]; start >= 0 {
-				captures[i] = subject[start:end]
-			}
-		}
-		replacement, err := fn(captures)
+	for i, caps := range captures {
+		out.WriteString(gaps[i])
+		replacement, err := fn(caps)
 		if err != nil {
 			return "", err
 		}
 		out.WriteString(replacement)
+	}
+	out.WriteString(gaps[len(gaps)-1])
+	return out.String(), nil
+}
+
+// RegexSplitMatches cuts subject at its matches. gaps has one more entry than
+// captures: gaps[i] is the text before match i, the last gap is the tail, and
+// captures[i] holds that match's captures, or the whole match when the pattern
+// has none. Substituting each captures list between the gaps rebuilds what
+// RegexReplaceFunc returns, so a runtime that cannot call back into Go can do
+// the loop itself.
+func RegexSplitMatches(subject, pattern string) (gaps []string, captures [][]string, err error) {
+	re, err := regexCompile(pattern)
+	if err != nil {
+		return nil, nil, err
+	}
+	groups := re.NumSubexp()
+	last := 0
+	for _, match := range re.FindAllStringSubmatchIndex(subject, -1) {
+		gaps = append(gaps, subject[last:match[0]])
+		caps := make([]string, groups)
+		if groups == 0 {
+			caps = append(caps, subject[match[0]:match[1]])
+		}
+		for i := range groups {
+			if start, end := match[2*i+2], match[2*i+3]; start >= 0 {
+				caps[i] = subject[start:end]
+			}
+		}
+		captures = append(captures, caps)
 		last = match[1]
 	}
-	out.WriteString(subject[last:])
-	return out.String(), nil
+	gaps = append(gaps, subject[last:])
+	return gaps, captures, nil
 }
 
 // RegexFindIndex mirrors Lua's string.find for a regular expression: the 1-based

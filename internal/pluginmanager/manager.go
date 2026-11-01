@@ -6,9 +6,9 @@ import (
 	"time"
 
 	lunar "github.com/mmcdole/lunar"
-	"modernc.org/quickjs"
 	"github.com/tetratelabs/wazero"
 	"github.com/tetratelabs/wazero/api"
+	"modernc.org/quickjs"
 
 	"goisekai/internal/database"
 	"goisekai/internal/enrich"
@@ -50,7 +50,7 @@ type loadedPlugin struct {
 	// source ABI and is excluded from the manga-source plugin list.
 	infoOnly bool
 	// mu serializes invocations: concurrent calls to the same plugin must not interleave.
-	// It also guards curCtx: the JS runtime's quickjs natives receive no context, so
+	// It also guards curCtx: the JS runtime's natives receive no context, so
 	// callJS publishes the invoke ctx here for them to read.
 	mu sync.Mutex
 	// curCtx is the in-flight invocation's context, set by callJS while mu is
@@ -120,7 +120,7 @@ type Manager struct {
 }
 
 // invokeCtx returns the context of the in-flight invocation for plugin id, or
-// context.Background() when none is running. JS natives run inside the goja VM
+// context.Background() when none is running. JS natives run inside the quickjs VM
 // and receive no ctx from the runtime, so they read the ctx published by
 // callJS here; without it a blocking host call (HTTP fetch, CDP solve) outlives
 // the invoke deadline.

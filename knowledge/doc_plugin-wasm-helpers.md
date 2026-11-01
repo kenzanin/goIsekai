@@ -33,6 +33,8 @@ url_encode, url_decode, html_decode, strip_html, strip_markdown, titlecase, norm
 
 base64, base64url, hex encode/decode; sha256_hex, md5_hex, hmac_sha256_hex, xor, vrf_sign, aes_gcm_decrypt, substitute_cipher.
 
+`substitute_cipher(data, material, direction)` uses hex tokens in every runtime (Lua, JS, yaegi, wasm): `"encrypt"` returns lowercase hex of the cipher bytes, and `"decrypt"` takes hex and returns the plaintext string. Non-hex decrypt input is an error. Raw cipher bytes are not valid UTF-8 and would be corrupted by the quickjs string boundary, which is why the token is hex.
+
 ## host.regex (IMPORTANT shape)
 
 - regex.find: first match captures (string if one, array if several), or null.

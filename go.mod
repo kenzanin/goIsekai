@@ -11,7 +11,6 @@ require (
 	github.com/bogdanfinn/fhttp v0.6.8
 	github.com/bogdanfinn/tls-client v1.15.1
 	github.com/coregx/coregex v0.12.25
-	github.com/dop251/goja v0.0.0-20260901132549-43234fa61381
 	github.com/ebitengine/purego v0.10.1
 	github.com/gen2brain/avif v0.6.0
 	github.com/gen2brain/jxl v0.2.0
@@ -21,13 +20,13 @@ require (
 	github.com/go-rod/rod v0.116.2
 	github.com/goccy/go-json v0.10.6
 	github.com/gomarkdown/markdown v0.0.0-20260917010721-cc30ffac3c05
-	github.com/mappu/miqt v0.15.0
 	github.com/mmcdole/lunar v0.1.1
 	github.com/tetratelabs/wazero v1.12.0
 	github.com/traefik/yaegi v0.16.1
 	goisekai/pkg/types v0.0.0
 	golang.org/x/net v0.58.0
 	gopkg.in/ini.v1 v1.67.3
+	modernc.org/quickjs v0.27.0
 	modernc.org/sqlite v1.57.0
 )
 
@@ -42,12 +41,9 @@ require (
 	github.com/bogdanfinn/websocket v1.5.5-barnius // indirect
 	github.com/coregx/ahocorasick v0.3.1 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
-	github.com/dlclark/regexp2/v2 v2.5.2 // indirect
 	github.com/dustin/go-humanize v1.1.0 // indirect
-	github.com/go-sourcemap/sourcemap v2.1.3+incompatible // indirect
 	github.com/godbus/dbus/v5 v5.1.0 // indirect
 	github.com/golang/groupcache v0.0.0-20210331224755-41bb18bfe9da // indirect
-	github.com/google/pprof v0.0.0-20260802141513-ef3492d7dac3 // indirect
 	github.com/google/uuid v1.6.0 // indirect
 	github.com/klauspost/compress v1.18.3 // indirect
 	github.com/lib/pq v1.12.3 // indirect
@@ -71,5 +67,4 @@ require (
 	modernc.org/libquickjs v0.14.0 // indirect
 	modernc.org/mathutil v1.7.1 // indirect
 	modernc.org/memory v1.12.1 // indirect
-	modernc.org/quickjs v0.27.0 // indirect
 )

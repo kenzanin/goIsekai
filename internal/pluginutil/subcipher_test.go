@@ -1,6 +1,7 @@
 package pluginutil
 
 import (
+	"encoding/hex"
 	"encoding/json"
 	"strings"
 	"testing"
@@ -62,6 +63,12 @@ func TestSubstituteCipherRoundTrip(t *testing.T) {
 		if err != nil {
 			t.Fatalf("encrypt %q: %v", plain, err)
 		}
+		if enc != strings.ToLower(enc) || len(enc) != 2*len(plain) {
+			t.Fatalf("encrypt output %q is not lowercase hex of %d bytes", enc, len(plain))
+		}
+		if _, err := hex.DecodeString(enc); err != nil {
+			t.Fatalf("encrypt output %q is not hex: %v", enc, err)
+		}
 		dec, err := SubstituteCipher(enc, material, "decrypt")
 		if err != nil {
 			t.Fatalf("decrypt %q: %v", enc, err)
@@ -104,8 +111,8 @@ func TestSubstituteCipherFollowsTheDocumentedRecurrence(t *testing.T) {
 		want[i] = byte(int(b) ^ []int{0xf0, 0x0f}[i%2] ^ prev)
 		prev = int(want[i])
 	}
-	if got != string(want) {
-		t.Errorf("recurrence mismatch\n got: %x\nwant: %x", got, want)
+	if got != hex.EncodeToString(want) {
+		t.Errorf("recurrence mismatch\n got: %s\nwant: %x", got, want)
 	}
 }
 
@@ -182,6 +189,12 @@ func TestSubstituteCipherRejectsBadInput(t *testing.T) {
 			!strings.Contains(err.Error(), "direction") {
 			t.Errorf("direction %q: want a direction error, got %v", dir, err)
 		}
+	}
+	// The token is hex, so a plaintext-looking or non-hex token must fail
+	// rather than decrypt to garbage.
+	if _, err := SubstituteCipher("not-hex!", material, "decrypt"); err == nil ||
+		!strings.Contains(err.Error(), "must be hex") {
+		t.Errorf("non-hex decrypt input: want a hex error, got %v", err)
 	}
 }
 

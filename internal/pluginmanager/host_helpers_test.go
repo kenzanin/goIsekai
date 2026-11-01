@@ -12,9 +12,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/dop251/goja"
-
 	lua "github.com/mmcdole/lunar"
+	"modernc.org/quickjs"
 
 	"goisekai/internal/hostnet"
 	"goisekai/pkg/types"
@@ -62,7 +61,12 @@ func TestLuaNormalizeStatusForms(t *testing.T) {
 
 // TestJSNormalizeStatusForms mirrors the Lua coverage for the JS runtime.
 func TestJSNormalizeStatusForms(t *testing.T) {
-	vm := goja.New()
+	vm, err := quickjs.NewVM()
+	if err != nil {
+		t.Fatalf("NewVM: %v", err)
+	}
+	defer func() { _ = vm.Close() }()
+
 	mgr := NewManager(hostnet.NewProxy(), t.TempDir())
 	if err := registerJSHostNatives(vm, mgr, "norms"); err != nil {
 		t.Fatalf("registerJSHostNatives: %v", err)
@@ -76,8 +80,8 @@ func TestJSNormalizeStatusForms(t *testing.T) {
 		assert(host.text.normalize_status("Weird Status") === "");
 		assert(host.text.normalize_status("Upcoming") === "Upcoming");
 	`
-	if _, err := vm.RunString(chunk); err != nil {
-		t.Fatalf("host.text helpers in goja: %v", err)
+	if _, err := vm.Eval(chunk, quickjs.EvalGlobal); err != nil {
+		t.Fatalf("host.text helpers in JS: %v", err)
 	}
 }
 
@@ -96,12 +100,17 @@ func TestHostTextNormalizeTitle(t *testing.T) {
 		assert(host.text.normalize_title("  Extra   spaces  ") === host.text.normalize_title("Extra spaces"));
 	`
 	if err := func() error {
-		vm := goja.New()
+		vm, err := quickjs.NewVM()
+		if err != nil {
+			return err
+		}
+		defer func() { _ = vm.Close() }()
+
 		mgr := NewManager(hostnet.NewProxy(), t.TempDir())
 		if err := registerJSHostNatives(vm, mgr, "test"); err != nil {
 			return err
 		}
-		_, err := vm.RunString(chunk)
+		_, err = vm.Eval(chunk, quickjs.EvalGlobal)
 		return err
 	}(); err != nil {
 		t.Fatalf("host.text.normalize_title in JS: %v", err)
@@ -196,7 +205,7 @@ func luaString(t *testing.T, chunk string) string {
 
 func jsString(t *testing.T, chunk string) string {
 	t.Helper()
-	return runJS(t, chunk).String()
+	return jsValString(runJS(t, chunk))
 }
 
 // luaHTMLLookups and jsHTMLLookups run the same eight lookups over the same
@@ -294,14 +303,19 @@ func TestHostHTMLSameCallTextInLuaAndJS(t *testing.T) {
 }
 
 // runJSString runs a chunk that is expected to fail and returns the error.
-func runJSString(t *testing.T, chunk string) (goja.Value, error) {
+func runJSString(t *testing.T, chunk string) (any, error) {
 	t.Helper()
-	vm := goja.New()
+	vm, err := quickjs.NewVM()
+	if err != nil {
+		t.Fatalf("NewVM: %v", err)
+	}
+	t.Cleanup(func() { _ = vm.Close() })
+
 	mgr := NewManager(hostnet.NewProxy(), t.TempDir())
 	if err := registerJSHostNatives(vm, mgr, "calltext"); err != nil {
 		t.Fatalf("registerJSHostNatives: %v", err)
 	}
-	return vm.RunString(chunk)
+	return vm.Eval(chunk, quickjs.EvalGlobal)
 }
 
 // TestHostHTMLErrorTextIdentical is 6.2: the same invalid selector and the same

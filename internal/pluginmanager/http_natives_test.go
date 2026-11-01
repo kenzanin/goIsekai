@@ -125,7 +125,7 @@ function get_page_list(a) return "[]" end`
 }
 
 // TestJSInvokeDeadlineCancelsBlockingFetch pins that a JS plugin's invoke ctx
-// reaches the proxy. goja's Interrupt only fires between JS statements, so a
+// reaches the proxy. quickjs's Interrupt only fires between JS statements, so a
 // host.http call already blocking inside the native is not interrupted by it;
 // without the ctx published by callJS the invoke would sit on the hanging
 // upstream for the full client timeout instead of dying at the plugin deadline.
@@ -175,7 +175,7 @@ function getPageList(a) { return "[]"; }`
 	_, err := mgr.GetMangaDetail("jshost", "m1")
 	elapsed := time.Since(start)
 	// The invoke must not outlive its deadline. Only the ctx tears down the
-	// native's blocking fetch — goja's Interrupt cannot abort a Go native mid
+	// native's blocking fetch — quickjs's Interrupt cannot abort a Go native mid
 	// call — so without it this would block for the handler's 8 s bound instead
 	// of returning at the 1 s deadline. The Interrupt fires first and surfaces
 	// the invoke as a timeout error, which is the expected outcome here.
@@ -184,6 +184,55 @@ function getPageList(a) { return "[]"; }`
 	}
 	if elapsed > 5*time.Second {
 		t.Fatalf("invoke took %v; the JS invoke deadline did not cancel the blocking fetch", elapsed)
+	}
+}
+
+// TestJSNonTerminatingInvokeTimesOut pins that a JS invoke spinning forever is
+// cut at the plugin deadline with a timeout error, and that the next call on
+// the same plugin still runs (the VM is reusable after an interrupt).
+func TestJSNonTerminatingInvokeTimesOut(t *testing.T) {
+	dir := t.TempDir()
+	if err := copyDir("testdata/jshost", filepath.Join(dir, "jshost")); err != nil {
+		t.Fatal(err)
+	}
+	pluginCode := `var PLUGIN = { contract_version: 1, name: "JS spin test" };
+
+function getMangaDetail(a) {
+	if (a.indexOf("spin") >= 0) { while (true) {} }
+	return JSON.stringify({id: "H1", title: "payload", description: "ok"});
+}
+function searchManga(a) { return "[]"; }
+function getChapterList(a) { return "[]"; }
+function getPageList(a) { return "[]"; }`
+	if err := os.WriteFile(filepath.Join(dir, "jshost", "main.js"), []byte(pluginCode), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "jshost", "plugin.json"),
+		[]byte(`{"contract_version":1,"timeout":1}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	mgr := NewManager(hostnet.NewProxy(), dir)
+	if err := mgr.Discover(); err != nil {
+		t.Fatalf("Discover: %v", err)
+	}
+	defer func() { _ = mgr.Close() }()
+
+	start := time.Now()
+	_, err := mgr.GetMangaDetail("jshost", "spin")
+	if err == nil || !strings.Contains(err.Error(), "timeout") {
+		t.Fatalf("spinning invoke err = %v, want a timeout error", err)
+	}
+	if elapsed := time.Since(start); elapsed > 5*time.Second {
+		t.Fatalf("spinning invoke took %v; the deadline did not interrupt it", elapsed)
+	}
+
+	d, err := mgr.GetMangaDetail("jshost", "m1")
+	if err != nil {
+		t.Fatalf("call after timeout: %v", err)
+	}
+	if d.Title != "payload" {
+		t.Fatalf("call after timeout: unexpected detail %+v", d)
 	}
 }
 

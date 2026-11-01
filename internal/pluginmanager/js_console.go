@@ -3,30 +3,22 @@ package pluginmanager
 import (
 	"context"
 	"fmt"
-	"strings"
 	"time"
 
-	"github.com/goccy/go-json"
-
-	"github.com/dop251/goja"
-
 	"goisekai/internal/logger"
+	"modernc.org/quickjs"
 )
 
-// callJS invokes a JS function on a goja-based plugin. The ABI contract is
+// callJS invokes a JS function on a quickjs-based plugin. The ABI contract is
 // identical to Lua: the function receives a single JSON string argument and
-// must return a JSON string (or an object that goja will serialize).
+// must return a JSON string (or an object that quickjs will serialize).
 func callJS(p *loadedPlugin, fnName, inputJSON string) (string, error) {
 	if _, ok := jsFnNames[fnName]; !ok {
 		return "", fmt.Errorf("js plugin %s: no js mapping for %s", p.id, fnName)
 	}
-	jsName, ok := resolveJSFn(p.id, p.js, fnName)
+	jsName, ok := resolveJSFn(p.js, p.id, fnName)
 	if !ok {
 		return "", fmt.Errorf("js plugin %s: %s is not a function", p.id, jsFnNames[fnName])
-	}
-	fn := p.js.Get(jsName)
-	if fn == nil || goja.IsUndefined(fn) {
-		return "", fmt.Errorf("js plugin %s: %s is not a function", p.id, jsName)
 	}
 
 	budget := p.invokeDeadline()
@@ -35,92 +27,98 @@ func callJS(p *loadedPlugin, fnName, inputJSON string) (string, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), budget)
 	defer cancel()
 
-	// Timeout via Interrupt. A stale interrupt on an idle VM persists into the
-	// next call, so always ClearInterrupt after the call completes. The interrupt
-	// aborts JS between statements; ctx carries the same deadline and tears down
-	// host calls (an HTTP fetch, a CDP solve) already blocking inside a native,
-	// which goja cannot interrupt. The interrupt must not watch ctx.Done():
-	// cancel() runs on return, after ClearInterrupt, so a select on Done() can
-	// fire late and leave a stale interrupt for the next call.
-	stop := make(chan struct{})
-	go func() {
-		select {
-		case <-time.After(p.invokeDeadline()):
-			p.js.Interrupt("timeout")
-		case <-stop:
-		}
-	}()
+	// The eval timeout bounds the JS evaluation itself. The interrupt handler
+	// is re-armed on every Eval/Call by quickjs, so a per-call SetEvalTimeout
+	// here is sufficient: when the budget expires, the next JS checkpoint
+	// aborts the evaluation with "InternalError: interrupted".
+	if err := p.js.SetEvalTimeout(budget); err != nil {
+		return "", fmt.Errorf("js plugin %s %s: %w", p.id, fnName, err)
+	}
 
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	p.curCtx = ctx
 	defer func() { p.curCtx = nil }()
 
-	callable, ok := goja.AssertFunction(fn)
-	if !ok {
-		close(stop)
-		return "", fmt.Errorf("js plugin %s %s: not callable", p.id, jsName)
-	}
-
-	v, err := callable(goja.Undefined(), p.js.ToValue(inputJSON))
-	close(stop)
-	p.js.ClearInterrupt()
+	// Call the global function by name; quickjs evaluates the name reference
+	// and invokes it with the single JSON string argument.
+	v, err := p.js.CallValue(jsName, inputJSON)
+	elapsed := time.Since(start)
 	if err != nil {
-		logger.Debug("plugin invoke fail", "plugin", p.id, "fn", fnName, "elapsed", time.Since(start).String(), "error", err)
+		logger.Debug("plugin invoke fail", "plugin", p.id, "fn", fnName, "elapsed", elapsed.String(), "error", err)
+		// quickjs reports its Interrupt as "InternalError: interrupted", which
+		// says nothing about why. When the invoke deadline is what fired, label
+		// it a timeout; the original error stays in the chain. Any other JS
+		// exception passes through unchanged. The elapsed check covers the race
+		// where quickjs's interrupt fires before the ctx timer has marked Err.
+		if ctx.Err() == context.DeadlineExceeded || elapsed >= budget {
+			return "", fmt.Errorf("js plugin %s %s: timeout after %s: %w", p.id, jsName, budget, err)
+		}
 		return "", fmt.Errorf("js plugin %s %s: %w", p.id, jsName, err)
 	}
-	if goja.IsUndefined(v) || goja.IsNull(v) {
-		return "", fmt.Errorf("js plugin %s %s: returned nil", p.id, jsName)
+	if v.IsUndefined() {
+		return "", fmt.Errorf("js plugin %s %s: returned nil", p.id, fnName)
 	}
+
+	// Convert the result to a Go value.
+	out, err := v.Any()
+	if err != nil {
+		return "", fmt.Errorf("js plugin %s %s: convert result: %w", p.id, jsName, err)
+	}
+
 	// If it's already a string, return directly.
-	if s, ok := v.Export().(string); ok {
-		logger.Debug("plugin invoke done", "plugin", p.id, "fn", fnName, "elapsed", time.Since(start).String(), "bytes", len(s))
+	if s, ok := out.(string); ok {
+		logger.Debug("plugin invoke done", "plugin", p.id, "fn", fnName, "elapsed", elapsed.String(), "bytes", len(s))
 		return s, nil
 	}
+
 	// Otherwise marshal to JSON.
-	raw, err := json.Marshal(v.Export())
-	if err != nil {
-		logger.Debug("plugin invoke fail", "plugin", p.id, "fn", fnName, "elapsed", time.Since(start).String(), "error", err)
-		return "", fmt.Errorf("js plugin %s %s: marshal result: %w", p.id, jsName, err)
+	switch r := out.(type) {
+	case *quickjs.Object:
+		raw, err := jsonMarshalAny(r)
+		if err != nil {
+			logger.Debug("plugin invoke fail", "plugin", p.id, "fn", fnName, "elapsed", elapsed.String(), "error", err)
+			return "", fmt.Errorf("js plugin %s %s: marshal result: %w", p.id, jsName, err)
+		}
+		logger.Debug("plugin invoke done", "plugin", p.id, "fn", fnName, "elapsed", elapsed.String(), "bytes", len(raw))
+		return string(raw), nil
+	default:
+		raw, err := jsonMarshalAny(out)
+		if err != nil {
+			logger.Debug("plugin invoke fail", "plugin", p.id, "fn", fnName, "elapsed", elapsed.String(), "error", err)
+			return "", fmt.Errorf("js plugin %s %s: marshal result: %w", p.id, jsName, err)
+		}
+		logger.Debug("plugin invoke done", "plugin", p.id, "fn", fnName, "elapsed", elapsed.String(), "bytes", len(raw))
+		return string(raw), nil
 	}
-	logger.Debug("plugin invoke done", "plugin", p.id, "fn", fnName, "elapsed", time.Since(start).String(), "bytes", len(raw))
-	return string(raw), nil
 }
 
-// newJSConsole builds the `console` global as a plain JS object with the
-// lowercase names a JS author expects. Handing goja a Go struct instead leaves
-// it mapping methods by their exported name, so only `console.Log` would
-// resolve while the familiar `console.log(...)` would not exist at all.
-// Arguments are joined with a space, the way console.log formats them.
-func newJSConsole(id string) map[string]any {
-	emit := func(level string, args []goja.Value) {
-		parts := make([]string, len(args))
-		for i, a := range args {
-			parts[i] = fmt.Sprint(a.Export())
+// jsonMarshalAny is a thin wrapper to keep the call site readable.
+func jsonMarshalAny(v any) ([]byte, error) {
+	switch r := v.(type) {
+	case *quickjs.Object:
+		// Object implements MarshalJSON.
+		type jsonMarshallable interface {
+			MarshalJSON() ([]byte, error)
 		}
-		msg := strings.Join(parts, " ")
-		switch level {
-		case "debug":
-			logger.Debug("plugin="+id, "msg", msg)
-		case "warn":
-			logger.Warn("plugin="+id, "msg", msg)
-		case "error":
-			logger.Error("plugin="+id, "msg", msg)
-		default:
-			logger.Info("plugin="+id, "msg", msg)
+		//nolint:staticcheck // Object implements json.Marshaler
+		if jm, ok := any(r).(jsonMarshallable); ok {
+			return jm.MarshalJSON()
 		}
 	}
-	fn := func(level string) func(goja.FunctionCall) goja.Value {
-		return func(call goja.FunctionCall) goja.Value {
-			emit(level, call.Arguments)
-			return goja.Undefined()
-		}
+	// Fallback: use encoding/json for Go primitives.
+	return jsonMarshal(v)
+}
+
+// ponytail: keep the encoding/json import here; jsonMarshal is defined in
+// js_json.go as a plain json.Marshal wrapper. Upgrade path: drop jsonMarshal
+// and use json.Marshal directly when the indirection is no longer needed.
+func jsonMarshal(v any) ([]byte, error) {
+	// Reuse the existing jsonEncodeValue path: it already handles nil,
+	// primitives, maps, slices and *quickjs.Object via JSON.stringify.
+	out, err := jsonEncodeValue(v)
+	if err != nil {
+		return nil, err
 	}
-	return map[string]any{
-		"log":   fn("info"),
-		"info":  fn("info"),
-		"warn":  fn("warn"),
-		"error": fn("error"),
-		"debug": fn("debug"),
-	}
+	return []byte(out), nil
 }

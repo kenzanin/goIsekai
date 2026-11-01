@@ -3,107 +3,138 @@ package pluginmanager
 import (
 	"errors"
 
-	"github.com/dop251/goja"
 	"goisekai/internal/htmldoc"
+	"modernc.org/quickjs"
 )
 
-// jsHTMLParse wraps host.html.parse for the goja runtime: a markup string
-// becomes a document handle. On failure it throws, the JS native convention.
-func jsHTMLParse(vm *goja.Runtime) func(goja.FunctionCall) goja.Value {
-	return func(call goja.FunctionCall) goja.Value {
-		s, ok := call.Argument(0).Export().(string)
+// jsHTMLParse wraps host.html.parse for the quickjs runtime: a markup string
+// becomes a numeric document handle. On failure it throws, the JS native
+// convention.
+func jsHTMLParse(vm *quickjs.VM, reg *jsHTMLHandleRegistry) quickjs.HostFunc {
+	return func(args []any) (any, error) {
+		if len(args) == 0 {
+			return nil, errors.New(htmlParseArgErr)
+		}
+		s, ok := args[0].(string)
 		if !ok {
-			panic(vm.NewGoError(errors.New(htmlParseArgErr)))
+			return nil, errors.New(htmlParseArgErr)
 		}
 		doc, err := htmldoc.Parse(s)
 		if err != nil {
-			panic(vm.NewGoError(err))
+			return nil, err
 		}
-		handle := &jsHTMLOpaqueHandle{doc: doc}
-		return vm.ToValue(handle)
+		return reg.newHandle(doc), nil
 	}
 }
 
-// jsHTMLFindText wraps host.html.find_text for the goja runtime.
-func jsHTMLFindText(vm *goja.Runtime) func(goja.FunctionCall) goja.Value {
-	return func(call goja.FunctionCall) goja.Value {
-		handle, ok := call.Argument(0).Export().(*jsHTMLOpaqueHandle)
-		if !ok {
-			panic(vm.NewGoError(errors.New("host.html.find_text: argument 0 must be a document handle")))
+// jsHTMLFindText wraps host.html.find_text for the quickjs runtime.
+func jsHTMLFindText(vm *quickjs.VM, reg *jsHTMLHandleRegistry) quickjs.HostFunc {
+	return func(args []any) (any, error) {
+		if len(args) < 2 {
+			return nil, errors.New("host.html.find_text: missing arguments")
 		}
-		selector, ok := call.Argument(1).Export().(string)
+		handleID, ok := args[0].(int)
 		if !ok {
-			panic(vm.NewGoError(errors.New("host.html.find_text: argument 1 must be a string")))
+			return nil, errors.New("host.html.find_text: argument 0 must be a document handle")
 		}
-		text, err := handle.doc.FindText(selector)
+		selector, ok := args[1].(string)
+		if !ok {
+			return nil, errors.New("host.html.find_text: argument 1 must be a string")
+		}
+		doc, err := reg.getHandle(handleID)
 		if err != nil {
-			panic(vm.NewGoError(err))
+			return nil, err
 		}
-		return vm.ToValue(text)
+		text, err := doc.FindText(selector)
+		if err != nil {
+			return nil, err
+		}
+		return text, nil
 	}
 }
 
-// jsHTMLFindAttr wraps host.html.find_attr for the goja runtime.
-func jsHTMLFindAttr(vm *goja.Runtime) func(goja.FunctionCall) goja.Value {
-	return func(call goja.FunctionCall) goja.Value {
-		handle, ok := call.Argument(0).Export().(*jsHTMLOpaqueHandle)
-		if !ok {
-			panic(vm.NewGoError(errors.New("host.html.find_attr: argument 0 must be a document handle")))
+// jsHTMLFindAttr wraps host.html.find_attr for the quickjs runtime.
+func jsHTMLFindAttr(vm *quickjs.VM, reg *jsHTMLHandleRegistry) quickjs.HostFunc {
+	return func(args []any) (any, error) {
+		if len(args) < 3 {
+			return nil, errors.New("host.html.find_attr: missing arguments")
 		}
-		selector, ok := call.Argument(1).Export().(string)
+		handleID, ok := args[0].(int)
 		if !ok {
-			panic(vm.NewGoError(errors.New("host.html.find_attr: argument 1 must be a string")))
+			return nil, errors.New("host.html.find_attr: argument 0 must be a document handle")
 		}
-		attr, ok := call.Argument(2).Export().(string)
+		selector, ok := args[1].(string)
 		if !ok {
-			panic(vm.NewGoError(errors.New("host.html.find_attr: argument 2 must be a string")))
+			return nil, errors.New("host.html.find_attr: argument 1 must be a string")
 		}
-		val, err := handle.doc.FindAttr(selector, attr)
+		attr, ok := args[2].(string)
+		if !ok {
+			return nil, errors.New("host.html.find_attr: argument 2 must be a string")
+		}
+		doc, err := reg.getHandle(handleID)
 		if err != nil {
-			panic(vm.NewGoError(err))
+			return nil, err
 		}
-		return vm.ToValue(val)
+		val, err := doc.FindAttr(selector, attr)
+		if err != nil {
+			return nil, err
+		}
+		return val, nil
 	}
 }
 
-// jsHTMLFindListText wraps host.html.find_list_text for the goja runtime.
-func jsHTMLFindListText(vm *goja.Runtime) func(goja.FunctionCall) goja.Value {
-	return func(call goja.FunctionCall) goja.Value {
-		handle, ok := call.Argument(0).Export().(*jsHTMLOpaqueHandle)
-		if !ok {
-			panic(vm.NewGoError(errors.New("host.html.find_list_text: argument 0 must be a document handle")))
+// jsHTMLFindListText wraps host.html.find_list_text for the quickjs runtime.
+func jsHTMLFindListText(vm *quickjs.VM, reg *jsHTMLHandleRegistry) quickjs.HostFunc {
+	return func(args []any) (any, error) {
+		if len(args) < 2 {
+			return nil, errors.New("host.html.find_list_text: missing arguments")
 		}
-		selector, ok := call.Argument(1).Export().(string)
+		handleID, ok := args[0].(int)
 		if !ok {
-			panic(vm.NewGoError(errors.New("host.html.find_list_text: argument 1 must be a string")))
+			return nil, errors.New("host.html.find_list_text: argument 0 must be a document handle")
 		}
-		texts, err := handle.doc.FindListText(selector)
+		selector, ok := args[1].(string)
+		if !ok {
+			return nil, errors.New("host.html.find_list_text: argument 1 must be a string")
+		}
+		doc, err := reg.getHandle(handleID)
 		if err != nil {
-			panic(vm.NewGoError(err))
+			return nil, err
 		}
-		return vm.ToValue(texts)
+		texts, err := doc.FindListText(selector)
+		if err != nil {
+			return nil, err
+		}
+		return texts, nil
 	}
 }
 
-// jsHTMLFindListAttr wraps host.html.find_list_attr for the goja runtime.
-func jsHTMLFindListAttr(vm *goja.Runtime) func(goja.FunctionCall) goja.Value {
-	return func(call goja.FunctionCall) goja.Value {
-		handle, ok := call.Argument(0).Export().(*jsHTMLOpaqueHandle)
-		if !ok {
-			panic(vm.NewGoError(errors.New("host.html.find_list_attr: argument 0 must be a document handle")))
+// jsHTMLFindListAttr wraps host.html.find_list_attr for the quickjs runtime.
+func jsHTMLFindListAttr(vm *quickjs.VM, reg *jsHTMLHandleRegistry) quickjs.HostFunc {
+	return func(args []any) (any, error) {
+		if len(args) < 3 {
+			return nil, errors.New("host.html.find_list_attr: missing arguments")
 		}
-		selector, ok := call.Argument(1).Export().(string)
+		handleID, ok := args[0].(int)
 		if !ok {
-			panic(vm.NewGoError(errors.New("host.html.find_list_attr: argument 1 must be a string")))
+			return nil, errors.New("host.html.find_list_attr: argument 0 must be a document handle")
 		}
-		attr, ok := call.Argument(2).Export().(string)
+		selector, ok := args[1].(string)
 		if !ok {
-			panic(vm.NewGoError(errors.New("host.html.find_list_attr: argument 2 must be a string")))
+			return nil, errors.New("host.html.find_list_attr: argument 1 must be a string")
 		}
-		vals, err := handle.doc.FindListAttr(selector, attr)
+		attr, ok := args[2].(string)
+		if !ok {
+			return nil, errors.New("host.html.find_list_attr: argument 2 must be a string")
+		}
+		doc, err := reg.getHandle(handleID)
 		if err != nil {
-			panic(vm.NewGoError(err))
+			return nil, err
 		}
-		return vm.ToValue(vals)
+		vals, err := doc.FindListAttr(selector, attr)
+		if err != nil {
+			return nil, err
+		}
+		return vals, nil
 	}
 }

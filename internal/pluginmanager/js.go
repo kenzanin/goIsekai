@@ -9,7 +9,7 @@ import (
 	"goisekai/internal/logger"
 	"goisekai/pkg/types"
 
-	"github.com/dop251/goja"
+	"modernc.org/quickjs"
 )
 
 // jsFnNames maps host ABI function names to the JS global names a JS plugin
@@ -34,7 +34,7 @@ var jsLegacyNames = map[string]string{
 
 // resolveJSFn returns the first name for fnName that is a function on the VM,
 // preferring the canonical name.
-func resolveJSFn(id string, vm *goja.Runtime, fnName string) (string, bool) {
+func resolveJSFn(vm *quickjs.VM, id, fnName string) (string, bool) {
 	candidates := []string{}
 	if n, ok := jsFnNames[fnName]; ok {
 		candidates = append(candidates, n)
@@ -43,120 +43,99 @@ func resolveJSFn(id string, vm *goja.Runtime, fnName string) (string, bool) {
 		candidates = append(candidates, n)
 	}
 	for _, name := range candidates {
-		val := vm.Get(name)
-		if val == nil || goja.IsUndefined(val) {
+		val, err := vm.Eval("typeof "+name+" === 'function' ? 1 : 0", quickjs.EvalGlobal)
+		if err != nil {
 			continue
 		}
-		if name != jsFnNames[fnName] {
-			logger.Warn("plugin uses a legacy ABI name", "plugin", id, "fn", fnName, "legacy", name, "use", jsFnNames[fnName])
+		if n, ok := val.(int); ok && n == 1 {
+			if name != jsFnNames[fnName] {
+				logger.Warn("plugin uses a legacy ABI name", "plugin", id, "fn", fnName, "legacy", name, "use", jsFnNames[fnName])
+			}
+			return name, true
 		}
-		return name, true
 	}
 	return "", false
 }
 
-// loadJS creates a sandboxed JavaScript VM via goja, loads <dir>/main.js,
+// loadJS creates a sandboxed JavaScript VM via quickjs, loads <dir>/main.js,
 // verifies the ABI exports, and returns a ready-to-call loadedPlugin. Metadata
 // comes from plugin.json, not from the VM.
 func (m *Manager) loadJS(id, dir string) (*loadedPlugin, error) {
-	vm := goja.New()
+	vm, err := quickjs.NewVM()
+	if err != nil {
+		return nil, fmt.Errorf("js plugin %s: new vm: %w", id, err)
+	}
 
 	// The plugin's own params must be readable BEFORE its code runs: a plugin
 	// that builds a URL at load time reads them at the top level.
 	m.loadParams(id, dir)
 
 	// Sandboxing: no fs, os, net, http, process, require, setTimeout globals.
-	// Only expose: console (debug/info/warn/error), JSON, and the log table.
-	_ = vm.Set("console", newJSConsole(id))
+	// quickjs ships none of them; only what we register is reachable.
+	if err := vm.StdAddHelpers(); err != nil {
+		_ = vm.Close()
+		return nil, fmt.Errorf("js plugin %s: std helpers: %w", id, err)
+	}
 
 	// Register the log table (same shape as Lua's log global).
-	logObj := vm.NewObject()
-	if err := logObj.Set("debug", func(call goja.FunctionCall) goja.Value {
-		if len(call.Arguments) > 0 {
-			logger.Debug("plugin="+id, "msg", fmt.Sprintf("%v", call.Arguments[0]))
-		}
-		return goja.Undefined()
-	}); err != nil {
-		return nil, fmt.Errorf("js plugin %s: set log.debug: %w", id, err)
-	}
-	if err := logObj.Set("info", func(call goja.FunctionCall) goja.Value {
-		if len(call.Arguments) > 0 {
-			logger.Info("plugin="+id, "msg", fmt.Sprintf("%v", call.Arguments[0]))
-		}
-		return goja.Undefined()
-	}); err != nil {
-		return nil, fmt.Errorf("js plugin %s: set log.info: %w", id, err)
-	}
-	if err := logObj.Set("warn", func(call goja.FunctionCall) goja.Value {
-		if len(call.Arguments) > 0 {
-			logger.Warn("plugin="+id, "msg", fmt.Sprintf("%v", call.Arguments[0]))
-		}
-		return goja.Undefined()
-	}); err != nil {
-		return nil, fmt.Errorf("js plugin %s: set log.warn: %w", id, err)
-	}
-	if err := logObj.Set("error", func(call goja.FunctionCall) goja.Value {
-		if len(call.Arguments) > 0 {
-			logger.Error("plugin="+id, "msg", fmt.Sprintf("%v", call.Arguments[0]))
-		}
-		return goja.Undefined()
-	}); err != nil {
-		return nil, fmt.Errorf("js plugin %s: set log.error: %w", id, err)
-	}
-	if err := vm.Set("log", logObj); err != nil {
+	if err := registerJSLog(vm, id); err != nil {
+		_ = vm.Close()
 		return nil, fmt.Errorf("js plugin %s: set log global: %w", id, err)
 	}
 
 	// Register http_request — delegates to the hostnet proxy (same path as
-	// WASM and Lua). Reads a JSON arg {"url","method","headers","body"},
-	// returns JSON {"status","headers","body"}.
-	if err := vm.Set("http_request", func(call goja.FunctionCall) goja.Value {
-		input := call.Arguments[0].String()
+	// WASM and Lua). Reads a JSON string arg, returns a JSON string result.
+	if err := vm.RegisterHostFunc("http_request", func(args []any) (any, error) {
+		input, _ := args[0].(string)
 		result, err := m.proxy.HandleRequestContext(m.invokeCtx(id), id, input)
 		if err != nil {
-			return vm.ToValue(map[string]any{"status": 0, "body": err.Error()})
+			return fmt.Sprintf(`{"status":0,"body":%q}`, err.Error()), nil
 		}
-		return vm.ToValue(result)
+		return result, nil
 	}); err != nil {
-		return nil, fmt.Errorf("js plugin %s: set http_request: %w", id, err)
+		_ = vm.Close()
+		return nil, fmt.Errorf("js plugin %s: register http_request: %w", id, err)
 	}
 
 	// Register host.* helpers (text/codecs/crypto/http) — same surface as the Lua runtime.
 	if err := registerJSHostNatives(vm, m, id); err != nil {
+		_ = vm.Close()
 		return nil, fmt.Errorf("js plugin %s: set host helpers: %w", id, err)
 	}
 
 	// Register a sandboxed require() that only loads sibling .js files from
 	// the plugin folder. No node_modules, no parent traversal.
-	if err := vm.Set("require", func(call goja.FunctionCall) goja.Value {
-		modulePath := call.Arguments[0].String()
+	if err := vm.RegisterHostFunc("require", func(args []any) (any, error) {
+		modulePath, _ := args[0].(string)
 		if strings.Contains(modulePath, "..") || strings.HasPrefix(modulePath, "/") {
-			panic(vm.NewGoError(fmt.Errorf("require: path %q not allowed", modulePath)))
+			return nil, fmt.Errorf("require: path %q not allowed", modulePath)
 		}
-		// Resolve relative to plugin dir.
 		resolved := filepath.Join(dir, modulePath)
 		if !strings.HasSuffix(resolved, ".js") {
 			resolved += ".js"
 		}
 		data, err := os.ReadFile(resolved)
 		if err != nil {
-			panic(vm.NewGoError(fmt.Errorf("require %q: %w", modulePath, err)))
+			return nil, fmt.Errorf("require %q: %w", modulePath, err)
 		}
-		v, err := vm.RunString(string(data))
+		out, err := vm.Eval(string(data), quickjs.EvalGlobal)
 		if err != nil {
-			panic(vm.NewGoError(fmt.Errorf("require %q: %w", modulePath, err)))
+			return nil, fmt.Errorf("require %q: %w", modulePath, err)
 		}
-		return v
+		return out, nil
 	}); err != nil {
-		return nil, fmt.Errorf("js plugin %s: set require: %w", id, err)
+		_ = vm.Close()
+		return nil, fmt.Errorf("js plugin %s: register require: %w", id, err)
 	}
 
 	// Load main.js.
 	src, err := os.ReadFile(filepath.Join(dir, "main.js"))
 	if err != nil {
+		_ = vm.Close()
 		return nil, fmt.Errorf("js plugin %s: read main.js: %w", id, err)
 	}
-	if _, err := vm.RunString(string(src)); err != nil {
+	if _, err := vm.Eval(string(src), quickjs.EvalGlobal); err != nil {
+		_ = vm.Close()
 		return nil, fmt.Errorf("js plugin %s: run main.js: %w", id, err)
 	}
 
@@ -165,6 +144,7 @@ func (m *Manager) loadJS(id, dir string) (*loadedPlugin, error) {
 	// just to be listed with its name and logo.
 	meta, err := pluginMetaFor(id, "js", dir)
 	if err != nil {
+		_ = vm.Close()
 		return nil, err
 	}
 	contractVer := meta.ContractVersion
@@ -178,7 +158,8 @@ func (m *Manager) loadJS(id, dir string) (*loadedPlugin, error) {
 		if abi == types.GetGenresFunc {
 			continue
 		}
-		if _, ok := resolveJSFn(id, vm, abi); !ok {
+		if _, ok := resolveJSFn(vm, id, abi); !ok {
+			_ = vm.Close()
 			return nil, fmt.Errorf("js plugin %s: missing function %s (abi: %s)", id, jsFnNames[abi], abi)
 		}
 	}
@@ -195,3 +176,55 @@ func (m *Manager) loadJS(id, dir string) (*loadedPlugin, error) {
 		meta:            meta,
 	}, nil
 }
+
+// registerJSLog registers the log global (same shape as Lua's log table).
+func registerJSLog(vm *quickjs.VM, id string) error {
+	logFn := func(level string) quickjs.HostFunc {
+		return func(args []any) (any, error) {
+			if len(args) > 0 {
+				msg := fmt.Sprintf("%v", args[0])
+				switch level {
+				case "debug":
+					logger.Debug("plugin="+id, "msg", msg)
+				case "info":
+					logger.Info("plugin="+id, "msg", msg)
+				case "warn":
+					logger.Warn("plugin="+id, "msg", msg)
+				case "error":
+					logger.Error("plugin="+id, "msg", msg)
+				}
+			}
+			return quickjs.Undefined{}, nil
+		}
+	}
+
+	// RegisterHostFunc can only define a function on the global object, and
+	// SetProperty's `any` path marshals its value, which a function cannot
+	// survive. So each level lands on a temporary global, and the log table is
+	// assembled and the temporaries dropped in one JS snippet.
+	for _, lv := range []string{"debug", "info", "warn", "error"} {
+		if err := vm.RegisterHostFunc(tmpLogFnName(lv), logFn(lv)); err != nil {
+			return fmt.Errorf("register log.%s: %w", lv, err)
+		}
+	}
+	_, err := vm.Eval(`
+		globalThis.log = {
+			debug: globalThis.__pm_log_debug,
+			info: globalThis.__pm_log_info,
+			warn: globalThis.__pm_log_warn,
+			error: globalThis.__pm_log_error,
+		};
+		delete globalThis.__pm_log_debug;
+		delete globalThis.__pm_log_info;
+		delete globalThis.__pm_log_warn;
+		delete globalThis.__pm_log_error;
+	`, quickjs.EvalGlobal)
+	if err != nil {
+		return fmt.Errorf("build log global: %w", err)
+	}
+	return nil
+}
+
+// tmpLogFnName is the scratch global registerJSLog uses before folding the
+// function into the log table.
+func tmpLogFnName(level string) string { return "__pm_log_" + level }

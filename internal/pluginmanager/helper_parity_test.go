@@ -2,14 +2,16 @@ package pluginmanager
 
 import (
 	"context"
+	"encoding/json"
+	"fmt"
 	"reflect"
 	"slices"
 	"sort"
 	"strings"
 	"testing"
 
-	"github.com/dop251/goja"
 	lua "github.com/mmcdole/lunar"
+	"modernc.org/quickjs"
 
 	"goisekai/internal/hostnet"
 )
@@ -388,45 +390,49 @@ func splitNamespace(name string) string {
 func TestJSHostHelperParity(t *testing.T) {
 	names := luaHostHelpers(t)
 
-	vm := goja.New()
-	if err := vm.Set("console", newJSConsole("parity")); err != nil {
+	vm, err := quickjs.NewVM()
+	if err != nil {
+		t.Fatalf("NewVM: %v", err)
+	}
+	defer func() { _ = vm.Close() }()
+
+	if err := registerJSConsole(vm, "parity"); err != nil {
 		t.Fatalf("set console: %v", err)
 	}
 	if err := registerJSHostNatives(vm, NewManager(hostnet.NewProxy(), t.TempDir()), "parity"); err != nil {
 		t.Fatalf("registerJSHostNatives: %v", err)
 	}
-	hostVal := vm.Get("host")
-	if hostVal == nil || goja.IsUndefined(hostVal) {
-		t.Fatal("JS runtime did not install a host object")
-	}
-	host := hostVal.ToObject(vm)
 
-	var missing []string
+	// The probe runs inside the VM. quickjs offers no Go-side view of a JS
+	// object's properties, so the runtime itself answers which names are
+	// missing. Same set, same gap rules, same messages as before.
+	var probes []string
 	for _, fn := range names {
 		if _, gap := wasmHelperGaps[fn]; gap {
 			continue
 		}
 		if renamed, ok := jsHelperRenames[fn]; ok {
 			// console.debug/info/warn/error — see newJSConsole.
-			con := vm.Get("console")
-			if con == nil || goja.IsUndefined(con) {
-				missing = append(missing, fn+" (no console global)")
-				continue
-			}
-			if v := con.ToObject(vm).Get(renamed); v == nil || goja.IsUndefined(v) {
-				missing = append(missing, fn+" (no console."+renamed+")")
-			}
+			probes = append(probes, fmt.Sprintf(
+				`if (typeof console === 'undefined') out.push(%q); else if (typeof console.%s === 'undefined') out.push(%q);`,
+				fn+" (no console global)", renamed, fn+" (no console."+renamed+")"))
 			continue
 		}
 		ns, field := splitHostName(fn)
-		group := host.Get(ns)
-		if group == nil || goja.IsUndefined(group) {
-			missing = append(missing, fn+" (no host."+ns+")")
-			continue
-		}
-		if v := group.ToObject(vm).Get(field); v == nil || goja.IsUndefined(v) {
-			missing = append(missing, fn)
-		}
+		probes = append(probes, fmt.Sprintf(
+			`if (typeof host === 'undefined' || typeof host[%[1]q] === 'undefined') out.push(%[2]q);`+
+				` else if (typeof host[%[1]q][%[3]q] === 'undefined') out.push(%[4]q);`,
+			ns, fn+" (no host."+ns+")", field, fn))
+	}
+
+	encoded, err := vm.Eval(`(function(){ var out = []; `+strings.Join(probes, "\n")+
+		`; return JSON.stringify(out); })();`, quickjs.EvalGlobal)
+	if err != nil {
+		t.Fatalf("parity probe: %v", err)
+	}
+	var missing []string
+	if err := json.Unmarshal([]byte(jsValString(encoded)), &missing); err != nil {
+		t.Fatalf("parity probe did not encode JSON: %v (got %v)", err, encoded)
 	}
 	if len(missing) > 0 {
 		t.Errorf("Lua exposes helpers the JS runtime lacks: %v\n"+

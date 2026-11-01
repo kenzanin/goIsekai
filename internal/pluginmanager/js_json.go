@@ -1,37 +1,64 @@
 package pluginmanager
 
 import (
+	"encoding/json"
 	"errors"
 
-	"github.com/dop251/goja"
+	"modernc.org/quickjs"
 )
 
-// jsJSONDecode wraps host.json.decode for the goja runtime: a JSON string
+// jsJSONDecode wraps host.json.decode for the quickjs runtime: a JSON string
 // becomes a JS object, array or primitive. Failures throw, which is how the
 // other JS natives report errors.
-func jsJSONDecode(vm *goja.Runtime) func(goja.FunctionCall) goja.Value {
-	return func(call goja.FunctionCall) goja.Value {
-		s, ok := call.Argument(0).Export().(string)
+func jsJSONDecode(vm *quickjs.VM) quickjs.HostFunc {
+	return func(args []any) (any, error) {
+		if len(args) == 0 {
+			return nil, errors.New(jsonDecodeArgErr)
+		}
+		s, ok := args[0].(string)
 		if !ok {
-			panic(vm.NewGoError(errors.New(jsonDecodeArgErr)))
+			return nil, errors.New(jsonDecodeArgErr)
 		}
-		decoded, err := jsonDecodeString(s)
+		if _, err := jsonDecodeString(s); err != nil {
+			return nil, err
+		}
+		// Round-trip through JSON.parse so the JS object/array structure is
+		// preserved, exactly as goja's ToValue(decoded) did.
+		literal, err := json.Marshal(s)
 		if err != nil {
-			panic(vm.NewGoError(err))
+			return nil, err
 		}
-		return vm.ToValue(decoded)
+		out, err := vm.Eval("JSON.parse("+string(literal)+")", quickjs.EvalGlobal)
+		if err != nil {
+			return nil, err
+		}
+		return out, nil
 	}
 }
 
-// jsJSONEncode wraps host.json.encode for the goja runtime: a JS value becomes a
-// JSON string. Values with no JSON form (functions) throw instead of producing a
-// partial document.
-func jsJSONEncode(vm *goja.Runtime) func(goja.FunctionCall) goja.Value {
-	return func(call goja.FunctionCall) goja.Value {
-		out, err := jsonEncodeValue(call.Argument(0).Export())
-		if err != nil {
-			panic(vm.NewGoError(errors.New(jsonEncodeErr)))
+// jsJSONEncode wraps host.json.encode for the quickjs runtime: a JS value
+// becomes a JSON string. Values with no JSON form (functions) throw instead
+// of producing a partial document.
+func jsJSONEncode(vm *quickjs.VM) quickjs.HostFunc {
+	return func(args []any) (any, error) {
+		if len(args) == 0 {
+			return "", errors.New(jsonEncodeErr)
 		}
-		return vm.ToValue(out)
+		v := args[0]
+		// A JS object arrives as *quickjs.Object, which keeps JS insertion
+		// order. Decode it into a Go map so the encoder sorts keys, as the
+		// Lua runtime's encoder does.
+		if obj, ok := v.(*quickjs.Object); ok {
+			var g any
+			if err := obj.Into(&g); err != nil {
+				return "", errors.New(jsonEncodeErr)
+			}
+			v = g
+		}
+		out, err := jsonEncodeValue(v)
+		if err != nil {
+			return "", errors.New(jsonEncodeErr)
+		}
+		return out, nil
 	}
 }

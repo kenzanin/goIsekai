@@ -1,6 +1,7 @@
 package pluginutil
 
 import (
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -70,6 +71,12 @@ func (m *SubstituteCipherMaterial) Validate() error {
 
 // SubstituteCipher runs data through the material's rounds.
 //
+// The token is hex on both sides, in every runtime. "encrypt" returns the
+// lowercase hex of the cipher bytes; "decrypt" takes that hex and returns the
+// plaintext string. The cipher bytes are not valid UTF-8, and quickjs would
+// corrupt them crossing its string boundary, so the hex form is the one ABI.
+// Plaintext is passed as-is in both directions.
+//
 // direction is "encrypt" to apply the sboxes forward and "decrypt" to invert
 // them; the two are exact inverses, so decrypt(encrypt(x)) == x for any x the
 // material accepts.
@@ -86,21 +93,26 @@ func SubstituteCipher(data, materialJSON, direction string) (string, error) {
 	if err := m.Validate(); err != nil {
 		return "", err
 	}
-	in := []byte(data)
 
 	switch direction {
 	case "encrypt":
+		in := []byte(data)
 		for r := range m.SBoxes {
 			in = substitute(in, m.SBoxes[r], m.Keys[r], m.Previous[r])
 		}
+		return hex.EncodeToString(in), nil
 	case "decrypt":
+		in, err := hex.DecodeString(data)
+		if err != nil {
+			return "", fmt.Errorf("substitute_cipher: decrypt input must be hex: %w", err)
+		}
 		for r, v := range slices.Backward(m.SBoxes) {
 			in = substituteInverse(in, v, m.Keys[r], m.Previous[r])
 		}
+		return string(in), nil
 	default:
 		return "", fmt.Errorf("substitute_cipher: direction must be \"encrypt\" or \"decrypt\", got %q", direction)
 	}
-	return string(in), nil
 }
 
 // substitute maps every byte through box[data[i] ^ key[i % len(key)] ^ prev],

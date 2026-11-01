@@ -1,7 +1,7 @@
 package pluginmanager
 
 import (
-	"github.com/dop251/goja"
+	"modernc.org/quickjs"
 
 	lua "github.com/mmcdole/lunar"
 )
@@ -22,9 +22,13 @@ func luaPluginParam(state *lua.State, m *Manager, id string) lua.Value {
 	return v.Value()
 }
 
-// jsPluginParam wraps host.plugin.param(name) for the JS runtime.
-func jsPluginParam(vm *goja.Runtime, m *Manager, id string) func(goja.FunctionCall) goja.Value {
-	return func(call goja.FunctionCall) goja.Value {
-		return vm.ToValue(m.pluginParam(id, call.Arguments[0].String()))
+// jsPluginParam wraps host.plugin.param(name) for the quickjs runtime.
+func jsPluginParam(vm *quickjs.VM, m *Manager, id string) quickjs.HostFunc {
+	return func(args []any) (any, error) {
+		if len(args) == 0 {
+			return "", nil
+		}
+		n, _ := args[0].(string)
+		return m.pluginParam(id, n), nil
 	}
 }

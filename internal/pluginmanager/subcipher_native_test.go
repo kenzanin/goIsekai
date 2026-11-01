@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"testing"
 
-	"github.com/dop251/goja"
+	"modernc.org/quickjs"
 
 	"goisekai/internal/hostnet"
 	"goisekai/internal/pluginutil"
@@ -52,6 +52,7 @@ func TestLuaSubstituteCipher(t *testing.T) {
 		local enc = host.crypto.substitute_cipher("/manga?keyword=x", material, "encrypt")
 		assert(type(enc) == "string" and #enc > 0, "encrypt must return a string")
 		assert(enc ~= "/manga?keyword=x", "encrypt must change the payload")
+		assert(string.find(enc, "^%x+$") ~= nil and enc == string.lower(enc), "encrypt must return lowercase hex")
 		local dec = host.crypto.substitute_cipher(enc, material, "decrypt")
 		assert(dec == "/manga?keyword=x", "round trip failed, got: " .. tostring(dec))
 	`
@@ -71,6 +72,11 @@ func TestLuaSubstituteCipherReportsErrors(t *testing.T) {
 		assert(out2 == nil, "an unknown direction must not produce output")
 		assert(type(err2) == "string" and string.find(err2, "direction", 1, true) ~= nil,
 			"error should name the direction: " .. tostring(err2))
+
+		local out3, err3 = host.crypto.substitute_cipher("not-hex!", ` + quoteLua(sboxPayload(t)) + `, "decrypt")
+		assert(out3 == nil, "non-hex decrypt input must not produce output")
+		assert(type(err3) == "string" and string.find(err3, "must be hex", 1, true) ~= nil,
+			"error should say the input must be hex: " .. tostring(err3))
 	`
 	if err := luaEval(t, chunk); err != nil {
 		t.Fatalf("substitute_cipher error path (Lua): %v", err)
@@ -78,7 +84,12 @@ func TestLuaSubstituteCipherReportsErrors(t *testing.T) {
 }
 
 func TestJSSubstituteCipher(t *testing.T) {
-	vm := goja.New()
+	vm, err := quickjs.NewVM()
+	if err != nil {
+		t.Fatalf("NewVM: %v", err)
+	}
+	defer func() { _ = vm.Close() }()
+
 	mgr := NewManager(hostnet.NewProxy(), t.TempDir())
 	if err := registerJSHostNatives(vm, mgr, "jsplug"); err != nil {
 		t.Fatalf("registerJSHostNatives: %v", err)
@@ -89,25 +100,34 @@ func TestJSSubstituteCipher(t *testing.T) {
 		const enc = host.crypto.substitute_cipher("/manga?keyword=x", material, "encrypt");
 		if (typeof enc !== "string" || enc.length === 0) throw new Error("encrypt must return a string");
 		if (enc === "/manga?keyword=x") throw new Error("encrypt must change the payload");
+		if (!/^[0-9a-f]+$/.test(enc)) throw new Error("encrypt must return lowercase hex");
 		const dec = host.crypto.substitute_cipher(enc, material, "decrypt");
 		if (dec !== "/manga?keyword=x") throw new Error("round trip failed, got " + dec);
 	`
-	if _, err := vm.RunString(script); err != nil {
+	if _, err := vm.Eval(script, quickjs.EvalGlobal); err != nil {
 		t.Fatalf("host.crypto.substitute_cipher (JS): %v", err)
 	}
 }
 
 func TestJSSubstituteCipherThrows(t *testing.T) {
-	vm := goja.New()
+	vm, err := quickjs.NewVM()
+	if err != nil {
+		t.Fatalf("NewVM: %v", err)
+	}
+	defer func() { _ = vm.Close() }()
+
 	mgr := NewManager(hostnet.NewProxy(), t.TempDir())
 	if err := registerJSHostNatives(vm, mgr, "jsplug"); err != nil {
 		t.Fatalf("registerJSHostNatives: %v", err)
 	}
-	if _, err := vm.RunString(`host.crypto.substitute_cipher("data", "not json", "encrypt")`); err == nil {
+	if _, err := vm.Eval(`host.crypto.substitute_cipher("data", "not json", "encrypt")`, quickjs.EvalGlobal); err == nil {
 		t.Fatal("JS: unparseable material must throw, not return silently")
 	}
-	if _, err := vm.RunString(`host.crypto.substitute_cipher("data", ` + quoteJSON(sboxPayload(t)) + `, "sideways")`); err == nil {
+	if _, err := vm.Eval(`host.crypto.substitute_cipher("data", `+quoteJSON(sboxPayload(t))+`, "sideways")`, quickjs.EvalGlobal); err == nil {
 		t.Fatal("JS: an unknown direction must throw")
+	}
+	if _, err := vm.Eval(`host.crypto.substitute_cipher("not-hex!", `+quoteJSON(sboxPayload(t))+`, "decrypt")`, quickjs.EvalGlobal); err == nil {
+		t.Fatal("JS: non-hex decrypt input must throw")
 	}
 }
 

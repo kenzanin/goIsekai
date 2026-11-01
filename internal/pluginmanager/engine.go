@@ -63,11 +63,16 @@ func (jsEngine) call(_ *Manager, p *loadedPlugin, fnName, input string) (string,
 	return callJS(p, fnName, input)
 }
 
+// close releases the html registry before the VM, then clears p.js so a second
+// close is a no-op (quickjs VM.Close must not run twice).
 func (jsEngine) close(_ *Manager, p *loadedPlugin) error {
-	if p.js != nil {
-		p.js.Interrupt("unloading")
+	if p.js == nil {
+		return nil
 	}
-	return nil
+	vm := p.js
+	releaseHTMLRegistry(vm)
+	p.js = nil
+	return vm.Close()
 }
 
 type goEngine struct{}

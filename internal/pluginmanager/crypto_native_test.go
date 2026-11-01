@@ -3,7 +3,7 @@ package pluginmanager
 import (
 	"testing"
 
-	"github.com/dop251/goja"
+	"modernc.org/quickjs"
 
 	"goisekai/internal/hostnet"
 )
@@ -46,7 +46,12 @@ func TestLuaCryptoAESGCMDecryptReportsErrors(t *testing.T) {
 }
 
 func TestJSCryptoAESGCMDecrypt(t *testing.T) {
-	vm := goja.New()
+	vm, err := quickjs.NewVM()
+	if err != nil {
+		t.Fatalf("NewVM: %v", err)
+	}
+	defer func() { _ = vm.Close() }()
+
 	mgr := NewManager(hostnet.NewProxy(), t.TempDir())
 	if err := registerJSHostNatives(vm, mgr, "aes"); err != nil {
 		t.Fatalf("registerJSHostNatives: %v", err)
@@ -58,12 +63,12 @@ func TestJSCryptoAESGCMDecrypt(t *testing.T) {
 		assert(plain.indexOf("1a.jpg") !== -1, "suffixed page name missing");
 		assert(plain.indexOf("14a.jpg") !== -1, "later suffixed page missing");
 	`
-	if _, err := vm.RunString(chunk); err != nil {
+	if _, err := vm.Eval(chunk, quickjs.EvalGlobal); err != nil {
 		t.Fatalf("host.crypto.aes_gcm_decrypt (JS): %v", err)
 	}
 
-	// goja reports a native error by throwing, matching jsStr2Err.
-	if _, err := vm.RunString(`host.crypto.aes_gcm_decrypt("c2hvcnQ", "` + aesIV + `", "` + aesTag + `", "` + aesCT + `")`); err == nil {
+	// quickjs reports a native error by throwing, matching jsStr2Err.
+	if _, err := vm.Eval(`host.crypto.aes_gcm_decrypt("c2hvcnQ", "`+aesIV+`", "`+aesTag+`", "`+aesCT+`")`, quickjs.EvalGlobal); err == nil {
 		t.Error("a bad key must throw in the JS runtime")
 	}
 }
