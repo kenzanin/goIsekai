@@ -140,6 +140,12 @@ func (s *Server) viewLibrary(w http.ResponseWriter, r *http.Request) {
 		page = 1
 	}
 	total := len(mangas)
+	totalPages := max((total+pageSize-1)/pageSize, 1)
+	// Past the last page the slice below would be empty, rendering a grid with
+	// no rows and no explanation; pin the request to the last real page instead.
+	if page > totalPages {
+		page = totalPages
+	}
 	start := min((page-1)*pageSize, total)
 	end := min(start+pageSize, total)
 	ratios := make(map[string]float64)

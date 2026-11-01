@@ -70,6 +70,8 @@ return function(data)
 		Tag = data.Tag,
 		View = data.View,
 		CategoryCounts = data.CategoryCounts,
+		Page = page,
+		TotalPages = totalPages,
 	})
 
 	return '<div class="flex items-center gap-3 flex-wrap mb-6">'
