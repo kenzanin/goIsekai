@@ -10,6 +10,7 @@ var PLUGIN = {
     verify_url: "https://www.mangzio.com",
     needs_human_verify: false,
     thumb_ratio: 0.703,
+    search_page_size: 24,
 };
 
 var BASE = "https://www.mangzio.com";
@@ -93,6 +94,15 @@ function searchManga(arg) {
             var slug = m[1];
             var title = m[2];
             var cover = m[3];
+            // Grab the genres that follow the card fields in the same RSC object.
+            var genres = null;
+            var gi2 = chunk.indexOf('"genres":[', re.lastIndex);
+            if (gi2 !== -1 && gi2 - re.lastIndex < 800) {
+                var end = chunk.indexOf(']', gi2);
+                if (end !== -1) {
+                    try { genres = JSON.parse(chunk.slice(gi2 + 10, end + 1)); } catch (e) {}
+                }
+            }
             // Deduplicate by slug
             var exists = false;
             for (var k = 0; k < results.length; k++) {
@@ -103,6 +113,7 @@ function searchManga(arg) {
                     id: slug,
                     title: title,
                     cover_url: cover.indexOf("http") === 0 ? cover : BASE + cover,
+                    genres: genres || [],
                 });
             }
         }
@@ -120,7 +131,7 @@ function searchManga(arg) {
         }
         results = filtered;
     }
-    // Return ALL filtered results — the host handles pagination.
+    // Return ALL filtered results — the host handles pagination via search_page_size.
     log.info("mangzio search: found " + results.length + " results for query=" + query);
     return JSON.stringify(results);
 }
@@ -190,7 +201,7 @@ function getChapterList(arg) {
                     manga_id: slug,
                     title: ch.chapterTitle || "Chapter " + ch.chapterNumber,
                     chapter_num: ch.chapterNumber,
-                    released_at: host.text.date_to_iso(ch.releaseDate || "") || undefined,
+                    released_at: host.text.date_to_iso(ch.createdAt || "") || undefined,
                     url: "/en/" + slug + "-en-chapter-" + ch.chapterNumber,
                 });
             }
