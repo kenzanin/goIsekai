@@ -94,15 +94,10 @@ function searchManga(arg) {
             var slug = m[1];
             var title = m[2];
             var cover = m[3];
-            // Grab the genres that follow the card fields in the same RSC object.
-            var genres = null;
-            var gi2 = chunk.indexOf('"genres":[', re.lastIndex);
-            if (gi2 !== -1 && gi2 - re.lastIndex < 800) {
-                var end = chunk.indexOf(']', gi2);
-                if (end !== -1) {
-                    try { genres = JSON.parse(chunk.slice(gi2 + 10, end + 1)); } catch (e) {}
-                }
-            }
+            // Genres live inside the same RSC object but can sit further than a
+            // small window past the card fields — parse the balanced object.
+            var obj = findJSONObject([chunk], '"slug":"' + slug + '"');
+            var genres = (obj && obj.genres) || [];
             // Deduplicate by slug
             var exists = false;
             for (var k = 0; k < results.length; k++) {
