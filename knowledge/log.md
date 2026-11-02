@@ -1,3 +1,7 @@
+## 2026-11-02
+* **Update**: Linked `mangzio-genres-balanced-rsc-and-getgenres-export.md` to `host-date-source-of-truth.md`.
+* **Creation**: Documented concept `mangzio-genres-balanced-rsc-and-getgenres-export.md` (Mangzio genres: per-item search genres via balanced RSC object; catalog GetGenres via filter buttons).
+
 ## 2026-11-01
 * **Update**: Linked `substitute-cipher-hex-abi.md` to `host-helper-surface-registry.md` (The registry where crypto.substitute_cipher is declared for every runtime.).
 * **Update**: Linked `substitute-cipher-hex-abi.md` to `quickjs-go-js-boundary-gotchas.md` (The string-boundary corruption that forced this decision.).
