@@ -25,7 +25,7 @@ const (
 type loadedPlugin struct {
 	id       string
 	wasmPath string // path to the plugin directory (or main.lua/main.js entry)
-	kind     string // "lua", "js", "go", or "yaegi"
+	kind     string // "lua", "js", "native", or "yaegi"
 	loaded   bool   // true after the runtime has been instantiated
 	// lunar holds the Lunar VM for lua-kind plugins.
 	lunar *lunar.State

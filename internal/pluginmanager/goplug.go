@@ -121,7 +121,7 @@ func (m *Manager) loadGo(id, path string) (*loadedPlugin, error) {
 	// Metadata lives in plugin.json beside the plugin, never in the .so: the
 	// host already read it at discovery, so a plugin never has to be opened
 	// just to be listed with its name and logo.
-	meta, err := pluginMetaFor(id, "go", filepath.Dir(path))
+	meta, err := pluginMetaFor(id, "native", filepath.Dir(path))
 	if err != nil {
 		_ = lib.close()
 		return nil, err
@@ -156,7 +156,7 @@ func (m *Manager) loadGo(id, path string) (*loadedPlugin, error) {
 	p := &loadedPlugin{
 		id:              id,
 		wasmPath:        path,
-		kind:            "go",
+		kind:            "native",
 		loaded:          true,
 		contractVersion: contractVer,
 		meta:            meta,

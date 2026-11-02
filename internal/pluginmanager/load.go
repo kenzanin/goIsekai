@@ -88,7 +88,7 @@ func (m *Manager) LoadPlugin(path string) (string, error) {
 			return "", err
 		}
 		m.registerLoaded(id, p)
-		logger.Debug("plugin loaded (hot)", "id", id, "kind", "go")
+		logger.Debug("plugin loaded (hot)", "id", id, "kind", "native")
 		return id, nil
 	}
 

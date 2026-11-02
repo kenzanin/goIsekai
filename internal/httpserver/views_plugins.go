@@ -11,7 +11,7 @@ import (
 // declared thumbnail ratio for the plugins page.
 type PluginView struct {
 	database.Plugin
-	Kind              string // runtime the plugin ships in: lua, js, go (native .so) or yaegi
+	Kind              string // runtime the plugin ships in: lua, js, native (native .so) or yaegi
 	Loaded            bool   // true once the runtime has been instantiated
 	VerifyURL         string
 	NeedsHumanVerify  bool

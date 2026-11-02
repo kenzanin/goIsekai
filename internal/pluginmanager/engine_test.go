@@ -28,7 +28,7 @@ func TestEngineForResolvesEveryShippedKind(t *testing.T) {
 	if len(engines) != want {
 		t.Fatalf("len(engines) = %d, want %d", len(engines), want)
 	}
-	for _, kind := range []string{"lua", "js", "go", "yaegi", "wasm"} {
+	for _, kind := range []string{"lua", "js", "native", "yaegi", "wasm"} {
 		if _, ok := engines[kind]; !ok {
 			t.Fatalf("engines missing shipped kind %q", kind)
 		}

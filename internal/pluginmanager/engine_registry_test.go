@@ -29,7 +29,7 @@ var registryFixtures = map[string]registryFixture{
 	"yaegi": func(t *testing.T) (string, string) {
 		return filepath.Join("testdata", "yaegitest"), types.SearchFunc
 	},
-	"go": func(t *testing.T) (string, string) {
+	"native": func(t *testing.T) (string, string) {
 		dir := nativeFixtureDir(t)
 		return filepath.Join(dir, "dummy", "main.so"), types.SearchFunc
 	},

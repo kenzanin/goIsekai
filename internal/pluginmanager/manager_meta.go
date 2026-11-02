@@ -12,7 +12,7 @@ import (
 // LoadedPlugin is metadata about a currently-registered plugin.
 type LoadedPlugin struct {
 	ID               string
-	Kind             string // runtime: "lua", "js", "go" or "yaegi"
+	Kind             string // runtime: "lua", "js", "native" or "yaegi"
 	Version          string // ABI contract version (e.g. "1")
 	Loaded           bool   // true when the runtime is instantiated
 	WasmPath         string // path to the plugin directory or entry file

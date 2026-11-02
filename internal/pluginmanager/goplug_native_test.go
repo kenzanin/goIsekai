@@ -62,7 +62,7 @@ func TestNativePluginRegistersLazilyWithMetadata(t *testing.T) {
 		t.Fatalf("registered %d plugin(s), want 1: %+v", len(loaded), loaded)
 	}
 	got := loaded[0]
-	if got.ID != "dummy" || got.Kind != "go" {
+	if got.ID != "dummy" || got.Kind != "native" {
 		t.Fatalf("unexpected registration: %+v", got)
 	}
 	if got.Loaded {

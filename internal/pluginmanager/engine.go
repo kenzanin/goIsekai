@@ -20,11 +20,11 @@ var ErrUnsupportedKind = errors.New("unsupported plugin kind")
 
 // engines maps the kind a plugin declares in plugin.json to its runtime.
 var engines = map[string]engine{
-	"lua":   luaEngine{},
-	"js":    jsEngine{},
-	"go":    goEngine{},
-	"yaegi": yaegiEngine{},
-	"wasm":  wasmEngine{},
+	"lua":    luaEngine{},
+	"js":     jsEngine{},
+	"native": nativeEngine{},
+	"yaegi":  yaegiEngine{},
+	"wasm":   wasmEngine{},
 }
 
 // engineFor returns the runtime registered for a plugin kind.
@@ -75,17 +75,17 @@ func (jsEngine) close(_ *Manager, p *loadedPlugin) error {
 	return vm.Close()
 }
 
-type goEngine struct{}
+type nativeEngine struct{}
 
-func (goEngine) load(m *Manager, id, path string) (*loadedPlugin, error) {
+func (nativeEngine) load(m *Manager, id, path string) (*loadedPlugin, error) {
 	return m.loadGo(id, path)
 }
 
-func (goEngine) call(_ *Manager, p *loadedPlugin, fnName, input string) (string, error) {
+func (nativeEngine) call(_ *Manager, p *loadedPlugin, fnName, input string) (string, error) {
 	return callGo(p, fnName, input)
 }
 
-func (goEngine) close(_ *Manager, p *loadedPlugin) error {
+func (nativeEngine) close(_ *Manager, p *loadedPlugin) error {
 	if p.goLib == nil {
 		return nil
 	}

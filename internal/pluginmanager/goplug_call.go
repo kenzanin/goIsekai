@@ -87,7 +87,7 @@ func (m *Manager) discoverGo() error {
 			if _, dup := m.plugins[id]; dup {
 				continue
 			}
-			if !m.registerFolderPlugin(id, dir, "go") {
+			if !m.registerFolderPlugin(id, dir, "native") {
 				continue
 			}
 			m.plugins[id].wasmPath = path
