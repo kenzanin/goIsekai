@@ -1,4 +1,5 @@
 ## 2026-11-02
+* **Update**: Updated concept `plugin-authoring-guide.md`.
 * **Creation**: Documented concept `plugin-authoring-guide.md` (Plugin authoring guide: what the host requires and what to return).
 * **Update**: Linked `mangzio-genres-balanced-rsc-and-getgenres-export.md` to `host-date-source-of-truth.md`.
 * **Creation**: Documented concept `mangzio-genres-balanced-rsc-and-getgenres-export.md` (Mangzio genres: per-item search genres via balanced RSC object; catalog GetGenres via filter buttons).
