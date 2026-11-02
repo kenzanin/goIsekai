@@ -256,3 +256,25 @@ function getPageList(arg) {
     return JSON.stringify([]);
 }
 
+function getGenres() {
+    // Catalog page hosts the genre filter as pill buttons; return name = slug.
+    var html = host.http.get_body(BASE + "/en/manga");
+    if (html === null) {
+        log.error("mangzio get_genres: request failed");
+        return JSON.stringify([]);
+    }
+    var genres = [];
+    var seen = {};
+    var re = /<button[^>]*>([A-Za-z][A-Za-z &-]{1,18})<\/button>/g;
+    var m;
+    var skip = { "Latest Update": true, "A-Z": true, "Most Chapters": true, "Rating": true, "All": true, "Ongoing": true, "Completed": true, "Hiatus": true };
+    while ((m = re.exec(html)) !== null) {
+        var name = m[1].trim();
+        if (skip[name] || seen[name]) continue;
+        seen[name] = true;
+        genres.push({ name: name, slug: name });
+    }
+    log.info("mangzio get_genres: found " + genres.length);
+    return JSON.stringify(genres);
+}
+
