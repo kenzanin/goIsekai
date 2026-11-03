@@ -5,6 +5,7 @@ okf_version: "0.2"
 # goIsekai Knowledge Base
 
 Persistent memory bundle for this repository.
+* [max_cache_gb editable on Settings; lowered cap prunes without restart](decisions/max-cache-gb-settings-editable-and-hot-prune.md) - The image cache cap is saved through the existing save-settings action (finite >= 0, stored precision one decimal) and the hot-reload callback goroutine-prunes on a lower, serialised by pruneMu; 0 disables pruning.
 * [1manga search returned 0 results - two stacked GraphQL syntax bugs](1manga-two-stacked-graphql-bugs.md) - x: "mn03" was emitted as a GraphQL string instead of the mn03 enum (API 400), and the query ended with image}}} instead of image}} (syntax error); each bug masked the other so fixing one alone never worked.
 * [Library view URL is the source of truth (no localStorage filter persistence)](library-view-url-is-source-of-truth.md) - The stuck-filter bug: gsk:library-view localStorage restore made All/New/In-progress chips bounce back to the last filter; the rule, the New status chip, and the jscpd-driven history/updates merge.
 * [1manga: port Lua to Go wasm via TinyGo](1manga-wasm-port.md) - 1manga ported from Lua to Go wasm via TinyGo 0.43.0 (own Makefile, ~1.2 MB) instead of the 3.4 MB std-Go wasip1 build that OOMs the wasm runtime.

@@ -1,9 +1,14 @@
 package httpserver
 
 import (
+	"goisekai/internal/config"
 	"io"
+	"math"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 )
@@ -47,6 +52,62 @@ func TestActionSaveSettings(t *testing.T) {
 	// cfgPath is empty in test, so save-settings may fail. Just verify no panic.
 	if rec.Code == 0 {
 		t.Fatal("expected a valid HTTP status code")
+	}
+}
+
+// cfgINIWithMaxCacheGB returns a minimal INI whose app section carries the
+// given max_cache_gb.
+func cfgINIWithMaxCacheGB(gb float64) string {
+	return "[app]\nmax_cache_gb=" + strconv.FormatFloat(gb, 'f', 1, 64) + "\n"
+}
+
+// testServerWithConfig is testServerFull running against a written config
+// file whose cfgPath the service knows, so save-settings can load and write it.
+func testServerWithConfig(t *testing.T, body string) *Server {
+	t.Helper()
+	cfgPath := filepath.Join(t.TempDir(), "goisekai.ini")
+	if err := os.WriteFile(cfgPath, []byte(body), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	s := testServerFull(t, "", true)
+	s.service.SetConfigPath(cfgPath)
+	return s
+}
+
+func TestSaveSettingsMaxCacheGB(t *testing.T) {
+	cases := []struct {
+		name   string
+		form   string  // form body posted
+		stored float64 // config MaxCacheGB before the POST
+		want   float64
+	}{
+		{name: "valid value", form: "max_cache_gb=5", stored: 2, want: 5},
+		{name: "fractional value", form: "max_cache_gb=1.5", stored: 2, want: 1.5},
+		{name: "zero disables pruning", form: "max_cache_gb=0", stored: 2, want: 0},
+		{name: "negative ignored", form: "max_cache_gb=-3", stored: 2, want: 2},
+		{name: "text ignored", form: "max_cache_gb=banana", stored: 2, want: 2},
+		{name: "NaN ignored", form: "max_cache_gb=" + strconv.FormatFloat(math.NaN(), 'f', -1, 64), stored: 2, want: 2},
+		{name: "inf ignored", form: "max_cache_gb=" + strconv.FormatFloat(math.Inf(1), 'f', -1, 64), stored: 2, want: 2},
+		{name: "missing key", form: "title=x", stored: 2, want: 2},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			s := testServerWithConfig(t, cfgINIWithMaxCacheGB(tc.stored))
+			req := csrfPost(s, "/action/save-settings", strings.NewReader(tc.form))
+			req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+			rec := httptest.NewRecorder()
+			s.Router.ServeHTTP(rec, req)
+			if rec.Code != 303 {
+				t.Fatalf("status = %d, want 303; body: %s", rec.Code, rec.Body.String())
+			}
+			cfg, err := config.Load(s.service.GetConfigPath())
+			if err != nil {
+				t.Fatalf("reload config: %v", err)
+			}
+			if cfg.MaxCacheGB != tc.want {
+				t.Errorf("MaxCacheGB = %v, want %v", cfg.MaxCacheGB, tc.want)
+			}
+		})
 	}
 }
 

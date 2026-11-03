@@ -123,7 +123,7 @@ func main() {
 	// maintenance goroutine never races with the watcher.
 	maxCacheGB := &atomic.Int64{}
 	maxCacheGB.Store(int64(math.Float64bits(cfg.MaxCacheGB)))
-	startConfigWatch(cfgPath, proxy, maxCacheGB)
+	startConfigWatch(cfgPath, proxy, maxCacheGB, dataDir)
 
 	mgr := buildPluginManager(proxy, pluginsDir, infoDir, db, detailTTL, chapterTTL)
 

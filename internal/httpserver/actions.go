@@ -1,6 +1,7 @@
 package httpserver
 
 import (
+	"math"
 	"net/http"
 	"net/url"
 	"os"
@@ -163,6 +164,13 @@ func (s *Server) handleSaveSettings(w http.ResponseWriter, r *http.Request) {
 	if _, ok := r.Form["update_stale_days"]; ok {
 		if n, err := strconv.Atoi(r.FormValue("update_stale_days")); err == nil && n >= 1 {
 			cfg.UpdateStaleDays = n
+		}
+	}
+	if _, ok := r.Form["max_cache_gb"]; ok {
+		// ponytail: ParseFloat accepts NaN/Inf, which must not overwrite a
+		// working cap with a value the pruner cannot compare against.
+		if n, err := strconv.ParseFloat(r.FormValue("max_cache_gb"), 64); err == nil && n >= 0 && !math.IsNaN(n) && !math.IsInf(n, 0) {
+			cfg.MaxCacheGB = n
 		}
 	}
 	if err := cfg.Save(cfgPath); err != nil {

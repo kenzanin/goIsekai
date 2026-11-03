@@ -73,7 +73,7 @@ return function(data)
     </div>
 
     <div class="border border-neutral-800 rounded-lg p-4">
-        <h2 class="text-sm font-medium text-neutral-300 mb-3">Library Updates</h2>
+        <h2 class="text-sm font-medium text-neutral-300 mb-3">Maintenance</h2>
         <div class="space-y-4">
             <div>
                 <label for="update_stale_days" class="block text-sm font-medium mb-1">Auto-refresh manga older than (days)</label>
@@ -81,6 +81,13 @@ return function(data)
 		tostring(cfg.UpdateStaleDays or 3)
 	) .. [[" class="w-full bg-neutral-900 border border-neutral-700 rounded-md px-3 py-2 text-sm">
                 <span class="text-xs text-neutral-500">Checked hourly; minimum 1.</span>
+            </div>
+            <div>
+                <label for="max_cache_gb" class="block text-sm font-medium mb-1">Image cache limit (GB)</label>
+                <input id="max_cache_gb" name="max_cache_gb" type="number" min="0" step="0.1" value="]] .. h(
+		tostring(cfg.MaxCacheGB or 0)
+	) .. [[" class="w-full bg-neutral-900 border border-neutral-700 rounded-md px-3 py-2 text-sm">
+                <span class="text-xs text-neutral-500">Current cache size: ]] .. h(formatBytes(cacheBytes)) .. [[. 0 turns size-based pruning off. Lowering the limit deletes cached files.</span>
             </div>
         </div>
     </div>

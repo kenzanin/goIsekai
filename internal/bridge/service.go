@@ -144,6 +144,11 @@ func (s *AppService) GetConfigPath() string {
 	return s.cfgPath
 }
 
+// SetConfigPath overrides the config path. Test-only.
+func (s *AppService) SetConfigPath(p string) {
+	s.cfgPath = p
+}
+
 // GetChapterList fetches the chapter list for a manga from the plugin.
 // Rides the interactive lane (task 4.1). For offline plugins returns cached data.
 func (s *AppService) GetChapterList(pluginID, mangaID string) ([]types.Chapter, error) {

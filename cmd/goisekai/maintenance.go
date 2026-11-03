@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -20,7 +21,8 @@ import (
 // startConfigWatch polls goisekai.ini and applies the safe subset (log level,
 // user-agent, referer, max_cache_gb) live. Unsafe fields like
 // host/port/cdp_engine need a restart, so they are deliberately not applied here.
-func startConfigWatch(cfgPath string, proxy *hostnet.Proxy, maxCacheGB *atomic.Int64) {
+// dataDir locates the image cache for prune-on-lower.
+func startConfigWatch(cfgPath string, proxy *hostnet.Proxy, maxCacheGB *atomic.Int64, dataDir string) {
 	_ = config.Watch(cfgPath, 5*time.Second, func(updated *config.Config) {
 		if err := logger.Init(updated.LogLevel); err != nil {
 			logger.Warn("config reload: bad log level", "log_level", updated.LogLevel, "error", err)
@@ -28,10 +30,32 @@ func startConfigWatch(cfgPath string, proxy *hostnet.Proxy, maxCacheGB *atomic.I
 		proxy.SetDefaultHeader("User-Agent", updated.UserAgent)
 		proxy.SetDefaultHeader("Referer", updated.Referer)
 		proxy.SetSecCHUA(updated.SecCHUA)
+		prevGB := maxCacheGBBits(maxCacheGB)
 		maxCacheGB.Store(int64(math.Float64bits(updated.MaxCacheGB)))
 		logger.Info("config reloaded", "log_level", updated.LogLevel, "max_cache_gb", updated.MaxCacheGB)
+		// Lowering the cap below the current cache size must take effect
+		// without waiting for the next maintenance tick; the prune runs on a
+		// goroutine so the watcher is never blocked. Raises and unchanged
+		// reloads delete nothing, so frequent config rewrites never walk a
+		// large cache directory for nothing.
+		if updated.MaxCacheGB > 0 && updated.MaxCacheGB < prevGB {
+			go func() {
+				pruneMu.Lock()
+				freed, err := pruneImageCache(updated, dataDir, updated.MaxCacheGB)
+				pruneMu.Unlock()
+				if err != nil {
+					logger.Error("config reload: prune image cache", "error", err)
+				} else {
+					logger.Info("config reload: pruned image cache", "freed_bytes", freed)
+				}
+			}()
+		}
 	})
 }
+
+// pruneMu serialises every image-cache walk (startup prune, maintenance-batch
+// prune, reload-triggered prune) so two walks never race over the same files.
+var pruneMu sync.Mutex
 
 // startMaintenance prunes orphaned rows at startup, then backs up + re-prunes
 // on the configured interval until the returned channel is closed.
@@ -60,7 +84,10 @@ func startMaintenance(ctx context.Context, db *database.DB, cfg *config.Config, 
 	// Keep the library search index consistent with library membership.
 	healFTS()
 	// Prune image cache at startup based on MaxCacheGB config.
-	if _, err := pruneImageCache(cfg, dataDir, maxCacheGBBits(maxCacheGB)); err != nil {
+	pruneMu.Lock()
+	_, err := pruneImageCache(cfg, dataDir, maxCacheGBBits(maxCacheGB))
+	pruneMu.Unlock()
+	if err != nil {
 		logger.Error("prune image cache at startup", "error", err)
 	}
 
@@ -91,7 +118,10 @@ func startMaintenance(ctx context.Context, db *database.DB, cfg *config.Config, 
 		} else {
 			logger.Info("db backup written", "dir", backupsDir, "keep", cfg.BackupKeep)
 		}
-		if _, err := pruneImageCache(cfg, dataDir, maxCacheGBBits(maxCacheGB)); err != nil {
+		pruneMu.Lock()
+		_, err := pruneImageCache(cfg, dataDir, maxCacheGBBits(maxCacheGB))
+		pruneMu.Unlock()
+		if err != nil {
 			logger.Error("prune image cache", "error", err)
 		}
 		return nil

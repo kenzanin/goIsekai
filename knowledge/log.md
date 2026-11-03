@@ -1,4 +1,8 @@
 ## 2026-11-03
+* **Update**: Updated concept `bugs/offline-image-cache-pruned-and-mangadex-challenge.md`.
+* **Update**: Linked `bugs/offline-image-cache-pruned-and-mangadex-challenge.md` to `hostnet-cdp-timeout-waits.md` (hostnet owns the challenge/CDP ladder the image path should escalate into.).
+* **Update**: Linked `bugs/offline-image-cache-pruned-and-mangadex-challenge.md` to `plans/alt-cover-picker-cache-mismatch.md` (Another case where the cover cache key and the URL actually requested diverge; same diskCachePath keying.).
+* **Creation**: Documented concept `bugs/offline-image-cache-pruned-and-mangadex-challenge.md` (Cached cover and chapter images vanish: FIFO prune plus MangaDex edge challenge blocks re-fetch).
 * **Creation**: Documented concept `live-plugin-feature-audit-sandbox-remediation.md` (live-plugin-feature-audit: sandbox audit + comix/sanascans remediation).
 
 ## 2026-11-02
