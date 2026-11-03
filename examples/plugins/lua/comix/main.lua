@@ -44,7 +44,10 @@ function search_manga(arg)
     -- "dungeon"). Fetch pages until one returns no new rows, dedup by slug.
     local out, seen = {}, {}
     local BASE_URL = BASE .. "/browse?q=" .. host.text.url_encode(query)
-    for page = 1, 40 do
+    -- Stop at page 2 (~56 rows) or when a page adds nothing new. The full
+    -- result set would need up to 40 pages × ~5s CDP fetch each; two pages
+    -- return enough for the UI and stay inside the host's call budget.
+    for page = 1, 2 do
         local url = BASE_URL .. "&page=" .. page
         local html = host.browser.fetch(url)
         if not html or html == "" then break end

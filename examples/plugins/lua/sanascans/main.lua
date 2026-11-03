@@ -75,7 +75,11 @@ function search(arg)
     local out, seen = {}, {}
     for _, m in ipairs(find_all(body,
         [[(?s)<a href="/series/([^"]+)"[^>]*>.*?<img[^>]*alt="([^"]*)"[^>]*src="([^"]+)"]]) or {}) do
+        -- The slug is URL-encoded AND HTML-escaped inside the href
+        -- (site's React-style link, e.g. "violetta&amp;#x27;s-...%3A...").
+        -- html_decode first, then url_decode; detail/chapter re-encode once.
         local slug, title, cover = m[1], m[2], m[3]
+        slug = host.text.url_decode(html_decode(slug))
         title = string.gsub(title, "^Cover [Oo]f%s+", "")
         if not seen[slug] then
             seen[slug] = true

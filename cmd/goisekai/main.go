@@ -33,6 +33,7 @@ func main() {
 	logLevel := flag.String("logLevel", "", "log level: debug|info|warning (overrides goisekai.ini log_level)")
 	host := flag.String("host", "", "HTTP server bind address (overrides goisekai.ini host)")
 	port := flag.Int("port", 0, "HTTP server port (overrides goisekai.ini port)")
+	dataDirFlag := flag.String("dataDir", "", "data directory override (DB, plugins, info, cache, PID; overrides goisekai.ini data_dir) — run an isolated sandbox instance like: ./goisekai -dataDir app_data_playground -port 8081")
 	open := flag.Bool("open", false, "open the default browser on startup")
 	genIni := flag.Bool("genini", false, "generate a default goisekai.ini and exit")
 	cdpEngine := flag.String("cdpEngine", "", "CDP browser engine for anti-bot solving: off|lightpanda|obscura|chrome (overrides goisekai.ini cdp_engine)")
@@ -74,6 +75,16 @@ func main() {
 	}
 
 	// CLI flags override config values.
+	// Environment fallback: GOISEKAI_DATA overrides the config file's data_dir
+	// without editing it — lets npm/just wrappers point a second instance at a
+	// sandbox directory. CLI -dataDir takes precedence over the env.
+	if envData := os.Getenv("GOISEKAI_DATA"); envData != "" {
+		cfg.DataDir = envData
+	}
+	if *dataDirFlag != "" {
+		cfg.DataDir = *dataDirFlag
+	}
+
 	applyFlagOverrides(cfg, host, cdpEngine, cdpPath, apiKey, port)
 
 	// Logger level: flag overrides config, config overrides the "info" default.

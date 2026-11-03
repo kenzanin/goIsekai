@@ -1,3 +1,6 @@
+## 2026-11-03
+* **Creation**: Documented concept `live-plugin-feature-audit-sandbox-remediation.md` (live-plugin-feature-audit: sandbox audit + comix/sanascans remediation).
+
 ## 2026-11-02
 * **Update**: Updated concept `plugin-authoring-guide.md`.
 * **Creation**: Documented concept `plugin-authoring-guide.md` (Plugin authoring guide: what the host requires and what to return).

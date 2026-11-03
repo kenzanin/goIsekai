@@ -2,11 +2,11 @@
 
 ## 1. Playground instance (prerequisite for safe auditing)
 
-- [ ] 1.0 Add a `-dataDir` CLI flag (and `GOISEKAI_DATA` env fallback) to `cmd/goisekai/main.go` that overrides `cfg.DataDir` before `setupDirs` runs — it already fans DB, plugins, info, cache and PID out of that one path. Verify with `./goisekai -dataDir app_data_playground -port 8081` starting on 8081 with its own empty DB and PID file while production keeps running.
+- [x] 1.0 Add a `-dataDir` CLI flag (and `GOISEKAI_DATA` env fallback) to `cmd/goisekai/main.go` that overrides `cfg.DataDir` before `setupDirs` runs — it already fans DB, plugins, info, cache and PID out of that one path. Verify with `./goisekai -dataDir app_data_playground -port 8081` starting on 8081 with its own empty DB and PID file while production keeps running.
 
 ## 2. Audit run
 
-- [ ] 2.1 Write `tools/audit-live-plugins.sh`: takes a base URL (default `http://127.0.0.1:8081`), for every active plugin in `GET /api/plugins`, sequentially probes search/detail/chapters/pages via existing read-only endpoints (including `/sandbox/plugins/*` raw probes) with ≤15s curl timeouts, and writes `live-plugin-audit.json` + `live-plugin-audit.md` (per-plugin rows, per-feature WORKING/MISSING/BROKEN, tag 403-challenge plugins separately).
+- [x] 2.1 Write `tools/audit-live-plugins.sh`: takes a base URL (default `http://127.0.0.1:8081`), for every active plugin in `GET /api/plugins`, sequentially probes search/detail/chapters/pages via existing read-only endpoints (including `/sandbox/plugins/*` raw probes) with ≤15s curl timeouts, and writes `live-plugin-audit.json` + `live-plugin-audit.md` (per-plugin rows, per-feature WORKING/MISSING/BROKEN, tag 403-challenge plugins separately).
 - [ ] 2.2 Run the audit against the sandbox instance (`-dataDir app_data_playground`) and record the resulting table (this is the baseline; findings land in the OKF note for this change).
 
 ## 3. Remediation
