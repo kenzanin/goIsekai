@@ -44,6 +44,13 @@ classify() { # $1=http_code $2=ok_expr_evaluated_as_1_or_0
 # has_true "pattern" file — 1 if regex grep matches (genreal data, not just key)
 has() { rg -q "$1" "$2" && echo 1 || echo 0; }
 
+# urlencode — percent-encode a string for safe embedding in a single URL path
+# segment. The sandbox routes accept exactly one segment per {var} (chi), so a
+# chapter id containing '/' (fanfox: "slug/c005.5") must be encoded: chi decodes
+# %2F back to '/' inside the param, but a literal '/' is a path separator and the
+# request 404s at the router before Lua ever runs.
+urlencode() { local s="$1" out=""; local i c; for ((i=0; i<${#s}; i++)); do c="${s:i:1}"; case "$c" in [a-zA-Z0-9.~_-]) out+="$c";; *) out+="$(printf '%%%02X' "'$c")";; esac; done; printf '%s' "$out"; }
+
 echo "[" > "$OUT_JSON"
 first=1
 plugins="$(node -e 'fetch(process.argv[1]+"/api/plugins").then(r=>r.json()).then(d=>console.log(d.map(p=>p.id).filter(Boolean).join("\n")))' "$BASE")"
@@ -65,7 +72,11 @@ for pid in $plugins; do
         # pages: first chapter id
         cid=$(node -e 'try{const d=JSON.parse(require("fs").readFileSync(process.argv[1],"utf8"));console.log((d.chapters&&d.chapters[0]&&d.chapters[0].id)||"")}catch(e){console.log("")}' "$TMPDIR/audit_${pid}.detail" 2>/dev/null)
         if [ -n "$cid" ]; then
-            code=$(probe "$BASE/api/sandbox/plugins/$pid/pages/$cid" "$TMPDIR/audit_${pid}.pages")
+            # Encode the chapter id: multi-segment ids (fanfox "slug/c005.5")
+            # must stay a single chi {chapterID} segment, or the request 404s
+            # at the router before Lua runs and the row is misclassified.
+            cid_enc="$(urlencode "$cid")"
+            code=$(probe "$BASE/api/sandbox/plugins/$pid/pages/$cid_enc" "$TMPDIR/audit_${pid}.pages")
             pl_ok=$(has '"url"' "$TMPDIR/audit_${pid}.pages")
             pcls=$(classify "$code" "$pl_ok")
             ccls=$(classify 200 "$ch")
