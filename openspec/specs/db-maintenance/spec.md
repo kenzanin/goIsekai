@@ -54,17 +54,20 @@ After a migration that deletes a significant amount of data, the system SHALL `V
 
 The image cache directory (`<cache_dir>/images`) SHALL be pruned to a configured
 maximum size. When the total size of cached image files exceeds `max_cache_gb`
-(default 2) after an image download or at a maintenance tick, files with the
-oldest modification time SHALL be deleted until the total is at or below the
-limit, and the freed amount SHALL be logged. A `max_cache_gb` of 0 SHALL disable
-size-based pruning entirely.
+(default 2) after an image download or at a maintenance tick, files SHALL be
+deleted until the total is at or below the limit, and the freed amount SHALL be
+logged. Files SHALL be deleted in order of least recent use, where serving a
+file from the cache counts as use. Files that belong to a library manga (its
+cover and the pages of its chapters) SHALL be deleted only after every other
+file has been deleted. A `max_cache_gb` of 0 SHALL disable size-based pruning
+entirely.
 
 #### Scenario: Cache exceeds the configured limit
 
 - **WHEN** the image cache totals more than `max_cache_gb`
 - **AND** maintenance runs or an image download completes
-- **THEN** the oldest-modified files are deleted until the cache totals at most
-  the limit
+- **THEN** the least recently used files are deleted until the cache totals at
+  most the limit
 - **AND** the freed amount is logged
 
 #### Scenario: Recently written files survive
@@ -76,6 +79,23 @@ size-based pruning entirely.
 
 - **WHEN** `max_cache_gb` is 0
 - **THEN** no files are ever deleted by the size limit
+
+#### Scenario: Reading a cached file keeps it
+
+- **WHEN** a cached image is served from the disk cache
+- **THEN** it ranks as recently used, so it is deleted after files that were
+  written later but never read
+
+#### Scenario: Library files are deleted last
+
+- **WHEN** the cache exceeds the limit and holds both library and non-library files
+- **THEN** non-library files are deleted first, whatever their age
+- **AND** a library manga's cover and chapter pages remain while any non-library file remains
+
+#### Scenario: Library alone exceeds the limit
+
+- **WHEN** only library files remain and the cache still exceeds the limit
+- **THEN** the least recently used library files are deleted until the cache is at most the limit
 
 ### Requirement: Changed cache limit is applied without a restart
 When the hot-reloaded `max_cache_gb` is lower than the previous value and the image cache currently exceeds the new limit, the host SHALL prune the cache down to the new limit without waiting for a restart or the next maintenance tick. The prune SHALL run off the request that saved the setting and SHALL log the freed amount. Raising the limit, or a reload that does not change it, SHALL NOT delete any file. A limit of 0 SHALL delete nothing.
