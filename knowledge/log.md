@@ -1,3 +1,6 @@
+## 2026-11-04
+* **Creation**: Documented concept `live-plugin-audit-and-sandbox-instance-pattern.md` (Live plugin audit: sandbox instance pattern and per-plugin classification).
+
 ## 2026-11-03
 * **Update**: Updated concept `bugs/offline-image-cache-pruned-and-mangadex-challenge.md`.
 * **Update**: Linked `bugs/offline-image-cache-pruned-and-mangadex-challenge.md` to `hostnet-cdp-timeout-waits.md` (hostnet owns the challenge/CDP ladder the image path should escalate into.).

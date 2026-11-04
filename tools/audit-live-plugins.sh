@@ -8,7 +8,7 @@
 # -dataDir app_data_playground -port 8081). Pass http://127.0.0.1:8080 to
 # audit production — read-only either way.
 #
-# Outputs (next to this script's cwd, i.e. repo root):
+# Outputs (repo root):
 #   live-plugin-audit.json  — raw per-plugin probe records
 #   live-plugin-audit.md    — human table: per-feature WORKING/MISSING/BROKEN
 #
@@ -25,9 +25,21 @@ BASE="${1:-http://127.0.0.1:8081}"
 OUT_JSON="$(pwd)/live-plugin-audit.json"
 OUT_MD="$(pwd)/live-plugin-audit.md"
 TIMEOUT=30
+Q=hero
 
-probe() { # $1=url $2=out-file -> echoes http_code; body saved to $2
-    curl -s --max-time "$TIMEOUT" -o "$2" -w '%{http_code}' "$1"
+# q=hero misses some catalogs; fall back to q=manga for an empty search.
+probe_search() { # $1=plugin -> writes $TMPDIR/audit_$1.search, sets code/search_ok
+    local pid="$1"
+    local code
+    code=$(curl -s --max-time "$TIMEOUT" -o "$TMPDIR/audit_${pid}.search" -w '%{http_code}' "$BASE/api/sandbox/plugins/${pid}/search?q=${Q}")
+    local ok
+    ok=$(node -e 'try{const d=JSON.parse(require("fs").readFileSync(process.argv[1],"utf8"));console.log(Array.isArray(d)&&d.length>0?"1":"0")}catch(e){console.log("0")}' "$TMPDIR/audit_${pid}.search" 2>/dev/null)
+    if [ "$ok" = "0" ] && [ "$Q" = "hero" ]; then
+        Q=manga
+        code=$(curl -s --max-time "$TIMEOUT" -o "$TMPDIR/audit_${pid}.search" -w '%{http_code}' "$BASE/api/sandbox/plugins/${pid}/search?q=${Q}")
+        ok=$(node -e 'try{const d=JSON.parse(require("fs").readFileSync(process.argv[1],"utf8"));console.log(Array.isArray(d)&&d.length>0?"1":"0")}catch(e){console.log("0")}' "$TMPDIR/audit_${pid}.search" 2>/dev/null)
+    fi
+    printf '%s %s' "$code" "$ok"
 }
 
 classify() { # $1=http_code $2=ok_expr_evaluated_as_1_or_0
@@ -40,9 +52,6 @@ classify() { # $1=http_code $2=ok_expr_evaluated_as_1_or_0
         *) echo "BROKEN(http$code)";;
     esac
 }
-
-# has_true "pattern" file — 1 if regex grep matches (genreal data, not just key)
-has() { rg -q "$1" "$2" && echo 1 || echo 0; }
 
 # urlencode — percent-encode a string for safe embedding in a single URL path
 # segment. The sandbox routes accept exactly one segment per {var} (chi), so a
@@ -57,31 +66,31 @@ plugins="$(node -e 'fetch(process.argv[1]+"/api/plugins").then(r=>r.json()).then
 n=0
 for pid in $plugins; do
     n=$((n+1))
-    # search
-    code=$(probe "$BASE/api/search?pluginID=$pid&q=hero" "$TMPDIR/audit_${pid}.search" 2>/dev/null) || code=000
-    search_ok=$(has '"title"' "$TMPDIR/audit_${pid}.search")
+    Q=hero
+    # search: sandbox search returns a bare array of items.
+    read -r code search_ok < <(probe_search "$pid")
     search_cls=$(classify "$code" "$search_ok")
-    # detail: take first search result id
-    mid=$(node -e 'try{const d=JSON.parse(require("fs").readFileSync(process.argv[1],"utf8"));console.log((d.results&&d.results[0]&&d.results[0].id)||"")}catch(e){console.log("")}' "$TMPDIR/audit_${pid}.search" 2>/dev/null)
-    ch=0; gm=0; ch_ok=0; g_ok=0; pl_ok=0; dcls=""; ccls=""; pcls=""
+    mid=""
+    if [ "$search_ok" = "1" ]; then
+        mid=$(node -e 'try{const d=JSON.parse(require("fs").readFileSync(process.argv[1],"utf8"));console.log(Array.isArray(d)&&d[0]?d[0].id:"")}catch(e){console.log("")}' "$TMPDIR/audit_${pid}.search" 2>/dev/null)
+    fi
+    ch=0; ccls=""; pcls=""; dcls=""
     if [ -n "$mid" ]; then
-        code=$(probe "$BASE/api/manga/$pid/$mid" "$TMPDIR/audit_${pid}.detail") || code=000
-        g_ok=$(has '"genres":\[' "$TMPDIR/audit_${pid}.detail")
-        ch=$(has '"chapter_num"' "$TMPDIR/audit_${pid}.detail" >/dev/null 2>&1 && rg -c '"released_at":"[^"]+"' "$TMPDIR/audit_${pid}.detail" || echo 0)
+        code=$(curl -s --max-time "$TIMEOUT" -o "$TMPDIR/audit_${pid}.detail" -w '%{http_code}' "$BASE/api/sandbox/plugins/${pid}/detail/${mid}")
+        g_ok=$(node -e 'try{const d=JSON.parse(require("fs").readFileSync(process.argv[1],"utf8"));console.log(Array.isArray(d.genres)&&d.genres.length>0?"1":"0")}catch(e){console.log("0")}' "$TMPDIR/audit_${pid}.detail" 2>/dev/null)
         dcls=$(classify "$code" "$g_ok")
-        # pages: first chapter id
-        cid=$(node -e 'try{const d=JSON.parse(require("fs").readFileSync(process.argv[1],"utf8"));console.log((d.chapters&&d.chapters[0]&&d.chapters[0].id)||"")}catch(e){console.log("")}' "$TMPDIR/audit_${pid}.detail" 2>/dev/null)
+        # chapters: dedicated sandbox endpoint carries released_at.
+        ccode=$(curl -s --max-time "$TIMEOUT" -o "$TMPDIR/audit_${pid}.chapters" -w '%{http_code}' "$BASE/api/sandbox/plugins/${pid}/chapters/${mid}")
+        ch=$(node -e 'try{const a=JSON.parse(require("fs").readFileSync(process.argv[1],"utf8"));console.log(Array.isArray(a)?a.filter(c=>c.released_at&&c.released_at!=="").length:"0")}catch(e){console.log("0")}' "$TMPDIR/audit_${pid}.chapters" 2>/dev/null)
+        ccls=$(classify "$ccode" "1")
+        cid=$(node -e 'try{const a=JSON.parse(require("fs").readFileSync(process.argv[1],"utf8"));console.log(Array.isArray(a)&&a[0]?a[0].id:"")}catch(e){console.log("")}' "$TMPDIR/audit_${pid}.chapters" 2>/dev/null)
         if [ -n "$cid" ]; then
-            # Encode the chapter id: multi-segment ids (fanfox "slug/c005.5")
-            # must stay a single chi {chapterID} segment, or the request 404s
-            # at the router before Lua runs and the row is misclassified.
             cid_enc="$(urlencode "$cid")"
-            code=$(probe "$BASE/api/sandbox/plugins/$pid/pages/$cid_enc" "$TMPDIR/audit_${pid}.pages")
-            pl_ok=$(has '"url"' "$TMPDIR/audit_${pid}.pages")
+            code=$(curl -s --max-time "$TIMEOUT" -o "$TMPDIR/audit_${pid}.pages" -w '%{http_code}' "$BASE/api/sandbox/plugins/${pid}/pages/${cid_enc}")
+            pl_ok=$(node -e 'try{const j=JSON.parse(require("fs").readFileSync(process.argv[1],"utf8"));const p=j.pages||j;console.log(Array.isArray(p)&&p.length>0&&p[0].url?"1":"0")}catch(e){console.log("0")}' "$TMPDIR/audit_${pid}.pages" 2>/dev/null)
             pcls=$(classify "$code" "$pl_ok")
-            ccls=$(classify 200 "$ch")
         else
-            ccls="BROKEN(nochapterFAQ)"
+            ccls="BROKEN(nochapter)"
             pcls="BROKEN(nochapter)"
         fi
     else
@@ -89,12 +98,11 @@ for pid in $plugins; do
     fi
     [ "$first" = "1" ] && first=0 || printf ",\n" >> "$OUT_JSON"
     printf '{"plugin":"%s","search":"%s","detail":"%s","chapters_with_date":%s,"pages":"%s"}' \
-        "$pid" "$search_cls" "$dcls" "${ch:-0}" "$pcls" >> "$OUT_JSON"
-    # md row
-    md_line="| $pid | $search_cls | $dcls | ${ch:-0} | $pcls |"
+        "$pid" "$search_cls" "${dcls:-MISSING}" "${ch:-0}" "${pcls:-MISSING}" >> "$OUT_JSON"
+    md_line="| $pid | $search_cls | ${dcls:-MISSING} | ${ch:-0} | ${pcls:-MISSING} |"
     if [ "$n" = "1" ]; then
-        printf '%s\n|---|---|---|---|---|\n' \
-"| plugin | search | detail | chapters w/ date | pages |" > "$OUT_MD"
+        printf '| plugin | search | detail | chapters w/ date | pages |\n' > "$OUT_MD"
+        printf '|---|---|---|---|---|\n' >> "$OUT_MD"
     fi
     printf '%s\n' "$md_line" >> "$OUT_MD"
 done
