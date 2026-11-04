@@ -23,6 +23,8 @@ type Proxy struct {
 	manualCookies    map[string]bool                  // per-plugin manual_cookies hint
 	pins             map[string]string                // pluginID -> pinned profile ("stdlib" = use doRequestStd)
 	hints            map[string][]string              // pluginID -> ordered profile ladder from metadata
+	uaPins           map[string]string                // pluginID -> remembered winning User-Agent entry (in-memory only, no persist)
+	uaLists          map[string][]string              // pluginID -> plugin-declared ordered User-Agent ladder
 	persistPin       func(pluginID, profile string)   // persists pin to DB; nil-safe
 	cdp              CDPConfig
 	pluginCDPTimeout map[string]time.Duration // per-plugin CDP solve budget (PLUGIN timeout key)
@@ -76,6 +78,8 @@ func NewProxy() *Proxy {
 		manualCookies:    make(map[string]bool),
 		pins:             make(map[string]string),
 		hints:            make(map[string][]string),
+		uaPins:           make(map[string]string),
+		uaLists:          make(map[string][]string),
 		pluginCDPTimeout: make(map[string]time.Duration),
 		solveChallenge:   solveChallenge,
 		stdlibTransport: &nethttp.Transport{

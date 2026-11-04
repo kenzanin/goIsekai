@@ -44,7 +44,13 @@ func (p *Proxy) doRequestStd(ctx context.Context, pluginID string, req types.HTT
 	for k, v := range p.headerMap(req.Headers) {
 		sreq.Header.Set(k, v)
 	}
-	if ua := p.uaOverride(pluginID); ua != "" {
+	perReqUA := ""
+	for k, v := range req.Headers {
+		if strings.EqualFold(k, "User-Agent") {
+			perReqUA = v
+		}
+	}
+	if ua := p.resolveUserAgent(pluginID, perReqUA); ua != "" {
 		sreq.Header.Set("User-Agent", ua)
 		p.reapplySecCHUAStd(sreq.Header)
 	}

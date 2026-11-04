@@ -2,10 +2,12 @@ package bridge
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
 	"time"
 
+	"goisekai/internal/hostnet"
 	"goisekai/internal/logger"
 	"goisekai/pkg/types"
 )
@@ -65,7 +67,7 @@ func (s *AppService) fetchImageWithRetry(
 		if pace {
 			s.paceImage(host)
 		}
-		resp, err = s.proxy.RequestContext(ctx, pluginID, types.HTTPRequest{
+		resp, err = s.proxy.RequestImageContext(ctx, pluginID, types.HTTPRequest{
 			Method:  http.MethodGet,
 			URL:     url,
 			Headers: withReferer(headers, ref),
@@ -86,6 +88,13 @@ func (s *AppService) fetchImageWithRetry(
 		if ctx.Err() != nil {
 			logger.Debug("image fetch abandoned", "url", url, "plugin", pluginID, "reason", ctx.Err())
 			return nil, ctx.Err()
+		}
+		// A challenge error is not "the same request failing again": the proxy
+		// has already walked the whole identity ladder and every identity was
+		// blocked. Retrying identical would just burn the same wall.
+		if errors.Is(err, hostnet.ErrChallenge) {
+			logger.Warn("image blocked by anti-bot challenge after identity ladder", "url", url, "plugin", pluginID)
+			return nil, err
 		}
 		if err != nil || resp.Status < 200 || resp.Status >= 300 {
 			// A 404 means the page is not on the CDN, which no referer and no

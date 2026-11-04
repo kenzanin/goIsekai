@@ -22,7 +22,7 @@ import (
 // user-agent, referer, max_cache_gb) live. Unsafe fields like
 // host/port/cdp_engine need a restart, so they are deliberately not applied here.
 // dataDir locates the image cache for prune-on-lower.
-func startConfigWatch(cfgPath string, proxy *hostnet.Proxy, maxCacheGB *atomic.Int64, dataDir string) {
+func startConfigWatch(cfgPath string, proxy *hostnet.Proxy, maxCacheGB *atomic.Int64, dataDir string, libraryProtection func() func(string) bool) {
 	_ = config.Watch(cfgPath, 5*time.Second, func(updated *config.Config) {
 		if err := logger.Init(updated.LogLevel); err != nil {
 			logger.Warn("config reload: bad log level", "log_level", updated.LogLevel, "error", err)
@@ -41,7 +41,11 @@ func startConfigWatch(cfgPath string, proxy *hostnet.Proxy, maxCacheGB *atomic.I
 		if updated.MaxCacheGB > 0 && updated.MaxCacheGB < prevGB {
 			go func() {
 				pruneMu.Lock()
-				freed, err := pruneImageCache(updated, dataDir, updated.MaxCacheGB)
+				var protect func(string) bool
+				if libraryProtection != nil {
+					protect = libraryProtection()
+				}
+				freed, err := pruneImageCache(updated, dataDir, updated.MaxCacheGB, protect)
 				pruneMu.Unlock()
 				if err != nil {
 					logger.Error("config reload: prune image cache", "error", err)
@@ -62,7 +66,7 @@ var pruneMu sync.Mutex
 // maxCacheGB holds the hot-reloadable image-cache size cap (float64 bits).
 // The pool handles the periodic maintenance jobs; a stop channel is returned
 // for graceful shutdown. Initial work runs immediately.
-func startMaintenance(ctx context.Context, db *database.DB, cfg *config.Config, dataDir string, maxCacheGB *atomic.Int64, pool *workers.Pool) chan struct{} {
+func startMaintenance(ctx context.Context, db *database.DB, cfg *config.Config, dataDir string, maxCacheGB *atomic.Int64, pool *workers.Pool, libraryProtection func() func(string) bool) chan struct{} {
 	backupsDir := filepath.Join(dataDir, "backups")
 	healFTS := func() {
 		rebuilt, err := db.EnsureLibraryFTS()
@@ -83,9 +87,13 @@ func startMaintenance(ctx context.Context, db *database.DB, cfg *config.Config, 
 	}
 	// Keep the library search index consistent with library membership.
 	healFTS()
+	var protect func(string) bool
+	if libraryProtection != nil {
+		protect = libraryProtection()
+	}
 	// Prune image cache at startup based on MaxCacheGB config.
 	pruneMu.Lock()
-	_, err := pruneImageCache(cfg, dataDir, maxCacheGBBits(maxCacheGB))
+	_, err := pruneImageCache(cfg, dataDir, maxCacheGBBits(maxCacheGB), protect)
 	pruneMu.Unlock()
 	if err != nil {
 		logger.Error("prune image cache at startup", "error", err)
@@ -118,8 +126,12 @@ func startMaintenance(ctx context.Context, db *database.DB, cfg *config.Config, 
 		} else {
 			logger.Info("db backup written", "dir", backupsDir, "keep", cfg.BackupKeep)
 		}
+		var protect func(string) bool
+		if libraryProtection != nil {
+			protect = libraryProtection()
+		}
 		pruneMu.Lock()
-		_, err := pruneImageCache(cfg, dataDir, maxCacheGBBits(maxCacheGB))
+		_, err := pruneImageCache(cfg, dataDir, maxCacheGBBits(maxCacheGB), protect)
 		pruneMu.Unlock()
 		if err != nil {
 			logger.Error("prune image cache", "error", err)

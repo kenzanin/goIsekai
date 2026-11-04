@@ -2,6 +2,7 @@ package bridge
 
 import (
 	"os"
+	"time"
 
 	"goisekai/internal/logger"
 )
@@ -43,6 +44,14 @@ func (s *AppService) cachedImage(pluginID, mangaID, chapterID, url string) ([]by
 			// Invalid cached image: delete stale file and treat as miss.
 			_ = os.Remove(base + ext)
 			continue
+		}
+		// Recency marker for the prune: a serve refreshes the file's mtime so
+		// the recency-aware prune keeps it while untouched neighbours age out.
+		// Touched only when older than an hour so a burst of reads does not
+		// churn metadata on every render. Ignoring errors is fine: an untouched
+		// mtime only makes the file slightly more prune-eligible.
+		if fi, statErr := os.Stat(base + ext); statErr == nil && time.Since(fi.ModTime()) > time.Hour {
+			_ = os.Chtimes(base+ext, time.Now(), time.Now())
 		}
 		s.imageMu.Lock()
 		s.imageCache[url] = data

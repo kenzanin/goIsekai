@@ -1,9 +1,11 @@
 package httpserver
 
 import (
+	"errors"
 	"net/http"
 
 	"goisekai/internal/bridge"
+	"goisekai/internal/hostnet"
 )
 
 // registerImageRoutes mounts the binary image proxy endpoint. Pages reference
@@ -52,6 +54,14 @@ func (s *Server) handleImage(w http.ResponseWriter, r *http.Request) {
 		if r.Context().Err() != nil {
 			// Abandoned, not failed: the client is gone. Nothing to write.
 			s.logger.Debug("image fetch abandoned", "url", url, "pluginID", pluginID, "reason", err)
+			return
+		}
+		// A challenge error is the anti-bot page serving itself as the image:
+		// every identical URL stack of these as ERROR would drown the log, so
+		// one Warn per URL and a dedicated status the reader can show.
+		if errors.Is(err, hostnet.ErrChallenge) {
+			s.logger.Warn("image blocked by anti-bot challenge", "url", url, "pluginID", pluginID)
+			http.Error(w, "source requires verification", http.StatusServiceUnavailable)
 			return
 		}
 		s.logger.Error("image fetch", "url", url, "pluginID", pluginID, "error", err)

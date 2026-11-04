@@ -61,7 +61,7 @@ func TestPruneImageCache(t *testing.T) {
 	// Set limit to keep only the newest file (total - oldest).
 	limitGB := float64(totalSize-oldestSize.Size()) / (1024 * 1024 * 1024)
 
-	freed, err := pruneImageCache(cfg, tmpDir, limitGB)
+	freed, err := pruneImageCache(cfg, tmpDir, limitGB, nil)
 	if err != nil {
 		t.Fatalf("pruneImageCache: %v", err)
 	}
@@ -86,6 +86,104 @@ func TestPruneImageCache(t *testing.T) {
 
 	_ = middleSize // avoid unused variable warning
 	_ = newestSize // avoid unused variable warning
+}
+
+// writeCacheFile writes a small file and sets its mtime to age ago.
+func writeCacheFile(t *testing.T, path string, age time.Duration) int64 {
+	t.Helper()
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	data := bytes.Repeat([]byte("x"), 1024)
+	if err := os.WriteFile(path, data, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	when := time.Now().Add(-age)
+	if err := os.Chtimes(path, when, when); err != nil {
+		t.Fatal(err)
+	}
+	return int64(len(data))
+}
+
+// TestPruneImageCacheProtection covers task 3.5: the library protection
+// predicate reorders eviction, and max_cache_gb 0 deletes nothing.
+func TestPruneImageCacheProtection(t *testing.T) {
+	tmpDir := t.TempDir()
+	cacheDir := filepath.Join(tmpDir, "cache", "images")
+	cfg := &config.Config{CacheDir: filepath.Join(tmpDir, "cache")}
+
+	// The predicate protects exactly one path, the "library" file.
+	library := filepath.Join(cacheDir, "lib.jpg")
+	browsing := filepath.Join(cacheDir, "browse.jpg")
+	newer := filepath.Join(cacheDir, "newer.jpg")
+	protected := func(p string) bool { return p == library }
+
+	t.Run("unprotected goes first regardless of age", func(t *testing.T) {
+		writeCacheFile(t, library, 48*time.Hour)       // oldest, but protected
+		sz := writeCacheFile(t, browsing, time.Minute) // newest, but unprotected
+		freed, err := pruneImageCache(cfg, tmpDir, float64(sz)/(1024*1024*1024), protected)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if freed != sz {
+			t.Errorf("freed = %d, want %d", freed, sz)
+		}
+		if _, err := os.Stat(browsing); !os.IsNotExist(err) {
+			t.Error("unprotected file should be deleted first")
+		}
+		if _, err := os.Stat(library); os.IsNotExist(err) {
+			t.Error("protected file should survive while unprotected files remain")
+		}
+	})
+
+	t.Run("cap is met when only library files remain", func(t *testing.T) {
+		lib2 := filepath.Join(cacheDir, "lib2.jpg")
+		writeCacheFile(t, lib2, time.Hour)
+		freed, err := pruneImageCache(cfg, tmpDir, 1e-12, func(p string) bool { return true })
+		if err != nil {
+			t.Fatal(err)
+		}
+		if freed == 0 {
+			t.Error("protected files must still be deleted once nothing else remains")
+		}
+		if entries, _ := os.ReadDir(cacheDir); len(entries) != 0 {
+			t.Errorf("cache not emptied: %v", entries)
+		}
+	})
+
+	t.Run("touched old file outlives untouched newer one", func(t *testing.T) {
+		old := filepath.Join(cacheDir, "old.jpg")
+		writeCacheFile(t, old, 48*time.Hour)
+		writeCacheFile(t, newer, time.Minute)
+		// A read "touches" the old file: its mtime becomes newer than `newer`.
+		if err := os.Chtimes(old, time.Now(), time.Now()); err != nil {
+			t.Fatal(err)
+		}
+		sz, _ := os.Stat(newer)
+		if _, err := pruneImageCache(cfg, tmpDir, float64(sz.Size())/(1024*1024*1024), nil); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := os.Stat(newer); !os.IsNotExist(err) {
+			t.Error("untouched newer file should be deleted")
+		}
+		if _, err := os.Stat(old); os.IsNotExist(err) {
+			t.Error("touched old file should survive")
+		}
+	})
+
+	t.Run("max_cache_gb 0 deletes nothing", func(t *testing.T) {
+		writeCacheFile(t, filepath.Join(cacheDir, "keep.jpg"), time.Hour)
+		freed, err := pruneImageCache(cfg, tmpDir, 0, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if freed != 0 {
+			t.Errorf("freed = %d, want 0", freed)
+		}
+		if entries, _ := os.ReadDir(cacheDir); len(entries) == 0 {
+			t.Error("cap 0 deleted files")
+		}
+	})
 }
 
 // waitCount polls until cacheImages holds n files or the deadline passes.
@@ -194,7 +292,7 @@ func TestConfigWatchPruneOnLower(t *testing.T) {
 			capV := &atomic.Int64{}
 			capV.Store(int64(math.Float64bits(999)))
 
-			go startConfigWatch(cfgPath, proxy, capV, tmp)
+			go startConfigWatch(cfgPath, proxy, capV, tmp, nil)
 
 			// The first reload (arm) proves the watcher sees writes; renames
 			// re-armed only via mtime, so arm and final are also the needed
@@ -236,12 +334,12 @@ func TestConcurrentPrunesNoDoubleDelete(t *testing.T) {
 	for range 2 {
 		wg.Go(func() {
 			pruneMu.Lock()
-			_, _ = pruneImageCache(cfg, tmp, 1e-9) // tiny cap: every file is prunable
+			_, _ = pruneImageCache(cfg, tmp, 1e-9, nil) // tiny cap: every file is prunable
 			pruneMu.Unlock()
 		})
 	}
 	wg.Wait()
-	if freed, err := pruneImageCache(cfg, tmp, 1e-9); err != nil || freed != 0 {
+	if freed, err := pruneImageCache(cfg, tmp, 1e-9, nil); err != nil || freed != 0 {
 		t.Fatalf("re-prune freed=%d err=%v, want 0/no-error", freed, err)
 	}
 }

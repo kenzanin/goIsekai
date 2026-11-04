@@ -185,6 +185,13 @@ type PluginMeta struct {
 	// "firefox_148", "chrome_131") or "stdlib" for Go's stock TLS + h2.
 	// Empty → host default (Chrome_146) then the built-in auto ladder.
 	HTTPProfiles []string `json:"http_profiles,omitempty"`
+	// UserAgents optionally declares an ordered User-Agent ladder. The first
+	// entry is sent from the first request; later entries are tried only when
+	// the current one is blocked, and the first entry that clears a block is
+	// remembered for the process life. The literal "default" stands for the
+	// host's configured User-Agent. Empty entries are ignored; an absent list
+	// keeps the host default.
+	UserAgents []string `json:"user_agents,omitempty"`
 	// Name is the human-readable site name (e.g. "MangaDex"). Falls back to the
 	// plugin ID when empty.
 	Name string `json:"name,omitempty"`

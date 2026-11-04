@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"maps"
 	"strings"
 
 	http "github.com/bogdanfinn/fhttp"
@@ -12,17 +13,36 @@ import (
 )
 
 // tryLadder walks the candidate ladder (plugin hints then the default ladder),
-// retrying the request with each untried profile. It returns the first
-// response that is not a challenge and not a WAF block, and pins the winning
-// profile only when that response is a clean 2xx/3xx (a 429/5xx from a rung is
-// a real origin answer, not a fingerprint win — it must not become permanent).
+// retrying the request with each untried profile. On each profile it first
+// walks the plugin's remaining User-Agent entries (task 1.5) before falling
+// through to the next TLS profile; a UA that clears the block on the current
+// profile is pinned and returned. It returns the first response that is not
+// blocked (a challenge, a WAF block, or an extra block the caller reports —
+// the image path passes isHTMLImageBlock so a 200 HTML interstitial keeps the
+// walk going instead of being pinned as a win), and pins the winning profile
+// only when that response is a clean 2xx/3xx (a 429/5xx from a rung is a real
+// origin answer, not a fingerprint win — it must not become permanent).
 // ok is false when every candidate fails.
-func (p *Proxy) tryLadder(ctx context.Context, pluginID string, req types.HTTPRequest) (types.HTTPResponse, bool) {
+func (p *Proxy) tryLadder(ctx context.Context, pluginID string, req types.HTTPRequest, extraBlock func(types.HTTPResponse) bool) (types.HTTPResponse, bool) {
 	tried := p.pin(pluginID)
 	if tried == "" {
 		tried = defaultProfileName
 	}
 	seen := map[string]bool{tried: true}
+	seenUA := map[string]bool{}
+
+	blocked := func(resp types.HTTPResponse) bool {
+		if isChallengeResponse(resp) || isWafBlock(resp) {
+			return true
+		}
+		return extraBlock != nil && extraBlock(resp)
+	}
+
+	// A verify-seeded or pinned UA already tried by the caller before reaching
+	// tryLadder counts as attempted, so the walk starts from the untried rest.
+	if p.uaPin(pluginID) != "" {
+		seenUA[p.uaPin(pluginID)] = true
+	}
 
 	// Without a browser engine fallback, a block-all origin burns the entire
 	// profile ladder on every request (8 probes). When no pin exists yet,
@@ -30,6 +50,31 @@ func (p *Proxy) tryLadder(ctx context.Context, pluginID string, req types.HTTPRe
 	// cost. Pinned plugins still get full rotation (the pin may have gone
 	// stale).
 	candidates := p.ladderFor(pluginID)
+
+	// runProfile executes the request on profile `name` with an explicit UA
+	// override (empty = no override, the resolved default is used).
+	runProfile := func(name, uaOverride string) (types.HTTPResponse, bool, error) {
+		orig := req.Headers
+		probe := types.HTTPRequest{
+			Method:  req.Method,
+			URL:     req.URL,
+			Body:    req.Body,
+			Headers: map[string]string{},
+		}
+		maps.Copy(probe.Headers, orig)
+		if uaOverride != "" {
+			probe.Headers["User-Agent"] = uaOverride
+		}
+		var resp types.HTTPResponse
+		var rerr error
+		if name == stdlibProfileName {
+			resp, rerr = p.doRequestStd(ctx, pluginID, probe)
+		} else {
+			resp, rerr = p.doRequestProfile(ctx, pluginID, name, probe)
+		}
+		ok := rerr == nil && !blocked(resp)
+		return resp, ok, rerr
+	}
 
 	for _, name := range candidates {
 		// Cancelled caller: stop probing profiles rather than burning the rest
@@ -42,22 +87,46 @@ func (p *Proxy) tryLadder(ctx context.Context, pluginID string, req types.HTTPRe
 		}
 		seen[name] = true
 
-		if name == stdlibProfileName {
-			retried, rerr := p.doRequestStd(ctx, pluginID, req)
-			if rerr == nil && !isChallengeResponse(retried) && !isWafBlock(retried) {
-				if retried.Status < 400 {
+		// Walk the plugin's untried User-Agent entries on this profile before
+		// falling through to the next TLS profile (decision 3). A plugin that
+		// declares no ladder probes exactly once per rung with the resolved
+		// (host-default) UA — the pre-ladder shape — so probes-per-rung only
+		// grows for plugins that opt in via user_agents.
+		var walk []string
+		if p.uaList(pluginID) != nil {
+			walk = p.uaCandidates(pluginID)
+		} else {
+			walk = []string{""} // no override: resolveUserAgent picks the default
+		}
+		for _, ua := range walk {
+			if ctx.Err() != nil {
+				break
+			}
+			if p.uaList(pluginID) != nil {
+				if seenUA[ua] {
+					continue
+				}
+				seenUA[ua] = true
+			}
+			retried, ok, rerr := runProfile(name, ua)
+			if rerr != nil || !ok {
+				continue
+			}
+			if retried.Status < 400 {
+				// A clean answer: pin the profile, and the winning UA entry
+				// only when the plugin declared a ladder.
+				if name == stdlibProfileName {
 					p.markStdlib(pluginID)
+				} else {
+					p.setPin(pluginID, name)
+				}
+				if p.uaList(pluginID) != nil {
+					p.setUaPin(pluginID, ua)
 				}
 				return retried, true
 			}
-			continue
-		}
-
-		retried, rerr := p.doRequestProfile(ctx, pluginID, name, req)
-		if rerr == nil && !isChallengeResponse(retried) && !isWafBlock(retried) {
-			if retried.Status < 400 {
-				p.setPin(pluginID, name)
-			}
+			// A 429/5xx is a real origin answer, not a fingerprint win: hand
+			// it to the caller unpinned (matches the profile-rung rule).
 			return retried, true
 		}
 	}
@@ -109,10 +178,17 @@ func (p *Proxy) doRequestProfile(ctx context.Context, pluginID, profileName stri
 
 	httpReq.Header = p.buildHeaders(req.Headers)
 
-	// A per-plugin UA override (from SetVerifyCookies) wins over both the
-	// default and any per-request User-Agent so the clearance cookie always
-	// travels with the browser identity it was issued to.
-	if ua := p.uaOverride(pluginID); ua != "" {
+	// A per-request UA the plugin set on this call, and the plugin's declared
+	// ladder (first/pinned entry), resolve through one helper so the tls and
+	// stdlib paths cannot drift. A verify-seeded UA still wins over both;
+	// Sec-CH-UA is kept in lockstep by the reapply below.
+	perReqUA := ""
+	for k, v := range req.Headers {
+		if strings.EqualFold(k, "User-Agent") {
+			perReqUA = v
+		}
+	}
+	if ua := p.resolveUserAgent(pluginID, perReqUA); ua != "" {
 		httpReq.Header.Set("User-Agent", ua)
 		p.reapplySecCHUA(httpReq.Header)
 	}

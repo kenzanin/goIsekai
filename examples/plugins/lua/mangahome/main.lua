@@ -176,10 +176,19 @@ function get_manga_detail(arg)
 	if string.sub(cover, 1, 2) == "//" then
 		cover = "https:" .. cover
 	end
-	-- genres: chips linking into /directory
+	-- genres: chips inside the "Genre(s):" cell. The site restructured from
+	-- <a href="/directory/{slug}"> to <a href="/{slug}"> — match bare /{slug}
+	-- links (deduped); empty cells (some titles list no genres) must not mask
+	-- populated ones.
 	local genres = {}
-	for g in string.gmatch(body, 'href="/directory/[^"]*"[^>]*>([^<]+)</a>') do
-		genres[#genres + 1] = trim(g)
+	local seen = {}
+	local cell = string.match(body, [[Genre%(s%):</span>%s*.-</p>]]) or ""
+	for g in string.gmatch(cell, 'href="/directory/[^"]*"[^>]*>([^<]+)</a>') do
+		if not seen[g] then seen[g] = true genres[#genres + 1] = trim(g) end
+	end
+	for name in string.gmatch(cell, '%s*<a[^>]*>([^<]+)</a>') do
+		local t = trim(name)
+		if t ~= "" and not seen[t] then seen[t] = true genres[#genres + 1] = t end
 	end
 	local status = string.match(body, ">(Ongoing)<") and "ongoing"
 		or (string.match(body, ">(Completed)<") and "completed" or "")

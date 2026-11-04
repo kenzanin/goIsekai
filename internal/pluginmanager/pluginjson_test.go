@@ -51,4 +51,21 @@ func TestReadPluginJSONMeta(t *testing.T) {
 			t.Fatalf("want zero meta, got %+v", meta)
 		}
 	})
+	t.Run("user_agents", func(t *testing.T) {
+		dir := t.TempDir()
+		if err := os.WriteFile(filepath.Join(dir, "plugin.json"),
+			[]byte(`{"name":"MD","user_agents":["goIsekai/1.0 (personal reader)","default"]}`), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		meta := readPluginJSONMeta(dir)
+		want := []string{"goIsekai/1.0 (personal reader)", "default"}
+		if len(meta.UserAgents) != len(want) {
+			t.Fatalf("UserAgents = %v, want %v", meta.UserAgents, want)
+		}
+		for i, u := range want {
+			if meta.UserAgents[i] != u {
+				t.Fatalf("UserAgents[%d] = %q, want %q", i, meta.UserAgents[i], u)
+			}
+		}
+	})
 }

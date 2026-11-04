@@ -2,6 +2,7 @@ package hostnet
 
 import (
 	"context"
+	"strings"
 
 	"goisekai/pkg/types"
 )
@@ -27,6 +28,130 @@ func (p *Proxy) SetHTTPProfiles(pluginID string, names []string) {
 		return
 	}
 	p.hints[pluginID] = filtered
+}
+
+// SetUserAgents stores a plugin-declared ordered User-Agent ladder. Empty
+// entries are dropped and the literal "default" is kept as a marker that
+// resolves to the host's configured User-Agent at send time. An empty (or
+// all-filtered) list clears any previously stored ladder so a manifest that
+// drops user_agents resets the plugin to the host default on reload.
+func (p *Proxy) SetUserAgents(pluginID string, list []string) {
+	var filtered []string
+	seen := map[string]bool{}
+	for _, u := range list {
+		u = strings.TrimSpace(u)
+		if u == "" || seen[u] {
+			continue
+		}
+		seen[u] = true
+		filtered = append(filtered, u)
+	}
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	if len(filtered) == 0 {
+		delete(p.uaLists, pluginID)
+		// A manifest that drops user_agents resets the identity: a remembered
+		// pin for the old list is stale and would keep a blocked entry active.
+		delete(p.uaPins, pluginID)
+		return
+	}
+	p.uaLists[pluginID] = filtered
+}
+
+// uaList returns the plugin's declared User-Agent ladder, empty when the
+// plugin declares none.
+func (p *Proxy) uaList(pluginID string) []string {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	return p.uaLists[pluginID]
+}
+
+// uaPin returns the remembered winning User-Agent entry for pluginID, or "".
+// A pin of "default" is not resolved here — the resolution to the host's
+// configured value happens at send time so a config reload of the host UA
+// still applies.
+func (p *Proxy) uaPin(pluginID string) string {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	return p.uaPins[pluginID]
+}
+
+// setUaPin remembers the first User-Agent entry that cleared a block for
+// pluginID. In-memory only (decision 2): no DB persistence; the upgrade
+// path is a plugins.ua_pin column wired like http_profile.
+func (p *Proxy) setUaPin(pluginID, ua string) {
+	p.mu.Lock()
+	p.uaPins[pluginID] = ua
+	p.mu.Unlock()
+}
+
+// clearUaPin drops the remembered User-Agent entry for pluginID.
+func (p *Proxy) clearUaPin(pluginID string) {
+	p.mu.Lock()
+	delete(p.uaPins, pluginID)
+	p.mu.Unlock()
+}
+
+// resolveUserAgent returns the User-Agent value to send for a request by
+// pluginID that already carries reqUA (a per-request "User-Agent" header, ""
+// when the plugin did not set one). Precedence: verify-seeded override,
+// per-request header, the plugin's remembered (pin) or first declared entry,
+// host default. The literal "default" entry resolves to the host's
+// configured value. One helper shared by the tls-client and stdlib request
+// paths so the precedence cannot drift between them.
+func (p *Proxy) resolveUserAgent(pluginID, reqUA string) string {
+	if ua := p.uaOverride(pluginID); ua != "" {
+		return ua
+	}
+	if reqUA != "" {
+		return reqUA
+	}
+	p.mu.Lock()
+	entries := p.uaLists[pluginID]
+	pin := p.uaPins[pluginID]
+	ua, _ := p.defaultHeaders["User-Agent"]
+	p.mu.Unlock()
+	if pin != "" {
+		entries = append([]string{pin}, entries...)
+	}
+	if len(entries) == 0 {
+		return ua
+	}
+	if entries[0] == "default" {
+		return ua
+	}
+	return entries[0]
+}
+
+// uaCandidates returns the ordered User-Agent values to walk on the current
+// profile when the plugin's current identity is blocked: the declared ladder
+// entries after the pinned one, with "default" resolved to the host value.
+// A plugin that declared no ladder yields a single entry (the host default),
+// so the TLS-profile ladder keeps its current walk shape.
+func (p *Proxy) uaCandidates(pluginID string) []string {
+	p.mu.Lock()
+	entries := p.uaLists[pluginID]
+	pin := p.uaPins[pluginID]
+	ua, _ := p.defaultHeaders["User-Agent"]
+	p.mu.Unlock()
+	if len(entries) == 0 {
+		return []string{ua}
+	}
+	var rest []string
+	for _, e := range entries {
+		if e != pin {
+			rest = append(rest, e)
+		}
+	}
+	if len(rest) == 0 {
+		rest = []string{entries[0]}
+	}
+	for i, e := range rest {
+		if e == "default" {
+			rest[i] = ua
+		}
+	}
+	return rest
 }
 
 // SetPinnedProfiles bulk-loads persisted pins at startup.
@@ -65,9 +190,13 @@ func (p *Proxy) setPin(pluginID, profile string) {
 	}
 }
 
-// clearPin removes the in-memory pin and persists the empty string.
+// clearPin removes the in-memory pin and persists the empty string. It also
+// drops the plugin's remembered User-Agent pin: resetting a plugin's profile
+// from the plugins page re-learns the whole identity, so a stale UA pin
+// would keep the block on the next request.
 func (p *Proxy) clearPin(pluginID string) {
 	p.setPin(pluginID, "")
+	p.clearUaPin(pluginID)
 }
 
 // ClearPin is the exported wrapper for clearPin, used by the action handler.

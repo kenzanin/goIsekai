@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 )
 
 // diskCachePath returns the L2 cache file path prefix (SHA256 hex, no
@@ -54,8 +55,68 @@ func (s *AppService) diskCachePath(pluginID, mangaID, chapterID, url string) str
 	return filepath.Join(s.cacheDir, "images", pluginID, sub, hex.EncodeToString(h[:8]))
 }
 
-// evictCoverURL drops one cover URL from L1 (imageCache) and L2 (disk file
-// across all encoded extensions). Mirrors the refetchCover evict block.
+// LibraryProtection returns the prune-recency predicate for the image cache:
+// a path is protected when it is a library manga's cover (base path through
+// diskCachePath), any file in `images/<pluginID>/<sourceMangaID>/` for a
+// library manga (chapter page images), or — because `diskCachePath` for covers
+// writes directly into `images/<pluginID>/library/` keyed by URL hash — a URL
+// that is the current cover of a library row. Alt covers (alt_covers table)
+// are excluded: they are candidates, not served images, so their cache files
+// are the same covers listed under their parent manga's CoverURL. Nil
+// predicate means "protect nothing"; the prune then behaves like the old
+// age-only prune. lonjasi: callers re-derive this before each prune so a
+// library change made mid-process is picked up on the next run instead of
+// stale.
+func (s *AppService) LibraryProtection() func(path string) bool {
+	if s.cacheDir == "" {
+		return nil
+	}
+	list, err := s.ListLibrary()
+	if err != nil || len(list) == 0 {
+		return nil
+	}
+	protected := map[string]bool{ // dir or file path prefix, absolute
+	}
+	for _, m := range list {
+		if m.PluginID == "" || m.SourceMangaID == "" {
+			continue
+		}
+		if m.CoverURL != "" {
+			if base := s.diskCachePath(m.PluginID, "", "", m.CoverURL); base != "" {
+				for _, ext := range []string{"." + string(FormatAVIF), "." + string(FormatWebP), ".img", "." + string(FormatJXL)} {
+					protected[base+ext] = true
+				}
+			}
+		}
+		mangaDir := filepath.Join(s.cacheDir, "images", m.PluginID, m.SourceMangaID)
+		protected[mangaDir] = true
+	}
+	return func(path string) bool {
+		return strings.HasPrefix(path, filepath.Join(s.cacheDir, "images")) && protectedPath(path, s.cacheDir, protected)
+	}
+}
+
+// protectedPath reports whether a cache file path is protected against prune.
+// An exact cover-file hit is protected; a library-manga directory prefix
+// (images/<pluginID>/<sourceMangaID>/) matches any file under it.
+func protectedPath(path, cacheDir string, protected map[string]bool) bool {
+	if protected[path] {
+		return true
+	}
+	// Walk up parent directories looking for a protected directory.
+	dir := filepath.Dir(path)
+	for {
+		if protected[dir] {
+			return true
+		}
+		parent := filepath.Dir(dir)
+		if parent == dir {
+			return false // reached the root: nothing protected above
+		}
+		dir = parent
+	}
+}
+
 func (s *AppService) evictCoverURL(pluginID, url string) {
 	if url == "" {
 		return

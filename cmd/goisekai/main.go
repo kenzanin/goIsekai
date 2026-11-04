@@ -123,7 +123,6 @@ func main() {
 	// maintenance goroutine never races with the watcher.
 	maxCacheGB := &atomic.Int64{}
 	maxCacheGB.Store(int64(math.Float64bits(cfg.MaxCacheGB)))
-	startConfigWatch(cfgPath, proxy, maxCacheGB, dataDir)
 
 	mgr := buildPluginManager(proxy, pluginsDir, infoDir, db, detailTTL, chapterTTL)
 
@@ -135,13 +134,18 @@ func main() {
 
 	svc := buildAppService(db, mgr, proxy, cfgPath, cacheDir)
 
+	// Hot-reload the safe config subset (log level, user-agent, referer,
+	// max_cache_gb). maxCacheGB carries the image-cache cap atomically so the
+	// maintenance goroutine never races with the watcher.
+	startConfigWatch(cfgPath, proxy, maxCacheGB, dataDir, svc.LibraryProtection)
+
 	// Signal handling: wait for SIGTERM/SIGINT, then shut down gracefully.
 	mainCtx, stop := signal.NotifyContext(context.Background(), syscall.SIGTERM, syscall.SIGINT)
 	defer stop()
 
 	// Maintenance: prune orphaned rows at startup, then back up + re-prune
 	// on the configured interval onto the maintenance lane.
-	maintenanceStop := startMaintenance(mainCtx, db, cfg, dataDir, maxCacheGB, svc.GetPool())
+	maintenanceStop := startMaintenance(mainCtx, db, cfg, dataDir, maxCacheGB, svc.GetPool(), svc.LibraryProtection)
 	defer close(maintenanceStop)
 
 	// Hourly background refresh of stale library manga (update_stale_days).

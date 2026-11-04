@@ -77,7 +77,7 @@ func (p *Proxy) RequestContext(ctx context.Context, pluginID string, req types.H
 	if isWafBlock(resp) {
 		htmlBlock := strings.Contains(resp.Headers["Content-Type"], "text/html")
 		if !htmlBlock {
-			if retried, ok := p.tryLadder(ctx, pluginID, req); ok {
+			if retried, ok := p.tryLadder(ctx, pluginID, req, nil); ok {
 				return retried, nil
 			}
 		}
@@ -92,6 +92,55 @@ func (p *Proxy) RequestContext(ctx context.Context, pluginID string, req types.H
 	}
 
 	return resp, nil
+}
+
+// RequestImageContext is RequestContext for the image path. The caller (the
+// bridge's image fetch) knows that a successful response must be an image —
+// knowledge the generic plugin path cannot have — so a 2xx answer whose body
+// is an HTML document is a block here, not corrupt image data: it drives the
+// same UA/TLS fallback as a recognised challenge and surfaces the challenge
+// error when everything is exhausted. Detection keys on the HTML shape of the
+// body rather than a MangaDex marker string, so another site's 200
+// interstitial is covered without a rule per site. A non-HTML body is
+// returned unchanged: a genuinely corrupt image keeps the caller's existing
+// corrupt-bytes retry.
+func (p *Proxy) RequestImageContext(ctx context.Context, pluginID string, req types.HTTPRequest) (types.HTTPResponse, error) {
+	resp, err := p.RequestContext(ctx, pluginID, req)
+	if err != nil {
+		return types.HTTPResponse{}, err
+	}
+	if resp.Status < 200 || resp.Status >= 300 {
+		return resp, nil
+	}
+	if !isHTMLImageBlock(resp) {
+		return resp, nil
+	}
+	// Blocked with an HTML interstitial served as 200: walk the plugin's
+	// untried UA entries and TLS profiles. tryLadder probes the current
+	// profile's UA entries first, then the remaining TLS profiles, and pins
+	// the first winning (profile, UA) pair.
+	if retried, ok := p.tryLadder(ctx, pluginID, req, isHTMLImageBlock); ok {
+		return retried, nil
+	}
+	// Ladder exhausted. The result of RequestContext succeeded as a response,
+	// but it is an HTML page — surfacing it as image bytes would hand a
+	// browser-verification page to the image decoder, so report the block.
+	return types.HTTPResponse{}, &ChallengeError{VerifyURL: req.URL}
+}
+
+// isHTMLImageBlock reports whether a 2xx response to an image request is an
+// HTML document rather than image data: an HTML content type, or a body that
+// starts with a DOCTYPE/html tag (some edge nodes serve the interstitial
+// without a text/html content type).
+func isHTMLImageBlock(resp types.HTTPResponse) bool {
+	if strings.Contains(resp.Headers["Content-Type"], "text/html") {
+		return true
+	}
+	if len(resp.Body) > 2*1024 {
+		return false // a real interstitial is small; big bodies are data
+	}
+	b := strings.ToLower(strings.TrimSpace(resp.Body))
+	return strings.HasPrefix(b, "<!doctype html") || strings.HasPrefix(b, "<html")
 }
 
 // HandleRequest decodes a request JSON string, executes it, and returns the

@@ -45,6 +45,7 @@ func (m *Manager) ensureLoaded(id string) error {
 	m.proxy.SetNeedsJS(id, p.meta.NeedsJS)
 	m.proxy.SetManualCookies(id, p.meta.ManualCookies)
 	m.proxy.SetHTTPProfiles(id, p.meta.HTTPProfiles)
+	m.proxy.SetUserAgents(id, p.meta.UserAgents)
 	if p.meta.Timeout > 0 {
 		m.proxy.SetPluginCDPTimeout(id, time.Duration(p.meta.Timeout)*time.Second)
 	}
@@ -97,6 +98,7 @@ func (m *Manager) registerLoaded(id string, p *loadedPlugin) {
 	m.proxy.SetNeedsJS(id, p.meta.NeedsJS)
 	m.proxy.SetManualCookies(id, p.meta.ManualCookies)
 	m.proxy.SetHTTPProfiles(id, p.meta.HTTPProfiles)
+	m.proxy.SetUserAgents(id, p.meta.UserAgents)
 	if p.meta.Timeout > 0 {
 		m.proxy.SetPluginCDPTimeout(id, time.Duration(p.meta.Timeout)*time.Second)
 	}
