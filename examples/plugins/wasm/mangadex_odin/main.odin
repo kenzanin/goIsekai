@@ -315,8 +315,16 @@ genres_impl :: proc () -> string {
 // ─── search ──────────────────────────────────────────────────────────────────
 
 // search_budget is how long the offset sweep may run. The host invoke budget is
-// 15s, so stopping at 8s returns partial results instead of failing outright.
+// 15s, and a single stalled request inside one page counts against that budget
+// too — the self-limit can only run BETWEEN pages. Host evidence: queries with
+// >800 API hits (hero/one/love/star) died at offset=800 with per-request
+// "context deadline exceeded", because the sweep walked every page of the full
+// result set. MAX_PAGES + the 8s budget keep the sweep well inside the budget
+// and the first 100 hits are the most relevant ones (order[relevance]=desc),
+// so truncating the tail loses nothing the UI would show anyway.
 SEARCH_BUDGET :: 8.0
+MAX_PAGES :: 4
+PAGE_SIZE :: 100
 
 search_impl :: proc (arg: string) -> string {
 	f: Search_Filter
@@ -364,7 +372,7 @@ search_impl :: proc (arg: string) -> string {
 		hadResult := false
 		searchedOnce := false
 	
-		for offset < total {
+		for offset < total && offset < MAX_PAGES*PAGE_SIZE {
 			if time.duration_seconds(time.tick_since(start)) > SEARCH_BUDGET {
 				break
 			}

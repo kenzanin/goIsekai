@@ -1,4 +1,6 @@
 ## 2026-11-04
+* **Update**: Linked `live-plugin-feature-audit-remaining-follow-ups.md` to `live-plugin-audit-and-sandbox-instance-pattern.md` (Enumerates what remains broken/missing after the audit change completed).
+* **Creation**: Documented concept `live-plugin-feature-audit-remaining-follow-ups.md` (Live plugin audit follow-ups: remaining broken/missing plugins and their first probes).
 * **Creation**: Documented concept `live-plugin-audit-and-sandbox-instance-pattern.md` (Live plugin audit: sandbox instance pattern and per-plugin classification).
 
 ## 2026-11-03
