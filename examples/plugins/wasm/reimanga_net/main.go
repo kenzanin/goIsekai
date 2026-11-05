@@ -138,6 +138,12 @@ type named struct {
 
 // /api/manga/<id> answers {"manga":{...},"similar":[...]} — there is no "data"
 // envelope here (that is the /api/chapters/manga/<id> shape).
+//
+// The detail payload encodes is_adult/completed as INTEGERS (0/1) even though
+// the search endpoint encodes them as booleans, so those two fields must not
+// appear here as bool: a single type mismatch makes json.Unmarshal fail and
+// detailImpl silently returns an empty manga. They are unused by the output,
+// so they are simply dropped (unknown fields are ignored).
 type detailResp struct {
 	Manga struct {
 		ID          int     `json:"id"`
@@ -146,9 +152,7 @@ type detailResp struct {
 		NameURL     string  `json:"name_url"`
 		CoverURL    string  `json:"cover_url"`
 		Description string  `json:"description"`
-		IsAdult     bool    `json:"is_adult"`
 		Status      int     `json:"status"`
-		Completed   bool    `json:"completed"`
 		Authors     []named `json:"authors"`
 		Genres      []named `json:"genres"`
 		Updated     string  `json:"updated_at"`

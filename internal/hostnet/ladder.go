@@ -178,6 +178,15 @@ func (p *Proxy) doRequestProfile(ctx context.Context, pluginID, profileName stri
 
 	httpReq.Header = p.buildHeaders(req.Headers)
 
+	// A plugin-supplied Host header is a vhost override (mangade.io's valid
+	// certificate fronts the api.mangade.io vhost this way). Promote it to
+	// req.Host: the HTTP/2 :authority reads req.Host, and leaving it only in
+	// the Header map would silently downgrade the override on h2 connections.
+	if h := httpReq.Header.Get("Host"); h != "" {
+		httpReq.Host = h
+		httpReq.Header.Del("Host")
+	}
+
 	// A per-request UA the plugin set on this call, and the plugin's declared
 	// ladder (first/pinned entry), resolve through one helper so the tls and
 	// stdlib paths cannot drift. A verify-seeded UA still wins over both;

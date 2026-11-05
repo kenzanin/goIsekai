@@ -29,10 +29,15 @@ local function decode_id(arg)
 	return v
 end
 
+-- api.mangade.io serves an expired TLS certificate (notAfter 2026-10-25), so
+-- every call goes to the mangade.io vhost (valid certificate) with a Host
+-- override; nginx routes that Host to the API backend.
+local VHOST = { ["Host"] = "api.mangade.io" }
+
 -- api_get fetches {url} and returns the decoded data table, or nil on any
 -- failure (HTTP error, non-success envelope, malformed JSON).
 local function api_get(url)
-	local body = host.http.get_body(url)
+	local body = host.http.get_body(url, VHOST)
 	if body == "" then
 		return nil
 	end
@@ -44,7 +49,7 @@ local function api_get(url)
 end
 
 -- ─── search_manga ──────────────────────────────────────────────────────────
--- GET https://api.mangade.io/api/comics?page={N}&size=20&name={query}
+-- GET https://mangade.io/api/comics?page={N}&size=20&name={query}
 -- The name filter is applied server-side. The API pges via page/size; the
 -- host slices results per search_page_size, so 20 per call is plenty.
 
@@ -61,7 +66,7 @@ function search_manga(arg)
 		return host.json.encode({}), nil
 	end
 	local page = tonumber(a.page) or 1
-	local url = "https://api.mangade.io/api/comics?page="
+	local url = "https://mangade.io/api/comics?page="
 		.. tostring(page)
 		.. "&size=20"
 	if query and query ~= "" then
@@ -89,7 +94,7 @@ function search_manga(arg)
 end
 
 -- ─── get_manga_detail ──────────────────────────────────────────────────────
--- GET https://api.mangade.io/api/comics/{id}/view — no author/artist field
+-- GET https://mangade.io/api/comics/{id}/view — no author/artist field
 -- exists on the API; status is a raw string; genres[] carry {name}.
 
 function get_manga_detail(arg)
@@ -97,7 +102,7 @@ function get_manga_detail(arg)
 	if manga_id == nil or manga_id == "" then
 		return host.json.encode({}), nil
 	end
-	local data = api_get("https://api.mangade.io/api/comics/" .. manga_id .. "/view")
+	local data = api_get("https://mangade.io/api/comics/" .. manga_id .. "/view")
 	if data == nil then
 		-- Failure shape for the object export: bare {id} (api.go never caches
 		-- it, so the next call retries). An [] here would not decode.
@@ -131,7 +136,7 @@ function get_chapter_list(arg)
 	if manga_id == nil or manga_id == "" then
 		return host.json.encode({}), nil
 	end
-	local data = api_get("https://api.mangade.io/api/comics/" .. manga_id .. "/view")
+	local data = api_get("https://mangade.io/api/comics/" .. manga_id .. "/view")
 	if data == nil or type(data.news_chapters) ~= "table" then
 		return host.json.encode({}), nil
 	end
@@ -158,7 +163,7 @@ function get_chapter_list(arg)
 end
 
 -- ─── get_page_list ─────────────────────────────────────────────────────────
--- GET https://api.mangade.io/api/chapters/{id}/view → data.chapter_images[]
+-- GET https://mangade.io/api/chapters/{id}/view → data.chapter_images[]
 -- ({image, ...}); public, no auth. Items arrive page-ordered; index is
 -- assigned from position to guarantee 0-based monotonicity. No special
 -- image headers: plain https://s3-load.ttr.group URLs.
@@ -168,7 +173,7 @@ function get_page_list(arg)
 	if chapter_id == nil or chapter_id == "" then
 		return host.json.encode({}), nil
 	end
-	local data = api_get("https://api.mangade.io/api/chapters/" .. chapter_id .. "/view")
+	local data = api_get("https://mangade.io/api/chapters/" .. chapter_id .. "/view")
 	if data == nil or type(data.chapter_images) ~= "table" then
 		return host.json.encode({}), nil
 	end
@@ -187,7 +192,7 @@ function get_page_list(arg)
 end
 
 -- ─── get_genres ─────────────────────────────────────────────────────────────
--- GET https://api.mangade.io/api/genres?size=500 — full genre vocabulary.
+-- GET https://mangade.io/api/genres?size=500 — full genre vocabulary.
 -- The /api/comics search filters by numeric genre ID, so the slug is the
 -- ID as a string. Cached in-memory for the VM lifetime; the host persists
 -- the result in plugins.genres for cross-restart freshness.
@@ -195,7 +200,7 @@ end
 local cached_genres = nil
 function get_genres()
 	if cached_genres then return cached_genres end
-	local data = api_get("https://api.mangade.io/api/genres?size=500")
+	local data = api_get("https://mangade.io/api/genres?size=500")
 	local genres = {}
 	if data and type(data) == "table" and type(data.genres) == "table" then
 			for _, g in ipairs(data.genres) do

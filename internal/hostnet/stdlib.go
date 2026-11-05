@@ -44,6 +44,12 @@ func (p *Proxy) doRequestStd(ctx context.Context, pluginID string, req types.HTT
 	for k, v := range p.headerMap(req.Headers) {
 		sreq.Header.Set(k, v)
 	}
+	// Same Host promotion as the tls-client path: net/http ignores
+	// Header["Host"] and takes the authority from req.Host.
+	if h := sreq.Header.Get("Host"); h != "" {
+		sreq.Host = h
+		sreq.Header.Del("Host")
+	}
 	perReqUA := ""
 	for k, v := range req.Headers {
 		if strings.EqualFold(k, "User-Agent") {
