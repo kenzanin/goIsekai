@@ -1,7 +1,7 @@
 package pluginmanager
 
 import (
-	"encoding/json"
+	json "github.com/goccy/go-json"
 	"testing"
 
 	"modernc.org/quickjs"

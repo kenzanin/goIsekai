@@ -1,9 +1,9 @@
 package hostnet
 
 import (
-	"encoding/json"
 	"errors"
 	"fmt"
+	json "github.com/goccy/go-json"
 	"net/url"
 	"strings"
 

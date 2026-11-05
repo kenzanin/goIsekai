@@ -1,7 +1,7 @@
 package pluginmanager
 
 import (
-	"encoding/json"
+	json "github.com/goccy/go-json"
 	"net/url"
 	"os"
 	"path/filepath"

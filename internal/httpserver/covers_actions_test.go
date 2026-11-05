@@ -3,7 +3,7 @@ package httpserver
 import (
 	"bytes"
 	"context"
-	"encoding/json"
+	json "github.com/goccy/go-json"
 	"log/slog"
 	"net/http"
 	"net/http/httptest"

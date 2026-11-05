@@ -2,8 +2,8 @@ package pluginmanager
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
+	json "github.com/goccy/go-json"
 	"reflect"
 	"slices"
 	"sort"

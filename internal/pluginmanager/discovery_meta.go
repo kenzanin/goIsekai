@@ -1,8 +1,8 @@
 package pluginmanager
 
 import (
-	"encoding/json"
 	"fmt"
+	json "github.com/goccy/go-json"
 	"goisekai/internal/logger"
 	"goisekai/pkg/types"
 	"os"

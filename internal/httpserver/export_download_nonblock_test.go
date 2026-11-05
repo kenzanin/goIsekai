@@ -2,7 +2,7 @@ package httpserver
 
 import (
 	"context"
-	"encoding/json"
+	json "github.com/goccy/go-json"
 	"net/http/httptest"
 	"strings"
 	"testing"

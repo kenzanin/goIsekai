@@ -2,7 +2,7 @@ package pluginmanager
 
 import (
 	"context"
-	"encoding/json"
+	json "github.com/goccy/go-json"
 	"strings"
 	"testing"
 

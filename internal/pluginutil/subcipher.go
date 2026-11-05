@@ -2,9 +2,9 @@ package pluginutil
 
 import (
 	"encoding/hex"
-	"encoding/json"
 	"errors"
 	"fmt"
+	json "github.com/goccy/go-json"
 	"slices"
 )
 

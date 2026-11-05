@@ -2,7 +2,7 @@ package pluginutil
 
 import (
 	"encoding/hex"
-	"encoding/json"
+	json "github.com/goccy/go-json"
 	"strings"
 	"testing"
 )

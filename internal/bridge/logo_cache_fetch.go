@@ -3,8 +3,8 @@ package bridge
 import (
 	"context"
 	"encoding/base64"
-	"encoding/json"
 	"fmt"
+	json "github.com/goccy/go-json"
 	"net/url"
 	"path/filepath"
 	"strings"

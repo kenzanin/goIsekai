@@ -1,8 +1,8 @@
 package bridge
 
 import (
-	"encoding/json"
 	"fmt"
+	json "github.com/goccy/go-json"
 
 	"goisekai/internal/logger"
 	"goisekai/internal/pluginmanager"
