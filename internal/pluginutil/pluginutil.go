@@ -108,13 +108,16 @@ func StripMarkdown(s string) string {
 // by URLs, typically found in some manga descriptions.
 var urlBlock = regexp.MustCompile(`(?mi)^Links?:.*$\n?`)
 
+// bareURLLine matches a line containing only a URL.
+var bareURLLine = regexp.MustCompile(`(?m)^\s*https?://\S+\s*$`)
+
 // StripLinkBlocks removes promotional link blocks, bare URL lists, and trailer
 // links from text. It handles "Links:" blocks and trailing URLs on their own lines.
 func StripLinkBlocks(s string) string {
 	// Remove "Links:" blocks at the start or end of lines
 	s = urlBlock.ReplaceAllString(s, "")
 	// Remove trailing URLs (http/https) on lines by themselves
-	s = regexp.MustCompile(`(?m)^\s*https?://\S+\s*$`).ReplaceAllString(s, "")
+	s = bareURLLine.ReplaceAllString(s, "")
 	return strings.TrimSpace(s)
 }
 
