@@ -37,7 +37,7 @@ func (s *AppService) fetchImageWithRetry(
 	// because it costs nothing; a slow one does not, because it has already
 	// spent the budget. Measured: 119s to 502 before, ~35s after.
 	start := time.Now()
-	for attempt := range 3 {
+	for attempt := range len(refs) {
 		if attempt > 0 {
 			// Backoff is cancellable so an abandoned request does not sit out
 			// the full delay before noticing.

@@ -32,6 +32,16 @@ local function find_all(html, pat)
     return host.regex.find_all(html, pat)
 end
 
+-- cover_abs absolutizes a cover URL: both the SSR detail JSON and the browse
+-- cards emit bare /images/covers/... paths, and a relative cover_url makes the
+-- manga view resolve the cover against the goIsekai host (cover 404s / missing
+-- image).
+local function cover_abs(url)
+    if type(url) ~= "string" or url == "" then return "" end
+    if url:sub(1, 1) == "/" then return BASE .. url end
+    return url
+end
+
 -- ─── ABI: search_manga ───────────────────────────────────────────────────
 -- arg: '"query"'
 function search_manga(arg)
@@ -57,7 +67,7 @@ function search_manga(arg)
             if not seen[slug] then
                 seen[slug] = true
                 -- aria-label is HTML-escaped; decode entities.
-                out[#out + 1] = { id = slug, title = host.text.html_decode(title), cover_url = cover }
+                out[#out + 1] = { id = slug, title = host.text.html_decode(title), cover_url = cover_abs(cover) }
                 added = added + 1
             end
         end
@@ -123,7 +133,7 @@ function get_manga_detail(arg)
             return host.json.encode({
                 id = slug,
                 title = v.title,
-                cover_url = cover,
+                cover_url = cover_abs(cover),
                 author = v.author,
                 artist = v.artist,
                 status = v.status,
